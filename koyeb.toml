@@ -1,0 +1,27 @@
+[build]
+  buildpack = "docker"
+
+[deploy]
+  [[deploy.web]]
+    name = "foodiebot-web"
+    build_command = ""
+    run_command = "npm start"
+    
+    [deploy.web.env]
+      PORT = "8000"
+      NODE_ENV = "production"
+    
+    [deploy.web.health_check]
+      path = "/health"
+      port = 8000
+      timeout = 10
+      interval = 30
+      retries = 3
+      
+    [deploy.web.scaling]
+      min = 1
+      max = 2
+      
+    [deploy.web.resources]
+      memory = "1GB"
+      cpu = "0.5"
