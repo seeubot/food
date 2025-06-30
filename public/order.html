@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoodieBot Menu</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .menu-container {
+            padding: 30px;
+        }
+
+        .category {
+            margin-bottom: 40px;
+        }
+
+        .category-title {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #25D366;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .menu-item {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+
+        .menu-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            border-color: #25D366;
+        }
+
+        .menu-item.selected {
+            border-color: #25D366;
+            background: #f0fdf4;
+        }
+
+        .item-image {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4em;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .item-content {
+            padding: 20px;
+        }
+
+        .item-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .item-description {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.4;
+            margin-bottom: 15px;
+        }
+
+        .item-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .item-price {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #25D366;
+        }
+
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .qty-btn {
+            width: 35px;
+            height: 35px;
+            border: none;
+            border-radius: 50%;
+            background: #25D366;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .qty-btn:hover {
+            background: #128C7E;
+            transform: scale(1.1);
+        }
+
+        .qty-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .quantity {
+            font-weight: bold;
+            font-size: 1.1em;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .cart-summary {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #25D366;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.3);
+            display: none;
+            align-items: center;
+            gap: 15px;
+            z-index: 1000;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .cart-summary:hover {
+            background: #128C7E;
+            transform: translateX(-50%) translateY(-3px);
+        }
+
+        .cart-summary.show {
+            display: flex;
+        }
+
+        .cart-count {
+            background: white;
+            color: #25D366;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #25D366;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #e53e3e;
+        }
+
+        .order-form {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .order-form.show {
+            display: flex;
+        }
+
+        .form-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .form-header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .form-header h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .order-summary {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .summary-total {
+            border-top: 2px solid #25D366;
+            padding-top: 10px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #25D366;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            background: #25D366;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #128C7E;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .menu-container {
+                padding: 20px;
+            }
+
+            .menu-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .cart-summary {
+                left: 20px;
+                right: 20px;
+                transform: none;
+                width: calc(100% - 40px);
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍽️ FoodieBot Menu</h1>
+            <p>Select your favorite items and place your order!</p>
+        </div>
+        
+        <div class="menu-container">
+            <div id="loading" class="loading">
+                <div class="loading-spinner"></div>
+                <p>Loading delicious menu items...</p>
+            </div>
+            
+            <div id="error" class="error" style="display: none;">
+                <h3>😔 Oops! Something went wrong</h3>
+                <p>Unable to load menu. Please try again later.</p>
+            </div>
+            
+            <div id="menu-content" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div id="cart-summary" class="cart-summary">
+        <div class="cart-count">0</div>
+        <span>View Cart & Order</span>
+        <span style="font-weight: bold;">₹0</span>
+    </div>
+
+    <div id="order-form" class="order-form">
+        <div class="form-content">
+            <div class="form-header">
+                <h2>🛒 Complete Your Order</h2>
+                <p>Review your items and provide details</p>
+            </div>
+            
+            <div id="order-summary" class="order-summary"></div>
+            
+            <form id="customer-form">
+                <div class="form-group">
+                    <label for="customer-name">Full Name *</label>
+                    <input type="text" id="customer-name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="customer-phone">Phone Number *</label>
+                    <input type="tel" id="customer-phone" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="customer-address">Delivery Address *</label>
+                    <textarea id="customer-address" rows="3" required placeholder="Include landmark for accurate delivery"></textarea>
+                </div>
+                
+                <div class="form-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="closeOrderForm()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Place Order via WhatsApp</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let menuItems = [];
+        let cart = [];
+        let categories = {};
+
+        const API_BASE = window.location.origin;
+
+        // Food emojis for different categories
+        const categoryEmojis = {
+            'appetizers': '🥗',
+            'starters': '🥗', 
+            'main course': '🍽️',
+            'mains': '🍽️',
+            'rice': '🍚',
+            'biryani': '🍚',
+            'curry': '🍛',
+            'desserts': '🍰',
+            'sweets': '🍰',
+            'beverages': '🥤',
+            'drinks': '🥤',
+            'snacks': '🍿',
+            'pizza': '🍕',
+            'burger': '🍔',
+            'sandwich': '🥪',
+            'noodles': '🍜',
+            'pasta': '🍝',
+            'salad': '🥗',
+            'soup': '🍲',
+            'default': '🍽️'
+        };
+
+        const itemEmojis = [
+            '🍕', '🍔', '🍟', '🌭', '🥪', '🌮', '🌯', '🥙', '🍖', '🍗',
+            '🥩', '🍚', '🍛', '🍜', '🍝', '🍲', '🥗', '🍿', '🧆', '🥘',
+            '🍱', '🍙', '🍘', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁',
+            '🍰', '🎂', '🍮', '🍭', '🍬', '🍫', '🥤', '🧃', '☕', '🧋'
+        ];
+
+        // Load menu items
+        async function loadMenu() {
+            try {
+                const response = await fetch(`${API_BASE}/api/menu`);
+                if (!response.ok) throw new Error('Failed to load menu');
+                
+                menuItems = await response.json();
+                
+                if (menuItems.length === 0) {
+                    showError('No menu items available');
+                    return;
+                }
+                
+                renderMenu();
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('menu-content').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading menu:', error);
+                showError('Failed to load menu');
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').innerHTML = `
+                <h3>😔 Oops! Something went wrong</h3>
+                <p>${message}</p>
+            `;
+        }
+
+        function renderMenu() {
+            // Group items by category
+            categories = {};
+            menuItems.forEach((item, index) => {
+                if (item.available !== false) {
+                    const category = item.category || 'Other';
+                    if (!categories[category]) {
+                        categories[category] = [];
+                    }
+                    categories[category].push({...item, index});
+                }
+            });
+
+            let html = '';
+            Object.keys(categories).forEach(category => {
+                const categoryKey = category.toLowerCase();
+                const emoji = categoryEmojis[categoryKey] || categoryEmojis.default;
+                
+                html += `
+                    <div class="category">
+                        <h2 class="category-title">
+                            ${emoji} ${category.charAt(0).toUpperCase() + category.slice(1)}
+                        </h2>
+                        <div class="menu-grid">
+                `;
+                
+                categories[category].forEach(item => {
+                    const itemEmoji = itemEmojis[item.index % itemEmojis.length];
+                    html += `
+                        <div class="menu-item" data-id="${item._id}">
+                            <div class="item-image">${itemEmoji}</div>
+                            <div class="item-content">
+                                <div class="item-name">${item.name}</div>
+                                <div class="item-description">${item.description || 'Delicious and fresh!'}</div>
+                                <div class="item-footer">
+                                    <div class="item-price">₹${item.price}</div>
+                                    <div class="quantity-controls">
+                                        <button class="qty-btn" onclick="updateQuantity('${item._id}', -1)">−</button>
+                                        <span class="quantity" id="qty-${item._id}">0</span>
+                                        <button class="qty-btn" onclick="updateQuantity('${item._id}', 1)">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('menu-content').innerHTML = html;
+        }
+
+        function updateQuantity(itemId, change) {
+            const item = menuItems.find(i => i._id === itemId);
+            if (!item) return;
+
+            const existingItem = cart.find(c => c._id === itemId);
+            
+            if (existingItem) {
+                existingItem.quantity += change;
+                if (existingItem.quantity <= 0) {
+                    cart = cart.filter(c => c._id !== itemId);
+                }
+            } else if (change > 0) {
+                cart.push({
+                    _id: itemId,
+                    name: item.name,
+                    price: item.price,
+                    quantity: 1
+                });
+            }
+
+            updateUI();
+        }
+
+        function updateUI() {
+            // Update quantity displays
+            menuItems.forEach(item => {
+                const cartItem = cart.find(c => c._id === item._id);
+                const qtyElement = document.getElementById(`qty-${item._id}`);
+                const menuItemElement = document.querySelector(`[data-id="${item._id}"]`);
+                
+                if (qtyElement) {
+                    qtyElement.textContent = cartItem ? cartItem.quantity : 0;
+                }
+                
+                if (menuItemElement) {
+                    if (cartItem && cartItem.quantity > 0) {
+                        menuItemElement.classList.add('selected');
+                    } else {
+                        menuItemElement.classList.remove('selected');
+                    }
+                }
+            });
+
+            // Update cart summary
+            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+            const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            const cartSummary = document.getElementById('cart-summary');
+            const cartCount = cartSummary.querySelector('.cart-count');
+            const cartTotal = cartSummary.querySelector('span:last-child');
+            
+            cartCount.textContent = totalItems;
+            cartTotal.textContent = `₹${totalPrice}`;
+            
+            if (totalItems > 0) {
+                cartSummary.classList.add('show');
+            } else {
+                cartSummary.classList.remove('show');
+            }
+        }
+
+        function showOrderForm() {
+            if (cart.length === 0) return;
+            
+            // Generate order summary
+            let summaryHtml = '';
+            let total = 0;
+            
+            cart.forEach(item => {
+                const itemTotal = item.price * item.quantity;
+                total += itemTotal;
+                summaryHtml += `
+                    <div class="summary-item">
+                        <span>${item.name} x${item.quantity}</span>
+                        <span>₹${itemTotal}</span>
+                    </div>
+                `;
+            });
+            
+            summaryHtml += `
+                <div class="summary-item summary-total">
+                    <span>Total</span>
+                    <span>₹${total}</span>
+                </div>
+            `;
+            
+            document.getElementById('order-summary').innerHTML = summaryHtml;
+            document.getElementById('order-form').classList.add('show');
+        }
+
+        function closeOrderForm() {
+            document.getElementById('order-form').classList.remove('show');
+        }
+
+        function submitOrder(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('customer-name').value;
+            const phone = document.getElementById('customer-phone').value;
+            const address = document.getElementById('customer-address').value;
+            
+            if (!name || !phone || !address) {
+                alert('Please fill all required fields');
+                return;
+            }
+            
+            // Generate order message for WhatsApp
+            let orderMessage = `🍽️ *New Order from Web Menu*\n\n`;
+            orderMessage += `👤 *Customer Details:*\n`;
+            orderMessage += `Name: ${name}\n`;
+            orderMessage += `Phone: ${phone}\n`;
+            orderMessage += `Address: ${address}\n\n`;
+            
+            orderMessage += `📋 *Order Items:*\n`;
+            let total = 0;
+            cart.forEach(item => {
+                const itemTotal = item.price * item.quantity;
+                total += itemTotal;
+                orderMessage += `• ${item.name} x${item.quantity} - ₹${itemTotal}\n`;
+            });
+            
+            orderMessage += `\n💰 *Total: ₹${total}*\n\n`;
+            orderMessage += `🌐 *Ordered via Web Menu*`;
+            
+            // Create WhatsApp URL
+            const whatsappUrl = `https://wa.me/918897350151?text=${encodeURIComponent(orderMessage)}`;
+            
+            // Open WhatsApp
+            window.open(whatsappUrl, '_blank');
+            
+            // Show success message
+            alert('🎉 Order details sent to WhatsApp! Please complete your order there.');
+            
+            // Reset form and cart
+            cart = [];
+            updateUI();
+            closeOrderForm();
+            document.getElementById('customer-form').reset();
+        }
+
+        // Event listeners
+        document.getElementById('cart-summary').addEventListener('click', showOrderForm);
+        document.getElementById('customer-form').addEventListener('submit', submitOrder);
+
+        // Close order form when clicking outside
+        document.getElementById('order-form').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeOrderForm();
+            }
+        });
+
+        // Load menu on page load
+        document.addEventListener('DOMContentLoaded', loadMenu);
+    </script>
+</body>
+</html>
