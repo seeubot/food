@@ -39,16 +39,28 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     lsb-release \
     xdg-utils \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first (for better caching)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Verify package-lock.json exists
+RUN ls -la package*.json
+
+# Set npm configuration for better reliability
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000
+
+# Install dependencies with error handling
+RUN npm ci --only=production --verbose || \
+    (echo "npm ci failed, trying npm install instead..." && \
+     rm -rf node_modules package-lock.json && \
+     npm install --only=production)
 
 # Copy app source
 COPY . .
