@@ -492,4 +492,18 @@
         function showNotification(message, type) {
             const notification = document.getElementById('notification');
             notification.textContent = message;
-            notification.className = `notification ${type
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMenu();
+        });
+    </script>
+</body>
+</html>
