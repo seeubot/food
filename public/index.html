@@ -63,9 +63,29 @@
         .refresh-btn:hover {
             background-color: #128C7E;
         }
+        .refresh-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
         .loading {
             color: #666;
             font-style: italic;
+        }
+        .error-msg {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #f5c6cb;
+        }
+        .debug-info {
+            background-color: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 0.9em;
+            text-align: left;
         }
     </style>
 </head>
@@ -78,10 +98,16 @@
             ⏳ Checking connection status...
         </div>
         
+        <div id="error-container" style="display: none;">
+            <div class="error-msg" id="error-message"></div>
+        </div>
+        
         <div id="qr-container" class="qr-container" style="display: none;">
             <h3>📱 Scan QR Code with WhatsApp</h3>
             <p>Open WhatsApp → Settings → Linked Devices → Link a Device</p>
-            <img id="qr-image" src="" alt="QR Code">
+            <div id="qr-loading" class="loading">🔄 Generating QR Code...</div>
+            <img id="qr-image" src="" alt="QR Code" style="display: none;">
+            <p><small>QR Code expires in <span id="qr-timer">60</span> seconds</small></p>
         </div>
         
         <div id="instructions" style="display: none;">
@@ -90,22 +116,134 @@
             <p>Users can text "menu" to see your food menu.</p>
         </div>
         
-        <button class="refresh-btn" onclick="checkStatus()">🔄 Refresh Status</button>
+        <button class="refresh-btn" id="refresh-btn" onclick="checkStatus()">🔄 Refresh Status</button>
+        <button class="refresh-btn" onclick="generateNewQR()">🔄 Generate New QR</button>
         <button class="refresh-btn" onclick="window.open('/admin.html', '_blank')">🎛️ Open Admin Panel</button>
+        
+        <div class="debug-info" id="debug-info" style="display: none;">
+            <h4>Debug Information:</h4>
+            <div id="debug-content"></div>
+        </div>
+        
+        <br>
+        <input type="checkbox" id="show-debug" onchange="toggleDebug()"> Show Debug Info
     </div>
 
     <script>
         let statusCheckInterval;
+        let qrTimer;
+        let qrTimeLeft = 60;
+        let retryCount = 0;
+        const MAX_RETRIES = 5;
 
-        // Check authentication status
-        async function checkStatus() {
+        // Show/hide debug information
+        function toggleDebug() {
+            const debugInfo = document.getElementById('debug-info');
+            const checkbox = document.getElementById('show-debug');
+            debugInfo.style.display = checkbox.checked ? 'block' : 'none';
+        }
+
+        // Update debug information
+        function updateDebug(message) {
+            const debugContent = document.getElementById('debug-content');
+            const timestamp = new Date().toLocaleTimeString();
+            debugContent.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            debugContent.scrollTop = debugContent.scrollHeight;
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorContainer = document.getElementById('error-container');
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = message;
+            errorContainer.style.display = 'block';
+            updateDebug(`ERROR: ${message}`);
+        }
+
+        // Hide error message
+        function hideError() {
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.style.display = 'none';
+        }
+
+        // Start QR timer countdown
+        function startQRTimer() {
+            const timerElement = document.getElementById('qr-timer');
+            qrTimeLeft = 60;
+            
+            if (qrTimer) clearInterval(qrTimer);
+            
+            qrTimer = setInterval(() => {
+                qrTimeLeft--;
+                timerElement.textContent = qrTimeLeft;
+                
+                if (qrTimeLeft <= 0) {
+                    clearInterval(qrTimer);
+                    generateNewQR();
+                }
+            }, 1000);
+        }
+
+        // Generate new QR code
+        async function generateNewQR() {
             try {
-                const response = await fetch('/api/status');
+                updateDebug('Requesting new QR code generation...');
+                const response = await fetch('/api/generate-qr', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    updateDebug('QR generation request successful');
+                    setTimeout(() => checkStatus(), 2000); // Wait a bit then check status
+                } else {
+                    throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Error generating new QR:', error);
+                showError('Failed to generate new QR code: ' + error.message);
+                updateDebug(`Failed to generate QR: ${error.message}`);
+            }
+        }
+
+        // Check authentication status with better error handling
+        async function checkStatus() {
+            const refreshBtn = document.getElementById('refresh-btn');
+            
+            try {
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '🔄 Checking...';
+                hideError();
+                
+                updateDebug(`Checking status (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                const response = await fetch('/api/status', {
+                    signal: controller.signal,
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
+                
                 const status = await response.json();
+                updateDebug(`Status response: ${JSON.stringify(status)}`);
                 
                 const statusDisplay = document.getElementById('status-display');
                 const qrContainer = document.getElementById('qr-container');
                 const instructions = document.getElementById('instructions');
+                
+                retryCount = 0; // Reset retry count on successful response
                 
                 if (status.isAuthenticated) {
                     // Connected
@@ -114,49 +252,145 @@
                     qrContainer.style.display = 'none';
                     instructions.style.display = 'block';
                     
-                    // Stop polling once connected
-                    if (statusCheckInterval) {
-                        clearInterval(statusCheckInterval);
-                    }
+                    // Stop polling and timers
+                    if (statusCheckInterval) clearInterval(statusCheckInterval);
+                    if (qrTimer) clearInterval(qrTimer);
                     
-                } else if (status.qrGenerated) {
+                    updateDebug('Successfully authenticated!');
+                    
+                } else if (status.qrCode || status.qrGenerated) {
                     // QR Code available
                     statusDisplay.className = 'status waiting';
                     statusDisplay.innerHTML = '📱 Scan QR Code to Connect';
                     instructions.style.display = 'none';
                     
-                    // Try to load QR code
-                    const qrImage = document.getElementById('qr-image');
-                    qrImage.onload = () => {
-                        qrContainer.style.display = 'block';
-                    };
-                    qrImage.onerror = () => {
-                        qrContainer.innerHTML = '<p class="loading">QR Code is being generated...</p>';
-                        qrContainer.style.display = 'block';
-                    };
-                    qrImage.src = '/api/qr?' + Date.now(); // Cache busting
+                    updateDebug('QR code should be available');
                     
-                } else {
-                    // Initializing
+                    // Show QR container
+                    qrContainer.style.display = 'block';
+                    
+                    // Try multiple QR endpoints
+                    await loadQRCode();
+                    
+                } else if (status.initializing !== false) {
+                    // Still initializing
                     statusDisplay.className = 'status waiting';
                     statusDisplay.innerHTML = '⏳ Bot is starting up...';
                     qrContainer.style.display = 'none';
                     instructions.style.display = 'none';
+                    updateDebug('Bot is still initializing...');
+                    
+                } else {
+                    // Unknown state
+                    statusDisplay.className = 'status disconnected';
+                    statusDisplay.innerHTML = '❓ Unknown status - try refreshing';
+                    qrContainer.style.display = 'none';
+                    instructions.style.display = 'none';
+                    updateDebug('Unknown status received');
                 }
                 
             } catch (error) {
                 console.error('Error checking status:', error);
+                retryCount++;
+                
                 const statusDisplay = document.getElementById('status-display');
-                statusDisplay.className = 'status disconnected';
-                statusDisplay.innerHTML = '❌ Cannot connect to bot server';
+                
+                if (error.name === 'AbortError') {
+                    showError('Request timed out - server may be slow to respond');
+                    statusDisplay.className = 'status disconnected';
+                    statusDisplay.innerHTML = '⏱️ Request timed out';
+                    updateDebug('Request timed out after 10 seconds');
+                } else if (retryCount >= MAX_RETRIES) {
+                    showError(`Cannot connect to bot server after ${MAX_RETRIES} attempts: ${error.message}`);
+                    statusDisplay.className = 'status disconnected';
+                    statusDisplay.innerHTML = '❌ Server connection failed';
+                    updateDebug(`Max retries reached: ${error.message}`);
+                    
+                    // Stop polling after max retries
+                    if (statusCheckInterval) clearInterval(statusCheckInterval);
+                } else {
+                    showError(`Connection issue (${retryCount}/${MAX_RETRIES}): ${error.message}`);
+                    statusDisplay.className = 'status disconnected';
+                    statusDisplay.innerHTML = `❌ Connection error (retrying...)`;
+                    updateDebug(`Retry ${retryCount}: ${error.message}`);
+                }
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Refresh Status';
             }
         }
 
-        // Start checking status
+        // Load QR code with multiple fallbacks
+        async function loadQRCode() {
+            const qrImage = document.getElementById('qr-image');
+            const qrLoading = document.getElementById('qr-loading');
+            
+            // List of possible QR endpoints to try
+            const qrEndpoints = [
+                '/api/qr',
+                '/qr',
+                '/api/whatsapp/qr',
+                '/whatsapp/qr'
+            ];
+            
+            qrLoading.style.display = 'block';
+            qrImage.style.display = 'none';
+            
+            for (const endpoint of qrEndpoints) {
+                try {
+                    updateDebug(`Trying QR endpoint: ${endpoint}`);
+                    
+                    const qrUrl = `${endpoint}?t=${Date.now()}&r=${Math.random()}`;
+                    
+                    // Test if the endpoint exists
+                    const testResponse = await fetch(qrUrl, { method: 'HEAD' });
+                    
+                    if (testResponse.ok) {
+                        updateDebug(`QR endpoint ${endpoint} is available`);
+                        
+                        qrImage.onload = () => {
+                            qrLoading.style.display = 'none';
+                            qrImage.style.display = 'block';
+                            startQRTimer();
+                            updateDebug('QR code loaded successfully');
+                        };
+                        
+                        qrImage.onerror = () => {
+                            updateDebug(`Failed to load QR image from ${endpoint}`);
+                        };
+                        
+                        qrImage.src = qrUrl;
+                        return; // Exit if successful
+                    }
+                } catch (error) {
+                    updateDebug(`QR endpoint ${endpoint} failed: ${error.message}`);
+                    continue;
+                }
+            }
+            
+            // If all endpoints failed
+            qrLoading.innerHTML = '❌ QR Code not available<br><button onclick="generateNewQR()" class="refresh-btn">Try Generate</button>';
+            updateDebug('All QR endpoints failed');
+            showError('QR code could not be loaded from any endpoint');
+        }
+
+        // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            updateDebug('Page loaded, starting status check...');
             checkStatus();
-            // Poll every 3 seconds until connected
-            statusCheckInterval = setInterval(checkStatus, 3000);
+            
+            // Poll every 5 seconds (increased from 3 to reduce server load)
+            statusCheckInterval = setInterval(() => {
+                if (retryCount < MAX_RETRIES) {
+                    checkStatus();
+                }
+            }, 5000);
+        });
+
+        // Clean up intervals when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (statusCheckInterval) clearInterval(statusCheckInterval);
+            if (qrTimer) clearInterval(qrTimer);
         });
     </script>
 </body>
