@@ -4,602 +4,733 @@ const { MongoClient, ObjectId } = require('mongodb');
 const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-require('dotenv').config();
 
 const app = express();
-
-// Security middleware
-app.use(helmet({
-    contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false
-}));
-app.use(compression());
-app.use(cors());
-
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-    message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api', limiter);
-
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json());
 app.use(express.static('public'));
 
-// Configure multer for image uploads
-const storage = multer.memoryStorage();
-const upload = multer({ 
-    storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files are allowed'), false);
-        }
-    }
-});
-
 // MongoDB connection
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room';
+const MONGO_URI = 'mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room';
 let db;
 
 // Connect to MongoDB
-async function connectToMongoDB() {
-    try {
-        const client = await MongoClient.connect(MONGO_URI);
+MongoClient.connect(MONGO_URI)
+    .then(client => {
         console.log('✅ Connected to MongoDB');
         db = client.db('foodiebot');
-    } catch (error) {
-        console.error('❌ MongoDB connection error:', error);
-        process.exit(1);
-    }
-}
+    })
+    .catch(error => console.error('❌ MongoDB connection error:', error));
 
-// Set the base URL for Koyeb deployment
-const BASE_URL = 'https://random-tiena-school1660440-c68d25b7.koyeb.app';
+// Helper function to generate unique order ID
+const generateOrderId = () => {
+    const timestamp = Date.now().toString();
+    const random = Math.random().toString(36).substr(2, 5).toUpperCase();
+    return `ORD${timestamp.slice(-6)}${random}`;
+};
 
 // Bot state
 let botState = {
     qrCode: null,
     isAuthenticated: false,
-    connectedSessions: 0,
-    status: 'initializing',
-    lastActivity: new Date(),
-    webhookUrl: process.env.WEBHOOK_URL
+    connectedSessions: 0
 };
 
-// User session management
-const userSessions = new Map();
+// User cart state and session management
+const userCarts = new Map();
+const userSessions = new Map(); // Track user conversation state
 
-// WhatsApp Client with enhanced configuration for production
+// WhatsApp Client
 const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: process.env.WHATSAPP_SESSION_PATH || './whatsapp-session'
-    }),
-    puppeteer: { 
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu',
-            '--disable-web-security',
-            '--disable-features=VizDisplayCompositor'
-        ]
-    }
+    authStrategy: new LocalAuth(),
+    puppeteer: { headless: true }
 });
 
-// Webhook function to notify external services
-async function sendWebhook(event, data) {
-    if (!process.env.WEBHOOK_URL) return;
-    
-    try {
-        const webhookPayload = {
-            event,
-            timestamp: new Date().toISOString(),
-            data,
-            bot_id: 'foodiebot-' + (process.env.NODE_ENV || 'development')
-        };
-
-        const response = await fetch(process.env.WEBHOOK_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Webhook-Secret': process.env.WEBHOOK_SECRET || '',
-                'User-Agent': 'FoodieBot-Webhook/1.0'
-            },
-            body: JSON.stringify(webhookPayload)
-        });
-
-        if (response.ok) {
-            console.log(`📡 Webhook sent successfully: ${event}`);
-        } else {
-            console.warn(`⚠️ Webhook failed: ${response.status} ${response.statusText}`);
-        }
-    } catch (error) {
-        console.error('❌ Webhook error:', error.message);
-    }
-}
-
-// Enhanced WhatsApp Event Handlers with Webhook Support
+// WhatsApp Event Handlers
 client.on('qr', async (qr) => {
-    console.log('\n🔄 Generating QR Code...');
-    
-    try {
-        botState.qrCode = await qrcode.toDataURL(qr);
-        botState.isAuthenticated = false;
-        botState.status = 'waiting_for_scan';
-        botState.lastActivity = new Date();
-        
-        console.log('✅ QR Code generated successfully!');
-        console.log('🌐 QR Code available at:', `${BASE_URL}/qr`);
-        
-        // Send webhook notification
-        await sendWebhook('qr_generated', {
-            status: botState.status,
-            qr_available: true
-        });
-        
-    } catch (error) {
-        console.error('❌ Error generating QR code:', error);
-    }
+    console.log('📱 QR Code generated - Scan with WhatsApp to connect');
+    console.log('QR Code available at: http://localhost:3000 -> QR Code tab');
+    botState.qrCode = await qrcode.toDataURL(qr);
+    botState.isAuthenticated = false;
 });
 
-client.on('ready', async () => {
-    console.log('\n🎉 SUCCESS! WhatsApp bot is ready and connected!');
-    console.log('✅ Bot is now active and can receive messages');
-    
+client.on('ready', () => {
+    console.log('✅ WhatsApp bot is ready and connected!');
     botState.isAuthenticated = true;
     botState.connectedSessions = 1;
     botState.qrCode = null;
-    botState.status = 'connected';
-    botState.lastActivity = new Date();
-    
-    // Send webhook notification
-    await sendWebhook('bot_ready', {
-        status: 'connected',
-        phone: client.info?.wid?.user || 'unknown',
-        name: client.info?.pushname || 'unknown'
-    });
 });
 
-client.on('authenticated', async () => {
-    console.log('🔐 WhatsApp authenticated successfully');
+client.on('authenticated', () => {
+    console.log('✅ WhatsApp authenticated successfully');
     botState.isAuthenticated = true;
-    botState.status = 'authenticated';
-    botState.lastActivity = new Date();
-    
-    await sendWebhook('authenticated', { status: 'authenticated' });
 });
 
-client.on('auth_failure', async (msg) => {
-    console.error('❌ WhatsApp authentication failed:', msg);
+client.on('auth_failure', (msg) => {
+    console.log('❌ WhatsApp authentication failed:', msg);
     botState.isAuthenticated = false;
     botState.qrCode = null;
-    botState.status = 'auth_failed';
-    
-    await sendWebhook('auth_failure', { error: msg });
 });
 
-client.on('disconnected', async (reason) => {
+client.on('disconnected', (reason) => {
     console.log('❌ WhatsApp disconnected:', reason);
     botState.isAuthenticated = false;
     botState.connectedSessions = 0;
-    botState.status = 'disconnected';
-    
-    await sendWebhook('disconnected', { reason });
 });
 
-// QR Code endpoint - Fixed and enhanced
-app.get('/qr', (req, res) => {
-    if (!botState.qrCode) {
-        return res.status(404).send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>FoodieBot - QR Code</title>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        min-height: 100vh;
-                        margin: 0;
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                    }
-                    .container {
-                        text-align: center;
-                        background: rgba(255, 255, 255, 0.1);
-                        padding: 2rem;
-                        border-radius: 15px;
-                        backdrop-filter: blur(10px);
-                        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-                    }
-                    .status {
-                        font-size: 1.2rem;
-                        margin-bottom: 1rem;
-                    }
-                    .refresh-btn {
-                        background: #4CAF50;
-                        color: white;
-                        border: none;
-                        padding: 10px 20px;
-                        border-radius: 5px;
-                        cursor: pointer;
-                        font-size: 1rem;
-                        margin-top: 1rem;
-                    }
-                    .refresh-btn:hover {
-                        background: #45a049;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>🤖 FoodieBot</h1>
-                    <div class="status">
-                        Status: ${botState.status === 'connected' ? '✅ Connected' : '⏳ ' + botState.status}
-                    </div>
-                    ${botState.status === 'connected' 
-                        ? '<p>✅ Bot is already connected and ready!</p>' 
-                        : '<p>⏳ QR Code not available yet. Please wait...</p>'
-                    }
-                    <button class="refresh-btn" onclick="window.location.reload()">🔄 Refresh</button>
-                    <script>
-                        // Auto-refresh every 3 seconds if not connected
-                        if ('${botState.status}' !== 'connected') {
-                            setTimeout(() => window.location.reload(), 3000);
-                        }
-                    </script>
-                </div>
-            </body>
-            </html>
-        `);
+// Helper function to get or create user profile
+const getUserProfile = async (userPhone) => {
+    let user = await db.collection('users').findOne({ phone: userPhone });
+    if (!user) {
+        user = {
+            phone: userPhone,
+            name: null,
+            address: null,
+            isProfileComplete: false,
+            createdAt: new Date()
+        };
+        await db.collection('users').insertOne(user);
+    }
+    return user;
+};
+
+// Helper function to update user profile
+const updateUserProfile = async (userPhone, updates) => {
+    await db.collection('users').updateOne(
+        { phone: userPhone },
+        { $set: { ...updates, updatedAt: new Date() } }
+    );
+};
+
+// Helper function to send welcome message with order URL
+const sendWelcomeMessage = (message) => {
+    const welcomeText = `🍽️ *Welcome to FoodieBot!* 🤖
+
+Hello! I'm your personal food ordering assistant.
+
+🌐 *ORDER NOW:*
+Click here to browse our menu and place your order:
+👆 https://your-restaurant-website.com/order
+
+📦 Type *"cart"* - View your current order
+✅ Type *"confirm"* - Place your order
+👤 Type *"profile"* - View/Edit your profile
+ℹ️ Type *"help"* - See this message again
+
+Let's get started! Click the link above to see what delicious items we have available today! 🍕🍔🍜`;
+
+    message.reply(welcomeText);
+};
+
+// Helper function to collect user details
+const collectUserDetails = async (message, userPhone, userProfile) => {
+    const session = userSessions.get(userPhone) || {};
+    
+    if (!userProfile.name) {
+        userSessions.set(userPhone, { ...session, state: 'collecting_name' });
+        message.reply('👋 Welcome! To complete your profile, please tell me your *full name*:');
+        return true;
     }
     
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>FoodieBot - Scan QR Code</title>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    min-height: 100vh;
-                    margin: 0;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                }
-                .container {
-                    text-align: center;
-                    background: rgba(255, 255, 255, 0.1);
-                    padding: 2rem;
-                    border-radius: 15px;
-                    backdrop-filter: blur(10px);
-                    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-                }
-                .qr-code {
-                    background: white;
-                    padding: 20px;
-                    border-radius: 10px;
-                    display: inline-block;
-                    margin: 20px 0;
-                }
-                .qr-code img {
-                    max-width: 300px;
-                    height: auto;
-                }
-                .instructions {
-                    max-width: 400px;
-                    margin: 0 auto;
-                    line-height: 1.6;
-                }
-                .refresh-btn {
-                    background: #4CAF50;
-                    color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 1rem;
-                    margin-top: 1rem;
-                }
-                .refresh-btn:hover {
-                    background: #45a049;
-                }
-                .status {
-                    font-size: 1.1rem;
-                    margin-bottom: 1rem;
-                    color: #ffeb3b;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🤖 FoodieBot Setup</h1>
-                <div class="status">📱 Ready to Connect</div>
-                
-                <div class="qr-code">
-                    <img src="${botState.qrCode}" alt="WhatsApp QR Code" />
-                </div>
-                
-                <div class="instructions">
-                    <h3>📋 How to Connect:</h3>
-                    <ol style="text-align: left; display: inline-block;">
-                        <li>Open WhatsApp on your phone</li>
-                        <li>Go to Settings → Linked Devices</li>
-                        <li>Tap "Link a Device"</li>
-                        <li>Scan this QR code</li>
-                        <li>Wait for connection confirmation</li>
-                    </ol>
-                </div>
-                
-                <button class="refresh-btn" onclick="window.location.reload()">🔄 Refresh QR Code</button>
-                
-                <script>
-                    // Auto-refresh every 30 seconds
-                    setTimeout(() => window.location.reload(), 30000);
-                    
-                    // Check connection status periodically
-                    setInterval(async () => {
-                        try {
-                            const response = await fetch('/api/status');
-                            const status = await response.json();
-                            if (status.isAuthenticated) {
-                                window.location.reload();
-                            }
-                        } catch (error) {
-                            console.log('Status check failed:', error);
-                        }
-                    }, 5000);
-                </script>
-            </div>
-        </body>
-        </html>
-    `);
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-    const health = {
-        status: 'OK',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        bot_status: botState.status,
-        bot_authenticated: botState.isAuthenticated,
-        mongodb_connected: !!db,
-        base_url: BASE_URL
-    };
+    if (!userProfile.address) {
+        userSessions.set(userPhone, { ...session, state: 'collecting_address' });
+        message.reply('📍 Please provide your *delivery address*:\n\n(Include full address with landmark for accurate delivery)');
+        return true;
+    }
     
-    res.status(200).json(health);
-});
+    return false; // Profile is complete
+};
 
-// Webhook endpoint for receiving external notifications
-app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
-    const signature = req.headers['x-webhook-signature'];
-    const payload = req.body;
+// Helper function to handle profile completion
+const handleProfileCompletion = async (message, userPhone, messageBody) => {
+    const session = userSessions.get(userPhone) || {};
     
-    // Verify webhook signature if secret is provided
-    if (process.env.WEBHOOK_SECRET && signature) {
-        const crypto = require('crypto');
-        const expectedSignature = crypto
-            .createHmac('sha256', process.env.WEBHOOK_SECRET)
-            .update(payload)
-            .digest('hex');
-        
-        if (signature !== `sha256=${expectedSignature}`) {
-            return res.status(401).json({ error: 'Invalid signature' });
+    if (session.state === 'collecting_name') {
+        await updateUserProfile(userPhone, { name: messageBody });
+        userSessions.set(userPhone, { ...session, state: 'collecting_address' });
+        message.reply('✅ Name saved!\n\n📍 Now please provide your *delivery address*:\n\n(Include full address with landmark for accurate delivery)');
+        return true;
+    }
+    
+    if (session.state === 'collecting_address') {
+        await updateUserProfile(userPhone, { 
+            address: messageBody,
+            isProfileComplete: true 
+        });
+        userSessions.set(userPhone, { ...session, state: null });
+        message.reply('✅ *Profile completed successfully!*\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and place your order:\n👆 https://your-restaurant-website.com/order');
+        return true;
+    }
+    
+    return false;
+};
+
+// Payment verification helper
+const handlePaymentVerification = async (message, userPhone, messageBody) => {
+    const session = userSessions.get(userPhone) || {};
+    
+    if (session.state === 'awaiting_upi_proof') {
+        // Check if message has attachment (screenshot)
+        if (message.hasMedia) {
+            const media = await message.downloadMedia();
+            if (media.mimetype.startsWith('image/')) {
+                // Save payment proof
+                const paymentProof = {
+                    orderId: session.pendingOrderId,
+                    customerPhone: userPhone,
+                    paymentMethod: 'UPI',
+                    proofType: 'screenshot',
+                    mediaData: media.data,
+                    timestamp: new Date(),
+                    status: 'pending_verification'
+                };
+                
+                await db.collection('payment_proofs').insertOne(paymentProof);
+                
+                // Update order status
+                await db.collection('orders').updateOne(
+                    { _id: new ObjectId(session.pendingOrderId) },
+                    { $set: { paymentStatus: 'verification_pending', paymentProofId: paymentProof._id } }
+                );
+                
+                userSessions.set(userPhone, { ...session, state: null, pendingOrderId: null });
+                
+                message.reply('✅ *Payment screenshot received!*\n\n🔍 Your payment is under verification. We\'ll confirm your order once payment is verified.\n\nThank you for choosing FoodieBot! 🍽️');
+                return true;
+            }
         }
+        
+        // Check if it's UTR number (12 digits)
+        if (/^\d{12}$/.test(messageBody)) {
+            const paymentProof = {
+                orderId: session.pendingOrderId,
+                customerPhone: userPhone,
+                paymentMethod: 'UPI',
+                proofType: 'utr',
+                utrNumber: messageBody,
+                timestamp: new Date(),
+                status: 'pending_verification'
+            };
+            
+            await db.collection('payment_proofs').insertOne(paymentProof);
+            
+            await db.collection('orders').updateOne(
+                { _id: new ObjectId(session.pendingOrderId) },
+                { $set: { paymentStatus: 'verification_pending', paymentProofId: paymentProof._id } }
+            );
+            
+            userSessions.set(userPhone, { ...session, state: null, pendingOrderId: null });
+            
+            message.reply(`✅ *UTR Number received!*\n\nUTR: ${messageBody}\n\n🔍 Your payment is under verification. We\'ll confirm your order once payment is verified.\n\nThank you for choosing FoodieBot! 🍽️`);
+            return true;
+        }
+        
+        message.reply('❌ Please send either:\n• Payment screenshot (image)\n• 12-digit UTR number\n\nOr type "cod" to switch to Cash on Delivery');
+        return true;
     }
+    
+    return false;
+};
+
+// Payment options helper
+const showPaymentOptions = (message, total, orderId) => {
+    const paymentText = `💳 *Payment Options*\n\n💰 Total Amount: ₹${total}\n\n*Choose your payment method:*\n\n🏦 *UPI Payment*\nType "upi" to pay via UPI\n• PhonePe: 9876543210\n• Google Pay: 9876543210\n• Paytm: 9876543210\n\n💵 *Cash on Delivery*\nType "cod" for cash payment on delivery\n\nPlease select your preferred payment method:`;
+    
+    message.reply(paymentText);
+};
+
+// Message handler
+client.on('message', async (message) => {
+    const chat = await message.getChat();
+    const contact = await message.getContact();
+    const userPhone = contact.number;
+    const messageBody = message.body.toLowerCase().trim();
     
     try {
-        const data = JSON.parse(payload);
-        console.log('📡 Webhook received:', data);
+        // Initialize user cart if doesn't exist
+        if (!userCarts.has(userPhone)) {
+            userCarts.set(userPhone, []);
+        }
         
-        // Process webhook data here
-        // You can trigger bot actions based on external events
+        // Get user profile
+        const userProfile = await getUserProfile(userPhone);
         
-        res.status(200).json({ success: true, received: true });
+        // Handle payment verification first
+        if (await handlePaymentVerification(message, userPhone, message.body)) {
+            return;
+        }
+        
+        // Handle profile completion
+        if (await handleProfileCompletion(message, userPhone, message.body)) {
+            return;
+        }
+        
+        // Check if profile is complete before allowing orders
+        if (!userProfile.isProfileComplete && !['hello', 'hi', 'start', 'help', 'profile', 'order'].includes(messageBody)) {
+            if (await collectUserDetails(message, userPhone, userProfile)) {
+                return;
+            }
+        }
+        
+        // Handle different commands
+        if (messageBody === 'hello' || messageBody === 'hi' || messageBody === 'start' || messageBody === 'help') {
+            sendWelcomeMessage(message);
+        }
+        else if (messageBody === 'order') {
+            const orderText = `🌐 *ORDER NOW:*\n\nClick here to browse our menu and place your order:\n👆 https://your-restaurant-website.com/order\n\n📱 After placing your order online, return here to:\n• Track your order status\n• Make payment\n• Get delivery updates\n\nHappy ordering! 🍽️`;
+            message.reply(orderText);
+        }
+        else if (messageBody === 'profile') {
+            let profileText = '👤 *Your Profile*\n\n';
+            profileText += `📱 Phone: ${userPhone}\n`;
+            profileText += `👋 Name: ${userProfile.name || 'Not set'}\n`;
+            profileText += `📍 Address: ${userProfile.address || 'Not set'}\n\n`;
+            
+            if (!userProfile.isProfileComplete) {
+                profileText += '⚠️ Profile incomplete. Please complete your profile to place orders.\n\n';
+                if (!userProfile.name) {
+                    profileText += 'Type your *full name* to update:';
+                } else if (!userProfile.address) {
+                    profileText += 'Type your *delivery address* to update:';
+                }
+            } else {
+                profileText += '✅ Profile complete!\n\n';
+                profileText += 'To update:\n• Type "update name" to change name\n• Type "update address" to change address';
+            }
+            
+            message.reply(profileText);
+        }
+        else if (messageBody === 'update name') {
+            userSessions.set(userPhone, { state: 'collecting_name' });
+            message.reply('👋 Please enter your *new name*:');
+        }
+        else if (messageBody === 'update address') {
+            userSessions.set(userPhone, { state: 'collecting_address' });
+            message.reply('📍 Please enter your *new delivery address*:');
+        }
+        else if (messageBody === 'cart') {
+            const userCart = userCarts.get(userPhone);
+            if (userCart.length === 0) {
+                message.reply('🛒 Your cart is empty.\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and add items:\n👆 https://your-restaurant-website.com/order');
+                return;
+            }
+            
+            let cartText = '🛒 *Your Cart*\n\n';
+            let total = 0;
+            
+            userCart.forEach((item, index) => {
+                cartText += `${index + 1}. ${item.name} x${item.quantity} - ₹${item.price * item.quantity}\n`;
+                total += item.price * item.quantity;
+            });
+            
+            cartText += `\n💰 *Total: ₹${total}*\n\n`;
+            cartText += '✅ Type "confirm" to place order\n';
+            cartText += '🌐 Click here to add more items:\n👆 https://your-restaurant-website.com/order';
+            
+            message.reply(cartText);
+        }
+        else if (messageBody === 'confirm') {
+            const userCart = userCarts.get(userPhone);
+            if (userCart.length === 0) {
+                message.reply('🛒 Your cart is empty.\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and add items:\n👆 https://your-restaurant-website.com/order');
+                return;
+            }
+            
+            // Calculate total
+            const total = userCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            // Generate unique order ID
+            const orderId = generateOrderId();
+            
+            // Create order with orderId
+            const order = {
+                orderId: orderId,
+                customerPhone: userPhone,
+                customerName: userProfile.name,
+                customerAddress: userProfile.address,
+                items: userCart,
+                total: total,
+                status: 'pending_payment',
+                paymentStatus: 'pending',
+                timestamp: new Date(),
+                createdAt: new Date()
+            };
+            
+            const result = await db.collection('orders').insertOne(order);
+            const mongoId = result.insertedId;
+            
+            // Show payment options
+            showPaymentOptions(message, total, mongoId);
+            
+            // Store order ID in session for payment processing
+            const session = userSessions.get(userPhone) || {};
+            userSessions.set(userPhone, { ...session, pendingOrderId: mongoId.toString() });
+        }
+        else if (messageBody === 'upi') {
+            const session = userSessions.get(userPhone) || {};
+            if (!session.pendingOrderId) {
+                message.reply('❌ No pending order found. Please place an order first by typing "confirm".');
+                return;
+            }
+            
+            const order = await db.collection('orders').findOne({ _id: new ObjectId(session.pendingOrderId) });
+            if (!order) {
+                message.reply('❌ Order not found. Please try again.');
+                return;
+            }
+            
+            userSessions.set(userPhone, { ...session, state: 'awaiting_upi_proof' });
+            
+            const upiText = `🏦 *UPI Payment Details*\n\n💰 Amount: ₹${order.total}\n📋 Order ID: ${order.orderId}\n\n*Pay to any of these UPI IDs:*\n• PhonePe: 9876543210\n• Google Pay: 9876543210\n• Paytm: 9876543210\n\n📸 *After payment, send:*\n• Payment screenshot (image), OR\n• 12-digit UTR number\n\n💡 Type "cod" to switch to Cash on Delivery`;
+            
+            message.reply(upiText);
+        }
+        else if (messageBody === 'cod') {
+            const session = userSessions.get(userPhone) || {};
+            if (!session.pendingOrderId) {
+                message.reply('❌ No pending order found. Please place an order first by typing "confirm".');
+                return;
+            }
+            
+            // Update order with COD payment
+            await db.collection('orders').updateOne(
+                { _id: new ObjectId(session.pendingOrderId) },
+                { 
+                    $set: { 
+                        paymentMethod: 'COD',
+                        paymentStatus: 'cod_selected',
+                        status: 'confirmed',
+                        confirmedAt: new Date()
+                    }
+                }
+            );
+            
+            const order = await db.collection('orders').findOne({ _id: new ObjectId(session.pendingOrderId) });
+            
+            // Clear cart and session
+            userCarts.set(userPhone, []);
+            userSessions.set(userPhone, { ...session, state: null, pendingOrderId: null });
+            
+            // Confirmation message
+            let confirmText = '✅ *Order Confirmed with Cash on Delivery!*\n\n';
+            confirmText += `📋 *Order ID: ${order.orderId}*\n\n`;
+            confirmText += '*Order Summary:*\n';
+            order.items.forEach((item, index) => {
+                confirmText += `${index + 1}. ${item.name} x${item.quantity} - ₹${item.price * item.quantity}\n`;
+            });
+            confirmText += `\n💰 *Total: ₹${order.total}*\n`;
+            confirmText += `💵 *Payment: Cash on Delivery*\n`;
+            confirmText += `📍 *Delivery Address:*\n${userProfile.address}\n\n`;
+            confirmText += '🚚 Your order is being prepared. We\'ll update you soon!\n';
+            confirmText += 'Thank you for choosing FoodieBot! 🍽️';
+            
+            message.reply(confirmText);
+        }
+        else {
+            // Unknown command - show available options
+            const helpText = `🤔 I didn't understand that command.\n\n*Available commands:*\n• "order" - Get ordering link\n• "cart" - View your cart\n• "confirm" - Place order\n• "profile" - View/Edit profile\n• "help" - Show this help\n\n🌐 *ORDER NOW:*\nClick here to browse our menu:\n👆 https://your-restaurant-website.com/order`;
+            message.reply(helpText);
+        }
+        
+        // Store session data
+        await db.collection('sessions').updateOne(
+            { phone: contact.number },
+            { 
+                $set: { 
+                    phone: contact.number,
+                    name: contact.name || contact.pushname || userProfile.name,
+                    lastMessage: message.body,
+                    lastSeen: new Date()
+                }
+            },
+            { upsert: true }
+        );
+        
     } catch (error) {
-        console.error('❌ Webhook processing error:', error);
-        res.status(400).json({ error: 'Invalid JSON payload' });
+        console.error('Error handling message:', error);
+        message.reply('😔 Sorry, something went wrong. Please try again or contact support.');
     }
 });
 
-// Enhanced API Routes with better error handling
+// API endpoint to add items to cart from web interface
+app.post('/api/add-to-cart', async (req, res) => {
+    try {
+        const { userPhone, items } = req.body;
+        
+        if (!userPhone || !items || !Array.isArray(items)) {
+            return res.status(400).json({ error: 'Invalid request data' });
+        }
+        
+        // Initialize user cart if doesn't exist
+        if (!userCarts.has(userPhone)) {
+            userCarts.set(userPhone, []);
+        }
+        
+        const userCart = userCarts.get(userPhone);
+        
+        // Add items to cart
+        items.forEach(newItem => {
+            const existingItem = userCart.find(cartItem => cartItem._id.toString() === newItem._id.toString());
+            
+            if (existingItem) {
+                existingItem.quantity += newItem.quantity || 1;
+            } else {
+                userCart.push({
+                    _id: newItem._id,
+                    name: newItem.name,
+                    price: newItem.price,
+                    quantity: newItem.quantity || 1
+                });
+            }
+        });
+        
+        // Send confirmation message to user
+        const itemNames = items.map(item => item.name).join(', ');
+        const confirmMessage = `✅ *Items added to your cart!*\n\n${itemNames}\n\n💬 Return to WhatsApp and type "cart" to view your order or "confirm" to place it.`;
+        
+        await client.sendMessage(`${userPhone}@c.us`, confirmMessage);
+        
+        res.json({ success: true, message: 'Items added to cart' });
+    } catch (error) {
+        console.error('Error adding to cart:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API Routes
 app.get('/api/status', (req, res) => {
     res.json({
-        ...botState,
-        uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development',
-        version: '1.0.0',
-        base_url: BASE_URL
+        isAuthenticated: botState.isAuthenticated,
+        connectedSessions: botState.connectedSessions,
+        qrGenerated: !!botState.qrCode
     });
 });
 
-// Root endpoint
-app.get('/', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>FoodieBot - Admin Panel</title>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    margin: 0;
-                    padding: 2rem;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    min-height: 100vh;
-                }
-                .container {
-                    max-width: 800px;
-                    margin: 0 auto;
-                    background: rgba(255, 255, 255, 0.1);
-                    padding: 2rem;
-                    border-radius: 15px;
-                    backdrop-filter: blur(10px);
-                    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-                }
-                .status {
-                    background: ${botState.isAuthenticated ? '#4CAF50' : '#f44336'};
-                    color: white;
-                    padding: 1rem;
-                    border-radius: 8px;
-                    margin: 1rem 0;
-                    text-align: center;
-                }
-                .links {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 1rem;
-                    margin-top: 2rem;
-                }
-                .link-card {
-                    background: rgba(255, 255, 255, 0.2);
-                    padding: 1.5rem;
-                    border-radius: 10px;
-                    text-decoration: none;
-                    color: white;
-                    text-align: center;
-                    transition: transform 0.3s;
-                }
-                .link-card:hover {
-                    transform: translateY(-5px);
-                    background: rgba(255, 255, 255, 0.3);
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🤖 FoodieBot Admin Panel</h1>
-                
-                <div class="status">
-                    Status: ${botState.isAuthenticated ? '✅ Connected & Ready' : '❌ Not Connected'}
-                </div>
-                
-                <div class="links">
-                    <a href="/qr" class="link-card">
-                        <h3>📱 QR Code</h3>
-                        <p>Connect WhatsApp</p>
-                    </a>
-                    <a href="/health" class="link-card">
-                        <h3>💚 Health Check</h3>
-                        <p>System Status</p>
-                    </a>
-                    <a href="/api/status" class="link-card">
-                        <h3>📊 API Status</h3>
-                        <p>Bot Status JSON</p>
-                    </a>
-                </div>
-                
-                <div style="margin-top: 2rem; text-align: center; opacity: 0.8;">
-                    <p>🌐 Server: ${BASE_URL}</p>
-                    <p>⏰ Uptime: ${Math.floor(process.uptime())} seconds</p>
-                    <p>🔄 Last Activity: ${botState.lastActivity.toLocaleString()}</p>
-                </div>
-            </div>
-        </body>
-        </html>
-    `);
-});
-
-// [Include all other existing routes from your original code here]
-// ... (menu routes, order routes, user routes, etc.)
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-    console.error('Server error:', error);
-    
-    if (error instanceof multer.MulterError) {
-        if (error.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ error: 'File size too large' });
-        }
+app.get('/api/qr', (req, res) => {
+    if (botState.qrCode) {
+        const base64Data = botState.qrCode.replace(/^data:image\/png;base64,/, '');
+        const img = Buffer.from(base64Data, 'base64');
+        res.writeHead(200, { 
+            'Content-Type': 'image/png',
+            'Content-Length': img.length 
+        });
+        res.end(img);
+    } else {
+        res.status(404).json({ 
+            error: 'QR code not available',
+            message: botState.isAuthenticated ? 'Already authenticated' : 'QR code not generated yet'
+        });
     }
-    
-    res.status(500).json({ 
-        error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
-    });
 });
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Endpoint not found' });
-});
-
-// Initialize the application
-async function initializeApp() {
+// Orders API
+app.get('/api/orders', async (req, res) => {
     try {
-        console.log('🚀 Starting FoodieBot for Koyeb deployment...');
-        
-        // Connect to MongoDB first
-        await connectToMongoDB();
-        
-        // Start the Express server
-        const PORT = process.env.PORT || 8000;
-        const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log('\n' + '='.repeat(60));
-            console.log('🎉 FoodieBot Server Started Successfully!');
-            console.log('='.repeat(60));
-            console.log(`🌐 Server running on: http://0.0.0.0:${PORT}`);
-            console.log(`🌍 Public URL: ${BASE_URL}`);
-            console.log(`📋 Admin Panel: ${BASE_URL}`);
-            console.log(`🛒 Order Interface: ${BASE_URL}/order`);
-            console.log(`📱 QR Code Page: ${BASE_URL}/qr`);
-            console.log(`💚 Health Check: ${BASE_URL}/health`);
-            console.log('='.repeat(60));
-            console.log('\n⏳ Initializing WhatsApp client...');
-        });
-        
-        // Graceful shutdown handler
-        process.on('SIGTERM', () => {
-            console.log('📱 Received SIGTERM, shutting down gracefully...');
-            server.close(async () => {
-                try {
-                    await client.destroy();
-                    console.log('✅ Server closed successfully');
-                    process.exit(0);
-                } catch (error) {
-                    console.error('❌ Error during shutdown:', error);
-                    process.exit(1);
-                }
-            });
-        });
-        
-        // Initialize WhatsApp client
-        console.log('🔄 Starting WhatsApp client initialization...');
-        await client.initialize();
-        
+        const orders = await db.collection('orders').find().sort({ timestamp: -1 }).toArray();
+        res.json(orders);
     } catch (error) {
-        console.error('❌ Failed to initialize application:', error);
-        process.exit(1);
+        res.status(500).json({ error: error.message });
     }
-}
+});
 
-// Start the application
-initializeApp();
+app.put('/api/orders/:id/status', async (req, res) => {
+    try {
+        const { status } = req.body;
+        await db.collection('orders').updateOne(
+            { _id: new ObjectId(req.params.id) },
+            { $set: { status, updatedAt: new Date() } }
+        );
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Payment verification API
+app.get('/api/payment-proofs', async (req, res) => {
+    try {
+        const proofs = await db.collection('payment_proofs').find().sort({ timestamp: -1 }).toArray();
+        res.json(proofs);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/payment-proofs/:id/verify', async (req, res) => {
+    try {
+        const { verified, notes } = req.body;
+        const proofId = new ObjectId(req.params.id);
+        
+        // Update payment proof
+        await db.collection('payment_proofs').updateOne(
+            { _id: proofId },
+            { 
+                $set: { 
+                    status: verified ? 'verified' : 'rejected',
+                    verificationNotes: notes,
+                    verifiedAt: new Date()
+                }
+            }
+        );
+        
+        // Get payment proof to find order
+        const proof = await db.collection('payment_proofs').findOne({ _id: proofId });
+        
+        if (proof && verified) {
+            // Update order status
+            await db.collection('orders').updateOne(
+                { _id: new ObjectId(proof.orderId) },
+                { 
+                    $set: { 
+                        paymentStatus: 'verified',
+                        status: 'confirmed',
+                        confirmedAt: new Date()
+                    }
+                }
+            );
+            
+            // Send confirmation to customer
+            const order = await db.collection('orders').findOne({ _id: new ObjectId(proof.orderId) });
+            if (order) {
+                const confirmText = `✅ *Payment Verified & Order Confirmed!*\n\n📋 Order ID: ${order.orderId}\n💰 Amount: ₹${order.total}\n🚚 Your order is now being prepared.\n\nThank you for choosing FoodieBot! 🍽️`;
+                await client.sendMessage(`${proof.customerPhone}@c.us`, confirmText);
+            }
+        } else if (proof && !verified) {
+            // Send rejection message
+            const rejectText = `❌ *Payment Verification Failed*\n\n${notes || 'Payment could not be verified. Please contact support or try again.'}\n\nFor assistance, please contact us.`;
+            await client.sendMessage(`${proof.customerPhone}@c.us`, rejectText);
+        }
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Users API
+app.get('/api/users', async (req, res) => {
+    try {
+        const users = await db.collection('users').find().sort({ createdAt: -1 }).toArray();
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Menu API
+app.get('/api/menu', async (req, res) => {
+    try {
+        const menuItems = await db.collection('menu').find().toArray();
+        res.json(menuItems);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/menu', async (req, res) => {
+    try {
+        const menuItem = { ...req.body, createdAt: new Date() };
+        const result = await db.collection('menu').insertOne(menuItem);
+        res.json({ success: true, id: result.insertedId });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/menu/:id', async (req, res) => {
+    try {
+        await db.collection('menu').deleteOne({ _id: new ObjectId(req.params.id) });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Sessions API
+app.get('/api/sessions', async (req, res) => {
+    try {
+        const sessions = await db.collection('sessions').find().sort({ lastSeen: -1 }).toArray();
+        res.json(sessions);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Broadcast API
+app.post('/api/broadcast', async (req, res) => {
+    try {
+        const { message } = req.body;
+        const sessions = await db.collection('sessions').find().toArray();
+        let sentCount = 0;
+        
+        for (const session of sessions) {
+            try {
+                await client.sendMessage(`${session.phone}@c.us`, message);
+                sentCount++;
+            } catch (error) {
+                console.error(`Failed to send to ${session.phone}:`, error);
+            }
+        }
+        
+        res.json({ success: true, sentTo: sentCount });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Serve admin panel
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📊 Admin panel: http://localhost:${PORT}`);
+    console.log(`📱 QR Code: http://localhost:${PORT}/api/qr`);
+    
+    // Initialize WhatsApp client
+    client.initialize();
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    console.log('\n🛑 Shutting down gracefully...');
+    
+    try {
+        await client.destroy();
+        console.log('✅ WhatsApp client destroyed');
+    } catch (error) {
+        console.error('❌ Error destroying WhatsApp client:', error);
+    }
+    
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+    
+    try {
+        await client.destroy();
+        console.log('✅ WhatsApp client destroyed');
+    } catch (error) {
+        console.error('❌ Error destroying WhatsApp client:', error);
+    }
+    
+    process.exit(0);
+});
+
+// Error handling
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    process.exit(1);
+});
+
+// Keep alive function for deployment platforms
+setInterval(() => {
+    console.log(`🔄 Bot is alive - ${new Date().toISOString()}`);
+}, 300000); // Every 5 minutes
