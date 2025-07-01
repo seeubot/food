@@ -109,7 +109,7 @@ Hello! I'm your personal food ordering assistant.
 
 🌐 *ORDER NOW:*
 Click here to browse our menu and place your order:
-👆 https://your-restaurant-website.com/order
+👆 https://random-tiena-school1660440-c68d25b7.koyeb.app/order.html
 
 📦 Type *"cart"* - View your current order
 ✅ Type *"confirm"* - Place your order
