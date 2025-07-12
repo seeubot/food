@@ -4,10 +4,34 @@ const { MongoClient, ObjectId } = require('mongodb');
 const qrcode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
+const session = require('express-session'); // For session management
 
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+// Serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Configure session middleware
+app.use(session({
+    secret: 'siddhikreddy', // Replace with a strong, random secret in production
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false } // Set to true if using HTTPS
+}));
+
+// --- Basic Authentication Middleware ---
+// For demonstration purposes. In production, use environment variables for credentials
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'password'; // Use a hashed password in production
+// IMPORTANT: Replace with the actual WhatsApp number of the admin (e.g., '919876543210')
+const ADMIN_WHATSAPP_NUMBER = '918897350151'; 
+
+const isAuthenticated = (req, res, next) => {
+    if (req.session.isAuthenticated) {
+        return next();
+    }
+    res.redirect('/login');
+};
 
 // MongoDB connection
 const MONGO_URI = 'mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room';
@@ -18,8 +42,35 @@ MongoClient.connect(MONGO_URI)
     .then(client => {
         console.log('✅ Connected to MongoDB');
         db = client.db('foodiebot');
+        // Optional: Insert some sample menu items if the collection is empty
+        insertSampleMenuItems(db);
     })
     .catch(error => console.error('❌ MongoDB connection error:', error));
+
+// Function to insert sample menu items if the collection is empty
+async function insertSampleMenuItems(db) {
+    const menuCollection = db.collection('menu_items');
+    const count = await menuCollection.countDocuments();
+    if (count === 0) {
+        const sampleItems = [
+            { name: 'Margherita Pizza', price: 250, description: 'Classic cheese and tomato pizza', category: 'Pizza' },
+            { name: 'Pepperoni Pizza', price: 300, description: 'Pepperoni, mozzarella, and tomato sauce', category: 'Pizza' },
+            { name: 'Veggie Burger', price: 180, description: 'Patty made with fresh vegetables', category: 'Burgers' },
+            { name: 'Chicken Burger', price: 220, description: 'Grilled chicken patty with fresh toppings', category: 'Burgers' },
+            { name: 'French Fries', price: 100, description: 'Crispy golden fries', category: 'Sides' },
+            { name: 'Coca-Cola', price: 60, description: 'Refreshing cold drink', category: 'Drinks' },
+            { name: 'Chicken Biryani', price: 350, description: 'Aromatic rice dish with marinated chicken', category: 'Main Course' },
+            { name: 'Paneer Butter Masala', price: 280, description: 'Creamy paneer curry', category: 'Main Course' },
+            { name: 'Garlic Naan', price: 70, description: 'Soft bread with garlic butter', category: 'Breads' },
+            { name: 'Gulab Jamun (2 pcs)', price: 120, description: 'Sweet milk-solid dumplings', category: 'Desserts' }
+        ];
+        await menuCollection.insertMany(sampleItems);
+        console.log('✅ Sample menu items inserted into MongoDB.');
+    } else {
+        console.log('✅ Menu items already exist in MongoDB.');
+    }
+}
+
 
 // Helper function to generate unique order ID
 const generateOrderId = () => {
@@ -37,6 +88,8 @@ let botState = {
 };
 
 // User cart state and session management
+// NOTE: For a production application, userCarts and userSessions should be persisted
+// in a database (e.g., MongoDB) rather than in-memory, as data will be lost on server restart.
 const userCarts = new Map();
 const userSessions = new Map(); // Track user conversation state
 
@@ -52,7 +105,7 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process', // <- this one doesn't work in Windows
+            // '--single-process', // <- this one doesn't work in Windows, uncomment for Linux/Docker
             '--disable-gpu'
         ]
     }
@@ -198,13 +251,15 @@ const handlePaymentVerification = async (message, userPhone, messageBody) => {
         if (message.hasMedia) {
             const media = await message.downloadMedia();
             if (media.mimetype.startsWith('image/')) {
-                // Save payment proof
+                // NOTE: Storing base64 media directly in MongoDB can lead to large document sizes.
+                // For production, consider uploading images to cloud storage (e.g., AWS S3, Google Cloud Storage)
+                // and storing the URL in MongoDB instead.
                 const paymentProof = {
                     orderId: session.pendingOrderId,
                     customerPhone: userPhone,
                     paymentMethod: 'UPI',
                     proofType: 'screenshot',
-                    mediaData: media.data,
+                    mediaData: media.data, // Base64 string of the image
                     timestamp: new Date(),
                     status: 'pending_verification'
                 };
@@ -485,217 +540,100 @@ app.post('/api/add-to-cart', async (req, res) => {
             return res.status(400).json({ error: 'Invalid request data' });
         }
         
-        // Initialize user cart if doesn't exist
-        if (!userCarts.has(userPhone)) {
-            userCarts.set(userPhone, []);
+        // Get user profile (or create if new)
+        const userProfile = await getUserProfile(userPhone);
+
+        // Calculate total
+        const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        
+        // Generate unique order ID
+        const orderId = generateOrderId();
+        
+        // Create order with initial status pending admin approval
+        const order = {
+            orderId: orderId,
+            customerPhone: userPhone,
+            customerName: userProfile.name,
+            customerAddress: userProfile.address,
+            items: items,
+            total: total,
+            status: 'pending_admin_approval', // New initial status
+            paymentStatus: 'awaiting_admin_review', // New initial payment status
+            timestamp: new Date(),
+            createdAt: new Date()
+        };
+        
+        const result = await db.collection('orders').insertOne(order);
+        const mongoId = result.insertedId;
+
+        // Notify admin about the new order
+        if (ADMIN_WHATSAPP_NUMBER && client.isReady) {
+            const adminNotificationMessage = `🔔 *New Order Placed!* 🔔\n\n` +
+                                             `📋 *Order ID:* ${order.orderId}\n` +
+                                             `👤 *Customer:* ${order.customerName || order.customerPhone}\n` +
+                                             `💰 *Total:* ₹${order.total}\n` +
+                                             `Items: ${order.items.map(item => `${item.name} x${item.quantity}`).join(', ')}\n\n` +
+                                             `Status: *Pending Admin Approval*\n\n` +
+                                             `Go to dashboard to review: http://localhost:3000/dashboard`;
+            await client.sendMessage(`${ADMIN_WHATSAPP_NUMBER}@c.us`, adminNotificationMessage);
+            console.log(`✅ Admin notified about new order: ${order.orderId}`);
+        } else {
+            console.warn('Admin WhatsApp number not set or client not ready. Admin not notified.');
         }
         
-        const userCart = userCarts.get(userPhone);
-        
-        // Add items to cart
-        items.forEach(newItem => {
-            const existingItem = userCart.find(cartItem => cartItem._id.toString() === newItem._id.toString());
-            
-            if (existingItem) {
-                existingItem.quantity += newItem.quantity || 1;
-            } else {
-                userCart.push({
-                    _id: newItem._id,
-                    name: newItem.name,
-                    price: newItem.price,
-                    quantity: newItem.quantity || 1
-                });
-            }
-        });
-        
-        // Send confirmation message to user
-        const itemNames = items.map(item => item.name).join(', ');
-        const confirmMessage = `✅ *Items added to your cart!*\n\n${itemNames}\n\n💬 Return to WhatsApp and type "cart" to view your order or "confirm" to place it.`;
-        
-        await client.sendMessage(`${userPhone}@c.us`, confirmMessage);
-        
-        res.json({ success: true, message: 'Items added to cart' });
+        // Respond to the web panel without sending direct WhatsApp confirmation to user
+        res.json({ success: true, message: 'Order placed successfully, awaiting admin confirmation.' });
     } catch (error) {
-        console.error('Error adding to cart:', error);
+        console.error('Error adding to cart (web panel):', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// QR Code HTML page endpoint
-app.get('/qr', (req, res) => {
-    const qrPageHTML = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>WhatsApp QR Code - FoodieBot</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 20px;
-                background: linear-gradient(135deg, #25D366, #128C7E);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .container {
-                background: white;
-                padding: 30px;
-                border-radius: 15px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                text-align: center;
-                max-width: 400px;
-                width: 100%;
-            }
-            h1 {
-                color: #25D366;
-                margin-bottom: 20px;
-            }
-            .qr-container {
-                margin: 20px 0;
-                padding: 20px;
-                background: #f5f5f5;
-                border-radius: 10px;
-            }
-            .qr-code {
-                max-width: 250px;
-                width: 100%;
-                height: auto;
-            }
-            .status {
-                margin: 15px 0;
-                padding: 10px;
-                border-radius: 5px;
-                font-weight: bold;
-            }
-            .status.connected {
-                background: #d4edda;
-                color: #155724;
-                border: 1px solid #c3e6cb;
-            }
-            .status.disconnected {
-                background: #f8d7da;
-                color: #721c24;
-                border: 1px solid #f5c6cb;
-            }
-            .status.loading {
-                background: #fff3cd;
-                color: #856404;
-                border: 1px solid #ffeaa7;
-            }
-            .refresh-btn {
-                background: #25D366;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 16px;
-                margin-top: 10px;
-            }
-            .refresh-btn:hover {
-                background: #128C7E;
-            }
-            .instructions {
-                text-align: left;
-                margin-top: 20px;
-                padding: 15px;
-                background: #e7f3ff;
-                border-radius: 5px;
-                border-left: 4px solid #25D366;
-            }
-            .loading {
-                display: inline-block;
-                width: 20px;
-                height: 20px;
-                border: 3px solid #f3f3f3;
-                border-top: 3px solid #25D366;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🍽️ FoodieBot Connection</h1>
-            
-            <div id="status" class="status loading">
-                <div class="loading"></div> Checking connection status...
-            </div>
-            
-            <div id="qr-container" class="qr-container" style="display: none;">
-                <p>📱 Scan this QR code with WhatsApp:</p>
-                <img id="qr-code" class="qr-code" src="" alt="QR Code">
-            </div>
-            
-            <button class="refresh-btn" onclick="checkStatus()">🔄 Refresh Status</button>
-            
-            <div class="instructions">
-                <h3>📋 Instructions:</h3>
-                <ol>
-                    <li>Open WhatsApp on your phone</li>
-                    <li>Go to <strong>Settings > Linked Devices</strong></li>
-                    <li>Tap <strong>"Link a Device"</strong></li>
-                    <li>Scan the QR code above</li>
-                    <li>Wait for connection confirmation</li>
-                </ol>
-            </div>
-        </div>
-
-        <script>
-            async function checkStatus() {
-                try {
-                    const response = await fetch('/api/status');
-                    const data = await response.json();
-                    const statusEl = document.getElementById('status');
-                    const qrContainer = document.getElementById('qr-container');
-                    
-                    if (data.isAuthenticated) {
-                        statusEl.className = 'status connected';
-                        statusEl.innerHTML = '✅ WhatsApp Connected Successfully!';
-                        qrContainer.style.display = 'none';
-                    } else if (data.qrGenerated) {
-                        statusEl.className = 'status loading';
-                        statusEl.innerHTML = '📱 QR Code Ready - Please scan with WhatsApp';
-                        qrContainer.style.display = 'block';
-                        
-                        // Load QR code image
-                        const qrImg = document.getElementById('qr-code');
-                        qrImg.src = '/api/qr?' + new Date().getTime(); // Cache busting
-                    } else {
-                        statusEl.className = 'status disconnected';
-                        statusEl.innerHTML = '⏳ Generating QR Code...';
-                        qrContainer.style.display = 'none';
-                    }
-                } catch (error) {
-                    console.error('Error checking status:', error);
-                    const statusEl = document.getElementById('status');
-                    statusEl.className = 'status disconnected';
-                    statusEl.innerHTML = '❌ Error checking connection status';
-                }
-            }
-            
-            // Check status every 3 seconds
-            setInterval(checkStatus, 3000);
-            
-            // Initial check
-            checkStatus();
-        </script>
-    </body>
-    </html>
-    `;
-    
-    res.send(qrPageHTML);
+// NEW: API endpoint to get menu items from MongoDB
+app.get('/api/menu', async (req, res) => {
+    try {
+        if (!db) {
+            return res.status(500).json({ error: 'Database not connected' });
+        }
+        const menuItems = await db.collection('menu_items').find({}).toArray();
+        res.json(menuItems);
+    } catch (error) {
+        console.error('Error fetching menu items:', error);
+        res.status(500).json({ error: 'Failed to fetch menu items' });
+    }
 });
 
-// API Routes
+
+// QR Code HTML page endpoint
+app.get('/qr', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'qr.html'));
+});
+
+// --- Authentication Routes ---
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+        req.session.isAuthenticated = true;
+        res.json({ success: true, redirect: '/dashboard' });
+    } else {
+        res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+});
+
+app.get('/logout', (req, res) => {
+    req.session.destroy(err => {
+        if (err) {
+            return res.status(500).send('Could not log out.');
+        }
+        res.redirect('/login');
+    });
+});
+
+// API Routes (protected by isAuthenticated middleware)
 app.get('/api/status', (req, res) => {
     res.json({
         isAuthenticated: botState.isAuthenticated,
@@ -722,7 +660,7 @@ app.get('/api/qr', (req, res) => {
 });
 
 // Force QR generation endpoint
-app.post('/api/generate-qr', async (req, res) => {
+app.post('/api/generate-qr', isAuthenticated, async (req, res) => {
     try {
         if (botState.isAuthenticated) {
             res.json({ error: 'Already authenticated' });
@@ -730,11 +668,13 @@ app.post('/api/generate-qr', async (req, res) => {
         }
         
         // Destroy existing client and create new one
+        // This can sometimes be slow or lead to issues. Consider more robust re-auth logic
+        // if this causes frequent problems in production.
         await client.destroy();
         
         setTimeout(() => {
             client.initialize();
-        }, 2000);
+        }, 2000); // Give some time before re-initializing
         
         res.json({ message: 'QR generation initiated' });
     } catch (error) {
@@ -742,13 +682,14 @@ app.post('/api/generate-qr', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-// Orders API (continuing from where it was cut off)
-app.get('/api/orders', async (req, res) => {
+
+// Orders API
+app.get('/api/orders', isAuthenticated, async (req, res) => {
     try {
         const orders = await db.collection('orders')
             .find({})
             .sort({ createdAt: -1 })
-            .limit(50)
+            .limit(50) // Limit to recent 50 orders for dashboard display
             .toArray();
         
         res.json(orders);
@@ -759,7 +700,7 @@ app.get('/api/orders', async (req, res) => {
 });
 
 // Get specific order
-app.get('/api/orders/:orderId', async (req, res) => {
+app.get('/api/orders/:orderId', isAuthenticated, async (req, res) => {
     try {
         const order = await db.collection('orders').findOne({ 
             orderId: req.params.orderId 
@@ -777,7 +718,7 @@ app.get('/api/orders/:orderId', async (req, res) => {
 });
 
 // Update order status
-app.put('/api/orders/:orderId/status', async (req, res) => {
+app.put('/api/orders/:orderId/status', isAuthenticated, async (req, res) => {
     try {
         const { status, paymentStatus } = req.body;
         const orderId = req.params.orderId;
@@ -798,7 +739,7 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
             return res.status(404).json({ error: 'Order not found' });
         }
         
-        // Get updated order
+        // Get updated order to send correct details to customer
         const updatedOrder = await db.collection('orders').findOne({ orderId: orderId });
         
         // Send status update to customer
@@ -811,9 +752,14 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
             'cancelled': '❌ Your order has been cancelled. Contact us for more info.'
         };
         
-        if (statusMessages[status]) {
+        // Only send message if the status is one that requires a customer notification
+        if (statusMessages[status] && updatedOrder && updatedOrder.customerPhone) {
             const message = `📋 *Order Update - ${updatedOrder.orderId}*\n\n${statusMessages[status]}\n\nThank you for choosing FoodieBot! 🤖`;
             await client.sendMessage(`${updatedOrder.customerPhone}@c.us`, message);
+            // If the order is confirmed, clear the user's in-memory cart (if they used the bot directly)
+            if (status === 'confirmed') {
+                userCarts.set(updatedOrder.customerPhone, []);
+            }
         }
         
         res.json({ success: true, order: updatedOrder });
@@ -824,7 +770,7 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
 });
 
 // Verify payment
-app.put('/api/payments/:paymentId/verify', async (req, res) => {
+app.put('/api/payments/:paymentId/verify', isAuthenticated, async (req, res) => {
     try {
         const { verified, notes } = req.body;
         const paymentId = req.params.paymentId;
@@ -869,15 +815,17 @@ app.put('/api/payments/:paymentId/verify', async (req, res) => {
             });
             
             // Send notification to customer
-            if (verified) {
-                const message = `✅ *Payment Verified!*\n\n📋 Order ID: ${order.orderId}\n💰 Amount: ₹${order.total}\n\nYour order is confirmed and being prepared! 👨‍🍳\n\nThank you for choosing FoodieBot! 🍽️`;
-                await client.sendMessage(`${order.customerPhone}@c.us`, message);
-                
-                // Clear user cart
-                userCarts.set(order.customerPhone, []);
-            } else {
-                const message = `❌ *Payment Verification Failed*\n\n📋 Order ID: ${order.orderId}\n\n${notes || 'Please contact support or try a different payment method.'}\n\nType "upi" to retry payment or "cod" for cash on delivery.`;
-                await client.sendMessage(`${order.customerPhone}@c.us`, message);
+            if (order && order.customerPhone) {
+                if (verified) {
+                    const message = `✅ *Payment Verified!*\n\n📋 Order ID: ${order.orderId}\n💰 Amount: ₹${order.total}\n\nYour order is confirmed and being prepared! 👨‍🍳\n\nThank you for choosing FoodieBot! 🍽️`;
+                    await client.sendMessage(`${order.customerPhone}@c.us`, message);
+                    
+                    // Clear user cart
+                    userCarts.set(order.customerPhone, []);
+                } else {
+                    const message = `❌ *Payment Verification Failed*\n\n📋 Order ID: ${order.orderId}\n\n${notes || 'Please contact support or try a different payment method.'}\n\nType "upi" to retry payment or "cod" for cash on delivery.`;
+                    await client.sendMessage(`${order.customerPhone}@c.us`, message);
+                }
             }
         }
         
@@ -889,12 +837,12 @@ app.put('/api/payments/:paymentId/verify', async (req, res) => {
 });
 
 // Get payment proofs
-app.get('/api/payments', async (req, res) => {
+app.get('/api/payments', isAuthenticated, async (req, res) => {
     try {
         const payments = await db.collection('payment_proofs')
             .find({})
             .sort({ timestamp: -1 })
-            .limit(50)
+            .limit(50) // Limit to recent 50 payments for dashboard display
             .toArray();
         
         res.json(payments);
@@ -905,7 +853,7 @@ app.get('/api/payments', async (req, res) => {
 });
 
 // Users API
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', isAuthenticated, async (req, res) => {
     try {
         const users = await db.collection('users')
             .find({})
@@ -920,7 +868,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Sessions API
-app.get('/api/sessions', async (req, res) => {
+app.get('/api/sessions', isAuthenticated, async (req, res) => {
     try {
         const sessions = await db.collection('sessions')
             .find({})
@@ -935,7 +883,7 @@ app.get('/api/sessions', async (req, res) => {
 });
 
 // Send message to user
-app.post('/api/send-message', async (req, res) => {
+app.post('/api/send-message', isAuthenticated, async (req, res) => {
     try {
         const { phone, message } = req.body;
         
@@ -943,6 +891,7 @@ app.post('/api/send-message', async (req, res) => {
             return res.status(400).json({ error: 'Phone and message are required' });
         }
         
+        // Ensure phone number is in correct format (e.g., '919876543210@c.us')
         await client.sendMessage(`${phone}@c.us`, message);
         res.json({ success: true, message: 'Message sent successfully' });
     } catch (error) {
@@ -952,7 +901,7 @@ app.post('/api/send-message', async (req, res) => {
 });
 
 // Broadcast message to all users
-app.post('/api/broadcast', async (req, res) => {
+app.post('/api/broadcast', isAuthenticated, async (req, res) => {
     try {
         const { message } = req.body;
         
@@ -969,11 +918,13 @@ app.post('/api/broadcast', async (req, res) => {
         // Send message to each user
         for (const user of users) {
             try {
-                await client.sendMessage(`${user.phone}@c.us`, message);
-                successCount++;
-                
-                // Add small delay to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                if (user.phone) { // Ensure phone number exists
+                    await client.sendMessage(`${user.phone}@c.us`, message);
+                    successCount++;
+                    
+                    // Add small delay to avoid rate limiting by WhatsApp
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
             } catch (error) {
                 console.error(`Error sending to ${user.phone}:`, error);
                 errorCount++;
@@ -993,7 +944,7 @@ app.post('/api/broadcast', async (req, res) => {
 });
 
 // Clear user cart
-app.delete('/api/cart/:phone', async (req, res) => {
+app.delete('/api/cart/:phone', isAuthenticated, async (req, res) => {
     try {
         const phone = req.params.phone;
         userCarts.set(phone, []);
@@ -1005,7 +956,7 @@ app.delete('/api/cart/:phone', async (req, res) => {
 });
 
 // Get user cart
-app.get('/api/cart/:phone', async (req, res) => {
+app.get('/api/cart/:phone', isAuthenticated, async (req, res) => {
     try {
         const phone = req.params.phone;
         const cart = userCarts.get(phone) || [];
@@ -1016,386 +967,9 @@ app.get('/api/cart/:phone', async (req, res) => {
     }
 });
 
-// Dashboard endpoint
-app.get('/dashboard', (req, res) => {
-    const dashboardHTML = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>FoodieBot Dashboard</title>
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: #f5f7fa;
-                color: #333;
-            }
-            .header {
-                background: linear-gradient(135deg, #25D366, #128C7E);
-                color: white;
-                padding: 20px;
-                text-align: center;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            }
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-                padding: 20px;
-            }
-            .stats {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 20px;
-                margin-bottom: 30px;
-            }
-            .stat-card {
-                background: white;
-                padding: 20px;
-                border-radius: 10px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-                text-align: center;
-            }
-            .stat-number {
-                font-size: 2em;
-                font-weight: bold;
-                color: #25D366;
-                margin-bottom: 10px;
-            }
-            .tabs {
-                display: flex;
-                background: white;
-                border-radius: 10px;
-                overflow: hidden;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-                margin-bottom: 20px;
-            }
-            .tab {
-                flex: 1;
-                padding: 15px;
-                text-align: center;
-                cursor: pointer;
-                border: none;
-                background: white;
-                font-size: 16px;
-            }
-            .tab.active {
-                background: #25D366;
-                color: white;
-            }
-            .tab-content {
-                background: white;
-                border-radius: 10px;
-                padding: 20px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-                min-height: 400px;
-            }
-            .tab-pane {
-                display: none;
-            }
-            .tab-pane.active {
-                display: block;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            th, td {
-                padding: 12px;
-                text-align: left;
-                border-bottom: 1px solid #eee;
-            }
-            th {
-                background: #f8f9fa;
-                font-weight: 600;
-            }
-            .status {
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            .status.pending { background: #fff3cd; color: #856404; }
-            .status.confirmed { background: #d4edda; color: #155724; }
-            .status.delivered { background: #d1ecf1; color: #0c5460; }
-            .status.cancelled { background: #f8d7da; color: #721c24; }
-            .btn {
-                padding: 8px 16px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-                margin: 2px;
-            }
-            .btn-primary { background: #25D366; color: white; }
-            .btn-danger { background: #dc3545; color: white; }
-            .btn-success { background: #28a745; color: white; }
-            .loading {
-                text-align: center;
-                padding: 40px;
-                color: #666;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>🍽️ FoodieBot Dashboard</h1>
-            <p>Manage your WhatsApp food ordering bot</p>
-        </div>
-        
-        <div class="container">
-            <div class="stats" id="stats">
-                <div class="stat-card">
-                    <div class="stat-number" id="totalOrders">-</div>
-                    <div>Total Orders</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalUsers">-</div>
-                    <div>Total Users</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="pendingOrders">-</div>
-                    <div>Pending Orders</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="botStatus">-</div>
-                    <div>Bot Status</div>
-                </div>
-            </div>
-            
-            <div class="tabs">
-                <button class="tab active" onclick="showTab('orders')">Orders</button>
-                <button class="tab" onclick="showTab('users')">Users</button>
-                <button class="tab" onclick="showTab('payments')">Payments</button>
-                <button class="tab" onclick="showTab('broadcast')">Broadcast</button>
-            </div>
-            
-            <div class="tab-content">
-                <div id="orders" class="tab-pane active">
-                    <h3>Recent Orders</h3>
-                    <div id="ordersTable" class="loading">Loading orders...</div>
-                </div>
-                
-                <div id="users" class="tab-pane">
-                    <h3>Users</h3>
-                    <div id="usersTable" class="loading">Loading users...</div>
-                </div>
-                
-                <div id="payments" class="tab-pane">
-                    <h3>Payment Verifications</h3>
-                    <div id="paymentsTable" class="loading">Loading payments...</div>
-                </div>
-                
-                <div id="broadcast" class="tab-pane">
-                    <h3>Broadcast Message</h3>
-                    <textarea id="broadcastMessage" placeholder="Enter your broadcast message..." rows="4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px;"></textarea>
-                    <button class="btn btn-primary" onclick="sendBroadcast()">Send Broadcast</button>
-                    <div id="broadcastResult"></div>
-                </div>
-            </div>
-        </div>
-
-        <script>
-            let currentData = {};
-            
-            function showTab(tabName) {
-                // Hide all tab panes
-                document.querySelectorAll('.tab-pane').forEach(pane => {
-                    pane.classList.remove('active');
-                });
-                
-                // Remove active class from all tabs
-                document.querySelectorAll('.tab').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                
-                // Show selected tab pane
-                document.getElementById(tabName).classList.add('active');
-                
-                // Add active class to clicked tab
-                event.target.classList.add('active');
-            }
-            
-            async function loadDashboard() {
-                try {
-                    // Load stats
-                    const [orders, users, payments, status] = await Promise.all([
-                        fetch('/api/orders').then(r => r.json()),
-                        fetch('/api/users').then(r => r.json()),
-                        fetch('/api/payments').then(r => r.json()),
-                        fetch('/api/status').then(r => r.json())
-                    ]);
-                    
-                    currentData = { orders, users, payments, status };
-                    
-                    // Update stats
-                    document.getElementById('totalOrders').textContent = orders.length;
-                    document.getElementById('totalUsers').textContent = users.length;
-                    document.getElementById('pendingOrders').textContent = orders.filter(o => o.status === 'pending_payment' || o.status === 'confirmed').length;
-                    document.getElementById('botStatus').textContent = status.isAuthenticated ? '✅' : '❌';
-                    
-                    // Load tables
-                    loadOrdersTable(orders);
-                    loadUsersTable(users);
-                    loadPaymentsTable(payments);
-                    
-                } catch (error) {
-                    console.error('Error loading dashboard:', error);
-                }
-            }
-            
-            function loadOrdersTable(orders) {
-                const table = createTable([
-                    'Order ID', 'Customer', 'Items', 'Total', 'Status', 'Payment', 'Date', 'Actions'
-                ], orders.map(order => [
-                    order.orderId,
-                    order.customerName || order.customerPhone,
-                    order.items.length + ' items',
-                    '₹' + order.total,
-                    '<span class="status ' + order.status + '">' + order.status + '</span>',
-                    order.paymentStatus || 'pending',
-                    new Date(order.createdAt).toLocaleString(),
-                    '<button class="btn btn-primary" onclick="updateOrderStatus(\'' + order.orderId + '\', \'confirmed\')">Confirm</button>' +
-                    '<button class="btn btn-success" onclick="updateOrderStatus(\'' + order.orderId + '\', \'delivered\')">Delivered</button>'
-                ]));
-                
-                document.getElementById('ordersTable').innerHTML = table;
-            }
-            
-            function loadUsersTable(users) {
-                const table = createTable([
-                    'Phone', 'Name', 'Address', 'Profile Complete', 'Joined'
-                ], users.map(user => [
-                    user.phone,
-                    user.name || '-',
-                    user.address || '-',
-                    user.isProfileComplete ? '✅' : '❌',
-                    new Date(user.createdAt).toLocaleString()
-                ]));
-                
-                document.getElementById('usersTable').innerHTML = table;
-            }
-            
-            function loadPaymentsTable(payments) {
-                const table = createTable([
-                    'Order ID', 'Customer', 'Method', 'Type', 'Status', 'Date', 'Actions'
-                ], payments.map(payment => [
-                    payment.orderId,
-                    payment.customerPhone,
-                    payment.paymentMethod,
-                    payment.proofType,
-                    payment.status,
-                    new Date(payment.timestamp).toLocaleString(),
-                    payment.status === 'pending_verification' ? 
-                        '<button class="btn btn-success" onclick="verifyPayment(\'' + payment._id + '\', true)">Verify</button>' +
-                        '<button class="btn btn-danger" onclick="verifyPayment(\'' + payment._id + '\', false)">Reject</button>' : '-'
-                ]));
-                
-                document.getElementById('paymentsTable').innerHTML = table;
-            }
-            
-            function createTable(headers, rows) {
-                let html = '<table><thead><tr>';
-                headers.forEach(header => {
-                    html += '<th>' + header + '</th>';
-                });
-                html += '</tr></thead><tbody>';
-                
-                rows.forEach(row => {
-                    html += '<tr>';
-                    row.forEach(cell => {
-                        html += '<td>' + cell + '</td>';
-                    });
-                    html += '</tr>';
-                });
-                
-                html += '</tbody></table>';
-                return html;
-            }
-            
-            async function updateOrderStatus(orderId, status) {
-                try {
-                    const response = await fetch('/api/orders/' + orderId + '/status', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ status })
-                    });
-                    
-                    if (response.ok) {
-                        alert('Order status updated successfully!');
-                        loadDashboard();
-                    } else {
-                        alert('Error updating order status');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Error updating order status');
-                }
-            }
-            
-            async function verifyPayment(paymentId, verified) {
-                try {
-                    const notes = verified ? 'Payment verified' : 'Payment rejected';
-                    const response = await fetch('/api/payments/' + paymentId + '/verify', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ verified, notes })
-                    });
-                    
-                    if (response.ok) {
-                        alert('Payment ' + (verified ? 'verified' : 'rejected') + ' successfully!');
-                        loadDashboard();
-                    } else {
-                        alert('Error updating payment status');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Error updating payment status');
-                }
-            }
-            
-            async function sendBroadcast() {
-                const message = document.getElementById('broadcastMessage').value;
-                if (!message) {
-                    alert('Please enter a message');
-                    return;
-                }
-                
-                try {
-                    const response = await fetch('/api/broadcast', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message })
-                    });
-                    
-                    const result = await response.json();
-                    document.getElementById('broadcastResult').innerHTML = 
-                        '<div style="margin-top: 10px; padding: 10px; background: #d4edda; border-radius: 4px; color: #155724;">' +
-                        result.message + '</div>';
-                    
-                    document.getElementById('broadcastMessage').value = '';
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Error sending broadcast');
-                }
-            }
-            
-            // Load dashboard on page load
-            loadDashboard();
-            
-            // Refresh every 30 seconds
-            setInterval(loadDashboard, 30000);
-        </script>
-    </body>
-    </html>
-    `;
-    
-    res.send(dashboardHTML);
+// Dashboard endpoint (protected)
+app.get('/dashboard', isAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 // Initialize WhatsApp client
@@ -1407,7 +981,8 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🎯 Server running on port ${PORT}`);
     console.log(`📱 QR Code: http://localhost:${PORT}/qr`);
-    console.log(`📊 Dashboard: http://localhost:${PORT}/dashboard`);
+    console.log(`📊 Dashboard: http://localhost:${PORT}/login (Login with admin/password)`);
+    console.log(`🛒 Order Panel: http://localhost:${PORT}/order`);
 });
 
 // Graceful shutdown
@@ -1422,3 +997,4 @@ process.on('SIGTERM', async () => {
     await client.destroy();
     process.exit(0);
 });
+
