@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp QR Code - FoodieBot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            color: #25D366;
+            margin-bottom: 20px;
+        }
+        .qr-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+        .qr-code {
+            max-width: 250px;
+            width: 100%;
+            height: auto;
+        }
+        .status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .refresh-btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .refresh-btn:hover {
+            background: #128C7E;
+        }
+        .instructions {
+            text-align: left;
+            margin-top: 20px;
+            padding: 15px;
+            background: #e7f3ff;
+            border-radius: 5px;
+            border-left: 4px solid #25D366;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #25D366;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍽️ FoodieBot Connection</h1>
+        
+        <div id="status" class="status loading">
+            <div class="loading-spinner"></div> Checking connection status...
+        </div>
+        
+        <div id="qr-container" class="qr-container" style="display: none;">
+            <p>📱 Scan this QR code with WhatsApp:</p>
+            <img id="qr-code" class="qr-code" src="" alt="QR Code">
+        </div>
+        
+        <button class="refresh-btn" onclick="checkStatus()">🔄 Refresh Status</button>
+        
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ol>
+                <li>Open WhatsApp on your phone</li>
+                <li>Go to <strong>Settings > Linked Devices</strong></li>
+                <li>Tap <strong>"Link a Device"</strong></li>
+                <li>Scan the QR code above</li>
+                <li>Wait for connection confirmation</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                const statusEl = document.getElementById('status');
+                const qrContainer = document.getElementById('qr-container');
+                
+                if (data.isAuthenticated) {
+                    statusEl.className = 'status connected';
+                    statusEl.innerHTML = '✅ WhatsApp Connected Successfully!';
+                    qrContainer.style.display = 'none';
+                } else if (data.qrGenerated) {
+                    statusEl.className = 'status loading';
+                    statusEl.innerHTML = '📱 QR Code Ready - Please scan with WhatsApp';
+                    qrContainer.style.display = 'block';
+                    
+                    // Load QR code image with cache busting
+                    const qrImg = document.getElementById('qr-code');
+                    qrImg.src = '/api/qr?' + new Date().getTime(); 
+                } else {
+                    statusEl.className = 'status disconnected';
+                    statusEl.innerHTML = '⏳ Generating QR Code...';
+                    qrContainer.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+                const statusEl = document.getElementById('status');
+                statusEl.className = 'status disconnected';
+                statusEl.innerHTML = '❌ Error checking connection status';
+            }
+        }
+        
+        // Check status every 3 seconds
+        setInterval(checkStatus, 3000);
+        
+        // Initial check
+        checkStatus();
+    </script>
+</body>
+</html>
+
