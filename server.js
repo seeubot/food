@@ -7,14 +7,14 @@ const QRCode = require('qrcode'); // Add this dependency for QR generation
 const path = require('path');
 const dotenv = require('dotenv');
 const cron = require('node-cron');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcrypt'); // Although not used for ADMIN_CREDENTIALS, keeping it as it was in original
 const session = require('express-session');
-const rateLimit = require('express-rate-limit'); // Add this dependency for rate limiting
+const rateLimit = require('express-rate-limit');
 
 // Load environment variables from .env file
 dotenv.config();
 
-// Hardcoded admin credentials
+// Hardcoded admin credentials (consider using environment variables for production)
 const ADMIN_CREDENTIALS = {
     username: 'admin',
     password: 'admin123'
@@ -23,7 +23,9 @@ const ADMIN_CREDENTIALS = {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
-const ADMIN_PHONE_NUMBER = process.env.ADMIN_PHONE_NUMBER || 'YOUR_ADMIN_PHONE_NUMBER_HERE';
+const ADMIN_PHONE_NUMBER = process.env.ADMIN_PHONE_NUMBER || 'YOUR_ADMIN_PHONE_NUMBER_HERE'; // Replace with actual admin number
+const WEB_MENU_URL = process.env.WEB_MENU_URL || `http://localhost:${PORT}/order`; // Default to local order page
+const DASHBOARD_URL = process.env.DASHBOARD_URL || `http://localhost:${PORT}/dashboard`; // Default to local dashboard
 
 // QR Code storage and management
 let whatsappQRData = null;
@@ -32,6 +34,7 @@ let qrCodeAccessToken = null;
 const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 
 // MongoDB Models
+// Ensure these paths are correct relative to server.js
 const Product = require('./models/Product');
 const Order = require('./models/Order');
 
@@ -51,17 +54,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Session middleware for basic authentication
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'supersecretkey',
+    secret: process.env.SESSION_SECRET || 'supersecretkey', // Use a strong, random secret in production
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false }
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
+        httpOnly: true, // Prevent client-side JS from accessing cookie
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
 }));
 
 // Basic Authentication Middleware
 const isAuthenticated = (req, res, next) => {
+    console.log('Checking authentication for:', req.path);
+    console.log('Session isAuthenticated:', req.session.isAuthenticated);
     if (req.session.isAuthenticated) {
         return next();
     }
+    console.log('User not authenticated, redirecting to login.');
     res.redirect('/admin/login');
 };
 
@@ -70,6 +80,7 @@ const validateQRAccess = (req, res, next) => {
     const { token } = req.query;
     
     if (!token || token !== qrCodeAccessToken) {
+        console.warn('Invalid or missing QR access token attempt:', token);
         return res.status(401).json({ 
             success: false, 
             message: 'Invalid or expired QR access token' 
@@ -78,6 +89,7 @@ const validateQRAccess = (req, res, next) => {
     
     // Check if QR code is still valid
     if (!qrCodeGeneratedAt || Date.now() - qrCodeGeneratedAt > QR_EXPIRY_TIME) {
+        console.warn('Expired QR access token attempt.');
         return res.status(410).json({ 
             success: false, 
             message: 'QR code has expired' 
@@ -99,37 +111,53 @@ mongoose.connect(MONGODB_URI)
 
 // --- WhatsApp Bot Initialization ---
 let whatsappClient;
-let qrCodeData = 'Loading QR Code...';
+let qrCodeData = 'Loading QR Code...'; // Initial status message
 
 const initializeWhatsAppClient = async () => {
+    console.log('Attempting to initialize WhatsApp Client...');
+    if (whatsappClient && whatsappClient.isReady) {
+        console.log('WhatsApp Client already ready, skipping re-initialization.');
+        return;
+    }
+
+    // Destroy existing client if it exists but is not ready
+    if (whatsappClient) {
+        try {
+            console.log('Destroying existing WhatsApp client instance...');
+            await whatsappClient.destroy();
+        } catch (destroyErr) {
+            console.error('Error destroying existing client:', destroyErr);
+        }
+        whatsappClient = null; // Clear the client instance
+    }
+
     whatsappClient = new Client({
-        authStrategy: new LocalAuth(),
+        authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Use a specific client ID
         puppeteer: {
             headless: true,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-gpu',
-                '--disable-dev-shm-usage',
+                '--disable-dev-shm-usage', // Recommended for Docker/headless environments
                 '--disable-extensions',
                 '--disable-plugins',
-                '--disable-images',
-                '--disable-javascript',
+                // '--disable-images', // Keep images enabled if needed for web.whatsapp.com
+                // '--disable-javascript', // Do NOT disable JS for web.whatsapp.com
                 '--disable-background-timer-throttling',
                 '--disable-backgrounding-occluded-windows',
                 '--disable-renderer-backgrounding',
                 '--disable-features=TranslateUI',
                 '--disable-ipc-flooding-protection',
-                '--disable-web-security',
+                '--disable-web-security', // Can be risky, use with caution
                 '--disable-features=site-per-process',
                 '--disable-site-isolation-trials',
                 '--disable-blink-features=AutomationControlled',
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--no-zygote',
-                '--single-process',
+                '--single-process', // Often helps in limited environments
                 '--memory-pressure-off',
-                '--max_old_space_size=4096',
                 '--disable-background-networking',
                 '--disable-default-apps',
                 '--disable-hang-monitor',
@@ -137,35 +165,43 @@ const initializeWhatsAppClient = async () => {
                 '--disable-sync',
                 '--metrics-recording-only',
                 '--no-crash-upload',
-                '--disable-component-update'
+                '--disable-component-update',
+                '--disable-software-rasterizer', // May help with GPU issues
+                '--disable-client-side-phishing-detection',
+                '--disable-cloud-import',
+                '--disable-speech-api',
+                '--disable-sync-preferences',
+                '--disable-zero-copy',
+                '--enable-features=NetworkService,NetworkServiceInProcess',
+                '--mute-audio'
             ],
-            timeout: 120000,
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            timeout: 120000, // 2 minutes
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // Use env var for path
             ignoreDefaultArgs: ['--disable-extensions'],
-            defaultViewport: null,
+            defaultViewport: null, // Important for responsive pages
             ignoreHTTPSErrors: true
         }
     });
 
     whatsappClient.on('qr', qr => {
         qrcode.generate(qr, { small: true });
-        qrCodeData = qr;
-        whatsappQRData = qr;
+        qrCodeData = qr; // Store raw QR data
+        whatsappQRData = qr; // Store for API endpoint
         qrCodeGeneratedAt = Date.now();
         qrCodeAccessToken = generateQRAccessToken();
-        console.log('QR RECEIVED', qr);
-        console.log('QR Access Token:', qrCodeAccessToken);
+        console.log('WhatsApp QR RECEIVED:', qr);
+        console.log('QR Access Token generated (valid for 5 mins):', qrCodeAccessToken);
     });
 
     whatsappClient.on('ready', () => {
-        console.log('WhatsApp Client is ready!');
+        console.log('WhatsApp Client is ready and connected!');
         qrCodeData = 'WhatsApp Client is ready!';
         whatsappQRData = null; // Clear QR data when connected
-        qrCodeAccessToken = null;
+        qrCodeAccessToken = null; // Invalidate token when connected
     });
 
     whatsappClient.on('message', async msg => {
-        console.log('MESSAGE RECEIVED', msg.body);
+        console.log(`MESSAGE from ${msg.from}: ${msg.body}`);
         const userMessage = msg.body.toLowerCase();
 
         if (userMessage === '!ping') {
@@ -173,43 +209,61 @@ const initializeWhatsAppClient = async () => {
         } else if (userMessage.includes('hi') || userMessage.includes('hello')) {
             msg.reply('👋 Hello there! How can I assist you today? You can view our menu or place an order.');
         } else if (userMessage.includes('menu')) {
-            msg.reply(`Here's our delicious menu: ${process.env.WEB_MENU_URL} 🍽️`);
+            msg.reply(`Here's our delicious menu: ${WEB_MENU_URL} 🍽️`);
         } else if (userMessage.includes('order')) {
-            msg.reply(`Ready to order? Visit our web menu here: ${process.env.WEB_MENU_URL} 🛒`);
+            msg.reply(`Ready to order? Visit our web menu here: ${WEB_MENU_URL} 🛒`);
         } else if (userMessage.includes('help')) {
             msg.reply('I can help you with placing an order! Just say "menu" to see what\'s available, or visit our website directly.');
         }
     });
 
     whatsappClient.on('disconnected', (reason) => {
-        console.log('WhatsApp Client was disconnected', reason);
+        console.warn('WhatsApp Client was disconnected:', reason);
         qrCodeData = `Disconnected: ${reason}. Please refresh to get new QR.`;
         whatsappQRData = null;
         qrCodeAccessToken = null;
+        console.log('Attempting to restart WhatsApp client in 10 seconds due to disconnection...');
+        setTimeout(() => {
+            initializeWhatsAppClient(); // Attempt to reinitialize on disconnection
+        }, 10000);
     });
 
-    whatsappClient.on('error', (error) => {
-        console.error('WhatsApp Client Error:', error);
-        qrCodeData = `Error: ${error.message}. Please check logs.`;
+    whatsappClient.on('auth_failure', (msg) => {
+        console.error('WhatsApp Authentication Failure:', msg);
+        qrCodeData = `Authentication failed: ${msg}. Please refresh QR.`;
         whatsappQRData = null;
         qrCodeAccessToken = null;
+        console.log('Attempting to restart WhatsApp client in 10 seconds due to auth failure...');
+        setTimeout(() => {
+            initializeWhatsAppClient();
+        }, 10000);
+    });
+
+    whatsappClient.on('change_state', state => {
+        console.log('WhatsApp Client State Changed:', state);
+        // You can update qrCodeData based on state if needed
+    });
+
+    whatsappClient.on('loading_screen', (percent, message) => {
+        console.log('WhatsApp Loading Screen:', percent, message);
+        qrCodeData = `Loading WhatsApp: ${percent}% - ${message}`;
     });
 
     try {
-        console.log('Initializing WhatsApp Client...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        console.log('Starting WhatsApp client initialization...');
+        console.log('Calling whatsappClient.initialize()...');
+        // Add a small delay before initialization to allow resources to settle
+        await new Promise(resolve => setTimeout(resolve, 5000)); 
         await whatsappClient.initialize();
-        console.log('WhatsApp Client initialization complete.');
+        console.log('whatsappClient.initialize() finished.');
     } catch (error) {
-        console.error('Failed to initialize WhatsApp Client:', error);
+        console.error('CRITICAL: Failed to initialize WhatsApp Client:', error.message);
+        console.error(error.stack); // Log full stack trace for debugging
         qrCodeData = `Initialization failed: ${error.message}. Check Docker logs for details.`;
         whatsappQRData = null;
         qrCodeAccessToken = null;
         
-        console.log('Attempting to restart WhatsApp client in 10 seconds...');
+        console.log('Attempting to restart WhatsApp client in 10 seconds after initialization failure...');
         setTimeout(() => {
-            console.log('Retrying WhatsApp client initialization...');
             initializeWhatsAppClient();
         }, 10000);
     }
@@ -219,6 +273,13 @@ const initializeWhatsAppClient = async () => {
 initializeWhatsAppClient();
 
 // --- Routes ---
+
+// Health check endpoint for deployment platforms
+app.get('/health', (req, res) => {
+    // Return 200 OK if the server is running.
+    // For a more robust check, you might verify DB connection or WhatsApp client status.
+    res.status(200).send('OK');
+});
 
 // Admin Login Page
 app.get('/admin/login', (req, res) => {
@@ -230,15 +291,28 @@ app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
     if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
         req.session.isAuthenticated = true;
-        res.redirect('/dashboard');
+        console.log('Admin login successful. Session set.');
+        req.session.save(err => { // Explicitly save session
+            if (err) {
+                console.error('Error saving session:', err);
+                return res.status(500).send('Session error');
+            }
+            res.redirect('/dashboard');
+        });
     } else {
+        console.warn('Admin login failed for username:', username);
         res.status(401).send('Invalid credentials');
     }
 });
 
 // Admin Logout
 app.get('/admin/logout', (req, res) => {
-    req.session.destroy(() => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Error destroying session:', err);
+        } else {
+            console.log('Admin session destroyed.');
+        }
         res.redirect('/admin/login');
     });
 });
@@ -272,6 +346,7 @@ app.get('/api/qr-status', isAuthenticated, (req, res) => {
 app.get('/api/qr-code', qrRateLimit, validateQRAccess, async (req, res) => {
     try {
         if (!whatsappQRData) {
+            console.log('QR code not available for /api/qr-code request.');
             return res.status(404).json({ 
                 success: false, 
                 message: 'QR code not available' 
@@ -318,7 +393,9 @@ app.get('/api/qr-code', qrRateLimit, validateQRAccess, async (req, res) => {
 // Force QR refresh endpoint (protected)
 app.post('/api/qr-refresh', isAuthenticated, async (req, res) => {
     try {
+        console.log('QR refresh requested.');
         if (whatsappClient) {
+            console.log('Destroying WhatsApp client for refresh...');
             await whatsappClient.destroy();
         }
         
@@ -328,11 +405,12 @@ app.post('/api/qr-refresh', isAuthenticated, async (req, res) => {
         qrCodeAccessToken = null;
         qrCodeData = 'Refreshing QR Code...';
         
-        // Reinitialize client
+        // Reinitialize client after a short delay
         setTimeout(() => {
+            console.log('Reinitializing WhatsApp client after refresh request...');
             initializeWhatsAppClient();
-        }, 2000);
-        
+        }, 2000); // Give some time for resources to clear
+
         res.json({ 
             success: true, 
             message: 'QR refresh initiated' 
@@ -370,9 +448,16 @@ app.post('/api/orders/:id/status', isAuthenticated, async (req, res) => {
         if (order) {
             if (whatsappClient && whatsappClient.isReady) {
                 const userNumber = order.userWhatsAppNumber;
-                if (userNumber) {
-                    whatsappClient.sendMessage(userNumber, `Your order #${order._id} status has been updated to: *${status}*`);
+                // Ensure the number is in the correct format (e.g., 91XXXXXXXXXX@c.us)
+                const formattedUserNumber = userNumber ? `${userNumber.replace(/\D/g, '')}@c.us` : null;
+                if (formattedUserNumber) {
+                    whatsappClient.sendMessage(formattedUserNumber, `Your order #${order._id} status has been updated to: *${status}*`);
+                    console.log(`Sent order status update to ${formattedUserNumber} for order #${order._id}`);
+                } else {
+                    console.warn(`Could not send WhatsApp message for order #${order._id}: Invalid user number ${userNumber}`);
                 }
+            } else {
+                console.warn('WhatsApp client not ready to send order status update.');
             }
             res.json(order);
         } else {
@@ -462,12 +547,16 @@ app.post('/api/order', async (req, res) => {
         await newOrder.populate('items.product');
 
         if (whatsappClient && whatsappClient.isReady && ADMIN_PHONE_NUMBER) {
+            const formattedAdminNumber = ADMIN_PHONE_NUMBER.replace(/\D/g, '') + '@c.us'; // Format admin number
             let orderSummary = `*New Order Received!* 🛍️\nOrder ID: #${newOrder._id}\nCustomer: ${userName || 'N/A'}\nWhatsApp: ${userWhatsAppNumber || 'N/A'}\nAddress: ${userAddress || 'N/A'}\nTotal: ₹${totalAmount.toFixed(2)}\nPayment: ${paymentMethod}\n\nItems:\n`;
             newOrder.items.forEach(item => {
                 orderSummary += `- ${item.quantity} x ${item.product ? item.product.name : 'Unknown Product'} (₹${item.price.toFixed(2)} each)\n`;
             });
-            orderSummary += `\nView dashboard for details: ${process.env.DASHBOARD_URL}`;
-            whatsappClient.sendMessage(ADMIN_PHONE_NUMBER, orderSummary);
+            orderSummary += `\nView dashboard for details: ${DASHBOARD_URL}`;
+            whatsappClient.sendMessage(formattedAdminNumber, orderSummary);
+            console.log(`Sent new order notification to admin: ${formattedAdminNumber}`);
+        } else {
+            console.warn('WhatsApp client not ready or ADMIN_PHONE_NUMBER not set for new order notification.');
         }
 
         res.status(201).json({ message: 'Order placed successfully!', order: newOrder });
@@ -479,24 +568,25 @@ app.post('/api/order', async (req, res) => {
 });
 
 // --- Scheduled Task ---
-cron.schedule('0 2 * * *', async () => {
+cron.schedule('0 2 * * *', async () => { // Runs daily at 2 AM
     console.log('Running daily cron job to notify users about old orders...');
     try {
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const ordersToNotify = await Order.find({
-            status: 'Completed',
+            status: 'Completed', // Only notify for completed orders
             createdAt: { $lte: sevenDaysAgo }
         });
 
         if (whatsappClient && whatsappClient.isReady) {
             for (const order of ordersToNotify) {
                 const userNumber = order.userWhatsAppNumber;
-                if (userNumber) {
-                    const message = `👋 Hi there! It's been a while since your last order #${order._id} on ${order.createdAt.toDateString()}. We hope you enjoyed your items! Check out our latest menu: ${process.env.WEB_MENU_URL}`;
-                    whatsappClient.sendMessage(userNumber, message);
-                    console.log(`Notified user ${userNumber} about old order #${order._id}`);
+                const formattedUserNumber = userNumber ? `${userNumber.replace(/\D/g, '')}@c.us` : null;
+                if (formattedUserNumber) {
+                    const message = `👋 Hi there! It's been a while since your last order #${order._id} on ${order.createdAt.toDateString()}. We hope you enjoyed your items! Check out our latest menu: ${WEB_MENU_URL}`;
+                    whatsappClient.sendMessage(formattedUserNumber, message);
+                    console.log(`Notified user ${formattedUserNumber} about old order #${order._id}`);
                 }
             }
         } else {
@@ -519,4 +609,6 @@ app.listen(PORT, () => {
     console.log(`Admin dashboard: http://localhost:${PORT}/dashboard`);
     console.log(`QR Panel: http://localhost:${PORT}/qr-panel`);
     console.log(`Admin credentials: Username: ${ADMIN_CREDENTIALS.username}, Password: ${ADMIN_CREDENTIALS.password}`);
+    console.log(`Ensure WEB_MENU_URL and DASHBOARD_URL environment variables are set for production deployment.`);
 });
+
