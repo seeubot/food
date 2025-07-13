@@ -101,10 +101,14 @@
         .btn-edit { background: #ffc107; color: #212529; }
         .btn-edit:hover { background: #e0a800; }
 
+        /* Added for responsive tables */
+        .table-responsive {
+            overflow-x: auto;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            min-width: 600px; /* Ensure table doesn't shrink too much */
         }
         th, td {
             padding: 12px;
@@ -221,7 +225,7 @@
         </div>
 
         <h2 class="section-title">Current Menu Items</h2>
-        <div id="menuItemsTable" class="loading">Loading menu items...</div>
+        <div id="menuItemsTable" class="loading table-responsive">Loading menu items...</div>
     </div>
 
     <!-- Custom Modal Structure -->
@@ -234,7 +238,7 @@
             <div class="modal-body">
                 <p id="modalMessage"></p>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" id="modalFooter">
                 <button class="btn btn-primary" onclick="closeModal()">OK</button>
             </div>
         </div>
@@ -242,11 +246,34 @@
 
     <script>
         // --- Modal Functions (copied from dashboard.html for consistency) ---
-        function showModal(title, message) {
+        function showModal(title, message, showConfirmButtons = false, onConfirm = null) {
             document.getElementById('modalTitle').textContent = title;
             document.getElementById('modalMessage').textContent = message;
+            const modalFooter = document.getElementById('modalFooter');
+            modalFooter.innerHTML = ''; // Clear previous buttons
+
+            if (showConfirmButtons) {
+                const confirmBtn = document.createElement('button');
+                confirmBtn.className = 'btn btn-danger';
+                confirmBtn.textContent = 'Confirm';
+                confirmBtn.onclick = () => { closeModal(); if (onConfirm) onConfirm(true); };
+                modalFooter.appendChild(confirmBtn);
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'btn btn-secondary';
+                cancelBtn.textContent = 'Cancel';
+                cancelBtn.onclick = () => { closeModal(); if (onConfirm) onConfirm(false); };
+                modalFooter.appendChild(cancelBtn);
+            } else {
+                const okBtn = document.createElement('button');
+                okBtn.className = 'btn btn-primary';
+                okBtn.textContent = 'OK';
+                okBtn.onclick = closeModal;
+                modalFooter.appendChild(okBtn);
+            }
             document.getElementById('myModal').classList.add('show');
         }
+
 
         function closeModal() {
             document.getElementById('myModal').classList.remove('show');
@@ -348,7 +375,8 @@
 
         async function editMenuItem(id) {
             try {
-                const response = await fetch(`/api/admin/menu`); // Fetch all to find by ID
+                // Fetch all items and find the one to edit (could optimize by fetching single item if API supported)
+                const response = await fetch(`/api/admin/menu`); 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -374,34 +402,26 @@
 
         async function deleteMenuItem(id) {
             // Using a custom modal for confirmation instead of browser's confirm()
-            const confirmDelete = await new Promise(resolve => {
-                showModal('Confirm Delete', 'Are you sure you want to delete this menu item?');
-                document.getElementById('modalFooter').innerHTML = `
-                    <button class="btn btn-danger" onclick="closeModal(); resolve(true);">Delete</button>
-                    <button class="btn btn-secondary" onclick="closeModal(); resolve(false);">Cancel</button>
-                `;
-            });
+            showModal('Confirm Delete', 'Are you sure you want to delete this menu item?', true, async (confirmed) => {
+                if (confirmed) {
+                    try {
+                        const response = await fetch(`/api/admin/menu/${id}`, {
+                            method: 'DELETE'
+                        });
 
-            if (!confirmDelete) {
-                return; // User cancelled
-            }
-
-            try {
-                const response = await fetch(`/api/admin/menu/${id}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    showModal('Success', 'Menu item deleted successfully!');
-                    loadMenuItems(); // Reload the list
-                } else {
-                    const errorData = await response.json();
-                    showModal('Error', `Failed to delete menu item: ` + (errorData.error || 'Unknown error'));
+                        if (response.ok) {
+                            showModal('Success', 'Menu item deleted successfully!');
+                            loadMenuItems(); // Reload the list
+                        } else {
+                            const errorData = await response.json();
+                            showModal('Error', `Failed to delete menu item: ` + (errorData.error || 'Unknown error'));
+                        }
+                    } catch (error) {
+                        console.error('Error deleting menu item:', error);
+                        showModal('Error', 'Network error or server issue.');
+                    }
                 }
-            } catch (error) {
-                console.error('Error deleting menu item:', error);
-                showModal('Error', 'Network error or server issue.');
-            }
+            });
         }
 
         function clearForm() {
