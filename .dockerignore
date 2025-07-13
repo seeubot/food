@@ -1,14 +1,18 @@
+# Ignore node_modules to prevent local dependencies from being copied
 node_modules
+
+# Ignore .env file as environment variables should be passed securely at runtime
+.env
+
+# Ignore Docker-related files
+Dockerfile
+.dockerignore
+
+# Ignore logs
 npm-debug.log
+*.log
+
+# Ignore local development files/directories
 .git
 .gitignore
-README.md
-.env
-.env.local
-.env.production
-.env.development
-whatsapp-session
-uploads
-*.log
-.DS_Store
-Thumbs.db
+
