@@ -5,7 +5,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install necessary system dependencies for Chromium
-# These packages are required for Puppeteer to run headless Chrome
+# This list is more comprehensive and includes common libraries needed by headless Chrome
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -15,13 +15,37 @@ RUN apk add --no-cache \
     ttf-freefont \
     fontconfig \
     udev \
-    # Add other common dependencies that might be missing
+    # Additional common dependencies for building and running Node.js apps with native modules
     git \
     openssh-client \
     python3 \
     make \
     g++ \
-    dumb-init # A small init system to properly handle signals for Node.js process
+    dumb-init \
+    # More specific dependencies often needed by Chromium
+    mesa-gl \
+    libstdc++ \
+    libgcc \
+    libxcomposite \
+    libxdamage \
+    libxfixes \
+    libxrandr \
+    libxcursor \
+    libxkbcommon \
+    libxmu \
+    libxpm \
+    libxt \
+    libxv \
+    libxxf86vm \
+    alsa-lib \
+    dbus \
+    glib \
+    pango \
+    cairo \
+    pixman \
+    # Ensure fonts are properly configured
+    # fc-cache is part of fontconfig and helps rebuild font caches
+    && fc-cache -f -v
 
 # Set dumb-init as the entrypoint to handle signals correctly
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
@@ -29,6 +53,10 @@ ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 # Install app dependencies
 # A wildcard is used to ensure both package.json and package-lock.json are copied
 COPY package*.json ./
+
+# IMPORTANT: Clean previous whatsapp-web.js session data before npm install
+# This helps prevent issues if the session data gets corrupted or becomes incompatible
+RUN rm -rf .wwebjs_auth
 
 # Install dependencies
 # Set PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true because we are installing chromium system-wide
