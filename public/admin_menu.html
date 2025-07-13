@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoodieBot Admin - Menu Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+        .header {
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            margin: 0;
+        }
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .section-title {
+            color: #25D366;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.5em;
+        }
+        .form-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .form-actions {
+            text-align: right;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-left: 10px;
+            transition: background 0.3s ease;
+        }
+        .btn-primary { background: #25D366; color: white; }
+        .btn-primary:hover { background: #128C7E; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #5a6268; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-edit { background: #ffc107; color: #212529; }
+        .btn-edit:hover { background: #e0a800; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        /* Modal Styles (copied from dashboard.html) */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .modal-header h2 {
+            margin: 0;
+            color: #25D366;
+        }
+        .close-button {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        .modal-footer {
+            text-align: right;
+        }
+        .modal-footer .btn {
+            margin-left: 10px;
+        }
+        .modal.show {
+            display: flex; /* Show the modal */
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🍔 FoodieBot - Menu Management</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+    
+    <div class="container">
+        <div class="form-section">
+            <h2 class="section-title" id="formTitle">Add New Menu Item</h2>
+            <form id="menuItemForm">
+                <input type="hidden" id="menuItemId">
+                <div class="form-group">
+                    <label for="itemName">Item Name:</label>
+                    <input type="text" id="itemName" required>
+                </div>
+                <div class="form-group">
+                    <label for="itemPrice">Price (₹):</label>
+                    <input type="number" id="itemPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="itemDescription">Description:</label>
+                    <textarea id="itemDescription" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="itemCategory">Category:</label>
+                    <input type="text" id="itemCategory" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Add Item</button>
+                    <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+                </div>
+            </form>
+        </div>
+
+        <h2 class="section-title">Current Menu Items</h2>
+        <div id="menuItemsTable" class="loading">Loading menu items...</div>
+    </div>
+
+    <!-- Custom Modal Structure -->
+    <div id="myModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"></h2>
+                <button class="close-button" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="modalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Modal Functions (copied from dashboard.html for consistency) ---
+        function showModal(title, message) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('myModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('myModal').classList.remove('show');
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('myModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        // --- Menu Management Functions ---
+        async function loadMenuItems() {
+            const menuItemsTableDiv = document.getElementById('menuItemsTable');
+            menuItemsTableDiv.innerHTML = '<div class="loading">Loading menu items...</div>';
+
+            try {
+                const response = await fetch('/api/admin/menu');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const items = await response.json();
+
+                if (items.length === 0) {
+                    menuItemsTableDiv.innerHTML = '<p class="loading">No menu items found. Add some above!</p>';
+                    return;
+                }
+
+                let tableHtml = '<table><thead><tr><th>Name</th><th>Price</th><th>Description</th><th>Category</th><th>Actions</th></tr></thead><tbody>';
+                items.forEach(item => {
+                    tableHtml += `
+                        <tr>
+                            <td>${item.name}</td>
+                            <td>₹${item.price.toFixed(2)}</td>
+                            <td>${item.description}</td>
+                            <td>${item.category}</td>
+                            <td>
+                                <button class="btn btn-edit" onclick="editMenuItem('${item._id}')">Edit</button>
+                                <button class="btn btn-danger" onclick="deleteMenuItem('${item._id}')">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tableHtml += '</tbody></table>';
+                menuItemsTableDiv.innerHTML = tableHtml;
+
+            } catch (error) {
+                console.error('Error loading menu items:', error);
+                menuItemsTableDiv.innerHTML = '<p class="loading">Failed to load menu items. Please try again.</p>';
+                showModal('Error', 'Failed to load menu items: ' + error.message);
+            }
+        }
+
+        async function submitMenuItem(event) {
+            event.preventDefault();
+            const itemId = document.getElementById('menuItemId').value;
+            const name = document.getElementById('itemName').value;
+            const price = parseFloat(document.getElementById('itemPrice').value);
+            const description = document.getElementById('itemDescription').value;
+            const category = document.getElementById('itemCategory').value;
+
+            if (!name || isNaN(price) || !description || !category) {
+                showModal('Validation Error', 'Please fill in all fields correctly.');
+                return;
+            }
+
+            const itemData = { name, price, description, category };
+            let response;
+
+            try {
+                if (itemId) { // Editing existing item
+                    response = await fetch(`/api/admin/menu/${itemId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(itemData)
+                    });
+                } else { // Adding new item
+                    response = await fetch('/api/admin/menu', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(itemData)
+                    });
+                }
+
+                if (response.ok) {
+                    showModal('Success', `Menu item ${itemId ? 'updated' : 'added'} successfully!`);
+                    clearForm();
+                    loadMenuItems(); // Reload the list
+                } else {
+                    const errorData = await response.json();
+                    showModal('Error', `Failed to ${itemId ? 'update' : 'add'} menu item: ` + (errorData.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error submitting menu item:', error);
+                showModal('Error', 'Network error or server issue.');
+            }
+        }
+
+        async function editMenuItem(id) {
+            try {
+                const response = await fetch(`/api/admin/menu`); // Fetch all to find by ID
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const items = await response.json();
+                const itemToEdit = items.find(item => item._id === id);
+
+                if (itemToEdit) {
+                    document.getElementById('menuItemId').value = itemToEdit._id;
+                    document.getElementById('itemName').value = itemToEdit.name;
+                    document.getElementById('itemPrice').value = itemToEdit.price;
+                    document.getElementById('itemDescription').value = itemToEdit.description;
+                    document.getElementById('itemCategory').value = itemToEdit.category;
+                    document.getElementById('formTitle').textContent = 'Edit Menu Item';
+                    document.getElementById('submitBtn').textContent = 'Update Item';
+                } else {
+                    showModal('Error', 'Menu item not found for editing.');
+                }
+            } catch (error) {
+                console.error('Error fetching item for edit:', error);
+                showModal('Error', 'Failed to load item for editing.');
+            }
+        }
+
+        async function deleteMenuItem(id) {
+            // Using a custom modal for confirmation instead of browser's confirm()
+            const confirmDelete = await new Promise(resolve => {
+                showModal('Confirm Delete', 'Are you sure you want to delete this menu item?');
+                document.getElementById('modalFooter').innerHTML = `
+                    <button class="btn btn-danger" onclick="closeModal(); resolve(true);">Delete</button>
+                    <button class="btn btn-secondary" onclick="closeModal(); resolve(false);">Cancel</button>
+                `;
+            });
+
+            if (!confirmDelete) {
+                return; // User cancelled
+            }
+
+            try {
+                const response = await fetch(`/api/admin/menu/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showModal('Success', 'Menu item deleted successfully!');
+                    loadMenuItems(); // Reload the list
+                } else {
+                    const errorData = await response.json();
+                    showModal('Error', `Failed to delete menu item: ` + (errorData.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error deleting menu item:', error);
+                showModal('Error', 'Network error or server issue.');
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('menuItemForm').reset();
+            document.getElementById('menuItemId').value = '';
+            document.getElementById('formTitle').textContent = 'Add New Menu Item';
+            document.getElementById('submitBtn').textContent = 'Add Item';
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/logout');
+                if (response.ok) {
+                    window.location.href = '/login';
+                } else {
+                    showModal('Logout Error', 'Failed to log out. Please try again.');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                showModal('Logout Error', 'An error occurred during logout.');
+            }
+        }
+
+        // Event listener for form submission
+        document.getElementById('menuItemForm').addEventListener('submit', submitMenuItem);
+
+        // Initial load of menu items when the page loads
+        document.addEventListener('DOMContentLoaded', loadMenuItems);
+    </script>
+</body>
+</html>
+
