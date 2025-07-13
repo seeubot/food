@@ -51,19 +51,26 @@ mongoose.connect(MONGODB_URI)
 let whatsappClient;
 let qrCodeData = 'Loading QR Code...'; // To store QR code data for display on dashboard
 
-const initializeWhatsAppClient = () => {
+const initializeWhatsAppClient = async () => { // Made this function async
     whatsappClient = new Client({
         authStrategy: new LocalAuth(), // Stores session data locally
         puppeteer: {
-            // Add these arguments for better Docker compatibility and performance
+            // Essential arguments for running headless Chromium in Docker
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-gpu', // Disable GPU hardware acceleration
-                '--disable-dev-shm-usage', // Overcome limited /dev/shm space in some environments
-                '--single-process' // Use only one process (can help with memory)
+                '--disable-gpu',
+                '--disable-dev-shm-usage', // Critical for Docker to prevent shared memory issues
+                '--single-process', // Can help with memory usage
+                '--no-zygote', // Prevents a potential crash on some Linux systems
+                '--disable-accelerated-2d-canvas', // Disables hardware acceleration for 2D canvas
+                '--no-first-run', // Suppresses the first-run experience
+                '--no-default-browser-check', // Prevents checking if Chrome is the default browser
+                '--disable-features=site-per-process', // Can help with stability
+                '--disable-site-isolation-trials', // Related to site-per-process
+                '--disable-blink-features=AutomationControlled' // Helps prevent detection as a bot
             ],
-            timeout: 60000 // Increase timeout to 60 seconds (from default 30s)
+            timeout: 90000 // Increased timeout to 90 seconds (from 60s)
         }
     });
 
@@ -99,12 +106,30 @@ const initializeWhatsAppClient = () => {
     whatsappClient.on('disconnected', (reason) => {
         console.log('WhatsApp Client was disconnected', reason);
         qrCodeData = `Disconnected: ${reason}. Please refresh to get new QR.`;
-        // Optionally, re-initialize or notify admin
+        // Attempt to re-initialize after a delay or on user action
+        // For production, consider a more robust re-initialization strategy
+        // setTimeout(() => initializeWhatsAppClient(), 5000);
     });
 
-    whatsappClient.initialize();
+    // Add a general error listener for the client
+    whatsappClient.on('error', (error) => {
+        console.error('WhatsApp Client Error:', error);
+        qrCodeData = `Error: ${error.message}. Please check logs.`;
+    });
+
+    try {
+        console.log('Initializing WhatsApp Client...');
+        await whatsappClient.initialize();
+        console.log('WhatsApp Client initialization complete.');
+    } catch (error) {
+        console.error('Failed to initialize WhatsApp Client:', error);
+        qrCodeData = `Initialization failed: ${error.message}. Check Docker logs for details.`;
+        // If initialization fails, you might want to exit or retry
+        // process.exit(1);
+    }
 };
 
+// Call the async initialization function
 initializeWhatsAppClient();
 
 // --- Routes ---
