@@ -3,11 +3,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode'); // Add this dependency for QR generation
 const path = require('path');
 const dotenv = require('dotenv');
 const cron = require('node-cron');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
+const rateLimit = require('express-rate-limit'); // Add this dependency for rate limiting
 
 // Load environment variables from .env file
 dotenv.config();
@@ -21,23 +23,38 @@ const ADMIN_CREDENTIALS = {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
-const ADMIN_PHONE_NUMBER = process.env.ADMIN_PHONE_NUMBER || 'YOUR_ADMIN_PHONE_NUMBER_HERE'; // e.g., '1234567890@c.us' for WhatsApp, or just '1234567890' for SMS concept
+const ADMIN_PHONE_NUMBER = process.env.ADMIN_PHONE_NUMBER || 'YOUR_ADMIN_PHONE_NUMBER_HERE';
+
+// QR Code storage and management
+let whatsappQRData = null;
+let qrCodeGeneratedAt = null;
+let qrCodeAccessToken = null;
+const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 
 // MongoDB Models
 const Product = require('./models/Product');
 const Order = require('./models/Order');
 
+// Rate limiting for QR endpoints
+const qrRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // limit each IP to 10 requests per windowMs
+    message: 'Too many QR requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // Middleware
-app.use(express.json()); // For parsing application/json
-app.use(express.urlencoded({ extended: true })); // For parsing application/x-www-form-urlencoded
-app.use(express.static(path.join(__dirname, 'public'))); // Serve static files from 'public' directory
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Session middleware for basic authentication
 app.use(session({
     secret: process.env.SESSION_SECRET || 'supersecretkey',
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false } // Set to true if using HTTPS
+    cookie: { secure: false }
 }));
 
 // Basic Authentication Middleware
@@ -48,6 +65,33 @@ const isAuthenticated = (req, res, next) => {
     res.redirect('/admin/login');
 };
 
+// QR Access Token Middleware
+const validateQRAccess = (req, res, next) => {
+    const { token } = req.query;
+    
+    if (!token || token !== qrCodeAccessToken) {
+        return res.status(401).json({ 
+            success: false, 
+            message: 'Invalid or expired QR access token' 
+        });
+    }
+    
+    // Check if QR code is still valid
+    if (!qrCodeGeneratedAt || Date.now() - qrCodeGeneratedAt > QR_EXPIRY_TIME) {
+        return res.status(410).json({ 
+            success: false, 
+            message: 'QR code has expired' 
+        });
+    }
+    
+    next();
+};
+
+// Generate secure access token for QR
+const generateQRAccessToken = () => {
+    return require('crypto').randomBytes(32).toString('hex');
+};
+
 // --- MongoDB Connection ---
 mongoose.connect(MONGODB_URI)
     .then(() => console.log('MongoDB connected successfully'))
@@ -55,19 +99,18 @@ mongoose.connect(MONGODB_URI)
 
 // --- WhatsApp Bot Initialization ---
 let whatsappClient;
-let qrCodeData = 'Loading QR Code...'; // To store QR code data for display on dashboard
+let qrCodeData = 'Loading QR Code...';
 
-const initializeWhatsAppClient = async () => { // Made this function async
+const initializeWhatsAppClient = async () => {
     whatsappClient = new Client({
-        authStrategy: new LocalAuth(), // Stores session data locally
+        authStrategy: new LocalAuth(),
         puppeteer: {
-            // Docker-optimized arguments for running headless Chromium
             headless: true,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-gpu',
-                '--disable-dev-shm-usage', // Critical for Docker to prevent shared memory issues
+                '--disable-dev-shm-usage',
                 '--disable-extensions',
                 '--disable-plugins',
                 '--disable-images',
@@ -84,7 +127,7 @@ const initializeWhatsAppClient = async () => { // Made this function async
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--no-zygote',
-                '--single-process', // Can help with memory usage in Docker
+                '--single-process',
                 '--memory-pressure-off',
                 '--max_old_space_size=4096',
                 '--disable-background-networking',
@@ -96,8 +139,7 @@ const initializeWhatsAppClient = async () => { // Made this function async
                 '--no-crash-upload',
                 '--disable-component-update'
             ],
-            timeout: 120000, // Increased timeout to 120 seconds
-            // Explicitly handle Chrome executable path for Docker
+            timeout: 120000,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
             ignoreDefaultArgs: ['--disable-extensions'],
             defaultViewport: null,
@@ -107,13 +149,19 @@ const initializeWhatsAppClient = async () => { // Made this function async
 
     whatsappClient.on('qr', qr => {
         qrcode.generate(qr, { small: true });
-        qrCodeData = qr; // Store QR data to display on dashboard
+        qrCodeData = qr;
+        whatsappQRData = qr;
+        qrCodeGeneratedAt = Date.now();
+        qrCodeAccessToken = generateQRAccessToken();
         console.log('QR RECEIVED', qr);
+        console.log('QR Access Token:', qrCodeAccessToken);
     });
 
     whatsappClient.on('ready', () => {
         console.log('WhatsApp Client is ready!');
-        qrCodeData = 'WhatsApp Client is ready!'; // Update status on dashboard
+        qrCodeData = 'WhatsApp Client is ready!';
+        whatsappQRData = null; // Clear QR data when connected
+        qrCodeAccessToken = null;
     });
 
     whatsappClient.on('message', async msg => {
@@ -131,37 +179,34 @@ const initializeWhatsAppClient = async () => { // Made this function async
         } else if (userMessage.includes('help')) {
             msg.reply('I can help you with placing an order! Just say "menu" to see what\'s available, or visit our website directly.');
         }
-        // Add more bot logic here for direct WhatsApp orders or queries
     });
 
     whatsappClient.on('disconnected', (reason) => {
         console.log('WhatsApp Client was disconnected', reason);
         qrCodeData = `Disconnected: ${reason}. Please refresh to get new QR.`;
-        // Attempt to re-initialize after a delay or on user action
-        // For production, consider a more robust re-initialization strategy
-        // setTimeout(() => initializeWhatsAppClient(), 5000);
+        whatsappQRData = null;
+        qrCodeAccessToken = null;
     });
 
-    // Add a general error listener for the client
     whatsappClient.on('error', (error) => {
         console.error('WhatsApp Client Error:', error);
         qrCodeData = `Error: ${error.message}. Please check logs.`;
+        whatsappQRData = null;
+        qrCodeAccessToken = null;
     });
 
     try {
         console.log('Initializing WhatsApp Client...');
-        
-        // Add a small delay before initialization to ensure system is ready
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
         console.log('Starting WhatsApp client initialization...');
         await whatsappClient.initialize();
         console.log('WhatsApp Client initialization complete.');
     } catch (error) {
         console.error('Failed to initialize WhatsApp Client:', error);
         qrCodeData = `Initialization failed: ${error.message}. Check Docker logs for details.`;
+        whatsappQRData = null;
+        qrCodeAccessToken = null;
         
-        // Retry mechanism with exponential backoff
         console.log('Attempting to restart WhatsApp client in 10 seconds...');
         setTimeout(() => {
             console.log('Retrying WhatsApp client initialization...');
@@ -177,13 +222,12 @@ initializeWhatsAppClient();
 
 // Admin Login Page
 app.get('/admin/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin-login.html')); // Create a simple login HTML
+    res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
 
 // Admin Login POST
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
-    // Use hardcoded admin credentials
     if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
         req.session.isAuthenticated = true;
         res.redirect('/dashboard');
@@ -204,7 +248,105 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-// API to get QR Code for dashboard
+// QR Panel Page (protected)
+app.get('/qr-panel', isAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'qr-panel.html'));
+});
+
+// API to get QR Code status and access token (protected)
+app.get('/api/qr-status', isAuthenticated, (req, res) => {
+    const now = Date.now();
+    const isExpired = qrCodeGeneratedAt && (now - qrCodeGeneratedAt > QR_EXPIRY_TIME);
+    
+    res.json({
+        success: true,
+        hasQR: !!whatsappQRData && !isExpired,
+        isConnected: whatsappClient && whatsappClient.isReady,
+        accessToken: qrCodeAccessToken,
+        expiresAt: qrCodeGeneratedAt ? qrCodeGeneratedAt + QR_EXPIRY_TIME : null,
+        timeRemaining: qrCodeGeneratedAt && !isExpired ? QR_EXPIRY_TIME - (now - qrCodeGeneratedAt) : 0
+    });
+});
+
+// Protected QR Code endpoint with rate limiting
+app.get('/api/qr-code', qrRateLimit, validateQRAccess, async (req, res) => {
+    try {
+        if (!whatsappQRData) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'QR code not available' 
+            });
+        }
+
+        const format = req.query.format || 'png';
+        const size = parseInt(req.query.size) || 256;
+
+        if (format === 'svg') {
+            const qrSvg = await QRCode.toString(whatsappQRData, { 
+                type: 'svg',
+                width: size,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            });
+            res.setHeader('Content-Type', 'image/svg+xml');
+            res.send(qrSvg);
+        } else {
+            const qrBuffer = await QRCode.toBuffer(whatsappQRData, {
+                type: 'png',
+                width: size,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            });
+            res.setHeader('Content-Type', 'image/png');
+            res.send(qrBuffer);
+        }
+    } catch (error) {
+        console.error('Error generating QR code:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error generating QR code' 
+        });
+    }
+});
+
+// Force QR refresh endpoint (protected)
+app.post('/api/qr-refresh', isAuthenticated, async (req, res) => {
+    try {
+        if (whatsappClient) {
+            await whatsappClient.destroy();
+        }
+        
+        // Reset QR data
+        whatsappQRData = null;
+        qrCodeGeneratedAt = null;
+        qrCodeAccessToken = null;
+        qrCodeData = 'Refreshing QR Code...';
+        
+        // Reinitialize client
+        setTimeout(() => {
+            initializeWhatsAppClient();
+        }, 2000);
+        
+        res.json({ 
+            success: true, 
+            message: 'QR refresh initiated' 
+        });
+    } catch (error) {
+        console.error('Error refreshing QR:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error refreshing QR code' 
+        });
+    }
+});
+
+// Original dashboard QR endpoint (for backward compatibility)
 app.get('/api/whatsapp-qr', isAuthenticated, (req, res) => {
     res.json({ qrCode: qrCodeData });
 });
@@ -226,9 +368,8 @@ app.post('/api/orders/:id/status', isAuthenticated, async (req, res) => {
         const { status } = req.body;
         const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
         if (order) {
-            // Notify user about status change via WhatsApp
             if (whatsappClient && whatsappClient.isReady) {
-                const userNumber = order.userWhatsAppNumber; // Assuming this is stored in the order
+                const userNumber = order.userWhatsAppNumber;
                 if (userNumber) {
                     whatsappClient.sendMessage(userNumber, `Your order #${order._id} status has been updated to: *${status}*`);
                 }
@@ -271,7 +412,7 @@ app.post('/api/menu', isAuthenticated, async (req, res) => {
 app.delete('/api/menu/:id', isAuthenticated, async (req, res) => {
     try {
         await Product.findByIdAndDelete(req.params.id);
-        res.status(204).send(); // No content
+        res.status(204).send();
     } catch (error) {
         console.error('Error deleting product:', error);
         res.status(500).json({ message: 'Error deleting product' });
@@ -292,7 +433,6 @@ app.post('/api/order', async (req, res) => {
             return res.status(400).json({ message: 'Order must contain items.' });
         }
 
-        // Validate items and calculate total
         let totalAmount = 0;
         const orderItems = [];
         for (const item of items) {
@@ -300,11 +440,10 @@ app.post('/api/order', async (req, res) => {
             if (!product) {
                 return res.status(400).json({ message: `Product with ID ${item.productId} not found.` });
             }
-            // Ensure product.name is available for the admin notification
             orderItems.push({
                 product: product._id,
                 quantity: item.quantity,
-                price: product.price // Store current price at time of order
+                price: product.price
             });
             totalAmount += product.price * item.quantity;
         }
@@ -316,15 +455,12 @@ app.post('/api/order', async (req, res) => {
             userAddress,
             totalAmount,
             paymentMethod,
-            status: 'Pending' // Initial status
+            status: 'Pending'
         });
 
         await newOrder.save();
-
-        // Re-populate product details for the notification message
         await newOrder.populate('items.product');
 
-        // Notify admin via WhatsApp
         if (whatsappClient && whatsappClient.isReady && ADMIN_PHONE_NUMBER) {
             let orderSummary = `*New Order Received!* 🛍️\nOrder ID: #${newOrder._id}\nCustomer: ${userName || 'N/A'}\nWhatsApp: ${userWhatsAppNumber || 'N/A'}\nAddress: ${userAddress || 'N/A'}\nTotal: ₹${totalAmount.toFixed(2)}\nPayment: ${paymentMethod}\n\nItems:\n`;
             newOrder.items.forEach(item => {
@@ -333,10 +469,6 @@ app.post('/api/order', async (req, res) => {
             orderSummary += `\nView dashboard for details: ${process.env.DASHBOARD_URL}`;
             whatsappClient.sendMessage(ADMIN_PHONE_NUMBER, orderSummary);
         }
-        // SMS notification concept (requires SMS gateway API)
-        // if (SMS_API_ENABLED && ADMIN_SMS_NUMBER) {
-        //     sendSMS(ADMIN_SMS_NUMBER, `New order #${newOrder._id} from ${userName}. Total: ₹${totalAmount.toFixed(2)}. Check dashboard.`);
-        // }
 
         res.status(201).json({ message: 'Order placed successfully!', order: newOrder });
 
@@ -346,21 +478,16 @@ app.post('/api/order', async (req, res) => {
     }
 });
 
-// --- Scheduled Task: Auto-notify users for orders older than 7 days ---
-// This cron job will run once every day at 2 AM (0 2 * * *)
+// --- Scheduled Task ---
 cron.schedule('0 2 * * *', async () => {
     console.log('Running daily cron job to notify users about old orders...');
     try {
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        // Find orders that are 'Completed' and older than 7 days, and haven't been notified recently
-        // You might need an additional field in the Order model like `lastNotifiedAt`
         const ordersToNotify = await Order.find({
             status: 'Completed',
-            createdAt: { $lte: sevenDaysAgo },
-            // Add a check here if you want to prevent repeated notifications for the same order
-            // e.g., lastNotifiedAt: { $lt: sevenDaysAgo } or lastNotifiedAt: { $exists: false }
+            createdAt: { $lte: sevenDaysAgo }
         });
 
         if (whatsappClient && whatsappClient.isReady) {
@@ -370,8 +497,6 @@ cron.schedule('0 2 * * *', async () => {
                     const message = `👋 Hi there! It's been a while since your last order #${order._id} on ${order.createdAt.toDateString()}. We hope you enjoyed your items! Check out our latest menu: ${process.env.WEB_MENU_URL}`;
                     whatsappClient.sendMessage(userNumber, message);
                     console.log(`Notified user ${userNumber} about old order #${order._id}`);
-                    // Optionally, update a `lastNotifiedAt` field on the order here
-                    // await Order.findByIdAndUpdate(order._id, { lastNotifiedAt: new Date() });
                 }
             }
         } else {
@@ -382,7 +507,6 @@ cron.schedule('0 2 * * *', async () => {
     }
 });
 
-
 // Redirect root to order page
 app.get('/', (req, res) => {
     res.redirect('/order');
@@ -392,6 +516,7 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Order page: http://localhost:${PORT}/order`);
-    console.log(`Admin dashboard: http://localhost:${PORT}/dashboard (Login at /admin/login)`);
+    console.log(`Admin dashboard: http://localhost:${PORT}/dashboard`);
+    console.log(`QR Panel: http://localhost:${PORT}/qr-panel`);
     console.log(`Admin credentials: Username: ${ADMIN_CREDENTIALS.username}, Password: ${ADMIN_CREDENTIALS.password}`);
 });
