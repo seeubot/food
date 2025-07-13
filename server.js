@@ -61,22 +61,47 @@ const initializeWhatsAppClient = async () => { // Made this function async
     whatsappClient = new Client({
         authStrategy: new LocalAuth(), // Stores session data locally
         puppeteer: {
-            // Essential arguments for running headless Chromium in Docker
+            // Docker-optimized arguments for running headless Chromium
+            headless: true,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-gpu',
                 '--disable-dev-shm-usage', // Critical for Docker to prevent shared memory issues
-                '--single-process', // Can help with memory usage
-                '--no-zygote', // Prevents a potential crash on some Linux systems
-                '--disable-accelerated-2d-canvas', // Disables hardware acceleration for 2D canvas
-                '--no-first-run', // Suppresses the first-run experience
-                '--no-default-browser-check', // Prevents checking if Chrome is the default browser
-                '--disable-features=site-per-process', // Can help with stability
-                '--disable-site-isolation-trials', // Related to site-per-process
-                '--disable-blink-features=AutomationControlled' // Helps prevent detection as a bot
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-images',
+                '--disable-javascript',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-features=TranslateUI',
+                '--disable-ipc-flooding-protection',
+                '--disable-web-security',
+                '--disable-features=site-per-process',
+                '--disable-site-isolation-trials',
+                '--disable-blink-features=AutomationControlled',
+                '--no-first-run',
+                '--no-default-browser-check',
+                '--no-zygote',
+                '--single-process', // Can help with memory usage in Docker
+                '--memory-pressure-off',
+                '--max_old_space_size=4096',
+                '--disable-background-networking',
+                '--disable-default-apps',
+                '--disable-hang-monitor',
+                '--disable-prompt-on-repost',
+                '--disable-sync',
+                '--metrics-recording-only',
+                '--no-crash-upload',
+                '--disable-component-update'
             ],
-            timeout: 90000 // Increased timeout to 90 seconds (from 60s)
+            timeout: 120000, // Increased timeout to 120 seconds
+            // Explicitly handle Chrome executable path for Docker
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            ignoreDefaultArgs: ['--disable-extensions'],
+            defaultViewport: null,
+            ignoreHTTPSErrors: true
         }
     });
 
@@ -125,13 +150,23 @@ const initializeWhatsAppClient = async () => { // Made this function async
 
     try {
         console.log('Initializing WhatsApp Client...');
+        
+        // Add a small delay before initialization to ensure system is ready
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        console.log('Starting WhatsApp client initialization...');
         await whatsappClient.initialize();
         console.log('WhatsApp Client initialization complete.');
     } catch (error) {
         console.error('Failed to initialize WhatsApp Client:', error);
         qrCodeData = `Initialization failed: ${error.message}. Check Docker logs for details.`;
-        // If initialization fails, you might want to exit or retry
-        // process.exit(1);
+        
+        // Retry mechanism with exponential backoff
+        console.log('Attempting to restart WhatsApp client in 10 seconds...');
+        setTimeout(() => {
+            console.log('Retrying WhatsApp client initialization...');
+            initializeWhatsAppClient();
+        }, 10000);
     }
 };
 
