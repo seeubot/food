@@ -3,540 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FoodieBot Dashboard</title>
+    <title>Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
-            color: #333;
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
         }
-        .header {
-            background: linear-gradient(135deg, #25D366, #128C7E);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .sidebar {
+            width: 250px;
+            min-width: 250px;
         }
-        .header h1 {
-            margin: 0;
-        }
-        .logout-btn {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s ease;
-        }
-        .logout-btn:hover {
-            background: rgba(255, 255, 255, 0.4);
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            text-align: center;
-        }
-        .stat-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #25D366;
-            margin-bottom: 10px;
-        }
-        .tabs {
-            display: flex;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-        }
-        .tab {
-            flex: 1;
-            padding: 15px;
-            text-align: center;
-            cursor: pointer;
-            border: none;
-            background: white;
-            font-size: 16px;
-            transition: background 0.3s ease, color 0.3s ease;
-        }
-        .tab.active {
-            background: #25D366;
-            color: white;
-        }
-        .tab:hover:not(.active) {
-            background: #e9ecef;
-        }
-        .tab-content {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            min-height: 400px;
-        }
-        .tab-pane {
-            display: none;
-        }
-        .tab-pane.active {
-            display: block;
-        }
-        /* Added for responsive tables */
-        .table-responsive {
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 600px; /* Ensure table doesn't shrink too much */
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        th {
-            background: #f8f9fa;
-            font-weight: 600;
-        }
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            display: inline-block;
-        }
-        .status-badge.pending_payment, .status-badge.pending_verification, .status-badge.awaiting_admin_review { background: #fff3cd; color: #856404; }
-        .status-badge.confirmed, .status-badge.verified { background: #d4edda; color: #155724; }
-        .status-badge.delivered, .status-badge.cod_selected { background: #d1ecf1; color: #0c5460; }
-        .status-badge.cancelled, .status-badge.rejected, .status-badge.payment_failed { background: #f8d7da; color: #721c24; }
-        .status-badge.preparing, .status-badge.out_for_delivery, .status-badge.pending_admin_approval { background: #cce5ff; color: #004085; }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            margin: 2px;
-            transition: background 0.3s ease;
-        }
-        .btn-primary { background: #25D366; color: white; }
-        .btn-primary:hover { background: #128C7E; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-danger:hover { background: #c82333; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-success:hover { background: #218838; }
-        .btn-info { background: #17a2b8; color: white; }
-        .btn-info:hover { background: #138496; }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
-            left: 0;
-            top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            max-width: 500px;
-            width: 90%;
-            text-align: center;
-            position: relative;
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .modal-header h2 {
-            margin: 0;
-            color: #25D366;
-        }
-        .close-button {
-            color: #aaa;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            background: none;
-        }
-        .close-button:hover,
-        .close-button:focus {
-            color: #000;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        .modal-body {
-            margin-bottom: 20px;
-        }
-        .modal-footer {
-            text-align: right;
-        }
-        .modal-footer .btn {
-            margin-left: 10px;
-        }
-        .modal.show {
-            display: flex; /* Show the modal */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                min-width: unset;
+            }
+            .main-content {
+                margin-left: 0 !important;
+            }
         }
     </style>
 </head>
-<body>
-    <div class="header">
-        <h1>🍽️ FoodieBot Dashboard</h1>
-        <button class="logout-btn" onclick="logout()">Logout</button>
-    </div>
-    
-    <div class="container">
-        <div class="stats" id="stats">
-            <div class="stat-card">
-                <div class="stat-number" id="totalOrders">-</div>
-                <div>Total Orders</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="totalUsers">-</div>
-                <div>Total Users</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="pendingOrders">-</div>
-                <div>Pending Orders</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="botStatus">-</div>
-                <div>Bot Status</div>
-            </div>
-        </div>
-        
-        <div class="tabs">
-            <button class="tab active" onclick="showTab(event, 'orders')">Orders</button>
-            <button class="tab" onclick="showTab(event, 'users')">Users</button>
-            <button class="tab" onclick="showTab(event, 'payments')">Payments</button>
-            <button class="tab" onclick="showTab(event, 'broadcast')">Broadcast</button>
-            <button class="tab" onclick="window.location.href='/admin/menu'">Menu Management</button>
-        </div>
-        
-        <div class="tab-content">
-            <div id="orders" class="tab-pane active">
-                <h3>Recent Orders</h3>
-                <div id="ordersTable" class="loading table-responsive">Loading orders...</div>
-            </div>
-            
-            <div id="users" class="tab-pane">
-                <h3>Users</h3>
-                <div id="usersTable" class="loading table-responsive">Loading users...</div>
-            </div>
-            
-            <div id="payments" class="tab-pane">
-                <h3>Payment Verifications</h3>
-                <div id="paymentsTable" class="loading table-responsive">Loading payments...</div>
-            </div>
-            
-            <div id="broadcast" class="tab-pane">
-                <h3>Broadcast Message</h3>
-                <textarea id="broadcastMessage" placeholder="Enter your broadcast message..." rows="4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px;"></textarea>
-                <button class="btn btn-primary" onclick="sendBroadcast()">Send Broadcast</button>
-                <div id="broadcastResult" style="margin-top: 15px;"></div>
-            </div>
-        </div>
-    </div>
+<body class="flex flex-col md:flex-row min-h-screen bg-gray-100">
 
-    <!-- Custom Modal Structure -->
-    <div id="myModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle"></h2>
-                <button class="close-button" onclick="closeModal()">&times;</button>
+    <!-- Sidebar -->
+    <aside class="sidebar bg-gray-800 text-white p-6 flex flex-col space-y-4 shadow-lg md:h-screen">
+        <h1 class="text-3xl font-bold text-center mb-6">Bot Admin</h1>
+        <nav class="flex flex-col space-y-2">
+            <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out" data-section="dashboard">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2 2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                Dashboard
+            </a>
+            <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out" data-section="orders">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                Orders
+            </a>
+            <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out" data-section="menu">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m7-7V3"></path></svg>
+                Menu Management
+            </a>
+            <a href="/admin/logout" class="nav-link flex items-center p-3 rounded-lg hover:bg-red-600 transition duration-200 ease-in-out bg-red-700 mt-auto">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                Logout
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content flex-1 p-6 md:ml-6 bg-white rounded-lg shadow-md m-4">
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="content-section active">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Dashboard Overview</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div class="bg-blue-500 text-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Total Orders</p>
+                        <p class="text-4xl font-bold" id="totalOrders">0</p>
+                    </div>
+                    <svg class="w-12 h-12 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                </div>
+                <div class="bg-green-500 text-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Pending Orders</p>
+                        <p class="text-4xl font-bold" id="pendingOrders">0</p>
+                    </div>
+                    <svg class="w-12 h-12 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div class="bg-purple-500 text-white p-6 rounded-lg shadow-md flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Total Menu Items</p>
+                        <p class="text-4xl font-bold" id="totalMenuItems">0</p>
+                    </div>
+                    <svg class="w-12 h-12 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m7-7V3"></path></svg>
+                </div>
             </div>
-            <div class="modal-body">
-                <p id="modalMessage"></p>
+
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">WhatsApp Bot Status</h3>
+                <div id="qrCodeContainer" class="flex flex-col items-center justify-center">
+                    <p class="text-gray-600 mb-2" id="qrStatus">Loading QR Code...</p>
+                    <img id="qrCodeImage" src="" alt="WhatsApp QR Code" class="w-64 h-64 border border-gray-300 rounded-lg shadow-sm" style="display:none;">
+                    <p class="text-sm text-gray-500 mt-2">Scan this QR code with your WhatsApp app to connect the bot.</p>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-primary" onclick="closeModal()">OK</button>
+        </section>
+
+        <!-- Orders Section -->
+        <section id="orders-section" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Orders Management</h2>
+            <div class="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WhatsApp</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordered At</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Orders will be loaded here by JavaScript -->
+                    </tbody>
+                </table>
+                <div id="noOrdersMessage" class="text-center py-4 text-gray-500 hidden">No orders found.</div>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <script>
-        let currentData = {};
-        
-        // --- Modal Functions ---
-        function showModal(title, message) {
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalMessage').textContent = message;
-            document.getElementById('myModal').classList.add('show');
-        }
+        <!-- Menu Management Section -->
+        <section id="menu-section" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Menu Management</h2>
 
-        function closeModal() {
-            document.getElementById('myModal').classList.remove('show');
-        }
+            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Add New Menu Item</h3>
+                <form id="menuItemForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="itemName" class="block text-gray-700 text-sm font-semibold mb-2">Item Name:</label>
+                        <input type="text" id="itemName" name="itemName" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <div>
+                        <label for="itemPrice" class="block text-gray-700 text-sm font-semibold mb-2">Price (₹):</label>
+                        <input type="number" id="itemPrice" name="itemPrice" step="0.01" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="itemDescription" class="block text-gray-700 text-sm font-semibold mb-2">Description:</label>
+                        <textarea id="itemDescription" name="itemDescription" rows="3" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label for="itemImageUrl" class="block text-gray-700 text-sm font-semibold mb-2">Image URL:</label>
+                        <input type="url" id="itemImageUrl" name="itemImageUrl" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/image.jpg">
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-200 ease-in-out transform hover:scale-105">
+                            Add Item
+                        </button>
+                    </div>
+                </form>
+                <div id="menuMessageBox" class="mt-4 p-3 rounded-lg hidden"></div>
+            </div>
 
-        // Close modal if clicking outside of it
-        window.onclick = function(event) {
-            const modal = document.getElementById('myModal');
-            if (event.target == modal) {
-                closeModal();
-            }
-        }
+            <div class="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
+                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Existing Menu Items</h3>
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (₹)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="menuItemsTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Menu items will be loaded here by JavaScript -->
+                    </tbody>
+                </table>
+                <div id="noMenuItemsMessage" class="text-center py-4 text-gray-500 hidden">No menu items added yet.</div>
+            </div>
+        </section>
+    </main>
 
-        function showTab(event, tabName) {
-            // Hide all tab panes
-            document.querySelectorAll('.tab-pane').forEach(pane => {
-                pane.classList.remove('active');
-            });
-            
-            // Remove active class from all tabs
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // Show selected tab pane
-            document.getElementById(tabName).classList.add('active');
-            
-            // Add active class to clicked tab
-            event.target.classList.add('active');
-        }
-        
-        async function loadDashboard() {
-            try {
-                // Load stats
-                const [orders, users, payments, status] = await Promise.all([
-                    fetch('/api/orders').then(r => r.json()),
-                    fetch('/api/users').then(r => r.json()),
-                    fetch('/api/payments').then(r => r.json()),
-                    fetch('/api/status').then(r => r.json())
-                ]);
-                
-                currentData = { orders, users, payments, status };
-                
-                // Update stats
-                document.getElementById('totalOrders').textContent = orders.length;
-                // Pending orders now includes 'pending_admin_approval'
-                document.getElementById('pendingOrders').textContent = orders.filter(o => o.status === 'pending_admin_approval' || o.status === 'pending_payment' || o.status === 'confirmed' || o.status === 'preparing' || o.status === 'out_for_delivery').length;
-                document.getElementById('totalUsers').textContent = users.length;
-                document.getElementById('botStatus').textContent = status.isAuthenticated ? '✅ Connected' : '❌ Disconnected';
-                
-                // Load tables
-                loadOrdersTable(orders);
-                loadUsersTable(users);
-                loadPaymentsTable(payments);
-                
-            } catch (error) {
-                console.error('Error loading dashboard:', error);
-                showModal('Error', 'Failed to load dashboard data. Please refresh or check server connection.');
-            }
-        }
-        
-        function loadOrdersTable(orders) {
-            const table = createTable([
-                'Order ID', 'Customer', 'Items', 'Total', 'Status', 'Payment', 'Date', 'Actions'
-            ], orders.map(order => [
-                order.orderId,
-                order.customerName || order.customerPhone,
-                order.items.length + ' items',
-                '₹' + order.total,
-                '<span class="status-badge ' + order.status + '">' + order.status.replace(/_/g, ' ') + '</span>',
-                '<span class="status-badge ' + order.paymentStatus + '">' + (order.paymentStatus || 'pending').replace(/_/g, ' ') + '</span>',
-                new Date(order.createdAt).toLocaleString(),
-                // Actions for orders, including 'Approve' for pending_admin_approval
-                (order.status === 'pending_admin_approval' ? 
-                 `<button class="btn btn-success" onclick="updateOrderStatus('${order.orderId}', 'confirmed')">Approve & Confirm</button>` : '') +
-                (order.status === 'confirmed' ?
-                 `<button class="btn btn-info" onclick="updateOrderStatus('${order.orderId}', 'preparing')">Prepare</button>` : '') +
-                (order.status === 'preparing' ?
-                 `<button class="btn btn-info" onclick="updateOrderStatus('${order.orderId}', 'out_for_delivery')">Out for Delivery</button>` : '') +
-                (order.status === 'out_for_delivery' ?
-                 `<button class="btn btn-success" onclick="updateOrderStatus('${order.orderId}', 'delivered')">Delivered</button>` : '') +
-                `<button class="btn btn-danger" onclick="updateOrderStatus('${order.orderId}', 'cancelled')">Cancel</button>`
-            ]));
-            
-            document.getElementById('ordersTable').innerHTML = table;
-        }
-        
-        function loadUsersTable(users) {
-            const table = createTable([
-                'Phone', 'Name', 'Address', 'Profile Complete', 'Joined'
-            ], users.map(user => [
-                user.phone,
-                user.name || '-',
-                user.address || '-',
-                user.isProfileComplete ? '✅ Yes' : '❌ No',
-                new Date(user.createdAt).toLocaleString()
-            ]));
-            
-            document.getElementById('usersTable').innerHTML = table;
-        }
-        
-        function loadPaymentsTable(payments) {
-            const table = createTable([
-                'Order ID', 'Customer', 'Method', 'Type', 'Status', 'Date', 'Actions'
-            ], payments.map(payment => [
-                payment.orderId,
-                payment.customerPhone,
-                payment.paymentMethod,
-                payment.proofType || '-',
-                '<span class="status-badge ' + payment.status + '">' + payment.status.replace(/_/g, ' ') + '</span>',
-                new Date(payment.timestamp).toLocaleString(),
-                payment.status === 'pending_verification' ? 
-                    `<button class="btn btn-success" onclick="verifyPayment('${payment._id}', true)">Verify</button>` +
-                    `<button class="btn btn-danger" onclick="verifyPayment('${payment._id}', false)">Reject</button>` : '-'
-            ]));
-            
-            document.getElementById('paymentsTable').innerHTML = table;
-        }
-        
-        function createTable(headers, rows) {
-            let html = '<table><thead><tr>';
-            headers.forEach(header => {
-                html += '<th>' + header + '</th>';
-            });
-            html += '</tr></thead><tbody>';
-            
-            rows.forEach(row => {
-                html += '<tr>';
-                row.forEach(cell => {
-                    html += '<td>' + cell + '</td>';
-                    // Added for debugging, remove in production
-                    // html += '<td>' + JSON.stringify(cell) + '</td>'; 
-                });
-                html += '</tr>';
-            });
-            
-            html += '</tbody></table>';
-            return html;
-        }
-        
-        async function updateOrderStatus(orderId, status) {
-            try {
-                const response = await fetch('/api/orders/' + orderId + '/status', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status })
-                });
-                
-                if (response.ok) {
-                    showModal('Success', 'Order status updated successfully!');
-                    loadDashboard();
-                } else {
-                    const errorData = await response.json();
-                    showModal('Error', 'Error updating order status: ' + (errorData.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showModal('Error', 'Network error or server issue while updating order status.');
-            }
-        }
-        
-        async function verifyPayment(paymentId, verified) {
-            try {
-                const notes = verified ? 'Payment verified by admin' : 'Payment rejected by admin';
-                const response = await fetch('/api/payments/' + paymentId + '/verify', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ verified, notes })
-                });
-                
-                if (response.ok) {
-                    showModal('Success', 'Payment ' + (verified ? 'verified' : 'rejected') + ' successfully!');
-                    loadDashboard();
-                } else {
-                    const errorData = await response.json();
-                    showModal('Error', 'Error updating payment status: ' + (errorData.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showModal('Error', 'Network error or server issue while updating payment status.');
-            }
-        }
-        
-        async function sendBroadcast() {
-            const message = document.getElementById('broadcastMessage').value;
-            if (!message) {
-                showModal('Warning', 'Please enter a message to broadcast.');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/broadcast', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
-                });
-                
-                const result = await response.json();
-                document.getElementById('broadcastResult').innerHTML = 
-                    '<div style="margin-top: 10px; padding: 10px; background: #d4edda; border-radius: 4px; color: #155724;">' +
-                    result.message + '</div>';
-                
-                document.getElementById('broadcastMessage').value = '';
-                showModal('Broadcast Sent', result.message);
-            } catch (error) {
-                console.error('Error:', error);
-                showModal('Error', 'Network error or server issue while sending broadcast.');
-            }
-        }
-
-        async function logout() {
-            try {
-                const response = await fetch('/logout');
-                if (response.ok) {
-                    window.location.href = '/login';
-                } else {
-                    showModal('Logout Error', 'Failed to log out. Please try again.');
-                }
-            } catch (error) {
-                console.error('Logout error:', error);
-                showModal('Logout Error', 'An error occurred during logout.');
-            }
-        }
-        
-        // Load dashboard on page load
-        loadDashboard();
-        
-        // Refresh every 30 seconds
-        setInterval(loadDashboard, 30000);
-    </script>
+    <script src="/js/dashboard.js"></script>
 </body>
 </html>
 
