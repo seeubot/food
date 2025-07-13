@@ -187,7 +187,7 @@ Hello! I'm your personal food ordering assistant.
 
 🌐 *ORDER NOW:*
 Click here to browse our menu and place your order:
-👆 https://jolly-phebe-seeutech-5259d95c.koyeb.app/order.html
+👆 https://your-restaurant-website.com/order
 
 📦 Type *"cart"* - View your current order
 ✅ Type *"confirm"* - Place your order
@@ -404,7 +404,7 @@ client.on('message', async (message) => {
             
             cartText += `\n💰 *Total: ₹${total}*\n\n`;
             cartText += '✅ Type "confirm" to place order\n';
-            cartText += '🌐 Click here to add more items:\n👆 https://jolly-phebe-seeutech-5259d95c.koyeb.app/order.html';
+            cartText += '🌐 Click here to add more items:\n👆 https://your-restaurant-website.com/order';
             
             message.reply(cartText);
         }
@@ -458,7 +458,7 @@ client.on('message', async (message) => {
                 return;
             }
             
-            userSessions.set(userPhone, { ...session, state: 'awaiting_upi_proof' });
+            userSessions.set(userPhone, { state: 'awaiting_upi_proof' });
             
             const upiText = `🏦 *UPI Payment Details*\n\n💰 Amount: ₹${order.total}\n📋 Order ID: ${order.orderId}\n\n*Pay to any of these UPI IDs:*\n• PhonePe: 9876543210\n• Google Pay: 9876543210\n• Paytm: 9876543210\n\n📸 *After payment, send:*\n• Payment screenshot (image), OR\n• 12-digit UTR number\n\n💡 Type "cod" to switch to Cash on Delivery`;
             
