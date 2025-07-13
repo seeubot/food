@@ -16,13 +16,13 @@ app.use(session({
     secret: 'your_secret_key_here', // Replace with a strong, random secret in production
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false } // Set to true if using HTTPS
+    cookie: { secure: true } // Set to true if using HTTPS. IMPORTANT: For local development, set to false.
 }));
 
 // --- Basic Authentication Middleware ---
 // For demonstration purposes. In production, use environment variables for credentials
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'password'; // Use a hashed password in production
+const ADMIN_PASSWORD = 'admin'; // Use a hashed password in production
 // IMPORTANT: Replace with the actual WhatsApp number of the admin (e.g., '919876543210')
 const ADMIN_WHATSAPP_NUMBER = '918897350151'; 
 
@@ -30,6 +30,7 @@ const isAuthenticated = (req, res, next) => {
     if (req.session.isAuthenticated) {
         return next();
     }
+    // Redirect to login page if not authenticated
     res.redirect('/login');
 };
 
@@ -187,7 +188,7 @@ Hello! I'm your personal food ordering assistant.
 
 🌐 *ORDER NOW:*
 Click here to browse our menu and place your order:
-👆 https://your-restaurant-website.com/order
+👆 http://localhost:3000/order
 
 📦 Type *"cart"* - View your current order
 ✅ Type *"confirm"* - Place your order
@@ -235,7 +236,7 @@ const handleProfileCompletion = async (message, userPhone, messageBody) => {
             isProfileComplete: true 
         });
         userSessions.set(userPhone, { ...session, state: null });
-        message.reply('✅ *Profile completed successfully!*\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and place your order:\n👆 https://your-restaurant-website.com/order');
+        message.reply('✅ *Profile completed successfully!*\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and place your order:\n👆 http://localhost:3000/order');
         return true;
     }
     
@@ -356,7 +357,7 @@ client.on('message', async (message) => {
             sendWelcomeMessage(message);
         }
         else if (messageBody === 'order') {
-            const orderText = `🌐 *ORDER NOW:*\n\nClick here to browse our menu and place your order:\n👆 https://your-restaurant-website.com/order\n\n📱 After placing your order online, return here to:\n• Track your order status\n• Make payment\n• Get delivery updates\n\nHappy ordering! 🍽️`;
+            const orderText = `🌐 *ORDER NOW:*\n\nClick here to browse our menu and place your order:\n👆 http://localhost:3000/order\n\n📱 After placing your order online, return here to:\n• Track your order status\n• Make payment\n• Get delivery updates\n\nHappy ordering! 🍽️`;
             message.reply(orderText);
         }
         else if (messageBody === 'profile') {
@@ -390,7 +391,7 @@ client.on('message', async (message) => {
         else if (messageBody === 'cart') {
             const userCart = userCarts.get(userPhone);
             if (userCart.length === 0) {
-                message.reply('🛒 Your cart is empty.\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and add items:\n👆 https://your-restaurant-website.com/order');
+                message.reply('🛒 Your cart is empty.\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and add items:\n👆 http://localhost:3000/order');
                 return;
             }
             
@@ -404,14 +405,14 @@ client.on('message', async (message) => {
             
             cartText += `\n💰 *Total: ₹${total}*\n\n`;
             cartText += '✅ Type "confirm" to place order\n';
-            cartText += '🌐 Click here to add more items:\n👆 https://your-restaurant-website.com/order';
+            cartText += '🌐 Click here to add more items:\n👆 http://localhost:3000/order';
             
             message.reply(cartText);
         }
         else if (messageBody === 'confirm') {
             const userCart = userCarts.get(userPhone);
             if (userCart.length === 0) {
-                message.reply('🛒 Your cart is empty.\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and add items:\n👆 https://your-restaurant-website.com/order');
+                message.reply('🛒 Your cart is empty.\n\n🌐 *ORDER NOW:*\nClick here to browse our menu and add items:\n👆 http://localhost:3000/order');
                 return;
             }
             
@@ -507,7 +508,7 @@ client.on('message', async (message) => {
         }
         else {
             // Unknown command - show available options
-            const helpText = `🤔 I didn't understand that command.\n\n*Available commands:*\n• "order" - Get ordering link\n• "cart" - View your cart\n• "confirm" - Place order\n• "profile" - View/Edit profile\n• "help" - Show this help\n\n🌐 *ORDER NOW:*\nClick here to browse our menu:\n👆 https://your-restaurant-website.com/order`;
+            const helpText = `🤔 I didn't understand that command.\n\n*Available commands:*\n• "order" - Get ordering link\n• "cart" - View your cart\n• "confirm" - Place order\n• "profile" - View/Edit profile\n• "help" - Show this help\n\n🌐 *ORDER NOW:*\nClick here to browse our menu:\n👆 http://localhost:3000/order`;
             message.reply(helpText);
         }
         
@@ -532,6 +533,7 @@ client.on('message', async (message) => {
 });
 
 // API endpoint to add items to cart from web interface
+// This endpoint is NOT protected, as it's used by the customer-facing order panel.
 app.post('/api/add-to-cart', async (req, res) => {
     try {
         const { userPhone, items } = req.body;
@@ -591,6 +593,7 @@ app.post('/api/add-to-cart', async (req, res) => {
 });
 
 // NEW: API endpoint to get menu items from MongoDB (for customer facing panel)
+// This endpoint is NOT protected, as it's used by the customer-facing order panel.
 app.get('/api/menu', async (req, res) => {
     try {
         if (!db) {
@@ -625,7 +628,6 @@ app.post('/api/admin/menu', isAuthenticated, async (req, res) => {
         }
         const newItem = { name, price: parseFloat(price), description, category, createdAt: new Date() };
         const result = await db.collection('menu_items').insertOne(newItem);
-        // Note: result.ops is deprecated in newer MongoDB drivers. Use result.insertedId and then fetch the document if needed.
         res.status(201).json({ success: true, item: { _id: result.insertedId, ...newItem } });
     } catch (error) {
         console.error('Error adding menu item:', error);
@@ -672,12 +674,13 @@ app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
 });
 
 
-// QR Code HTML page endpoint
-app.get('/qr', (req, res) => {
+// QR Code HTML page endpoint (Protected)
+app.get('/qr', isAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'qr.html'));
 });
 
 // --- Authentication Routes ---
+// Login page (Not protected)
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
@@ -695,6 +698,7 @@ app.post('/login', (req, res) => {
 app.get('/logout', (req, res) => {
     req.session.destroy(err => {
         if (err) {
+            console.error('Error destroying session:', err);
             return res.status(500).send('Could not log out.');
         }
         res.redirect('/login');
@@ -702,6 +706,7 @@ app.get('/logout', (req, res) => {
 });
 
 // API Routes (protected by isAuthenticated middleware)
+// Status API (Not protected - can be used to check bot status from login page)
 app.get('/api/status', (req, res) => {
     res.json({
         isAuthenticated: botState.isAuthenticated,
@@ -710,6 +715,7 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+// QR Image API (Not protected - image needs to be accessible by qr.html)
 app.get('/api/qr', (req, res) => {
     if (botState.qrCode) {
         const base64Data = botState.qrCode.replace(/^data:image\/png;base64,/, '');
@@ -727,7 +733,7 @@ app.get('/api/qr', (req, res) => {
     }
 });
 
-// Force QR generation endpoint
+// Force QR generation endpoint (Protected)
 app.post('/api/generate-qr', isAuthenticated, async (req, res) => {
     try {
         if (botState.isAuthenticated) {
@@ -736,8 +742,6 @@ app.post('/api/generate-qr', isAuthenticated, async (req, res) => {
         }
         
         // Destroy existing client and create new one
-        // This can sometimes be slow or lead to issues. Consider more robust re-auth logic
-        // if this causes frequent problems in production.
         await client.destroy();
         
         setTimeout(() => {
@@ -751,7 +755,7 @@ app.post('/api/generate-qr', isAuthenticated, async (req, res) => {
     }
 });
 
-// Orders API
+// Orders API (Protected)
 app.get('/api/orders', isAuthenticated, async (req, res) => {
     try {
         const orders = await db.collection('orders')
@@ -767,7 +771,7 @@ app.get('/api/orders', isAuthenticated, async (req, res) => {
     }
 });
 
-// Get specific order
+// Get specific order (Protected)
 app.get('/api/orders/:orderId', isAuthenticated, async (req, res) => {
     try {
         const order = await db.collection('orders').findOne({ 
@@ -785,7 +789,7 @@ app.get('/api/orders/:orderId', isAuthenticated, async (req, res) => {
     }
 });
 
-// Update order status
+// Update order status (Protected)
 app.put('/api/orders/:orderId/status', isAuthenticated, async (req, res) => {
     try {
         const { status, paymentStatus } = req.body;
@@ -837,7 +841,7 @@ app.put('/api/orders/:orderId/status', isAuthenticated, async (req, res) => {
     }
 });
 
-// Verify payment
+// Verify payment (Protected)
 app.put('/api/payments/:paymentId/verify', isAuthenticated, async (req, res) => {
     try {
         const { verified, notes } = req.body;
@@ -904,7 +908,7 @@ app.put('/api/payments/:paymentId/verify', isAuthenticated, async (req, res) => 
     }
 });
 
-// Get payment proofs
+// Get payment proofs (Protected)
 app.get('/api/payments', isAuthenticated, async (req, res) => {
     try {
         const payments = await db.collection('payment_proofs')
@@ -920,7 +924,7 @@ app.get('/api/payments', isAuthenticated, async (req, res) => {
     }
 });
 
-// Users API
+// Users API (Protected)
 app.get('/api/users', isAuthenticated, async (req, res) => {
     try {
         const users = await db.collection('users')
@@ -935,7 +939,7 @@ app.get('/api/users', isAuthenticated, async (req, res) => {
     }
 });
 
-// Sessions API
+// Sessions API (Protected)
 app.get('/api/sessions', isAuthenticated, async (req, res) => {
     try {
         const sessions = await db.collection('sessions')
@@ -950,7 +954,7 @@ app.get('/api/sessions', isAuthenticated, async (req, res) => {
     }
 });
 
-// Send message to user
+// Send message to user (Protected)
 app.post('/api/send-message', isAuthenticated, async (req, res) => {
     try {
         const { phone, message } = req.body;
@@ -968,7 +972,7 @@ app.post('/api/send-message', isAuthenticated, async (req, res) => {
     }
 });
 
-// Broadcast message to all users
+// Broadcast message to all users (Protected)
 app.post('/api/broadcast', isAuthenticated, async (req, res) => {
     try {
         const { message } = req.body;
@@ -1011,7 +1015,7 @@ app.post('/api/broadcast', isAuthenticated, async (req, res) => {
     }
 });
 
-// Clear user cart
+// Clear user cart (Protected)
 app.delete('/api/cart/:phone', isAuthenticated, async (req, res) => {
     try {
         const phone = req.params.phone;
@@ -1023,7 +1027,7 @@ app.delete('/api/cart/:phone', isAuthenticated, async (req, res) => {
     }
 });
 
-// Get user cart
+// Get user cart (Protected)
 app.get('/api/cart/:phone', isAuthenticated, async (req, res) => {
     try {
         const phone = req.params.phone;
@@ -1035,14 +1039,19 @@ app.get('/api/cart/:phone', isAuthenticated, async (req, res) => {
     }
 });
 
-// Dashboard endpoint (protected)
+// Dashboard endpoint (Protected)
 app.get('/dashboard', isAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-// Admin Menu Panel endpoint (protected)
+// Admin Menu Panel endpoint (Protected)
 app.get('/admin/menu', isAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_menu.html'));
+});
+
+// Customer Order Panel endpoint (Not Protected)
+app.get('/order', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'order.html'));
 });
 
 
