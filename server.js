@@ -55,7 +55,15 @@ const initializeWhatsAppClient = () => {
     whatsappClient = new Client({
         authStrategy: new LocalAuth(), // Stores session data locally
         puppeteer: {
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            // Add these arguments for better Docker compatibility and performance
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-gpu', // Disable GPU hardware acceleration
+                '--disable-dev-shm-usage', // Overcome limited /dev/shm space in some environments
+                '--single-process' // Use only one process (can help with memory)
+            ],
+            timeout: 60000 // Increase timeout to 60 seconds (from default 30s)
         }
     });
 
