@@ -103,9 +103,14 @@
         .tab-pane.active {
             display: block;
         }
+        /* Added for responsive tables */
+        .table-responsive {
+            overflow-x: auto;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 600px; /* Ensure table doesn't shrink too much */
         }
         th, td {
             padding: 12px;
@@ -255,17 +260,17 @@
         <div class="tab-content">
             <div id="orders" class="tab-pane active">
                 <h3>Recent Orders</h3>
-                <div id="ordersTable" class="loading">Loading orders...</div>
+                <div id="ordersTable" class="loading table-responsive">Loading orders...</div>
             </div>
             
             <div id="users" class="tab-pane">
                 <h3>Users</h3>
-                <div id="usersTable" class="loading">Loading users...</div>
+                <div id="usersTable" class="loading table-responsive">Loading users...</div>
             </div>
             
             <div id="payments" class="tab-pane">
                 <h3>Payment Verifications</h3>
-                <div id="paymentsTable" class="loading">Loading payments...</div>
+                <div id="paymentsTable" class="loading table-responsive">Loading payments...</div>
             </div>
             
             <div id="broadcast" class="tab-pane">
