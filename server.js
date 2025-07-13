@@ -12,6 +12,12 @@ const session = require('express-session');
 // Load environment variables from .env file
 dotenv.config();
 
+// Hardcoded admin credentials
+const ADMIN_CREDENTIALS = {
+    username: 'admin',
+    password: 'admin123'
+};
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
@@ -142,8 +148,8 @@ app.get('/admin/login', (req, res) => {
 // Admin Login POST
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
-    // For simplicity, hardcode admin credentials. In production, use a database.
-    if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) { // Use environment variables
+    // Use hardcoded admin credentials
+    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
         req.session.isAuthenticated = true;
         res.redirect('/dashboard');
     } else {
@@ -352,5 +358,5 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Order page: http://localhost:${PORT}/order`);
     console.log(`Admin dashboard: http://localhost:${PORT}/dashboard (Login at /admin/login)`);
+    console.log(`Admin credentials: Username: ${ADMIN_CREDENTIALS.username}, Password: ${ADMIN_CREDENTIALS.password}`);
 });
-
