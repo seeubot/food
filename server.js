@@ -13,7 +13,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Configure session middleware
 app.use(session({
-    secret: 'siddhikreddy', // Replace with a strong, random secret in production
+    secret: 'your_secret_key_here', // Replace with a strong, random secret in production
     resave: false,
     saveUninitialized: true,
     cookie: { secure: false } // Set to true if using HTTPS
@@ -187,7 +187,7 @@ Hello! I'm your personal food ordering assistant.
 
 🌐 *ORDER NOW:*
 Click here to browse our menu and place your order:
-👆 https://your-restaurant-website.com/order
+👆 https://jolly-phebe-seeutech-5259d95c.koyeb.app/order.html
 
 📦 Type *"cart"* - View your current order
 ✅ Type *"confirm"* - Place your order
@@ -404,7 +404,7 @@ client.on('message', async (message) => {
             
             cartText += `\n💰 *Total: ₹${total}*\n\n`;
             cartText += '✅ Type "confirm" to place order\n';
-            cartText += '🌐 Click here to add more items:\n👆 https://your-restaurant-website.com/order';
+            cartText += '🌐 Click here to add more items:\n👆 https://jolly-phebe-seeutech-5259d95c.koyeb.app/order.html';
             
             message.reply(cartText);
         }
@@ -575,6 +575,7 @@ app.post('/api/add-to-cart', async (req, res) => {
                                              `Items: ${order.items.map(item => `${item.name} x${item.quantity}`).join(', ')}\n\n` +
                                              `Status: *Pending Admin Approval*\n\n` +
                                              `Go to dashboard to review: http://localhost:3000/dashboard`;
+            // Ensure ADMIN_WHATSAPP_NUMBER is formatted correctly for client.sendMessage
             await client.sendMessage(`${ADMIN_WHATSAPP_NUMBER}@c.us`, adminNotificationMessage);
             console.log(`✅ Admin notified about new order: ${order.orderId}`);
         } else {
@@ -589,7 +590,7 @@ app.post('/api/add-to-cart', async (req, res) => {
     }
 });
 
-// NEW: API endpoint to get menu items from MongoDB
+// NEW: API endpoint to get menu items from MongoDB (for customer facing panel)
 app.get('/api/menu', async (req, res) => {
     try {
         if (!db) {
@@ -600,6 +601,73 @@ app.get('/api/menu', async (req, res) => {
     } catch (error) {
         console.error('Error fetching menu items:', error);
         res.status(500).json({ error: 'Failed to fetch menu items' });
+    }
+});
+
+// NEW: Admin Menu Management APIs (protected)
+// Get all menu items for admin
+app.get('/api/admin/menu', isAuthenticated, async (req, res) => {
+    try {
+        const menuItems = await db.collection('menu_items').find({}).toArray();
+        res.json(menuItems);
+    } catch (error) {
+        console.error('Error fetching admin menu items:', error);
+        res.status(500).json({ error: 'Failed to fetch menu items for admin' });
+    }
+});
+
+// Add a new menu item
+app.post('/api/admin/menu', isAuthenticated, async (req, res) => {
+    try {
+        const { name, price, description, category } = req.body;
+        if (!name || !price || !description || !category) {
+            return res.status(400).json({ error: 'Name, price, description, and category are required' });
+        }
+        const newItem = { name, price: parseFloat(price), description, category, createdAt: new Date() };
+        const result = await db.collection('menu_items').insertOne(newItem);
+        // Note: result.ops is deprecated in newer MongoDB drivers. Use result.insertedId and then fetch the document if needed.
+        res.status(201).json({ success: true, item: { _id: result.insertedId, ...newItem } });
+    } catch (error) {
+        console.error('Error adding menu item:', error);
+        res.status(500).json({ error: 'Failed to add menu item' });
+    }
+});
+
+// Update an existing menu item
+app.put('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, price, description, category } = req.body;
+        if (!name || !price || !description || !category) {
+            return res.status(400).json({ error: 'Name, price, description, and category are required' });
+        }
+        const updatedItem = { name, price: parseFloat(price), description, category, updatedAt: new Date() };
+        const result = await db.collection('menu_items').updateOne(
+            { _id: new ObjectId(id) },
+            { $set: updatedItem }
+        );
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: 'Menu item not found' });
+        }
+        res.json({ success: true, message: 'Menu item updated successfully' });
+    } catch (error) {
+        console.error('Error updating menu item:', error);
+        res.status(500).json({ error: 'Failed to update menu item' });
+    }
+});
+
+// Delete a menu item
+app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await db.collection('menu_items').deleteOne({ _id: new ObjectId(id) });
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ error: 'Menu item not found' });
+        }
+        res.json({ success: true, message: 'Menu item deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting menu item:', error);
+        res.status(500).json({ error: 'Failed to delete menu item' });
     }
 });
 
@@ -972,6 +1040,12 @@ app.get('/dashboard', isAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
+// Admin Menu Panel endpoint (protected)
+app.get('/admin/menu', isAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin_menu.html'));
+});
+
+
 // Initialize WhatsApp client
 console.log('🚀 Starting FoodieBot...');
 client.initialize();
@@ -983,6 +1057,7 @@ app.listen(PORT, () => {
     console.log(`📱 QR Code: http://localhost:${PORT}/qr`);
     console.log(`📊 Dashboard: http://localhost:${PORT}/login (Login with admin/password)`);
     console.log(`🛒 Order Panel: http://localhost:${PORT}/order`);
+    console.log(`🍔 Admin Menu Panel: http://localhost:${PORT}/admin/menu`);
 });
 
 // Graceful shutdown
