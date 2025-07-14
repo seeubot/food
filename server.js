@@ -9,6 +9,7 @@ const dotenv = require('dotenv');
 const cron = require('node-cron');
 const session = require('express-session');
 const rateLimit = require('express-rate-limit');
+const fs = require('fs').promises; // For async file operations
 
 // Load environment variables from .env file
 dotenv.config();
@@ -35,6 +36,11 @@ const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 // WhatsApp Client Retry Configuration
 const MAX_RETRY_ATTEMPTS = 5;
 let currentRetryAttempt = 0;
+let whatsappClient = null; // Initialize whatsappClient to null
+
+// Path to the session folder created by whatsapp-web.js LocalAuth
+// This folder needs to be cleared on critical failures to force a fresh QR
+const sessionDir = path.join(__dirname, '.wwebjs_auth', 'session-whatsapp-bot');
 
 // MongoDB Models
 const Product = require('./models/Product');
@@ -116,7 +122,6 @@ mongoose.connect(MONGODB_URI)
     .catch(err => console.error('MongoDB connection error:', err));
 
 // --- WhatsApp Bot Initialization ---
-let whatsappClient;
 let qrCodeData = 'Initializing WhatsApp Client...'; // Initial status message
 
 // Global error handlers to catch unhandled exceptions and rejections
@@ -132,6 +137,55 @@ process.on('uncaughtException', (err) => {
     // process.exit(1); // Exit with a failure code
 });
 
+/**
+ * Helper function to destroy the WhatsApp client, clear session data (optionally),
+ * and then attempt to reinitialize after a delay.
+ * @param {boolean} clearSession - True to delete the session folder, forcing a new QR.
+ * @param {string} reason - The reason for destroying and retrying.
+ */
+const destroyClientAndRetry = async (clearSession = false, reason = 'unknown') => {
+    console.log(`[WhatsApp Retry Helper] Destroying client and retrying due to: ${reason}. Clear session: ${clearSession}`);
+    
+    if (whatsappClient) {
+        try {
+            console.log('[WhatsApp Retry Helper] Attempting whatsappClient.destroy()...');
+            await whatsappClient.destroy();
+            console.log('[WhatsApp Retry Helper] whatsappClient.destroy() successful.');
+        } catch (destroyErr) {
+            console.error('[WhatsApp Retry Helper] Error during whatsappClient.destroy():', destroyErr.message);
+            console.error(destroyErr.stack);
+        } finally {
+            whatsappClient = null; // Ensure client is nullified regardless of destroy success
+        }
+    }
+
+    if (clearSession) {
+        try {
+            console.log(`[WhatsApp Retry Helper] Attempting to remove session directory: ${sessionDir}`);
+            await fs.rm(sessionDir, { recursive: true, force: true });
+            console.log('[WhatsApp Retry Helper] Session directory removed successfully.');
+        } catch (fsErr) {
+            console.error('[WhatsApp Retry Helper] Error removing session directory:', fsErr.message);
+            console.error(fsErr.stack);
+        }
+    }
+
+    // Reset QR data and access token
+    whatsappQRData = null;
+    qrCodeGeneratedAt = null;
+    qrCodeAccessToken = null;
+    qrCodeData = `Restarting WhatsApp Client (${reason})...`;
+
+    // Calculate delay with exponential backoff
+    const delay = 10000 * (currentRetryAttempt + 1); // 10s, 20s, 30s...
+    console.log(`[WhatsApp Retry Helper] Waiting ${delay / 1000} seconds before next initialization attempt.`);
+    
+    setTimeout(() => {
+        initializeWhatsAppClient();
+    }, delay);
+};
+
+
 const initializeWhatsAppClient = async () => {
     console.log(`[WhatsApp Init] Attempting to initialize WhatsApp Client (Attempt ${currentRetryAttempt + 1}/${MAX_RETRY_ATTEMPTS})...`);
     
@@ -141,17 +195,13 @@ const initializeWhatsAppClient = async () => {
         return;
     }
 
-    // Destroy existing client if it exists but is not ready
-    if (whatsappClient) {
-        try {
-            console.log('[WhatsApp Init] Destroying existing WhatsApp client instance...');
-            await whatsappClient.destroy();
-            whatsappClient = null; // Clear the client instance
-        } catch (destroyErr) {
-            console.error('[WhatsApp Init] Error destroying existing client:', destroyErr.message);
-            console.error(destroyErr.stack);
-        }
+    if (currentRetryAttempt >= MAX_RETRY_ATTEMPTS) {
+        console.error(`[WhatsApp Init CRITICAL] Max retry attempts (${MAX_RETRY_ATTEMPTS}) reached. WhatsApp client could not be initialized.`);
+        qrCodeData = 'Initialization failed: Max retries reached. Check logs.';
+        return; // Stop trying
     }
+
+    currentRetryAttempt++; // Increment attempt counter
 
     whatsappClient = new Client({
         authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Use a specific client ID
@@ -176,7 +226,7 @@ const initializeWhatsAppClient = async () => {
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--no-zygote',
-                '--single-process', // Can sometimes help, but also cause issues with multiple tabs/contexts
+                // '--single-process', // Removed: Can sometimes cause issues in complex setups
                 '--memory-pressure-off',
                 '--disable-background-networking',
                 '--disable-default-apps',
@@ -240,24 +290,15 @@ const initializeWhatsAppClient = async () => {
 
     whatsappClient.on('disconnected', (reason) => {
         console.warn('[WhatsApp Disconnected] WhatsApp Client was disconnected:', reason);
-        qrCodeData = `Disconnected: ${reason}. Please refresh to get new QR.`;
-        whatsappQRData = null;
-        qrCodeAccessToken = null;
-        console.log('[WhatsApp Disconnected] Attempting to reinitialize WhatsApp client...');
-        currentRetryAttempt = 0; // Reset retry counter for new initialization attempt
-        // Immediately try to reinitialize on disconnect
-        initializeWhatsAppClient(); 
+        // On disconnection, destroy client and retry, but don't clear session immediately
+        // unless it's a persistent issue. Let's try without clearing session first.
+        destroyClientAndRetry(false, `disconnected (${reason})`); 
     });
 
     whatsappClient.on('auth_failure', (msg) => {
         console.error('[WhatsApp Auth Failure] WhatsApp Authentication Failure:', msg);
-        qrCodeData = `Authentication failed: ${msg}. Please refresh QR.`;
-        whatsappQRData = null;
-        qrCodeAccessToken = null;
-        console.log('[WhatsApp Auth Failure] Attempting to restart WhatsApp client...');
-        currentRetryAttempt = 0; // Reset retry counter for new initialization attempt
-        // Immediately try to reinitialize on auth failure
-        initializeWhatsAppClient();
+        // On auth failure, destroy client and retry, clearing session to force new QR
+        destroyClientAndRetry(true, `auth_failure (${msg})`);
     });
 
     whatsappClient.on('change_state', state => {
@@ -280,21 +321,8 @@ const initializeWhatsAppClient = async () => {
         console.error(`Error name: ${error.name}, Error code: ${error.code || 'N/A'}`);
         console.error(error.stack); // Log full stack trace for debugging
 
-        qrCodeData = `Initialization failed: ${error.message}. Check Docker logs for details.`;
-        whatsappQRData = null;
-        qrCodeAccessToken = null;
-        
-        if (currentRetryAttempt < MAX_RETRY_ATTEMPTS) {
-            currentRetryAttempt++;
-            const retryDelay = 10000 * currentRetryAttempt; // Exponential backoff (10s, 20s, 30s...)
-            console.log(`[WhatsApp Init CRITICAL] Retrying WhatsApp client initialization in ${retryDelay / 1000} seconds (Attempt ${currentRetryAttempt}/${MAX_RETRY_ATTEMPTS})...`);
-            setTimeout(() => {
-                initializeWhatsAppClient();
-            }, retryDelay);
-        } else {
-            console.error(`[WhatsApp Init CRITICAL] Max retry attempts (${MAX_RETRY_ATTEMPTS}) reached. WhatsApp client could not be initialized.`);
-            // You might want to send an alert or notification here in a real production app.
-        }
+        // If initialization fails, destroy client and retry, clearing session
+        destroyClientAndRetry(true, `initialization_failed (${error.message})`);
     }
 };
 
@@ -423,33 +451,10 @@ app.get('/api/qr-code', qrRateLimit, validateQRAccess, async (req, res) => {
 // Force QR refresh endpoint (protected)
 app.post('/api/qr-refresh', isAuthenticated, async (req, res) => {
     try {
-        console.log('[QR Refresh] QR refresh requested.');
-        // If client exists and is ready, attempt to destroy it first
-        if (whatsappClient) {
-            console.log('[QR Refresh] Destroying WhatsApp client for refresh...');
-            try {
-                await whatsappClient.destroy();
-                whatsappClient = null; // Clear the client instance after successful destruction
-                console.log('[QR Refresh] WhatsApp client destroyed successfully.');
-            } catch (destroyErr) {
-                console.error('[QR Refresh] Error destroying WhatsApp client during refresh:', destroyErr.message);
-                console.error(destroyErr.stack);
-                // Even if destroy fails, try to proceed with reinitialization
-                whatsappClient = null; 
-            }
-        }
+        console.log('[QR Refresh] QR refresh requested by user.');
+        currentRetryAttempt = 0; // Reset retry counter for a fresh start on user-initiated refresh
+        await destroyClientAndRetry(true, 'user_initiated_refresh'); // Clear session to force new QR
         
-        // Reset QR data and trigger reinitialization
-        whatsappQRData = null;
-        qrCodeGeneratedAt = null;
-        qrCodeAccessToken = null;
-        qrCodeData = 'Refreshing QR Code...';
-        currentRetryAttempt = 0; // Reset retry counter for a fresh start
-
-        console.log('[QR Refresh] Reinitializing WhatsApp client after refresh request...');
-        // Call initializeWhatsAppClient directly, it has its own retry logic
-        initializeWhatsAppClient(); 
-
         res.json({ 
             success: true, 
             message: 'QR refresh initiated. Please wait for the new QR code.' 
