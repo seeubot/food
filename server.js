@@ -3,7 +3,11 @@
 // --- 1. Import necessary modules ---
 const express = require('express');
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
+const dotenv = require('dotenv'); // Make sure this is imported first
+
+// Load environment variables from .env file FIRST
+dotenv.config();
+
 const path = require('path');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
@@ -14,28 +18,40 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal'); // For displaying QR in console
 const fs = require('fs'); // For file system operations (QR image storage)
 
-// Load environment variables from .env file
-dotenv.config();
-
-// --- 2. Initialize Express App ---
+// --- 2. Initialize Express App and Environment Variables ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key'; // **IMPORTANT**: Change this to a strong, random secret in production
+const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`; // Base URL for your web menu/dashboard
+
+// Log loaded environment variables for debugging
+console.log('--- Environment Variables Status ---');
+console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'Loaded' : 'NOT LOADED');
+console.log('PORT:', process.env.PORT || 'Defaulted to 3000');
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'NOT LOADED');
+console.log('WHATSAPP_SESSION_PATH:', process.env.WHATSAPP_SESSION_PATH || './whatsapp_sessions');
+console.log('APP_BASE_URL:', process.env.APP_BASE_URL || `http://localhost:${PORT}`);
+console.log('------------------------------------');
+
 
 // --- 3. Middleware Setup ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(cors()); // Allow all CORS for development, restrict in production
+app.use(express.static(path.join(__dirname, 'public'))); // Serve static files
 
 // --- 4. MongoDB Connection ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
-mongoose.connect(MONGODB_URI, {
-    // These options are deprecated in Mongoose 6+, but harmless if included.
-    // useNewUrlParser: true,
-    // useUnifiedTopology: true,
-})
+// Robust check for MONGODB_URI
+if (!MONGODB_URI) {
+    console.error('CRITICAL ERROR: MONGODB_URI environment variable is not defined.');
+    console.error('Please ensure you have a .env file in your project root with MONGODB_URI set,');
+    console.error('or that it is configured in your deployment environment (e.g., Koyeb).');
+    process.exit(1); // Exit the application if no MongoDB URI is found
+}
+
+mongoose.connect(MONGODB_URI)
     .then(() => {
         console.log('MongoDB connected successfully!');
         createDefaultAdmin(); // Optional: Create a default admin user if none exists
@@ -43,7 +59,7 @@ mongoose.connect(MONGODB_URI, {
     .catch(err => {
         console.error('MongoDB connection error details:', err.message); // Log the specific error message
         console.error('Full MongoDB connection error object:', err); // Log the full error object for more context
-        process.exit(1);
+        process.exit(1); // Exit process if DB connection fails
     });
 
 // Function to create a default admin user if not exists
@@ -84,7 +100,7 @@ const menuItemSchema = new mongoose.Schema({
     imageUrl: String,
     category: String,
     inStock: { type: Boolean, default: true },
-    isNew: { type: Boolean, default: false },
+    isNewlyAdded: { type: Boolean, default: false }, // Renamed from isNew to avoid Mongoose warning
     isTrending: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
@@ -141,6 +157,12 @@ app.get('/', (req, res) => {
 
 app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// Health check endpoint for deployment platforms
+app.get('/health', (req, res) => {
+    // You can add more checks here, e.g., database connection status
+    res.status(200).json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', whatsappBot: whatsappClientStatus });
 });
 
 app.get('/api/menu', async (req, res) => {
@@ -311,11 +333,12 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
 
 const WHATSAPP_SESSION_PATH = process.env.WHATSAPP_SESSION_PATH || './whatsapp_sessions';
 let qrCodeData = null; // To store QR code as base64 for web display
-let whatsappClientStatus = 'disconnected'; // 'disconnected', 'connecting', 'ready', 'qr_available'
+let whatsappClientStatus = 'disconnected'; // 'disconnected', 'connecting', 'ready', 'qr_available', 'authenticated', 'auth_failure'
 
 // Ensure session directory exists
 if (!fs.existsSync(WHATSAPP_SESSION_PATH)) {
     fs.mkdirSync(WHATSAPP_SESSION_PATH);
+    console.log(`Created WhatsApp session directory: ${WHATSAPP_SESSION_PATH}`);
 }
 
 const client = new Client({
@@ -333,15 +356,18 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process', // This helps with memory usage on some platforms
-            '--disable-gpu'
-        ]
+            '--disable-gpu',
+            '--incognito' // Ensures a clean session start for puppeteer
+        ],
+        // Optional: specify executable path if chromium is not found automatically
+        // executablePath: '/usr/bin/google-chrome' // Example for Linux, adjust as needed
     }
 });
 
 client.on('qr', (qr) => {
     // Generate and scan this code with your phone
     qrcode.generate(qr, { small: true });
-    console.log('QR RECEIVED', qr);
+    console.log('QR RECEIVED:', qr);
     qrCodeData = qr; // Store QR data for web display
     whatsappClientStatus = 'qr_available';
 });
@@ -359,20 +385,29 @@ client.on('authenticated', () => {
 
 client.on('auth_failure', msg => {
     // Fired if session restore fails
-    console.error('AUTHENTICATION FAILURE', msg);
+    console.error('AUTHENTICATION FAILURE:', msg);
     whatsappClientStatus = 'auth_failure';
+    // Consider deleting session files here if auth_failure is persistent
+    // fs.readdirSync(WHATSAPP_SESSION_PATH).forEach(file => fs.unlinkSync(path.join(WHATSAPP_SESSION_PATH, file)));
+    // client.initialize(); // Re-initialize after clearing session
 });
 
 client.on('disconnected', (reason) => {
     console.log('WhatsApp Client was disconnected:', reason);
     whatsappClientStatus = 'disconnected';
     // Attempt to re-initialize or prompt for re-scan
-    // client.initialize(); // You might want a more robust re-initialization strategy
+    // For production, you might want a more robust re-initialization strategy with delays/retries
+    // client.initialize();
 });
 
 // Main message handler for the bot
 client.on('message', async msg => {
-    console.log('MESSAGE RECEIVED', msg.body);
+    console.log('MESSAGE RECEIVED:', msg.body);
+
+    // Filter out messages from groups or status updates if you only want direct chats
+    if (msg.isGroupMsg || msg.from.endsWith('@g.us') || msg.from.endsWith('@broadcast')) {
+        return; // Ignore group messages and broadcasts
+    }
 
     const chat = await msg.getChat();
     const contact = await msg.getContact();
@@ -380,7 +415,7 @@ client.on('message', async msg => {
 
     // Ensure the user exists in our DB or create them
     let user = await User.findOneAndUpdate(
-        { whatsappId: msg.from },
+        { whatsappId: msg.from }, // Use msg.from as whatsappId
         { name: userName, phone: msg.from },
         { upsert: true, new: true, setDefaultsOnInsert: true }
     );
@@ -390,9 +425,9 @@ client.on('message', async msg => {
     const lowerCaseBody = msg.body.toLowerCase();
 
     if (lowerCaseBody.includes('hi') || lowerCaseBody.includes('hello') || lowerCaseBody === 'start') {
-        replyMessage = `Hello ${userName}! Welcome to our food service. Here's our delicious menu: ${process.env.APP_BASE_URL || `http://localhost:${PORT}`}`;
+        replyMessage = `Hello ${userName}! Welcome to our food service. Here's our delicious menu: ${APP_BASE_URL}`;
     } else if (lowerCaseBody.includes('menu')) {
-        replyMessage = `Here's our menu: ${process.env.APP_BASE_URL || `http://localhost:${PORT}`}`;
+        replyMessage = `Here's our menu: ${APP_BASE_URL}`;
     } else if (lowerCaseBody.includes('order status') || lowerCaseBody.includes('my order')) {
         const latestOrder = await Order.findOne({ userId: user._id }).sort({ orderDate: -1 });
         if (latestOrder) {
@@ -406,7 +441,12 @@ client.on('message', async msg => {
     // Add more complex bot logic here based on user input
 
     // Send the reply
-    await msg.reply(replyMessage);
+    try {
+        await msg.reply(replyMessage);
+        console.log(`Sent reply to ${msg.from}: ${replyMessage}`);
+    } catch (error) {
+        console.error(`Error sending reply to ${msg.from}:`, error);
+    }
 });
 
 // Initialize the WhatsApp client
@@ -419,14 +459,17 @@ async function sendWhatsAppMessage(to, message) {
     if (whatsappClientStatus === 'ready') {
         try {
             // WhatsApp Web.js requires the ID to be in the format 'number@c.us'
-            const chatId = to.includes('@c.us') ? to : `${to.replace(/\+/g, '')}@c.us`; // Ensure correct format
+            // Ensure 'to' is a valid phone number string (e.g., '919876543210')
+            const chatId = to.includes('@c.us') ? to : `${to.replace(/\+/g, '')}@c.us`;
             await client.sendMessage(chatId, message);
-            console.log(`Message sent to ${to}: ${message}`);
+            console.log(`WhatsApp message sent to ${chatId}: ${message}`);
         } catch (error) {
-            console.error(`Failed to send message to ${to}:`, error);
+            console.error(`ERROR: Failed to send WhatsApp message to ${to}. Reason:`, error.message);
+            console.error('Ensure the WhatsApp client is "ready" and the recipient number is valid.');
         }
     } else {
-        console.warn(`WhatsApp client not ready to send message to ${to}. Current status: ${whatsappClientStatus}`);
+        console.warn(`WARNING: WhatsApp client not ready to send message to ${to}. Current status: ${whatsappClientStatus}`);
+        console.warn('Message was not sent:', message);
     }
 }
 
@@ -453,8 +496,8 @@ app.use((err, req, res, next) => {
 // --- 11. Start the Server ---
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Web Menu: http://localhost:${PORT}`);
-    console.log(`Admin Dashboard: http://localhost:${PORT}/dashboard`);
-    // WhatsApp Web.js will print QR to console or use /api/whatsapp/qr
+    console.log(`Web Menu: ${APP_BASE_URL}`);
+    console.log(`Admin Dashboard: ${APP_BASE_URL}/dashboard`);
+    console.log('WhatsApp Web.js will print QR to console or use /api/whatsapp/qr endpoint.');
 });
 
