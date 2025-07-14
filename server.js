@@ -1,24 +1,38 @@
 // server.js
 import express from 'express';
 import mongoose from 'mongoose';
-import { Client, LocalAuth } from 'whatsapp-web.js';
-import qrcode from 'qrcode-terminal';
-import QRCode from 'qrcode';
+// Correct way to import CommonJS modules like whatsapp-web.js
+import pkgWhatsappWeb from 'whatsapp-web.js';
+const { Client, LocalAuth } = pkgWhatsappWeb;
+
+import pkgQrcodeTerminal from 'qrcode-terminal';
+const qrcode = pkgQrcodeTerminal; // qrcode-terminal exports its main function as default
+
+import pkgQrcode from 'qrcode';
+const QRCode = pkgQrcode; // qrcode exports its main function as default
+
 import path from 'path';
 import { fileURLToPath } from 'url'; // For __dirname equivalent
-import dotenv from 'dotenv';
-import cron from 'node-cron';
-import session from 'express-session';
-import rateLimit from 'express-rate-limit';
-import fs from 'fs/promises'; // For async file operations
-import crypto from 'crypto'; // For generateQRAccessToken
+
+import pkgDotenv from 'dotenv';
+const dotenv = pkgDotenv; // dotenv exports its config function as default
+dotenv.config(); // Call config after importing
+
+import pkgNodeCron from 'node-cron';
+const cron = pkgNodeCron; // node-cron exports its main function as default
+
+import pkgExpressSession from 'express-session';
+const session = pkgExpressSession; // express-session exports its main function as default
+
+import pkgExpressRateLimit from 'express-rate-limit';
+const rateLimit = pkgExpressRateLimit; // express-rate-limit exports its main function as default
+
+import fs from 'fs/promises'; // Native Node.js module, works directly with ES modules
+import crypto from 'crypto'; // Native Node.js module, works directly with ES modules
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load environment variables from .env file
-dotenv.config();
 
 // Hardcoded admin credentials (consider using environment variables for production)
 const ADMIN_CREDENTIALS = {
@@ -49,9 +63,10 @@ const sessionDir = path.join(__dirname, '.wwebjs_auth', 'session-whatsapp-bot');
 const singletonLockPath = path.join(sessionDir, 'SingletonLock'); // Path to the problematic lock file
 
 // MongoDB Models
-// Assuming these models are also converted to ES module syntax (using export default)
-import Product from './models/Product.js'; // Ensure your model files are .js and use export default
-import Order from './models/Order.js';     // Ensure your model files are .js and use export default
+// IMPORTANT: Ensure these model files (Product.js, Order.js) also use ES module syntax
+// (e.g., 'export default mongoose.model(...)') and are named with .js extension.
+import Product from './models/Product.js'; 
+import Order from './models/Order.js';     
 
 // Rate limiting for QR endpoints
 const qrRateLimit = rateLimit({
