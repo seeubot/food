@@ -1,5 +1,5 @@
 // models/Product.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose'; // Use import for ES modules
 
 const productSchema = new mongoose.Schema({
     name: {
@@ -18,14 +18,24 @@ const productSchema = new mongoose.Schema({
     },
     imageUrl: {
         type: String,
-        default: 'https://placehold.co/400x300/E0E0E0/333333?text=No+Image', // Placeholder image
-        trim: true
+        trim: true,
+        default: 'https://placehold.co/150x150/cccccc/000000?text=No+Image' // Placeholder image
     },
     createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    updatedAt: {
         type: Date,
         default: Date.now
     }
 });
 
-module.exports = mongoose.model('Product', productSchema);
+// Update `updatedAt` field on save
+productSchema.pre('save', function(next) {
+    this.updatedAt = Date.now();
+    next();
+});
+
+export default mongoose.model('Product', productSchema); // Use export default for ES modules
 
