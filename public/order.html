@@ -3,180 +3,396 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Menu</title>
+    <title>Food Menu - Your Restaurant</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
+        /* Custom styles for better aesthetics */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+            background-color: #f0f2f5; /* Light grey background */
+            color: #333;
         }
         .product-card {
-            display: flex;
-            flex-direction: column;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            background-color: white;
-            transition: transform 0.2s ease-in-out;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            border-radius: 1rem; /* More rounded corners */
         }
         .product-card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15); /* Stronger shadow on hover */
         }
-        .product-image {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-            border-top-left-radius: 0.75rem;
-            border-top-right-radius: 0.75rem;
+        .add-to-cart-btn {
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 0.75rem; /* Rounded button */
         }
-        .quantity-control {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
+        .add-to-cart-btn:hover {
+            background-color: #1e88e5; /* Darker blue on hover */
+            transform: translateY(-2px);
         }
         .quantity-btn {
-            background-color: #4f46e5;
+            border-radius: 0.5rem; /* Rounded quantity buttons */
+        }
+        .header-section {
+            background: linear-gradient(to right, #60a5fa, #3b82f6); /* Gradient background for header */
             color: white;
-            border-radius: 9999px; /* Fully rounded */
-            width: 2rem;
-            height: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1.25rem;
-            cursor: pointer;
-            transition: background-color 0.2s ease-in-out;
+            border-radius: 1.5rem; /* More rounded header */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
         }
-        .quantity-btn:hover {
-            background-color: #4338ca;
+        .category-nav {
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
         }
-        .quantity-input {
-            width: 3rem;
-            text-align: center;
-            border: 1px solid #d1d5db;
-            border-radius: 0.375rem;
-            padding: 0.25rem 0.5rem;
-            -moz-appearance: textfield; /* Hide arrows for Firefox */
-        }
-        .quantity-input::-webkit-outer-spin-button,
-        .quantity-input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-
-        /* Custom Modal Styles */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .modal-content {
-            background-color: white;
-            padding: 2rem;
+        .category-nav a {
+            padding: 0.5rem 1rem;
             border-radius: 0.75rem;
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
-            width: 90%;
-            position: relative;
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
         }
-        .close-button {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #4b5563;
+        .category-nav a:hover {
+            background-color: #eff6ff; /* Light blue background on hover */
+            color: #2563eb;
+        }
+        /* Message box styling */
+        .message-box {
+            animation: fadeInOut 3s forwards;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(20px); }
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-900">
-    <header class="bg-blue-600 text-white p-4 shadow-md">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-3xl font-bold">Online Food Order</h1>
-            <button id="viewCartBtn" class="bg-blue-800 hover:bg-blue-900 text-white font-semibold py-2 px-4 rounded-lg flex items-center transition duration-200 ease-in-out transform hover:scale-105">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                Cart (<span id="cartItemCount">0</span>)
-            </button>
-        </div>
-    </header>
-
-    <main class="container mx-auto p-4 py-8">
-        <h2 class="text-4xl font-extrabold text-center text-gray-800 mb-10">Our Delicious Menu</h2>
-
-        <div id="menuItemsContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            <!-- Menu items will be loaded here by JavaScript -->
-        </div>
-        <div id="loadingMessage" class="text-center text-gray-500 text-lg mt-8">Loading menu...</div>
-        <div id="noItemsMessage" class="text-center text-gray-500 text-lg mt-8 hidden">No menu items available at the moment. Please check back later!</div>
-    </main>
-
-    <!-- Cart Modal -->
-    <div id="cartModal" class="modal hidden">
-        <div class="modal-content">
-            <button class="close-button" id="closeCartModal">&times;</button>
-            <h3 class="text-2xl font-bold text-gray-800 mb-6">Your Cart</h3>
-            <div id="cartItemsContainer" class="mb-6 max-h-80 overflow-y-auto">
-                <!-- Cart items will be displayed here -->
-                <p id="emptyCartMessage" class="text-gray-500 text-center">Your cart is empty.</p>
-            </div>
-            <div class="flex justify-between items-center border-t pt-4 mt-4">
-                <p class="text-xl font-semibold">Total: <span id="cartTotal">₹0.00</span></p>
-                <button id="checkoutBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-105">
-                    Proceed to Checkout
+<body class="antialiased">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Header Section -->
+        <header class="header-section flex flex-col sm:flex-row justify-between items-center p-4 sm:p-6 mb-8">
+            <h1 class="text-3xl font-bold mb-4 sm:mb-0">Our Delicious Menu</h1>
+            <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+                <div class="relative w-full sm:w-auto">
+                    <input type="text" placeholder="Search menu..." class="py-2 px-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-800 w-full" onkeyup="filterMenuItems(event)">
+                    <i class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                </div>
+                <button class="bg-white text-blue-600 py-2 px-4 rounded-lg shadow-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300 flex items-center w-full sm:w-auto justify-center" onclick="showCartModal()">
+                    <i class="fas fa-shopping-cart mr-2"></i>
+                    Cart (<span id="cart-count">0</span>)
                 </button>
             </div>
-        </div>
-    </div>
+        </header>
 
-    <!-- Checkout Modal -->
-    <div id="checkoutModal" class="modal hidden">
-        <div class="modal-content">
-            <button class="close-button" id="closeCheckoutModal">&times;</button>
-            <h3 class="text-2xl font-bold text-gray-800 mb-6">Checkout Details</h3>
-            <form id="checkoutForm" class="space-y-4">
-                <div>
-                    <label for="userName" class="block text-gray-700 text-sm font-semibold mb-2">Your Name:</label>
-                    <input type="text" id="userName" name="userName" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                </div>
-                <div>
-                    <label for="userWhatsAppNumber" class="block text-gray-700 text-sm font-semibold mb-2">WhatsApp Number (e.g., 91XXXXXXXXXX):</label>
-                    <input type="tel" id="userWhatsAppNumber" name="userWhatsAppNumber" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 919876543210" required pattern="[0-9]{10,15}" title="Please enter a valid WhatsApp number (10-15 digits, including country code if applicable)">
-                </div>
-                <div>
-                    <label for="userAddress" class="block text-gray-700 text-sm font-semibold mb-2">Delivery Address:</label>
-                    <textarea id="userAddress" name="userAddress" rows="3" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required></textarea>
-                </div>
-                <div>
-                    <label for="paymentMethod" class="block text-gray-700 text-sm font-semibold mb-2">Payment Method:</label>
-                    <select id="paymentMethod" name="paymentMethod" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="Cash on Delivery">Cash on Delivery</option>
-                        <option value="Online Payment (Placeholder)">Online Payment (Placeholder)</option>
-                    </select>
+        <!-- Category Navigation -->
+        <nav class="category-nav p-4 mb-8">
+            <ul class="flex flex-wrap justify-center sm:justify-start gap-4 text-gray-700 font-medium">
+                <li><a href="#" class="hover:text-blue-600 transition-colors duration-200" data-category="all" onclick="filterByCategory('all')">All</a></li>
+                <li><a href="#" class="hover:text-blue-600 transition-colors duration-200" data-category="starters" onclick="filterByCategory('starters')">Starters</a></li>
+                <li><a href="#" class="hover:text-blue-600 transition-colors duration-200" data-category="main-courses" onclick="filterByCategory('main-courses')">Main Courses</a></li>
+                <li><a href="#" class="hover:text-blue-600 transition-colors duration-200" data-category="desserts" onclick="filterByCategory('desserts')">Desserts</a></li>
+                <li><a href="#" class="hover:text-blue-600 transition-colors duration-200" data-category="beverages" onclick="filterByCategory('beverages')">Beverages</a></li>
+                <li><a href="#" class="hover:text-blue-600 transition-colors duration-200" data-category="specials" onclick="filterByCategory('specials')">Specials</a></li>
+                <li><a href="#" class="hover:text-blue-600 transition-colors duration-200" data-category="new" onclick="filterByCategory('new')">New Arrivals</a></li>
+                <li><a href="#" class="hover:text-blue-600 transition-colors duration-200" data-category="trending" onclick="filterByCategory('trending')">Trending</a></li>
+            </ul>
+        </nav>
+
+        <!-- Product Grid -->
+        <div id="menu-items-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Product Cards will be injected here by JavaScript -->
+        </div>
+
+        <!-- Cart Modal -->
+        <div id="cart-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white p-6 rounded-xl shadow-2xl w-11/12 max-w-lg max-h-[90vh] overflow-y-auto relative">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">Your Cart</h2>
+                <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl" onclick="hideCartModal()">&times;</button>
+                <div id="cart-items-list" class="mb-4 space-y-3">
+                    <!-- Cart items will be listed here -->
                 </div>
                 <div class="flex justify-between items-center border-t pt-4 mt-4">
-                    <p class="text-xl font-semibold">Order Total: <span id="checkoutTotal">₹0.00</span></p>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-105">
+                    <span class="text-xl font-semibold text-gray-800">Total: $<span id="cart-total">0.00</span></span>
+                    <button class="bg-green-600 text-white py-3 px-6 rounded-lg shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 text-lg font-semibold" onclick="placeOrder()">
                         Place Order
                     </button>
                 </div>
-            </form>
-            <div id="orderMessageBox" class="mt-4 p-3 rounded-lg hidden"></div>
+            </div>
         </div>
     </div>
 
-    <script src="/js/order.js"></script>
+    <script>
+        // Global variables
+        let allMenuItems = []; // Stores all fetched menu items
+        let displayedMenuItems = []; // Stores currently displayed menu items (after filtering/search)
+        let cart = []; // Global cart array
+
+        // Function to fetch menu items from the backend
+        async function fetchMenuItems() {
+            try {
+                const response = await fetch('/api/menu'); // Fetch from your Node.js backend
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                allMenuItems = await response.json();
+                displayedMenuItems = [...allMenuItems]; // Initialize displayed items with all items
+                renderMenuItems(); // Render them after fetching
+            } catch (error) {
+                console.error('Could not fetch menu items:', error);
+                showMessage('Failed to load menu items. Please try again later.', 'error');
+            }
+        }
+
+        // Function to render menu items on the page
+        function renderMenuItems() {
+            const grid = document.getElementById('menu-items-grid');
+            grid.innerHTML = ''; // Clear existing items
+
+            displayedMenuItems.forEach(item => {
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card bg-white rounded-xl shadow-lg overflow-hidden relative flex flex-col justify-between p-4';
+                productCard.setAttribute('data-id', item._id); // Use MongoDB's _id
+
+                // Discount badge (example, assuming discount is calculated or provided)
+                const discountPercentage = item.originalPrice && item.originalPrice > item.price ? 
+                    Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100) : 0;
+                const discountBadge = discountPercentage > 0 ? `<span class="absolute top-4 left-4 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">${discountPercentage}% OFF</span>` : '';
+                
+                // New/Trending indicators
+                const indicatorBadges = `
+                    ${item.isNew ? '<span class="absolute top-4 right-4 bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded-full">New</span>' : ''}
+                    ${item.isTrending ? '<span class="absolute top-12 right-4 bg-purple-500 text-white text-xs font-semibold px-2 py-1 rounded-full">Trending</span>' : ''}
+                `;
+
+                productCard.innerHTML = `
+                    ${discountBadge}
+                    ${indicatorBadges}
+                    <div class="flex justify-center items-center h-48 mb-4">
+                        <img src="${item.imageUrl || 'https://placehold.co/400x300/CCCCCC/333333?text=No+Image'}" alt="${item.name}" class="max-h-full max-w-full object-contain rounded-lg">
+                    </div>
+                    <div class="flex-grow">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-1">${item.name}</h3>
+                        <p class="text-sm text-gray-500 mb-2">
+                            <i class="fas fa-circle ${item.inStock ? 'text-green-500' : 'text-red-500'} text-xs mr-1"></i>
+                            ${item.inStock ? 'In Stock' : 'Out of Stock'} ${item.description ? `- ${item.description}` : ''}
+                        </p>
+                        <div class="flex items-baseline mb-4">
+                            <span class="text-2xl font-bold text-gray-900 mr-2">$${item.price.toFixed(2)}</span>
+                            ${item.originalPrice && item.originalPrice > item.price ? `<span class="text-sm text-gray-500 line-through">$${item.originalPrice.toFixed(2)}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-4">
+                        <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                            <button class="quantity-btn bg-gray-100 text-gray-700 px-3 py-1 hover:bg-gray-200 focus:outline-none" data-action="decrease">-</button>
+                            <input type="number" value="1" min="1" class="quantity-input w-12 text-center border-x border-gray-300 focus:outline-none text-gray-800" readonly>
+                            <button class="quantity-btn bg-gray-100 text-gray-700 px-3 py-1 hover:bg-gray-200 focus:outline-none" data-action="increase">+</button>
+                        </div>
+                        <button class="add-to-cart-btn bg-blue-600 text-white py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center">
+                            <i class="fas fa-cart-plus mr-2"></i> Add
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(productCard);
+            });
+            attachEventListeners(); // Attach event listeners after rendering
+        }
+
+        // Function to update cart count in the header
+        function updateCartCount() {
+            const cartCountElement = document.getElementById('cart-count');
+            cartCountElement.textContent = cart.reduce((total, item) => total + item.quantity, 0);
+            updateCartModal(); // Also update the modal when cart changes
+        }
+
+        // Function to attach event listeners to quantity buttons and add to cart buttons
+        function attachEventListeners() {
+            document.querySelectorAll('.quantity-btn').forEach(button => {
+                button.onclick = (event) => { // Use onclick for simplicity, addEventListener is better practice
+                    const input = event.target.closest('.product-card').querySelector('.quantity-input');
+                    let quantity = parseInt(input.value);
+                    if (event.target.dataset.action === 'increase') {
+                        quantity++;
+                    } else if (event.target.dataset.action === 'decrease' && quantity > 1) {
+                        quantity--;
+                    }
+                    input.value = quantity;
+                };
+            });
+
+            document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+                button.onclick = (event) => {
+                    const productCard = event.target.closest('.product-card');
+                    const itemId = productCard.dataset.id; // Get _id from data-id
+                    const quantity = parseInt(productCard.querySelector('.quantity-input').value);
+                    const item = allMenuItems.find(i => i._id === itemId); // Find item by _id
+
+                    if (item && item.inStock) {
+                        const existingCartItemIndex = cart.findIndex(cartItem => cartItem._id === itemId);
+                        if (existingCartItemIndex > -1) {
+                            cart[existingCartItemIndex].quantity += quantity;
+                        } else {
+                            cart.push({ ...item, quantity: quantity });
+                        }
+                        updateCartCount();
+                        showMessage(`Added ${quantity} x ${item.name} to cart!`, 'success');
+                    } else {
+                        showMessage(`Sorry, ${item.name} is out of stock.`, 'error');
+                    }
+                };
+            });
+        }
+
+        // Function to filter menu items by category
+        function filterByCategory(category) {
+            if (category === 'all') {
+                displayedMenuItems = [...allMenuItems];
+            } else if (category === 'new') {
+                displayedMenuItems = allMenuItems.filter(item => item.isNew);
+            } else if (category === 'trending') {
+                displayedMenuItems = allMenuItems.filter(item => item.isTrending);
+            } else {
+                displayedMenuItems = allMenuItems.filter(item => item.category && item.category.toLowerCase() === category);
+            }
+            renderMenuItems();
+        }
+
+        // Function to filter menu items by search input
+        function filterMenuItems(event) {
+            const searchTerm = event.target.value.toLowerCase();
+            displayedMenuItems = allMenuItems.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) ||
+                (item.description && item.description.toLowerCase().includes(searchTerm)) ||
+                (item.category && item.category.toLowerCase().includes(searchTerm))
+            );
+            renderMenuItems();
+        }
+
+        // --- Cart Modal Functions ---
+        function showCartModal() {
+            document.getElementById('cart-modal').classList.remove('hidden');
+            updateCartModal();
+        }
+
+        function hideCartModal() {
+            document.getElementById('cart-modal').classList.add('hidden');
+        }
+
+        function updateCartModal() {
+            const cartList = document.getElementById('cart-items-list');
+            const cartTotalElement = document.getElementById('cart-total');
+            cartList.innerHTML = '';
+            let total = 0;
+
+            if (cart.length === 0) {
+                cartList.innerHTML = '<p class="text-gray-600 text-center">Your cart is empty.</p>';
+            } else {
+                cart.forEach((item, index) => {
+                    const itemTotal = item.price * item.quantity;
+                    total += itemTotal;
+                    const cartItemDiv = document.createElement('div');
+                    cartItemDiv.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg shadow-sm';
+                    cartItemDiv.innerHTML = `
+                        <div class="flex-grow">
+                            <p class="font-semibold text-gray-800">${item.name}</p>
+                            <p class="text-sm text-gray-600">$${item.price.toFixed(2)} x ${item.quantity}</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-gray-900">$${itemTotal.toFixed(2)}</span>
+                            <button class="text-red-500 hover:text-red-700 text-lg ml-2" onclick="removeFromCart(${index})">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    `;
+                    cartList.appendChild(cartItemDiv);
+                });
+            }
+            cartTotalElement.textContent = total.toFixed(2);
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1); // Remove item from cart array
+            updateCartCount(); // Update count and modal
+            showMessage('Item removed from cart.', 'info');
+        }
+
+        // Function to place the order
+        async function placeOrder() {
+            if (cart.length === 0) {
+                showMessage('Your cart is empty. Add items before placing an order.', 'error');
+                return;
+            }
+
+            // In a real application, you would:
+            // 1. Get the actual userId (e.g., from a logged-in session or passed from WhatsApp initial link)
+            // 2. Get delivery address and other user details.
+            // For now, we'll use a placeholder userId and a dummy address.
+            const dummyUserId = '60c72b2f9b1d4c001c8e4d1a'; // Replace with a real user ID from your DB
+            const dummyDeliveryAddress = '123 Main St, Anytown, USA';
+
+            const orderPayload = {
+                userId: dummyUserId,
+                items: cart.map(item => ({
+                    menuItemId: item._id,
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: item.price
+                })),
+                totalAmount: parseFloat(document.getElementById('cart-total').textContent),
+                deliveryAddress: dummyDeliveryAddress
+            };
+
+            try {
+                const response = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(orderPayload),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to place order.');
+                }
+
+                const result = await response.json();
+                showMessage(`Order placed successfully! Order ID: ${result.orderId}`, 'success');
+                cart = []; // Clear cart after successful order
+                updateCartCount();
+                hideCartModal();
+                console.log('Order placed response:', result);
+            } catch (error) {
+                console.error('Error placing order:', error);
+                showMessage(`Error placing order: ${error.message}`, 'error');
+            }
+        }
+
+        // Simple message box for notifications (instead of alert())
+        function showMessage(message, type = 'info') {
+            const messageBox = document.createElement('div');
+            messageBox.className = `message-box fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-50`;
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-500');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500');
+            } else {
+                messageBox.classList.add('bg-blue-500');
+            }
+            messageBox.textContent = message;
+            document.body.appendChild(messageBox);
+
+            setTimeout(() => {
+                messageBox.remove();
+            }, 3000); // Message disappears after 3 seconds
+        }
+
+        // Initial fetch and render when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchMenuItems(); // Fetch from backend on load
+            updateCartCount();
+        });
+    </script>
 </body>
 </html>
 
