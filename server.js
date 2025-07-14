@@ -1,15 +1,21 @@
 // server.js
-const express = require('express');
-const mongoose = require('mongoose');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
-const QRCode = require = require('qrcode');
-const path = require('path');
-const dotenv = require('dotenv');
-const cron = require('node-cron');
-const session = require('express-session');
-const rateLimit = require('express-rate-limit');
-const fs = require('fs').promises; // For async file operations
+import express from 'express';
+import mongoose from 'mongoose';
+import { Client, LocalAuth } from 'whatsapp-web.js';
+import qrcode from 'qrcode-terminal';
+import QRCode from 'qrcode';
+import path from 'path';
+import { fileURLToPath } from 'url'; // For __dirname equivalent
+import dotenv from 'dotenv';
+import cron from 'node-cron';
+import session from 'express-session';
+import rateLimit from 'express-rate-limit';
+import fs from 'fs/promises'; // For async file operations
+import crypto from 'crypto'; // For generateQRAccessToken
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
 dotenv.config();
@@ -43,8 +49,9 @@ const sessionDir = path.join(__dirname, '.wwebjs_auth', 'session-whatsapp-bot');
 const singletonLockPath = path.join(sessionDir, 'SingletonLock'); // Path to the problematic lock file
 
 // MongoDB Models
-const Product = require('./models/Product');
-const Order = require('./models/Order');
+// Assuming these models are also converted to ES module syntax (using export default)
+import Product from './models/Product.js'; // Ensure your model files are .js and use export default
+import Order from './models/Order.js';     // Ensure your model files are .js and use export default
 
 // Rate limiting for QR endpoints
 const qrRateLimit = rateLimit({
@@ -112,7 +119,7 @@ const validateQRAccess = (req, res, next) => {
 
 // Generate secure access token for QR
 const generateQRAccessToken = () => {
-    return require('crypto').randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString('hex');
 };
 
 // --- MongoDB Connection ---
@@ -237,7 +244,6 @@ const initializeWhatsAppClient = async () => {
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--no-zygote',
-                // Removed '--single-process' as it can sometimes cause issues
                 '--memory-pressure-off',
                 '--disable-background-networking',
                 '--disable-default-apps',
