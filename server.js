@@ -95,12 +95,27 @@ const authenticateToken = (req, res, next) => {
 };
 
 // --- WhatsApp Web JS Client Setup ---
-let qrCodeData = 'Initializing...'; // Store QR code data
+let qrCodeImageBase64 = null; // Stores QR code image data (base64)
+let whatsappStatusMessage = 'Initializing WhatsApp Client...'; // Stores status message
 let whatsappClient; // WhatsApp client instance
 let isWhatsappClientReady = false; // Flag to indicate client readiness
 
+// Function to emit current QR and status to all connected Socket.IO clients
+const emitQrAndStatus = () => {
+    io.emit('qr', {
+        image: qrCodeImageBase64,
+        status: whatsappStatusMessage,
+        isReady: isWhatsappClientReady
+    });
+};
+
 const initializeWhatsappClient = () => {
     console.log('Initializing WhatsApp Client...');
+    whatsappStatusMessage = 'Initializing WhatsApp Client...';
+    qrCodeImageBase64 = null;
+    isWhatsappClientReady = false;
+    emitQrAndStatus(); // Emit initial state
+
     try {
         whatsappClient = new Client({
             authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Stores session data locally
@@ -130,36 +145,42 @@ const initializeWhatsappClient = () => {
 
         whatsappClient.on('qr', async (qr) => {
             console.log('QR RECEIVED', qr);
-            qrCodeData = await qrcode.toDataURL(qr); // Convert QR string to data URL
-            io.emit('qr', qrCodeData); // Emit QR code to connected dashboard clients
-            isWhatsappClientReady = false; // Client is not ready until 'ready' event
+            qrCodeImageBase64 = await qrcode.toDataURL(qr); // Convert QR string to data URL
+            whatsappStatusMessage = 'Scan this QR code with your WhatsApp app.';
+            isWhatsappClientReady = false;
+            emitQrAndStatus(); // Emit QR code to connected dashboard clients
         });
 
         whatsappClient.on('ready', () => {
             console.log('WhatsApp Client is ready!');
-            qrCodeData = 'WhatsApp Client is ready!'; // Update status
-            io.emit('qr', qrCodeData); // Inform dashboard
-            isWhatsappClientReady = true; // Set client as ready
+            qrCodeImageBase64 = null; // Clear QR image once ready
+            whatsappStatusMessage = 'WhatsApp Client is ready!';
+            isWhatsappClientReady = true;
+            emitQrAndStatus(); // Inform dashboard
         });
 
         whatsappClient.on('authenticated', () => {
             console.log('WhatsApp Client Authenticated');
-            qrCodeData = 'WhatsApp Client Authenticated!';
-            io.emit('qr', qrCodeData);
+            qrCodeImageBase64 = null; // Clear QR image once authenticated
+            whatsappStatusMessage = 'WhatsApp Client Authenticated!';
+            isWhatsappClientReady = true;
+            emitQrAndStatus();
         });
 
         whatsappClient.on('auth_failure', msg => {
             console.error('AUTHENTICATION FAILURE', msg);
-            qrCodeData = `Auth Failure: ${msg}`;
-            io.emit('qr', qrCodeData);
+            qrCodeImageBase64 = null;
+            whatsappStatusMessage = `Auth Failure: ${msg}`;
             isWhatsappClientReady = false;
+            emitQrAndStatus();
         });
 
         whatsappClient.on('disconnected', (reason) => {
             console.log('WhatsApp Client Disconnected', reason);
-            qrCodeData = `Disconnected: ${reason}. Reconnecting...`;
-            io.emit('qr', qrCodeData);
+            qrCodeImageBase64 = null;
+            whatsappStatusMessage = `Disconnected: ${reason}. Reconnecting...`;
             isWhatsappClientReady = false;
+            emitQrAndStatus();
             // Attempt to re-initialize or restart the client
             console.log('Attempting to re-initialize WhatsApp Client in 5 seconds...');
             setTimeout(() => initializeWhatsappClient(), 5000); // Try to re-initialize after 5 seconds
@@ -241,9 +262,10 @@ Please choose from the options below:
         whatsappClient.initialize();
     } catch (error) {
         console.error('Error initializing WhatsApp Client:', error);
-        qrCodeData = `Initialization Error: ${error.message}. Check server logs.`;
-        io.emit('qr', qrCodeData);
+        whatsappStatusMessage = `Initialization Error: ${error.message}. Check server logs.`;
+        qrCodeImageBase64 = null;
         isWhatsappClientReady = false;
+        emitQrAndStatus();
         // Attempt to re-initialize after a delay
         console.log('Attempting to re-initialize WhatsApp Client after an error in 10 seconds...');
         setTimeout(() => initializeWhatsappClient(), 10000);
@@ -552,7 +574,11 @@ orderRouter.put('/:id/status', authenticateToken, async (req, res) => {
 
 // --- WhatsApp Web QR Code Endpoint ---
 app.get('/api/whatsapp/qr', (req, res) => {
-    res.json({ qrCode: qrCodeData });
+    res.json({
+        image: qrCodeImageBase64,
+        status: whatsappStatusMessage,
+        isReady: isWhatsappClientReady
+    });
 });
 
 // --- Webhook Endpoint for WhatsApp (if using a proper webhook service like Twilio/MessageBird) ---
@@ -584,7 +610,6 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => { // Use server.listen for socket.io
     console.log(`Server running on port ${PORT}`);
     console.log(`Dashboard served from /`);
-    // Removed API_BASE_URL from here as it's a frontend concept
     console.log(`WhatsApp QR code endpoint: /api/whatsapp/qr`);
     console.log('Remember to set JWT_SECRET, MENU_URL, FAQ_URL, REMINDER_INTERVAL_DAYS, and ADMIN_WHATSAPP_NUMBER in your .env file!');
 });
@@ -592,8 +617,8 @@ server.listen(PORT, () => { // Use server.listen for socket.io
 // --- Socket.IO Connection ---
 io.on('connection', (socket) => {
     console.log('A dashboard client connected via Socket.IO');
-    // Send current QR code data to newly connected client
-    socket.emit('qr', qrCodeData);
+    // Send current QR and status data to newly connected client
+    emitQrAndStatus();
 
     socket.on('disconnect', () => {
         console.log('A dashboard client disconnected');
