@@ -26,6 +26,9 @@ RUN apt-get update && apt-get install -y \
     libxss1 \
     xdg-utils \
     lsb-release \
+    # Add build tools for native Node.js modules
+    build-essential \
+    python3 \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
