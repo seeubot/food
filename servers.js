@@ -1,768 +1,644 @@
+// server.js
+// This is the main entry point for the Node.js backend server.
+
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
-const { MongoClient, ObjectId } = require('mongodb');
-const qrcode = require('qrcode');
-const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
+const mongoose = require('mongoose');
+const http = require('http'); // Required for socket.io
+const socketIo = require('socket.io'); // For real-time QR code updates
+const path = require('path'); // For serving static files
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js'); // WhatsApp Web JS library
+const qrcode = require('qrcode'); // For generating QR code images
+const cron = require('node-cron'); // For scheduling recurring tasks
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+const server = http.createServer(app);
+const io = socketIo(server); // Initialize socket.io with the HTTP server
 
-// Configure multer for image uploads
-const storage = multer.memoryStorage();
-const upload = multer({ 
-    storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files are allowed'), false);
-        }
+// --- MongoDB Connection ---
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room"; // Default if not in .env
+
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('MongoDB connected successfully!'))
+    .catch(err => console.error('MongoDB connection error:', err));
+
+// --- Mongoose Models ---
+
+// User Model for Dashboard Login
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+});
+
+// Hash password before saving
+UserSchema.pre('save', async function (next) {
+    if (this.isModified('password')) {
+        this.password = await bcrypt.hash(this.password, 10);
     }
+    next();
 });
 
-// MongoDB connection
-const MONGO_URI = 'mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room';
-let db;
+const User = mongoose.model('User', UserSchema);
 
-// Connect to MongoDB
-async function connectToMongoDB() {
-    try {
-        const client = await MongoClient.connect(MONGO_URI);
-        console.log('✅ Connected to MongoDB');
-        db = client.db('foodiebot');
-    } catch (error) {
-        console.error('❌ MongoDB connection error:', error);
-        process.exit(1);
-    }
-}
+// MenuItem Model with suppressReservedKeysWarning
+const MenuItemSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    description: { type: String },
+    price: { type: Number, required: true },
+    imageUrl: { type: String, default: 'https://placehold.co/400x300/E0E0E0/333333?text=No+Image' }, // Placeholder image
+    category: { type: String, default: 'General' },
+    isAvailable: { type: Boolean, default: true },
+    isNew: { type: Boolean, default: false },
+    isTrending: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now },
+}, { suppressReservedKeysWarning: true }); // <--- Added this option to suppress the warning
 
-// Helper function to generate unique order ID
-const generateOrderId = () => {
-    const timestamp = Date.now().toString();
-    const random = Math.random().toString(36).substr(2, 5).toUpperCase();
-    return `ORD${timestamp.slice(-6)}${random}`;
-};
+const MenuItem = mongoose.model('MenuItem', MenuItemSchema);
 
-// Bot state
-let botState = {
-    qrCode: null,
-    isAuthenticated: false,
-    connectedSessions: 0,
-    status: 'initializing'
-};
-
-// User session management (simplified)
-const userSessions = new Map();
-
-// WhatsApp Client with enhanced configuration
-const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: './whatsapp-session'
-    }),
-    puppeteer: { 
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu'
-        ]
-    }
+// Order Model
+const OrderSchema = new mongoose.Schema({
+    customerId: { type: String, required: true }, // WhatsApp phone number (e.g., 919876543210@c.us)
+    customerName: { type: String, default: 'Unknown' },
+    items: [{
+        menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
+        name: { type: String, required: true },
+        price: { type: Number, required: true },
+        quantity: { type: Number, required: true, default: 1 },
+    }],
+    totalAmount: { type: Number, required: true },
+    status: { type: String, enum: ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'], default: 'Pending' },
+    orderDate: { type: Date, default: Date.now },
 });
 
-// WhatsApp Event Handlers
-client.on('qr', async (qr) => {
-    console.log('\n🔄 Generating QR Code...');
-    console.log('📱 QR Code generated - Scan with WhatsApp to connect');
-    console.log('🌐 QR Code available at: http://localhost:3000/qr');
-    console.log('📋 Admin Panel: http://localhost:3000');
-    console.log('\n' + '='.repeat(50));
-    
-    try {
-        botState.qrCode = await qrcode.toDataURL(qr);
-        botState.isAuthenticated = false;
-        botState.status = 'waiting_for_scan';
-        console.log('✅ QR Code generated successfully!');
-        
-        // Also generate QR in terminal (optional)
-        const qrTerminal = await qrcode.toString(qr, { type: 'terminal', small: true });
-        console.log('\n📱 Scan this QR code with WhatsApp:');
-        console.log(qrTerminal);
-        console.log('\n' + '='.repeat(50));
-        
-    } catch (error) {
-        console.error('❌ Error generating QR code:', error);
-    }
-});
+const Order = mongoose.model('Order', OrderSchema);
 
-client.on('ready', () => {
-    console.log('\n🎉 SUCCESS! WhatsApp bot is ready and connected!');
-    console.log('✅ Bot is now active and can receive messages');
-    console.log('📱 Phone number connected:', client.info?.wid?.user || 'Unknown');
-    console.log('🤖 Bot name:', client.info?.pushname || 'Unknown');
-    botState.isAuthenticated = true;
-    botState.connectedSessions = 1;
-    botState.qrCode = null;
-    botState.status = 'connected';
-});
+// --- Middleware ---
+app.use(express.json()); // For parsing JSON request bodies
+app.use(express.urlencoded({ extended: true })); // For parsing URL-encoded request bodies
 
-client.on('authenticated', () => {
-    console.log('🔐 WhatsApp authenticated successfully');
-    botState.isAuthenticated = true;
-    botState.status = 'authenticated';
-});
+// --- Authentication Middleware ---
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-client.on('auth_failure', (msg) => {
-    console.error('❌ WhatsApp authentication failed:', msg);
-    botState.isAuthenticated = false;
-    botState.qrCode = null;
-    botState.status = 'auth_failed';
-});
+    if (!token) return res.status(401).json({ message: 'Access Denied: No token provided!' });
 
-client.on('disconnected', (reason) => {
-    console.log('❌ WhatsApp disconnected:', reason);
-    botState.isAuthenticated = false;
-    botState.connectedSessions = 0;
-    botState.status = 'disconnected';
-});
-
-client.on('loading_screen', (percent, message) => {
-    console.log('⏳ Loading WhatsApp...', percent + '%', message);
-});
-
-// Helper function to get or create user profile
-const getUserProfile = async (userPhone) => {
-    let user = await db.collection('users').findOne({ phone: userPhone });
-    if (!user) {
-        user = {
-            phone: userPhone,
-            name: null,
-            address: null,
-            isProfileComplete: false,
-            createdAt: new Date()
-        };
-        await db.collection('users').insertOne(user);
-    }
-    return user;
-};
-
-// Helper function to update user profile
-const updateUserProfile = async (userPhone, updates) => {
-    await db.collection('users').updateOne(
-        { phone: userPhone },
-        { $set: { ...updates, updatedAt: new Date() } }
-    );
-};
-
-// Helper function to send welcome message with web order link
-const sendWelcomeMessage = async (message) => {
-    const orderLink = `${process.env.BASE_URL || 'http://localhost:3000'}/order`;
-    const welcomeText = `🍽️ *Welcome to FoodieBot!* 🤖
-
-Hello! I'm your personal food ordering assistant.
-
-🌐 *Place Your Order Online:*
-${orderLink}
-
-📱 *Quick Commands:*
-🔗 Type *"order"* - Get the order link
-👤 Type *"profile"* - View/Edit your profile  
-📋 Type *"orders"* - View your order history
-💳 Type *"payments"* - View payment options
-ℹ️ Type *"help"* - See this message again
-
-🚀 *Click the link above to browse our menu and place your order!*
-
-Let's get started! 🍕🍔🍜`;
-
-    message.reply(welcomeText);
-};
-
-// Helper function to send order link
-const sendOrderLink = async (message) => {
-    const orderLink = `${process.env.BASE_URL || 'http://localhost:3000'}/order`;
-    const orderText = `🛒 *Place Your Order*
-
-Click the link below to browse our delicious menu and place your order:
-
-🔗 *Order Link:* ${orderLink}
-
-📱 The link will open in your browser where you can:
-• Browse our full menu with images
-• Add items to your cart
-• Enter delivery details
-• Choose payment method
-• Track your order
-
-💡 *Tip:* Bookmark this link for easy future ordering!
-
-🙏 Thank you for choosing FoodieBot!`;
-
-    message.reply(orderText);
-};
-
-// Helper function to get user session state
-const getUserSession = (userPhone) => {
-    if (!userSessions.has(userPhone)) {
-        userSessions.set(userPhone, { state: 'default', data: {} });
-    }
-    return userSessions.get(userPhone);
-};
-
-// Helper function to set user session state
-const setUserSession = (userPhone, state, data = {}) => {
-    userSessions.set(userPhone, { state, data });
-};
-
-// Main message handler
-client.on('message', async (message) => {
-    try {
-        const userPhone = message.from;
-        const messageText = message.body.toLowerCase().trim();
-        
-        // Get user profile and session
-        const user = await getUserProfile(userPhone);
-        const session = getUserSession(userPhone);
-        
-        console.log(`📱 Message from ${userPhone}: ${message.body}`);
-        
-        // Handle profile completion flow
-        if (session.state === 'awaiting_name') {
-            await updateUserProfile(userPhone, { name: message.body.trim() });
-            setUserSession(userPhone, 'awaiting_address');
-            message.reply('👤 Great! Now please provide your delivery address:');
-            return;
-        }
-        
-        if (session.state === 'awaiting_address') {
-            await updateUserProfile(userPhone, { 
-                address: message.body.trim(),
-                isProfileComplete: true 
-            });
-            setUserSession(userPhone, 'default');
-            const orderLink = `${process.env.BASE_URL || 'http://localhost:3000'}/order`;
-            message.reply(`✅ Profile completed! Now you can place orders.\n\n🔗 Order here: ${orderLink}`);
-            return;
-        }
-        
-        // Handle profile editing
-        if (session.state === 'editing_name') {
-            await updateUserProfile(userPhone, { name: message.body.trim() });
-            setUserSession(userPhone, 'default');
-            message.reply('✅ Name updated successfully!');
-            return;
-        }
-        
-        if (session.state === 'editing_address') {
-            await updateUserProfile(userPhone, { address: message.body.trim() });
-            setUserSession(userPhone, 'default');
-            message.reply('✅ Address updated successfully!');
-            return;
-        }
-        
-        // Main command handling
-        if (messageText === 'hi' || messageText === 'hello' || messageText === 'start') {
-            await sendWelcomeMessage(message);
-            return;
-        }
-        
-        // Removed 'menu' command - only 'order' now
-        if (messageText === 'order') {
-            await sendOrderLink(message);
-            return;
-        }
-        
-        if (messageText === 'help') {
-            await sendWelcomeMessage(message);
-            return;
-        }
-        
-        if (messageText === 'profile') {
-            const updatedUser = await getUserProfile(userPhone);
-            let profileText = '👤 *Your Profile*\n\n';
-            profileText += `📱 Phone: ${userPhone}\n`;
-            profileText += `👤 Name: ${updatedUser.name || 'Not set'}\n`;
-            profileText += `📍 Address: ${updatedUser.address || 'Not set'}\n\n`;
-            profileText += `✏️ To edit:\n`;
-            profileText += `• Type "edit name" to change name\n`;
-            profileText += `• Type "edit address" to change address`;
-            message.reply(profileText);
-            return;
-        }
-        
-        if (messageText === 'edit name') {
-            setUserSession(userPhone, 'editing_name');
-            message.reply('👤 Please enter your new name:');
-            return;
-        }
-        
-        if (messageText === 'edit address') {
-            setUserSession(userPhone, 'editing_address');
-            message.reply('📍 Please enter your new address:');
-            return;
-        }
-        
-        if (messageText === 'orders' || messageText === 'my orders') {
-            try {
-                const userOrders = await db.collection('orders')
-                    .find({ userPhone })
-                    .sort({ createdAt: -1 })
-                    .limit(5)
-                    .toArray();
-                
-                if (userOrders.length === 0) {
-                    const orderLink = `${process.env.BASE_URL || 'http://localhost:3000'}/order`;
-                    message.reply(`📋 You haven't placed any orders yet.\n\n🔗 Place your first order: ${orderLink}`);
-                    return;
-                }
-                
-                let ordersText = '📋 *Your Recent Orders*\n\n';
-                userOrders.forEach((order, index) => {
-                    const date = order.createdAt.toLocaleDateString();
-                    const time = order.createdAt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    ordersText += `${index + 1}. *${order.orderId}*\n`;
-                    ordersText += `   💰 ₹${order.total} • ${order.status}\n`;
-                    ordersText += `   📅 ${date} ${time}\n\n`;
-                });
-                
-                const orderLink = `${process.env.BASE_URL || 'http://localhost:3000'}/order`;
-                ordersText += `🔗 Place new order: ${orderLink}`;
-                
-                message.reply(ordersText);
-            } catch (error) {
-                console.error('Error fetching user orders:', error);
-                message.reply('❌ Sorry, unable to fetch your orders right now.');
-            }
-            return;
-        }
-        
-        if (messageText === 'payments') {
-            const paymentText = `💳 *Payment Options*\n\n💰 *Cash on Delivery (COD)*\n• Pay when your order arrives\n• No advance payment required\n\n🏦 *Online Payment*\n• UPI: foodiebot@upi\n• PhonePe: 9876543210\n• GPay: 9876543210\n\n📞 For payment issues, contact: 9876543210`;
-            message.reply(paymentText);
-            return;
-        }
-        
-        // Handle numbers or any other input - redirect to web ordering
-        const orderLink = `${process.env.BASE_URL || 'http://localhost:3000'}/order`;
-        
-        // If user sends numbers or any unrecognized command
-        if (messageText.match(/\d+/g) || messageText.includes('menu')) {
-            message.reply(`🛒 To place your order and browse our menu, please use our web interface:\n\n🔗 ${orderLink}\n\n📱 This will open in your browser where you can easily browse items and add them to your cart!`);
-            return;
-        }
-        
-        // Default response for unrecognized commands
-        message.reply(`❓ I didn't understand that command.\n\nType "help" to see all available commands.\n\n🔗 Or place an order directly: ${orderLink}`);
-        
-    } catch (error) {
-        console.error('Error handling message:', error);
-        message.reply('❌ Sorry, something went wrong. Please try again.');
-    }
-});
-
-// API Routes
-
-// Get bot status
-app.get('/api/status', (req, res) => {
-    res.json(botState);
-});
-
-// Get QR code for WhatsApp connection - Enhanced endpoint
-app.get('/api/qr', (req, res) => {
-    res.json({ 
-        qrCode: botState.qrCode,
-        status: botState.status,
-        isAuthenticated: botState.isAuthenticated
+    jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key', (err, user) => {
+        if (err) return res.status(403).json({ message: 'Access Denied: Invalid token!' });
+        req.user = user;
+        next();
     });
-});
+};
 
-// New QR page route
-app.get('/qr', (req, res) => {
-    const qrPageHTML = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>WhatsApp QR Code - FoodieBot</title>
-        <style>
-            body { 
-                font-family: Arial, sans-serif; 
-                text-align: center; 
-                padding: 20px; 
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                min-height: 100vh;
-                margin: 0;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-            }
-            .container {
-                background: rgba(255, 255, 255, 0.1);
-                backdrop-filter: blur(10px);
-                border-radius: 20px;
-                padding: 40px;
-                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-                border: 1px solid rgba(255, 255, 255, 0.18);
-                max-width: 500px;
-                width: 100%;
-            }
-            .qr-container {
-                background: white;
-                padding: 20px;
-                border-radius: 15px;
-                margin: 20px 0;
-                display: inline-block;
-            }
-            .status {
-                margin: 20px 0;
-                padding: 15px;
-                border-radius: 10px;
-                font-weight: bold;
-            }
-            .status.waiting { background: rgba(255, 193, 7, 0.3); }
-            .status.connected { background: rgba(40, 167, 69, 0.3); }
-            .status.error { background: rgba(220, 53, 69, 0.3); }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🤖 FoodieBot WhatsApp Connection</h1>
-            <div id="status" class="status waiting">⏳ Loading...</div>
-            <div id="qr-container" class="qr-container">
-                <p>Generating QR Code...</p>
-            </div>
-            <div id="instructions">
-                <h3>📱 How to Connect:</h3>
-                <ol style="text-align: left; display: inline-block;">
-                    <li>Open WhatsApp on your phone</li>
-                    <li>Go to Settings → Linked Devices</li>
-                    <li>Tap "Link a Device"</li>
-                    <li>Scan the QR code above</li>
-                </ol>
-            </div>
-        </div>
+// --- WhatsApp Web JS Client Setup ---
+let qrCodeImageBase64 = null; // Stores QR code image data (base64)
+let whatsappStatusMessage = 'Initializing WhatsApp Client...'; // Stores status message
+let whatsappClient; // WhatsApp client instance
+let isWhatsappClientReady = false; // Flag to indicate client readiness
 
-        <script>
-            async function checkQRCode() {
-                try {
-                    const response = await fetch('/api/qr');
-                    const data = await response.json();
-                    
-                    const statusDiv = document.getElementById('status');
-                    const qrContainer = document.getElementById('qr-container');
-                    
-                    if (data.isAuthenticated) {
-                        statusDiv.innerHTML = '✅ Bot Connected Successfully!';
-                        statusDiv.className = 'status connected';
-                        qrContainer.innerHTML = '<p>✅ WhatsApp is now connected!</p>';
-                    } else if (data.qrCode) {
-                        statusDiv.innerHTML = '📱 Scan QR Code with WhatsApp';
-                        statusDiv.className = 'status waiting';
-                        qrContainer.innerHTML = '<img src="' + data.qrCode + '" alt="QR Code" style="max-width: 100%;">';
-                    } else {
-                        statusDiv.innerHTML = '⏳ Generating QR Code...';
-                        statusDiv.className = 'status waiting';
-                        qrContainer.innerHTML = '<p>Please wait...</p>';
+// Function to emit current QR and status to all connected Socket.IO clients
+const emitQrAndStatus = () => {
+    io.emit('qr', {
+        image: qrCodeImageBase64,
+        status: whatsappStatusMessage,
+        isReady: isWhatsappClientReady
+    });
+};
+
+const initializeWhatsappClient = () => {
+    console.log('Initializing WhatsApp Client...');
+    whatsappStatusMessage = 'Initializing WhatsApp Client...';
+    qrCodeImageBase64 = null;
+    isWhatsappClientReady = false;
+    emitQrAndStatus(); // Emit initial state
+
+    try {
+        whatsappClient = new Client({
+            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Stores session data locally
+            puppeteer: {
+                headless: true, // Run in headless mode for deployment
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process', // This might help on some environments
+                    '--disable-gpu',
+                    // Additional arguments for better stability on headless Linux environments
+                    '--disable-features=site-per-process',
+                    '--disable-web-security',
+                    '--disable-sync',
+                    '--disable-infobars',
+                    '--window-size=1920,1080', // Explicit window size
+                    '--ignore-certificate-errors', // Can sometimes help with SSL issues
+                    '--incognito', // Starts a clean session each time (might help if session data gets corrupted)
+                    '--enable-features=NetworkService,NetworkServiceInProcess' // Experimental, but sometimes helps
+                ],
+            },
+        });
+
+        whatsappClient.on('qr', async (qr) => {
+            console.log('QR RECEIVED', qr);
+            qrCodeImageBase64 = await qrcode.toDataURL(qr); // Convert QR string to data URL
+            whatsappStatusMessage = 'Scan this QR code with your WhatsApp app.';
+            isWhatsappClientReady = false;
+            emitQrAndStatus(); // Emit QR code to connected dashboard clients
+        });
+
+        whatsappClient.on('ready', () => {
+            console.log('WhatsApp Client is ready!');
+            qrCodeImageBase64 = null; // Clear QR image once ready
+            whatsappStatusMessage = 'WhatsApp Client is ready!';
+            isWhatsappClientReady = true;
+            emitQrAndStatus(); // Inform dashboard
+        });
+
+        whatsappClient.on('authenticated', () => {
+            console.log('WhatsApp Client Authenticated');
+            qrCodeImageBase64 = null; // Clear QR image once authenticated
+            whatsappStatusMessage = 'WhatsApp Client Authenticated!';
+            isWhatsappClientReady = true;
+            emitQrAndStatus();
+        });
+
+        whatsappClient.on('auth_failure', msg => {
+            console.error('AUTHENTICATION FAILURE', msg);
+            qrCodeImageBase64 = null;
+            whatsappStatusMessage = `Auth Failure: ${msg}`;
+            isWhatsappClientReady = false;
+            emitQrAndStatus();
+        });
+
+        whatsappClient.on('disconnected', (reason) => {
+            console.log('WhatsApp Client Disconnected', reason);
+            qrCodeImageBase64 = null;
+            whatsappStatusMessage = `Disconnected: ${reason}. Reconnecting...`;
+            isWhatsappClientReady = false;
+            emitQrAndStatus();
+            // Attempt to re-initialize or restart the client
+            console.log('Attempting to re-initialize WhatsApp Client in 5 seconds...');
+            setTimeout(() => initializeWhatsappClient(), 5000); // Try to re-initialize after 5 seconds
+        });
+
+        whatsappClient.on('message', async (msg) => {
+            console.log('MESSAGE RECEIVED', msg.body);
+
+            const chat = await msg.getChat();
+            // Ensure the customerId is in the format expected by WhatsApp-web.js (e.g., 919876543210@c.us)
+            const customerId = msg.from;
+            const customerName = chat.name || customerId.split('@')[0]; // Use chat name or phone number
+
+            let responseText = '';
+
+            // Convert message to lowercase for case-insensitive matching
+            const lowerCaseMsg = msg.body.toLowerCase();
+
+            if (lowerCaseMsg.includes('hi') || lowerCaseMsg.includes('hello') || lowerCaseMsg.includes('hey')) {
+                responseText = `Hello ${customerName}! Welcome to our food business!
+How can I help you today?
+
+*1. Web Menu:* Browse our delicious menu and order online.
+*2. Orders:* Check your past orders.
+*3. Profile:* View your profile details.
+*4. Help/Support:* Get assistance.
+
+Please reply with the number of the option you'd like to choose.`;
+            } else if (lowerCaseMsg.includes('1') || lowerCaseMsg.includes('menu')) {
+                responseText = `Here's our delicious web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}
+You can browse and place your order directly from there!`;
+            } else if (lowerCaseMsg.includes('2') || lowerCaseMsg.includes('orders')) {
+                // Fetch past orders for this customer
+                const customerOrders = await Order.find({ customerId: customerId }).sort({ orderDate: -1 }).limit(5);
+
+                if (customerOrders.length > 0) {
+                    responseText = `Here are your recent orders:\n\n`;
+                    customerOrders.forEach((order, index) => {
+                        responseText += `*Order #${index + 1}* (ID: ${order._id.toString().substring(0, 8)}...)\n`;
+                        responseText += `Status: *${order.status}*\n`;
+                        responseText += `Total: Rs. ${order.totalAmount.toFixed(2)}\n`;
+                        responseText += `Date: ${order.orderDate.toLocaleDateString()}\n`;
+                        responseText += `Items: ${order.items.map(item => `${item.name} (x${item.quantity})`).join(', ')}\n\n`;
+                    });
+                    responseText += `To place a new order, visit our web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
+                } else {
+                    responseText = `You haven't placed any orders yet. Visit our web menu to start ordering: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
+                }
+            } else if (lowerCaseMsg.includes('3') || lowerCaseMsg.includes('profile')) {
+                responseText = `Your profile details:
+Phone Number: ${customerId.split('@')[0]}
+Name: ${customerName}
+(More profile features coming soon!)`;
+            } else if (lowerCaseMsg.includes('4') || lowerCaseMsg.includes('help') || lowerCaseMsg.includes('support')) {
+                responseText = `For any assistance, you can:
+- Call us at: +91 12345 67890
+- Email us at: support@yourfoodbusiness.com
+- Visit our FAQ: ${process.env.FAQ_URL || 'https://your-food-business.com/faq'}
+
+We are here to help!`;
+            } else if (lowerCaseMsg.includes('order')) {
+                // This is a simplified order creation. In a real scenario, you'd have a more guided flow.
+                // For now, it will just direct them to the menu.
+                responseText = `To place an order, please visit our web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
+            }
+            else {
+                responseText = `I'm sorry, I didn't understand that.
+Please choose from the options below:
+
+*1. Web Menu:* Browse our delicious menu and order online.
+*2. Orders:* Check your past orders.
+*3. Profile:* View your profile details.
+*4. Help/Support:* Get assistance.`;
+            }
+
+            await msg.reply(responseText);
+        });
+
+        whatsappClient.initialize();
+    } catch (error) {
+        console.error('Error initializing WhatsApp Client:', error);
+        whatsappStatusMessage = `Initialization Error: ${error.message}. Check server logs.`;
+        qrCodeImageBase64 = null;
+        isWhatsappClientReady = false;
+        emitQrAndStatus();
+        // Attempt to re-initialize after a delay
+        console.log('Attempting to re-initialize WhatsApp Client after an error in 10 seconds...');
+        setTimeout(() => initializeWhatsappClient(), 10000);
+    }
+};
+
+// Initialize WhatsApp client on server start
+initializeWhatsappClient();
+
+// --- Scheduled Notification Function ---
+const sendOrderReminderNotifications = async () => {
+    if (!isWhatsappClientReady) {
+        console.log('WhatsApp client not ready for sending scheduled notifications.');
+        return;
+    }
+
+    console.log('Running scheduled order reminder task...');
+    try {
+        // Find all unique customer IDs that have placed orders
+        const distinctCustomerIds = await Order.distinct('customerId');
+
+        for (const customerId of distinctCustomerIds) {
+            // Find the most recent order for this customer
+            const lastOrder = await Order.findOne({ customerId })
+                .sort({ orderDate: -1 })
+                .limit(1);
+
+            if (lastOrder) {
+                const now = new Date();
+                const lastOrderDate = lastOrder.orderDate;
+                const timeDiff = now.getTime() - lastOrderDate.getTime();
+                const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+                // Check if daysDiff is a multiple of 7 (or very close, e.g., within 1 day of a multiple of 7)
+                const REMINDER_INTERVAL_DAYS = parseInt(process.env.REMINDER_INTERVAL_DAYS || '7');
+                const isReminderDay = (daysDiff > 0 && daysDiff % REMINDER_INTERVAL_DAYS === 0) ||
+                                     (daysDiff > 0 && (daysDiff + 1) % REMINDER_INTERVAL_DAYS === 0) || // Check day before
+                                     (daysDiff > 0 && (daysDiff - 1) % REMINDER_INTERVAL_DAYS === 0); // Check day after
+
+                if (isReminderDay) {
+                    const message = `Hey ${lastOrder.customerName || lastOrder.customerId.split('@')[0]}!
+It's been a while since your last delicious order with us! 😋
+
+We miss you! Check out our latest menu and special offers:
+${process.env.MENU_URL || 'https://your-food-business.com/menu'}
+
+Looking forward to serving you again soon!`;
+
+                    try {
+                        await whatsappClient.sendMessage(customerId, message);
+                        console.log(`Sent reminder to ${customerId} (last ordered ${daysDiff} days ago).`);
+                    } catch (sendError) {
+                        console.error(`Failed to send reminder to ${customerId}:`, sendError);
                     }
-                } catch (error) {
-                    console.error('Error fetching QR code:', error);
-                    document.getElementById('status').innerHTML = '❌ Error loading QR code';
-                    document.getElementById('status').className = 'status error';
                 }
             }
+        }
+    } catch (error) {
+        console.error('Error in scheduled order reminder task:', error);
+    }
+};
 
-            // Check QR code every 2 seconds
-            setInterval(checkQRCode, 2000);
-            checkQRCode(); // Initial check
-        </script>
-    </body>
-    </html>`;
-    
-    res.send(qrPageHTML);
+// Schedule the task to run once every day at 09:00 AM (adjust as needed)
+cron.schedule('0 9 * * *', () => {
+    sendOrderReminderNotifications();
+}, {
+    scheduled: true,
+    timezone: "Asia/Kolkata" // Set your desired timezone
 });
 
-// Get menu items
-app.get('/api/menu', async (req, res) => {
+// --- Admin Notification Function for New Orders ---
+const notifyAdminOfNewOrder = async (order) => {
+    if (!isWhatsappClientReady) {
+        console.log('WhatsApp client not ready for sending admin notifications.');
+        return;
+    }
+
+    const adminNumber = process.env.ADMIN_WHATSAPP_NUMBER;
+    if (!adminNumber) {
+        console.warn('ADMIN_WHATSAPP_NUMBER is not set in .env. Cannot send admin new order notification.');
+        return;
+    }
+
+    const orderItems = order.items.map(item => `${item.name} (x${item.quantity})`).join(', ');
+    const notificationMessage = `*🔔 New Order Alert! 🔔*
+
+*Order ID:* ${order._id.toString().substring(0, 8)}...
+*Customer:* ${order.customerName || order.customerId.split('@')[0]}
+*Contact:* ${order.customerId.split('@')[0]}
+*Items:* ${orderItems}
+*Total Amount:* Rs. ${order.totalAmount.toFixed(2)}
+*Status:* ${order.status}
+*Order Date:* ${order.orderDate.toLocaleString()}
+
+Please check the dashboard for more details.`;
+
     try {
-        const menuItems = await db.collection('menu').find({ available: true }).toArray();
+        // Ensure the adminNumber is in the correct WhatsApp ID format (e.g., 919876543210@c.us)
+        const formattedAdminNumber = adminNumber.includes('@c.us') ? adminNumber : `${adminNumber}@c.us`;
+        await whatsappClient.sendMessage(formattedAdminNumber, notificationMessage);
+        console.log(`Admin notified about new order: ${order._id}`);
+    } catch (error) {
+        console.error(`Failed to send new order notification to admin (${adminNumber}):`, error);
+    }
+};
+
+
+// --- API Endpoints (URL Rewriting using Express Router) ---
+
+// Auth Routes
+const authRouter = express.Router();
+app.use('/api/auth', authRouter);
+
+authRouter.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const newUser = new User({ username, password });
+        await newUser.save();
+        res.status(201).json({ message: 'User registered successfully!' });
+    } catch (error) {
+        if (error.code === 11000) { // Duplicate key error for unique username
+            return res.status(409).json({ message: 'Username already exists.' });
+        }
+        console.error('Registration error:', error);
+        res.status(500).json({ message: 'Error registering user.', error: error.message });
+    }
+});
+
+authRouter.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).json({ message: 'Invalid credentials.' });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ message: 'Invalid credentials.' });
+
+        const token = jwt.sign(
+            { id: user._id, username: user.username },
+            process.env.JWT_SECRET || 'your_jwt_secret_key',
+            { expiresIn: '1h' } // Token expires in 1 hour
+        );
+
+        res.json({ message: 'Logged in successfully!', token });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error during login.', error: error.message });
+    }
+});
+
+// Menu Management Routes
+const menuRouter = express.Router();
+app.use('/api/menu', menuRouter); // No authentication for fetching menu items on public menu
+
+// Get all menu items
+menuRouter.get('/', async (req, res) => {
+    try {
+        const menuItems = await MenuItem.find({});
         res.json(menuItems);
     } catch (error) {
-        console.error('Error fetching menu:', error);
-        res.status(500).json({ error: 'Failed to fetch menu' });
+        console.error('Error fetching menu items:', error);
+        res.status(500).json({ message: 'Error fetching menu items.', error: error.message });
     }
 });
 
-// Add menu item
-app.post('/api/menu', upload.single('image'), async (req, res) => {
+// Add a new menu item (protected for dashboard)
+menuRouter.post('/', authenticateToken, async (req, res) => {
+    const { name, description, price, imageUrl, category, isAvailable, isNew, isTrending } = req.body;
     try {
-        const { name, description, price, category, available } = req.body;
-        
-        const menuItem = {
-            name,
-            description,
-            price: parseFloat(price),
-            category,
-            available: available !== 'false',
-            imageData: req.file ? req.file.buffer : null,
-            imageType: req.file ? req.file.mimetype : null,
-            createdAt: new Date(),
-            updatedAt: new Date()
-        };
-        
-        const result = await db.collection('menu').insertOne(menuItem);
-        res.json({ success: true, id: result.insertedId });
+        const newItem = new MenuItem({ name, description, price, imageUrl, category, isAvailable, isNew, isTrending });
+        await newItem.save();
+        res.status(201).json({ message: 'Menu item added successfully!', item: newItem });
     } catch (error) {
         console.error('Error adding menu item:', error);
-        res.status(500).json({ error: 'Failed to add menu item' });
+        res.status(400).json({ message: 'Error adding menu item.', error: error.message });
     }
 });
 
-// Update menu item
-app.put('/api/menu/:id', upload.single('image'), async (req, res) => {
+// Update a menu item (protected for dashboard)
+menuRouter.put('/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
     try {
-        const { id } = req.params;
-        const { name, description, price, category, available } = req.body;
-        
-        const updateData = {
-            name,
-            description,
-            price: parseFloat(price),
-            category,
-            available: available !== 'false',
-            updatedAt: new Date()
-        };
-        
-        if (req.file) {
-            updateData.imageData = req.file.buffer;
-            updateData.imageType = req.file.mimetype;
+        const updatedItem = await MenuItem.findByIdAndUpdate(id, updates, { new: true });
+        if (!updatedItem) {
+            return res.status(404).json({ message: 'Menu item not found.' });
         }
-        
-        await db.collection('menu').updateOne(
-            { _id: new ObjectId(id) },
-            { $set: updateData }
-        );
-        
-        res.json({ success: true });
+        res.json({ message: 'Menu item updated successfully!', item: updatedItem });
     } catch (error) {
         console.error('Error updating menu item:', error);
-        res.status(500).json({ error: 'Failed to update menu item' });
+        res.status(400).json({ message: 'Error updating menu item.', error: error.message });
     }
 });
 
-// Delete menu item
-app.delete('/api/menu/:id', async (req, res) => {
+// Delete a menu item (protected for dashboard)
+menuRouter.delete('/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
     try {
-        const { id } = req.params;
-        await db.collection('menu').deleteOne({ _id: new ObjectId(id) });
-        res.json({ success: true });
+        const deletedItem = await MenuItem.findByIdAndDelete(id);
+        if (!deletedItem) {
+            return res.status(404).json({ message: 'Menu item not found.' });
+        }
+        res.json({ message: 'Menu item deleted successfully!' });
     } catch (error) {
         console.error('Error deleting menu item:', error);
-        res.status(500).json({ error: 'Failed to delete menu item' });
+        res.status(500).json({ message: 'Error deleting menu item.', error: error.message });
     }
 });
 
-// Get menu item image
-app.get('/api/menu/:id/image', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const menuItem = await db.collection('menu').findOne({ _id: new ObjectId(id) });
-        
-        if (!menuItem || !menuItem.imageData) {
-            return res.status(404).json({ error: 'Image not found' });
-        }
-        
-        res.set('Content-Type', menuItem.imageType);
-        res.send(menuItem.imageData);
-    } catch (error) {
-        console.error('Error fetching image:', error);
-        res.status(500).json({ error: 'Failed to fetch image' });
-    }
-});
+// Order Management Routes
+const orderRouter = express.Router();
+app.use('/api/orders', orderRouter); // No authentication for placing orders from web menu
 
-// Save order from web interface
-app.post('/api/orders', async (req, res) => {
+// Endpoint for placing a new order from the web menu
+orderRouter.post('/place', async (req, res) => {
+    // Expected body: { customerPhoneNumber: '919876543210', customerName: 'John Doe', items: [{ itemId: '...', quantity: 1 }] }
+    const { customerPhoneNumber, customerName, items } = req.body;
+
+    if (!customerPhoneNumber || !items || items.length === 0) {
+        return res.status(400).json({ message: 'Missing customer phone number or order items.' });
+    }
+
+    // Format customerId for WhatsApp-web.js
+    const customerId = customerPhoneNumber.includes('@c.us') ? customerPhoneNumber : `${customerPhoneNumber}@c.us`;
+
     try {
-        const { userPhone, userName, userAddress, items, total, paymentMethod } = req.body;
-        
-        const orderId = generateOrderId();
-        
-        const order = {
-            orderId,
-            userPhone,
-            userName,
-            userAddress,
-            items,
-            total,
-            paymentMethod: paymentMethod || 'COD',
-            status: 'pending',
-            createdAt: new Date(),
-            updatedAt: new Date()
-        };
-        
-        await db.collection('orders').insertOne(order);
-        
-        // Update user profile if provided
-        if (userName || userAddress) {
-            await updateUserProfile(userPhone, {
-                name: userName,
-                address: userAddress,
-                isProfileComplete: true
+        let totalAmount = 0;
+        const orderItems = [];
+
+        // Fetch menu item details to validate and calculate total
+        for (const item of items) {
+            const menuItem = await MenuItem.findById(item.itemId);
+            if (!menuItem || !menuItem.isAvailable) {
+                return res.status(400).json({ message: `Item "${item.name}" (ID: ${item.itemId}) not found or not available.` });
+            }
+            orderItems.push({
+                menuItemId: menuItem._id,
+                name: menuItem.name,
+                price: menuItem.price,
+                quantity: item.quantity,
             });
+            totalAmount += menuItem.price * item.quantity;
         }
-        
-        res.json({ success: true, orderId });
+
+        const newOrder = new Order({
+            customerId,
+            customerName: customerName || 'Guest',
+            items: orderItems,
+            totalAmount,
+            status: 'Pending', // Initial status
+        });
+
+        await newOrder.save();
+
+        // Notify admin about the new order
+        await notifyAdminOfNewOrder(newOrder);
+
+        res.status(201).json({ message: 'Order placed successfully!', order: newOrder });
     } catch (error) {
-        console.error('Error saving order:', error);
-        res.status(500).json({ error: 'Failed to save order' });
+        console.error('Error placing new order:', error);
+        res.status(500).json({ message: 'Error placing order.', error: error.message });
     }
 });
 
-// Get orders
-app.get('/api/orders', async (req, res) => {
+// Get all orders (protected for dashboard)
+orderRouter.get('/', authenticateToken, async (req, res) => {
     try {
-        const orders = await db.collection('orders')
-            .find({})
-            .sort({ createdAt: -1 })
-            .toArray();
+        const orders = await Order.find({}).populate('items.menuItemId'); // Populate menu item details
         res.json(orders);
     } catch (error) {
         console.error('Error fetching orders:', error);
-        res.status(500).json({ error: 'Failed to fetch orders' });
+        res.status(500).json({ message: 'Error fetching orders.', error: error.message });
     }
 });
 
-// Update order status
-app.put('/api/orders/:id/status', async (req, res) => {
+// Get a single order by ID (protected for dashboard)
+orderRouter.get('/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
     try {
-        const { id } = req.params;
-        const { status } = req.body;
-        
-        await db.collection('orders').updateOne(
-            { _id: new ObjectId(id) },
-            { $set: { status, updatedAt: new Date() } }
-        );
-        
-        res.json({ success: true });
+        const order = await Order.findById(id).populate('items.menuItemId');
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found.' });
+        }
+        res.json(order);
+    } catch (error) {
+        console.error('Error fetching order by ID:', error);
+        res.status(500).json({ message: 'Error fetching order.', error: error.message });
+    }
+});
+
+// Update order status (protected for dashboard)
+orderRouter.put('/:id/status', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body; // Expected status: 'Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'
+    try {
+        const updatedOrder = await Order.findByIdAndUpdate(id, { status }, { new: true });
+        if (!updatedOrder) {
+            return res.status(404).json({ message: 'Order not found.' });
+        }
+        res.json({ message: 'Order status updated successfully!', order: updatedOrder });
     } catch (error) {
         console.error('Error updating order status:', error);
-        res.status(500).json({ error: 'Failed to update order status' });
+        res.status(400).json({ message: 'Error updating order status.', error: error.message });
     }
 });
 
-// Get users
-app.get('/api/users', async (req, res) => {
-    try {
-        const users = await db.collection('users')
-            .find({})
-            .sort({ createdAt: -1 })
-            .toArray();
-        res.json(users);
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ error: 'Failed to fetch users' });
-    }
+// --- WhatsApp Web QR Code Endpoint ---
+app.get('/api/whatsapp/qr', (req, res) => {
+    res.json({
+        image: qrCodeImageBase64,
+        status: whatsappStatusMessage,
+        isReady: isWhatsappClientReady
+    });
 });
 
-// Serve static files
-app.use(express.static('public'));
+// --- Webhook Endpoint for WhatsApp (if using a proper webhook service like Twilio/MessageBird) ---
+app.post('/webhook/whatsapp', (req, res) => {
+    console.log('Received webhook event:', req.body);
+    // Process incoming WhatsApp messages here if using an external webhook provider
+    res.status(200).send('Webhook received!');
+});
 
-// Serve the admin panel
-app.get('/', (req, res) => {
+
+// --- Serve Static Frontend Files (for Koyeb deployment) ---
+// This serves your HTML dashboard from the 'public' directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// For any other routes not matched by API endpoints, serve the index.html
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Serve the order page (main ordering interface)
-app.get('/order', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'order.html'));
+
+// --- Error Handling Middleware ---
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something broke!');
 });
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-    if (error instanceof multer.MulterError) {
-        if (error.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ error: 'File size too large' });
-        }
-    }
-    console.error('Server error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+// --- Server Start ---
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => { // Use server.listen for socket.io
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Dashboard served from /`);
+    console.log(`WhatsApp QR code endpoint: /api/whatsapp/qr`);
+    console.log('Remember to set JWT_SECRET, MENU_URL, FAQ_URL, REMINDER_INTERVAL_DAYS, and ADMIN_WHATSAPP_NUMBER in your .env file!');
 });
 
-// Initialize the application
-async function initializeApp() {
+// --- Socket.IO Connection ---
+io.on('connection', (socket) => {
+    console.log('A dashboard client connected via Socket.IO');
+    // Send current QR and status data to newly connected client
+    emitQrAndStatus();
+
+    socket.on('disconnect', () => {
+        console.log('A dashboard client disconnected');
+    });
+});
+
+// --- Initial Admin User Creation (Optional, for first run) ---
+async function createDefaultAdminUser() {
     try {
-        console.log('🚀 Starting FoodieBot...');
-        
-        // Connect to MongoDB first
-        await connectToMongoDB();
-        
-        // Start the Express server
-        const PORT = process.env.PORT || 3000;
-        app.listen(PORT, () => {
-            console.log('\n' + '='.repeat(60));
-            console.log('🎉 FoodieBot Server Started Successfully!');
-            console.log('='.repeat(60));
-            console.log(`🌐 Server running on: http://localhost:${PORT}`);
-            console.log(`📋 Admin Panel: http://localhost:${PORT}`);
-            console.log(`🛒 Order Interface: http://localhost:${PORT}/order`);
-            console.log(`📱 QR Code Page: http://localhost:${PORT}/qr`);
-            console.log('='.repeat(60));
-            console.log('\n⏳ Initializing WhatsApp client...');
-        });
-        
-        // Initialize WhatsApp client
-        console.log('🔄 Starting WhatsApp client initialization...');
-        client.initialize();
-        
+        const adminUser = await User.findOne({ username: 'admin' });
+        if (!adminUser) {
+            const newAdmin = new User({ username: 'admin', password: 'adminpassword' }); // Change this password!
+            await newAdmin.save();
+            console.log('Default admin user "admin" created with password "adminpassword". PLEASE CHANGE THIS IN PRODUCTION!');
+        }
     } catch (error) {
-        console.error('❌ Failed to initialize application:', error);
-        process.exit(1);
+        console.error('Error creating default admin user:', error);
     }
 }
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-    console.log('\n📱 Shutting down WhatsApp bot...');
-    try {
-        await client.destroy();
-        console.log('✅ WhatsApp client destroyed successfully');
-    } catch (error) {
-        console.error('❌ Error destroying WhatsApp client:', error);
-    }
-    process.exit(0);
+// Call this function after MongoDB connection is established
+mongoose.connection.once('open', () => {
+    createDefaultAdminUser();
 });
-
-process.on('SIGTERM', async () => {
-    console.log('\n📱 Received SIGTERM, shutting down gracefully...');
-    try {
-        await client.destroy();
-        console.log('✅ WhatsApp client destroyed successfully');
-    } catch (error) {
-        console.error('❌ Error destroying WhatsApp client:', error);
-    }
-    process.exit(0);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-    console.error('❌ Uncaught Exception:', error);
-    process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-    process.exit(1);
-});
-
-// Start the application
-initializeApp();
