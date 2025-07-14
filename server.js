@@ -31,13 +31,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 // --- 4. MongoDB Connection ---
 const MONGODB_URI = process.env.MONGODB_URI;
 
-mongoose.connect(MONGODB_URI)
+mongoose.connect(MONGODB_URI, {
+    // These options are deprecated in Mongoose 6+, but harmless if included.
+    // useNewUrlParser: true,
+    // useUnifiedTopology: true,
+})
     .then(() => {
         console.log('MongoDB connected successfully!');
         createDefaultAdmin(); // Optional: Create a default admin user if none exists
     })
     .catch(err => {
-        console.error('MongoDB connection error:', err);
+        console.error('MongoDB connection error details:', err.message); // Log the specific error message
+        console.error('Full MongoDB connection error object:', err); // Log the full error object for more context
         process.exit(1);
     });
 
