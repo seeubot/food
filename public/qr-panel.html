@@ -113,6 +113,7 @@
 
         let qrAccessToken = null;
         let qrExpiryInterval = null;
+        let statusPollingInterval = null; // New variable for dynamic polling
 
         // Function to show a custom message box instead of alert
         function showMessageBox(message, type = 'info') {
@@ -145,6 +146,14 @@
             }, 5000); // Message disappears after 5 seconds
         }
 
+        // Function to set polling interval dynamically
+        function setPollingInterval(intervalMs) {
+            if (statusPollingInterval) {
+                clearInterval(statusPollingInterval);
+            }
+            statusPollingInterval = setInterval(fetchQrStatus, intervalMs);
+        }
+
         // Function to fetch QR code and status
         async function fetchQrStatus() {
             loadingIndicator.classList.remove('hidden');
@@ -159,8 +168,6 @@
             try {
                 const statusResponse = await fetch('/api/qr-status');
                 if (!statusResponse.ok) {
-                    // If not authenticated, the server will redirect, but client-side fetch won't follow.
-                    // Check for 401 specifically to handle this.
                     if (statusResponse.status === 401) {
                         window.location.href = '/admin/login'; // Redirect to login if not authenticated
                         return;
@@ -178,6 +185,7 @@
                     loadingIndicator.classList.add('hidden');
                     qrExpiryTime.textContent = ''; // No expiry for connected state
                     qrAccessToken = null; // Clear token when connected
+                    setPollingInterval(60000); // Poll less frequently when connected (e.g., every minute)
                 } else if (statusData.hasQR && statusData.accessToken) {
                     connectionStatus.textContent = 'Scanning QR';
                     connectionStatus.classList.remove('text-green-600', 'text-red-600');
@@ -214,6 +222,7 @@
                         qrExpiryInterval = setInterval(updateExpiry, 1000);
                         updateExpiry(); // Call immediately to set initial time
                     }
+                    setPollingInterval(5000); // Poll more frequently when QR is available (e.g., every 5 seconds)
 
                 } else {
                     connectionStatus.textContent = 'Disconnected / Waiting for QR';
@@ -224,6 +233,7 @@
                     loadingIndicator.classList.add('hidden');
                     qrExpiryTime.textContent = '';
                     qrAccessToken = null;
+                    setPollingInterval(10000); // Poll frequently when disconnected (e.g., every 10 seconds)
                 }
             } catch (error) {
                 console.error('Error fetching QR status:', error);
@@ -235,6 +245,7 @@
                 loadingIndicator.classList.add('hidden');
                 qrExpiryTime.textContent = '';
                 showMessageBox(`Failed to fetch QR status: ${error.message}`, 'error');
+                setPollingInterval(15000); // Poll less frequently on error
             }
         }
 
@@ -250,6 +261,7 @@
             if (qrExpiryInterval) {
                 clearInterval(qrExpiryInterval);
             }
+            setPollingInterval(5000); // Start fast polling during refresh
 
             try {
                 const response = await fetch('/api/qr-refresh', { method: 'POST' });
@@ -279,6 +291,15 @@
             }
         }
 
+        // Add error handling for the QR image itself
+        qrCodeImage.onerror = () => {
+            console.error('Failed to load QR code image. It might be corrupted or the URL is invalid.');
+            qrCodeImage.style.display = 'none';
+            qrCodeMessage.textContent = 'Failed to load QR image. Please try refreshing.';
+            showMessageBox('Failed to load QR image. This might indicate an issue with QR generation on the server. Please try refreshing.', 'error');
+        };
+
+
         // Event listeners
         refreshQrBtn.addEventListener('click', refreshQrCode);
         logoutBtn.addEventListener('click', () => {
@@ -286,10 +307,11 @@
         });
 
         // Initial fetch on page load
-        document.addEventListener('DOMContentLoaded', fetchQrStatus);
-
-        // Periodically check status to update connection state and QR expiry
-        setInterval(fetchQrStatus, 30000); // Check every 30 seconds
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchQrStatus();
+            // Initial polling rate set based on expected initial state (disconnected/waiting)
+            setPollingInterval(10000); 
+        });
     </script>
 </body>
 </html>
