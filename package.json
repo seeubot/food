@@ -1,25 +1,32 @@
 {
-  "name": "your-whatsapp-bot",
+  "name": "whatsapp-food-bot",
   "version": "1.0.0",
-  "description": "A WhatsApp bot for ordering food",
+  "description": "A Node.js WhatsApp bot for an e-commerce food business.",
   "main": "server.js",
-  "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "ecommerce",
+    "food",
+    "nodejs",
+    "mongodb",
+    "whatsapp-web.js"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2",
-    "mongoose": "^8.4.4",
-    "whatsapp-web.js": "^1.23.0",
-    "qrcode-terminal": "^0.12.0",
-    "qrcode": "^1.5.3",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "node-cron": "^3.0.3",
-    "express-session": "^1.18.0",
-    "express-rate-limit": "^7.3.1",
-    "crypto": "^1.0.1",
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7",
-    "url": "^0.11.1"
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.4.4",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.23.0"
   }
 }
+
