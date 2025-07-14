@@ -1,32 +1,28 @@
 {
-  "name": "whatsapp-food-bot",
+  "name": "whatsapp-food-bot-backend",
   "version": "1.0.0",
-  "description": "A Node.js WhatsApp bot for an e-commerce food business.",
+  "description": "Node.js backend for WhatsApp food ordering bot with dashboard API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": [
-    "whatsapp",
-    "bot",
-    "ecommerce",
-    "food",
-    "nodejs",
-    "mongodb",
-    "whatsapp-web.js"
-  ],
-  "author": "Your Name",
-  "license": "MIT",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.4",
-    "qrcode-terminal": "^0.12.0",
+    "node-cron": "^3.0.3",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.5",
     "whatsapp-web.js": "^1.23.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
   }
 }
 
