@@ -4,315 +4,250 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp QR Panel</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Light gray background */
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
         }
         .container {
-            max-width: 90%; /* Fluid width for responsiveness */
-            margin: 2rem auto;
-            padding: 1.5rem;
-            background-color: #ffffff;
-            border-radius: 0.75rem; /* Rounded corners */
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
         }
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
+        h1 {
+            color: #25D366;
+            margin-bottom: 20px;
+        }
+        .status-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .status-item {
+            margin: 10px 0;
+            display: flex;
+        }
+        .status-label {
+            font-weight: bold;
+            min-width: 120px;
+        }
+        #qrImage {
+            margin: 20px auto;
+            max-width: 100%;
+            display: block;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        #countdown {
+            font-size: 18px;
+            margin: 15px 0;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        button {
+            background-color: #25D366;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
             cursor: pointer;
-            transition: background-color 0.2s, transform 0.2s;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            margin-top: 15px;
         }
-        .btn-primary {
-            background-color: #2563eb; /* Blue */
-            color: #ffffff;
+        button:hover {
+            background-color: #128C7E;
         }
-        .btn-primary:hover {
-            background-color: #1d4ed8; /* Darker blue */
-            transform: translateY(-1px);
+        .connected {
+            color: #2ecc71;
         }
-        .btn-danger {
-            background-color: #dc2626; /* Red */
-            color: #ffffff;
-        }
-        .btn-danger:hover {
-            background-color: #b91c1c; /* Darker red */
-            transform: translateY(-1px);
-        }
-        .message-box {
-            background-color: #fefcbf; /* Light yellow */
-            color: #8a6534; /* Dark yellow text */
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            border: 1px solid #fcd34d; /* Yellow border */
-        }
-        @media (min-width: 768px) {
-            .container {
-                max-width: 600px; /* Max width for larger screens */
-            }
+        .disconnected {
+            color: #e74c3c;
         }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
-    <header class="bg-blue-600 text-white p-4 shadow-md">
-        <div class="container flex justify-between items-center bg-transparent shadow-none p-0 m-0 w-full">
-            <h1 class="text-2xl font-bold">WhatsApp QR Panel</h1>
-            <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
-        </div>
-    </header>
-
-    <main class="flex-grow flex items-center justify-center p-4">
-        <div class="container text-center">
-            <h2 class="text-xl font-semibold mb-4 text-gray-800">Scan QR Code to Connect WhatsApp</h2>
-            
-            <!-- Loading Indicator -->
-            <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center p-4">
-                <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-3"></div>
-                <p class="text-gray-600">Loading QR code...</p>
+<body>
+    <div class="container">
+        <h1>WhatsApp Connection Panel</h1>
+        
+        <div class="status-box">
+            <div class="status-item">
+                <span class="status-label">Status:</span>
+                <span id="statusText">Checking...</span>
             </div>
-
-            <!-- QR Code Display -->
-            <div id="qrCodeContainer" class="flex flex-col items-center justify-center p-4 mb-4 bg-gray-50 rounded-lg shadow-inner border border-gray-200">
-                <img id="qrCodeImage" src="" alt="WhatsApp QR Code" class="w-full max-w-xs rounded-md shadow-lg" style="display: none;">
-                <p id="qrCodeMessage" class="text-gray-600 mt-4"></p>
+            <div class="status-item">
+                <span class="status-label">Connection:</span>
+                <span id="connectionStatus">-</span>
             </div>
-
-            <!-- Connection Status -->
-            <div class="mb-6">
-                <p class="text-lg font-medium text-gray-700">Connection Status: <span id="connectionStatus" class="font-bold text-blue-600">Checking...</span></p>
-                <p id="qrExpiryTime" class="text-sm text-gray-500 mt-1"></p>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="flex flex-col sm:flex-row justify-center gap-4">
-                <button id="refreshQrBtn" class="btn btn-primary flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004 12c0 2.21.896 4.21 2.36 5.64m1.432 1.432L13 19.5l-1.5-1.5m1.5 1.5L13 19.5l1.5-1.5m-1.5 1.5l-1.5-1.5M20 20v-5h-.582m-15.356-2A8.001 8.001 0 0020 12c0-2.21-.896-4.21-2.36-5.64m-1.432-1.432L11 4.5l1.5 1.5m-1.5-1.5L11 4.5l-1.5 1.5"></path></svg>
-                    Refresh QR Code
-                </button>
-                <button id="logoutBtn" class="btn btn-danger flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    Logout
-                </button>
+            <div class="status-item">
+                <span class="status-label">QR Status:</span>
+                <span id="qrStatus">-</span>
             </div>
         </div>
-    </main>
+
+        <div id="countdown"></div>
+        <img id="qrImage" alt="WhatsApp QR Code">
+        
+        <button id="refreshBtn">Refresh QR Code</button>
+    </div>
 
     <script>
-        const qrCodeImage = document.getElementById('qrCodeImage');
-        const qrCodeMessage = document.getElementById('qrCodeMessage');
-        const connectionStatus = document.getElementById('connectionStatus');
-        const refreshQrBtn = document.getElementById('refreshQrBtn');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const qrExpiryTime = document.getElementById('qrExpiryTime');
-        const logoutBtn = document.getElementById('logoutBtn');
-
-        let qrAccessToken = null;
-        let qrExpiryInterval = null;
-        let statusPollingInterval = null; // New variable for dynamic polling
-
-        // Function to show a custom message box instead of alert
-        function showMessageBox(message, type = 'info') {
-            const container = document.querySelector('.container');
-            let messageBox = document.getElementById('customMessageBox');
-            if (!messageBox) {
-                messageBox = document.createElement('div');
-                messageBox.id = 'customMessageBox';
-                messageBox.classList.add('message-box', 'mt-4', 'p-3', 'rounded-md', 'text-sm', 'flex', 'justify-between', 'items-center');
-                container.insertBefore(messageBox, container.firstChild);
-            }
+        document.addEventListener('DOMContentLoaded', function() {
+            const statusText = document.getElementById('statusText');
+            const connectionStatus = document.getElementById('connectionStatus');
+            const qrStatus = document.getElementById('qrStatus');
+            const qrImage = document.getElementById('qrImage');
+            const countdown = document.getElementById('countdown');
+            const refreshBtn = document.getElementById('refreshBtn');
             
-            messageBox.innerHTML = `<span>${message}</span><button class="ml-4 text-gray-600 hover:text-gray-900 font-bold" onclick="this.parentNode.remove()">X</button>`;
-            
-            // Apply type-specific styling
-            messageBox.classList.remove('bg-red-100', 'text-red-800', 'border-red-400', 'bg-green-100', 'text-green-800', 'border-green-400', 'bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
-            if (type === 'error') {
-                messageBox.classList.add('bg-red-100', 'text-red-800', 'border-red-400');
-            } else if (type === 'success') {
-                messageBox.classList.add('bg-green-100', 'text-green-800', 'border-green-400');
-            } else { // info or default
-                messageBox.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-400');
+            let refreshInterval;
+            let countdownInterval;
+
+            // Format time for display
+            function formatTime(ms) {
+                const seconds = Math.floor(ms / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
             }
 
-            messageBox.style.display = 'flex';
-            setTimeout(() => {
-                if (messageBox && messageBox.parentNode) {
-                    messageBox.remove();
+            // Update countdown display
+            function updateCountdown(timeRemaining) {
+                countdown.textContent = `QR expires in: ${formatTime(timeRemaining)}`;
+                
+                if (timeRemaining < 30000) { // Less than 30 seconds
+                    countdown.style.color = '#e74c3c';
+                } else {
+                    countdown.style.color = '#2c3e50';
                 }
-            }, 5000); // Message disappears after 5 seconds
-        }
-
-        // Function to set polling interval dynamically
-        function setPollingInterval(intervalMs) {
-            if (statusPollingInterval) {
-                clearInterval(statusPollingInterval);
-            }
-            statusPollingInterval = setInterval(fetchQrStatus, intervalMs);
-        }
-
-        // Function to fetch QR code and status
-        async function fetchQrStatus() {
-            loadingIndicator.classList.remove('hidden');
-            qrCodeImage.style.display = 'none';
-            qrCodeMessage.textContent = '';
-            connectionStatus.textContent = 'Checking...';
-            qrExpiryTime.textContent = '';
-            if (qrExpiryInterval) {
-                clearInterval(qrExpiryInterval);
             }
 
-            try {
-                const statusResponse = await fetch('/api/qr-status');
-                if (!statusResponse.ok) {
-                    if (statusResponse.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login if not authenticated
-                        return;
-                    }
-                    throw new Error(`HTTP error! status: ${statusResponse.status}`);
-                }
-                const statusData = await statusResponse.json();
-
-                if (statusData.isConnected) {
-                    connectionStatus.textContent = 'Connected';
-                    connectionStatus.classList.remove('text-blue-600', 'text-red-600');
-                    connectionStatus.classList.add('text-green-600');
-                    qrCodeMessage.textContent = 'WhatsApp client is connected!';
-                    qrCodeImage.style.display = 'none';
-                    loadingIndicator.classList.add('hidden');
-                    qrExpiryTime.textContent = ''; // No expiry for connected state
-                    qrAccessToken = null; // Clear token when connected
-                    setPollingInterval(60000); // Poll less frequently when connected (e.g., every minute)
-                } else if (statusData.hasQR && statusData.accessToken) {
-                    connectionStatus.textContent = 'Scanning QR';
-                    connectionStatus.classList.remove('text-green-600', 'text-red-600');
-                    connectionStatus.classList.add('text-blue-600');
-                    qrAccessToken = statusData.accessToken;
+            // Fetch QR status from server
+            async function fetchQRStatus() {
+                try {
+                    const response = await fetch('/api/qr-status', {
+                        credentials: 'include'
+                    });
+                    const data = await response.json();
                     
-                    // Fetch QR image using the access token
-                    const qrImageResponse = await fetch(`/api/qr-code?format=png&size=300&token=${qrAccessToken}`);
-                    if (!qrImageResponse.ok) {
-                        throw new Error(`Failed to fetch QR image: ${qrImageResponse.statusText}`);
-                    }
-                    const qrBlob = await qrImageResponse.blob();
-                    qrCodeImage.src = URL.createObjectURL(qrBlob);
-                    qrCodeImage.style.display = 'block';
-                    qrCodeMessage.textContent = 'Scan this QR code with your WhatsApp app.';
-                    loadingIndicator.classList.add('hidden');
-
-                    // Set up expiry timer
-                    if (statusData.expiresAt) {
-                        const updateExpiry = () => {
-                            const now = Date.now();
-                            const timeRemaining = statusData.expiresAt - now;
-                            if (timeRemaining > 0) {
-                                const minutes = Math.floor(timeRemaining / 60000);
-                                const seconds = Math.floor((timeRemaining % 60000) / 1000);
-                                qrExpiryTime.textContent = `QR expires in ${minutes}m ${seconds}s`;
+                    if (data.success) {
+                        // Update status display
+                        statusText.textContent = 'Operational';
+                        
+                        // Update connection status
+                        if (data.isConnected) {
+                            connectionStatus.textContent = 'Connected';
+                            connectionStatus.className = 'connected';
+                            qrStatus.textContent = 'Not needed';
+                            qrImage.style.display = 'none';
+                            countdown.textContent = '';
+                        } else {
+                            connectionStatus.textContent = 'Disconnected';
+                            connectionStatus.className = 'disconnected';
+                            
+                            if (data.hasQR) {
+                                qrStatus.textContent = 'Available';
+                                qrImage.style.display = 'block';
+                                qrImage.src = `/api/qr-code?token=${data.accessToken}&size=300`;
+                                
+                                // Update countdown
+                                updateCountdown(data.timeRemaining);
+                                
+                                // Start countdown if needed
+                                if (data.timeRemaining > 0) {
+                                    clearInterval(countdownInterval);
+                                    countdownInterval = setInterval(() => {
+                                        data.timeRemaining -= 1000;
+                                        if (data.timeRemaining <= 0) {
+                                            clearInterval(countdownInterval);
+                                            countdown.textContent = 'QR Code Expired';
+                                            fetchQRStatus(); // Refresh status
+                                        } else {
+                                            updateCountdown(data.timeRemaining);
+                                        }
+                                    }, 1000);
+                                }
                             } else {
-                                qrExpiryTime.textContent = 'QR expired. Refreshing...';
-                                showMessageBox('QR code expired. Attempting to refresh...', 'info');
-                                refreshQrCode(); // Auto-refresh
-                                clearInterval(qrExpiryInterval);
+                                qrStatus.textContent = 'Generating...';
+                                qrImage.style.display = 'none';
+                                countdown.textContent = '';
                             }
-                        };
-                        qrExpiryInterval = setInterval(updateExpiry, 1000);
-                        updateExpiry(); // Call immediately to set initial time
+                        }
+                    } else {
+                        statusText.textContent = 'Error fetching status';
                     }
-                    setPollingInterval(5000); // Poll more frequently when QR is available (e.g., every 5 seconds)
-
-                } else {
-                    connectionStatus.textContent = 'Disconnected / Waiting for QR';
-                    connectionStatus.classList.remove('text-green-600', 'text-blue-600');
-                    connectionStatus.classList.add('text-red-600');
-                    qrCodeMessage.textContent = 'No QR code available or client is disconnected. Click "Refresh QR Code" to generate a new one.';
-                    qrCodeImage.style.display = 'none';
-                    loadingIndicator.classList.add('hidden');
-                    qrExpiryTime.textContent = '';
-                    qrAccessToken = null;
-                    setPollingInterval(10000); // Poll frequently when disconnected (e.g., every 10 seconds)
+                } catch (error) {
+                    console.error('Error fetching QR status:', error);
+                    statusText.textContent = 'Connection error';
                 }
-            } catch (error) {
-                console.error('Error fetching QR status:', error);
-                connectionStatus.textContent = 'Error';
-                connectionStatus.classList.remove('text-green-600', 'text-blue-600');
-                connectionStatus.classList.add('text-red-600');
-                qrCodeMessage.textContent = `Error: ${error.message}. Please try refreshing.`;
-                qrCodeImage.style.display = 'none';
-                loadingIndicator.classList.add('hidden');
-                qrExpiryTime.textContent = '';
-                showMessageBox(`Failed to fetch QR status: ${error.message}`, 'error');
-                setPollingInterval(15000); // Poll less frequently on error
             }
-        }
 
-        // Function to refresh QR code
-        async function refreshQrCode() {
-            refreshQrBtn.disabled = true;
-            refreshQrBtn.textContent = 'Refreshing...';
-            loadingIndicator.classList.remove('hidden');
-            qrCodeImage.style.display = 'none';
-            qrCodeMessage.textContent = 'Initiating QR refresh...';
-            connectionStatus.textContent = 'Refreshing...';
-            qrExpiryTime.textContent = '';
-            if (qrExpiryInterval) {
-                clearInterval(qrExpiryInterval);
-            }
-            setPollingInterval(5000); // Start fast polling during refresh
-
-            try {
-                const response = await fetch('/api/qr-refresh', { method: 'POST' });
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login';
-                        return;
+            // Refresh QR code
+            async function refreshQR() {
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = 'Refreshing...';
+                
+                try {
+                    const response = await fetch('/api/qr-refresh', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Clear current QR
+                        qrImage.src = '';
+                        qrStatus.textContent = 'Refreshing...';
+                        countdown.textContent = 'Please wait...';
+                        
+                        // Check for new QR every 2 seconds
+                        const checkInterval = setInterval(async () => {
+                            const statusResponse = await fetch('/api/qr-status', {
+                                credentials: 'include'
+                            });
+                            const statusData = await statusResponse.json();
+                            
+                            if (statusData.hasQR) {
+                                clearInterval(checkInterval);
+                                fetchQRStatus(); // Update display with new QR
+                            }
+                        }, 2000);
                     }
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                } catch (error) {
+                    console.error('Error refreshing QR:', error);
+                    alert('Failed to refresh QR code');
+                } finally {
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = 'Refresh QR Code';
                 }
-                const data = await response.json();
-                if (data.success) {
-                    showMessageBox('QR refresh initiated successfully. Please wait a few moments for the new QR code to appear.', 'success');
-                    // Wait a bit before refetching status to allow backend to generate new QR
-                    setTimeout(fetchQrStatus, 5000); 
-                } else {
-                    showMessageBox(`Failed to initiate QR refresh: ${data.message}`, 'error');
-                    fetchQrStatus(); // Fetch status even if refresh failed to show current state
-                }
-            } catch (error) {
-                console.error('Error refreshing QR:', error);
-                showMessageBox(`Error refreshing QR: ${error.message}`, 'error');
-                fetchQrStatus(); // Fetch status to show current error state
-            } finally {
-                refreshQrBtn.disabled = false;
-                refreshQrBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004 12c0 2.21.896 4.21 2.36 5.64m1.432 1.432L13 19.5l-1.5-1.5m1.5 1.5L13 19.5l1.5-1.5m-1.5 1.5l-1.5-1.5M20 20v-5h-.582m-15.356-2A8.001 8.001 0 0020 12c0-2.21-.896-4.21-2.36-5.64m-1.432-1.432L11 4.5l1.5 1.5m-1.5-1.5L11 4.5l-1.5 1.5"></path></svg> Refresh QR Code`;
             }
-        }
 
-        // Add error handling for the QR image itself
-        qrCodeImage.onerror = () => {
-            console.error('Failed to load QR code image. It might be corrupted or the URL is invalid.');
-            qrCodeImage.style.display = 'none';
-            qrCodeMessage.textContent = 'Failed to load QR image. Please try refreshing.';
-            showMessageBox('Failed to load QR image. This might indicate an issue with QR generation on the server. Please try refreshing.', 'error');
-        };
-
-
-        // Event listeners
-        refreshQrBtn.addEventListener('click', refreshQrCode);
-        logoutBtn.addEventListener('click', () => {
-            window.location.href = '/admin/logout';
-        });
-
-        // Initial fetch on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchQrStatus();
-            // Initial polling rate set based on expected initial state (disconnected/waiting)
-            setPollingInterval(10000); 
+            // Set up event listeners
+            refreshBtn.addEventListener('click', refreshQR);
+            
+            // Initial fetch and set up polling
+            fetchQRStatus();
+            refreshInterval = setInterval(fetchQRStatus, 5000);
+            
+            // Clean up on exit
+            window.addEventListener('beforeunload', () => {
+                clearInterval(refreshInterval);
+                clearInterval(countdownInterval);
+            });
         });
     </script>
 </body>
 </html>
-
