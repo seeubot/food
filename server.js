@@ -54,7 +54,7 @@ let qrCodeAccessToken = null;
 const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 
 // WhatsApp Client Retry Configuration
-const MAX_RETRY_ATTEMPTS = 10; // Increased retry attempts
+const MAX_RETRY_ATTEMPTS = 20; // Increased retry attempts
 let currentRetryAttempt = 0;
 let whatsappClient = null; // Initialize whatsappClient to null
 
@@ -167,9 +167,14 @@ const destroyClientAndRetry = async (clearSession = false, reason = 'unknown') =
     
     if (whatsappClient) {
         try {
-            console.log('[WhatsApp Retry Helper] Attempting whatsappClient.destroy()...');
-            await whatsappClient.destroy();
-            console.log('[WhatsApp Retry Helper] whatsappClient.destroy() successful.');
+            // Only attempt to destroy if the browser instance exists to prevent TypeError
+            if (whatsappClient.browser) { 
+                console.log('[WhatsApp Retry Helper] Attempting whatsappClient.destroy()...');
+                await whatsappClient.destroy();
+                console.log('[WhatsApp Retry Helper] whatsappClient.destroy() successful.');
+            } else {
+                console.log('[WhatsApp Retry Helper] whatsappClient.browser is null, skipping destroy().');
+            }
         } catch (destroyErr) {
             console.error('[WhatsApp Retry Helper] Error during whatsappClient.destroy():', destroyErr.message);
             console.error(destroyErr.stack);
@@ -195,8 +200,8 @@ const destroyClientAndRetry = async (clearSession = false, reason = 'unknown') =
     qrCodeAccessToken = null;
     qrCodeData = `Restarting WhatsApp Client (${reason})...`;
 
-    // Calculate delay with exponential backoff
-    const delay = 5000 * (currentRetryAttempt + 1); // Shorter initial delay, then exponential (5s, 10s, 15s...)
+    // Calculate delay with linear backoff (10s, 20s, 30s...)
+    const delay = 10000 * (currentRetryAttempt + 1); 
     console.log(`[WhatsApp Retry Helper] Waiting ${delay / 1000} seconds before next initialization attempt.`);
     
     setTimeout(() => {
@@ -239,63 +244,31 @@ const initializeWhatsAppClient = async () => {
     }
     // --- END CRITICAL FIX ---
 
+    const puppeteerExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome';
+    console.log(`[WhatsApp Init] Using Puppeteer executable path: ${puppeteerExecutablePath}`);
+
     whatsappClient = new Client({
         authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Use a specific client ID
         puppeteer: {
             headless: true,
             args: [
-                '--no-sandbox', // Required for Docker environments
-                '--disable-setuid-sandbox', // Required for Docker environments
-                '--disable-gpu',
-                '--disable-dev-shm-usage', // Recommended for Docker/headless environments
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-features=TranslateUI',
-                '--disable-ipc-flooding-protection',
-                '--disable-web-security', 
-                '--disable-features=site-per-process',
-                '--disable-site-isolation-trials',
-                '--disable-blink-features=AutomationControlled',
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--no-zygote',
-                '--disable-infobars', // Disable "Chrome is being controlled by automated test software"
-                '--disable-breakpad', // Disable crash reporting
-                '--disable-features=site-per-process', // Sometimes helps with stability
-                '--disable-site-isolation-trials',
-                '--disable-component-update',
-                '--disable-default-apps',
-                '--disable-logging', // Reduce noise
-                '--enable-features=NetworkService,NetworkServiceInProcess',
-                '--single-process', // Re-enabling single-process, as it can sometimes reduce resource usage
-                '--incognito', // Start in incognito mode (might help with session issues)
-                '--no-startup-window', // Don't open a window on startup
-                '--hide-scrollbars', // Hide scrollbars
-                '--mute-audio',
-                '--disable-setuid-sandbox',
-                '--disable-accelerated-2d-canvas',
-                '--disable-dev-shm-usage',
-                '--disable-features=site-per-process',
-                '--enable-features=NetworkService,NetworkServiceInProcess',
-                '--no-first-run',
-                '--no-sandbox',
-                '--no-zygote',
-                '--disable-gl-drawing-for-tests',
-                '--disable-software-rasterizer',
-                '--disable-web-security',
-                '--disable-xss-auditor',
-                '--fast-start',
-                '--force-color-profile=srgb',
-                '--ignore-certificate-errors',
-                '--start-maximized',
-                '--window-size=1920,1080' // Set a reasonable window size
+                '--no-sandbox', // Essential for Docker/container environments
+                '--disable-setuid-sandbox', // Essential for Docker/container environments
+                '--disable-dev-shm-usage', // Essential for Docker/headless environments to prevent OOM
+                '--no-zygote', // Helps with stability in some environments
+                '--disable-gpu', // Generally good for headless environments
+                '--disable-background-networking', // Reduce background network activity
+                '--disable-sync', // Disable Chrome Sync
+                '--disable-features=IsolateOrigins,site-per-process', // More specific site isolation control
+                '--disable-features=BlockInsecurePrivateNetworkRequests', // Can help with local network access
+                '--shm-size=1gb', // Explicitly set shared memory size, sometimes needed for larger operations
+                '--single-process', // Can sometimes help with resource usage, but can also cause issues.
+                '--window-size=1920,1080', // Set a default window size for consistency
+                '--ignore-certificate-errors' // Useful for testing/dev, but be cautious in production
             ],
             timeout: 120000, // 2 minutes for browser launch
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome', // Default to common path for Docker
-            ignoreDefaultArgs: ['--disable-extensions'],
+            executablePath: puppeteerExecutablePath, // Default to common path for Docker
+            ignoreDefaultArgs: ['--disable-extensions'], // Prevents "Chrome is being controlled by automated test software"
             defaultViewport: null, // Important for responsive pages
             ignoreHTTPSErrors: true // Ignore HTTPS errors, useful for some environments
         }
@@ -366,6 +339,8 @@ const initializeWhatsAppClient = async () => {
         console.error(`Error name: ${error.name}, Error code: ${error.code || 'N/A'}`);
         console.error(error.stack); // Log full stack trace for debugging
 
+        // Increment retry attempt only on actual initialization failure
+        currentRetryAttempt++; 
         destroyClientAndRetry(true, `initialization_failed (${error.message})`);
     }
 };
@@ -670,7 +645,7 @@ cron.schedule('0 2 * * *', async () => { // Runs daily at 2 AM
                 const userNumber = order.userWhatsAppNumber;
                 const formattedUserNumber = userNumber ? `${userNumber.replace(/\D/g, '')}@c.us` : null;
                 if (formattedUserNumber) {
-                    const message = `👋 Hi there! It's been a while since your last order #${order._id} on ${order.createdAt.toDateString()}. We hope you enjoyed your items! Check out our latest menu: ${WEB_MENU_URL}`;
+                    const message = `👋 Hi there! It's been a while since your last order #${order._id}. We hope you enjoyed your items! Check out our latest menu: ${WEB_MENU_URL}`;
                     whatsappClient.sendMessage(formattedUserNumber, message);
                     console.log(`[Cron Job] Notified user ${formattedUserNumber} about old order #${order._id}`);
                 }
@@ -696,5 +671,7 @@ app.listen(PORT, () => {
     console.log(`QR Panel: http://localhost:${PORT}/qr-panel`);
     console.log(`Admin credentials: Username: ${ADMIN_CREDENTIALS.username}, Password: ${ADMIN_CREDENTIALS.password}`);
     console.log(`Ensure WEB_MENU_URL and DASHBOARD_URL environment variables are set for production deployment.`);
+    console.log(`Ensure PUPPETEER_EXECUTABLE_PATH is set correctly for your environment (e.g., /usr/bin/google-chrome for Docker).`);
+    console.log(`Ensure ADMIN_PHONE_NUMBER is set to a valid WhatsApp number.`);
 });
 
