@@ -54,7 +54,7 @@ let qrCodeAccessToken = null;
 const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 
 // WhatsApp Client Retry Configuration
-const MAX_RETRY_ATTEMPTS = 5;
+const MAX_RETRY_ATTEMPTS = 10; // Increased retry attempts
 let currentRetryAttempt = 0;
 let whatsappClient = null; // Initialize whatsappClient to null
 
@@ -152,6 +152,8 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
+    // In production, consider a graceful shutdown here.
+    // process.exit(1); // Exit with a failure code
 });
 
 /**
@@ -194,7 +196,7 @@ const destroyClientAndRetry = async (clearSession = false, reason = 'unknown') =
     qrCodeData = `Restarting WhatsApp Client (${reason})...`;
 
     // Calculate delay with exponential backoff
-    const delay = 10000 * (currentRetryAttempt + 1); // 10s, 20s, 30s...
+    const delay = 5000 * (currentRetryAttempt + 1); // Shorter initial delay, then exponential (5s, 10s, 15s...)
     console.log(`[WhatsApp Retry Helper] Waiting ${delay / 1000} seconds before next initialization attempt.`);
     
     setTimeout(() => {
@@ -214,14 +216,15 @@ const initializeWhatsAppClient = async () => {
 
     if (currentRetryAttempt >= MAX_RETRY_ATTEMPTS) {
         console.error(`[WhatsApp Init CRITICAL] Max retry attempts (${MAX_RETRY_ATTEMPTS}) reached. WhatsApp client could not be initialized.`);
-        qrCodeData = 'Initialization failed: Max retries reached. Check logs.';
+        qrCodeData = 'Initialization failed: Max retries reached. Please check server logs for details.';
         return; // Stop trying
     }
 
-    currentRetryAttempt++; // Increment attempt counter
-
     // --- CRITICAL FIX: Explicitly remove SingletonLock before launching browser ---
     try {
+        // Check if the session directory exists, create if not (important for fs.access later)
+        await fs.mkdir(sessionDir, { recursive: true });
+        
         // Check if the SingletonLock file exists and remove it
         await fs.access(singletonLockPath); // Throws if file doesn't exist
         console.log(`[WhatsApp Init] Found existing SingletonLock at: ${singletonLockPath}. Attempting to remove.`);
@@ -259,26 +262,39 @@ const initializeWhatsAppClient = async () => {
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--no-zygote',
-                '--memory-pressure-off',
-                '--disable-background-networking',
-                '--disable-default-apps',
-                '--disable-hang-monitor',
-                '--disable-prompt-on-repost',
-                '--disable-sync',
-                '--metrics-recording-only',
-                '--no-crash-upload',
+                '--disable-infobars', // Disable "Chrome is being controlled by automated test software"
+                '--disable-breakpad', // Disable crash reporting
+                '--disable-features=site-per-process', // Sometimes helps with stability
+                '--disable-site-isolation-trials',
                 '--disable-component-update',
-                '--disable-software-rasterizer',
-                '--disable-client-side-phishing-detection',
-                '--disable-cloud-import',
-                '--disable-speech-api',
-                '--disable-sync-preferences',
-                '--disable-zero-copy',
+                '--disable-default-apps',
+                '--disable-logging', // Reduce noise
                 '--enable-features=NetworkService,NetworkServiceInProcess',
-                '--mute-audio'
+                '--single-process', // Re-enabling single-process, as it can sometimes reduce resource usage
+                '--incognito', // Start in incognito mode (might help with session issues)
+                '--no-startup-window', // Don't open a window on startup
+                '--hide-scrollbars', // Hide scrollbars
+                '--mute-audio',
+                '--disable-setuid-sandbox',
+                '--disable-accelerated-2d-canvas',
+                '--disable-dev-shm-usage',
+                '--disable-features=site-per-process',
+                '--enable-features=NetworkService,NetworkServiceInProcess',
+                '--no-first-run',
+                '--no-sandbox',
+                '--no-zygote',
+                '--disable-gl-drawing-for-tests',
+                '--disable-software-rasterizer',
+                '--disable-web-security',
+                '--disable-xss-auditor',
+                '--fast-start',
+                '--force-color-profile=srgb',
+                '--ignore-certificate-errors',
+                '--start-maximized',
+                '--window-size=1920,1080' // Set a reasonable window size
             ],
             timeout: 120000, // 2 minutes for browser launch
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // Use env var for path
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome', // Default to common path for Docker
             ignoreDefaultArgs: ['--disable-extensions'],
             defaultViewport: null, // Important for responsive pages
             ignoreHTTPSErrors: true // Ignore HTTPS errors, useful for some environments
