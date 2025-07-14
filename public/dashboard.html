@@ -317,7 +317,7 @@
                         <input type="checkbox" id="item-in-stock" name="inStock" class="mr-2 h-4 w-4 text-blue-600 rounded"> In Stock
                     </label>
                     <label class="flex items-center text-gray-700">
-                        <input type="checkbox" id="item-is-new" name="isNew" class="mr-2 h-4 w-4 text-green-600 rounded"> New Item
+                        <input type="checkbox" id="item-is-newly-added" name="isNewlyAdded" class="mr-2 h-4 w-4 text-green-600 rounded"> New Item
                     </label>
                     <label class="flex items-center text-gray-700">
                         <input type="checkbox" id="item-is-trending" name="isTrending" class="mr-2 h-4 w-4 text-purple-600 rounded"> Trending
@@ -442,7 +442,7 @@
             } else if (sectionId === 'dashboard-overview') {
                 loadDashboardData();
             } else if (sectionId === 'whatsapp-connect') {
-                getWhatsAppQrCode(); // Load QR code/status when WhatsApp section is opened
+                getWhatsAppQrCode();
             }
         }
 
@@ -531,7 +531,7 @@
                         </span>
                     </td>
                     <td class="py-3 px-4">
-                        ${item.isNew ? '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mr-1">New</span>' : ''}
+                        ${item.isNewlyAdded ? '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mr-1">New</span>' : ''}
                         ${item.isTrending ? '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Trending</span>' : ''}
                     </td>
                     <td class="py-3 px-4 text-right">
@@ -557,7 +557,7 @@
                 document.getElementById('item-image-url').value = item.imageUrl || '';
                 document.getElementById('item-category').value = item.category || '';
                 document.getElementById('item-in-stock').checked = item.inStock;
-                document.getElementById('item-is-new').checked = item.isNew;
+                document.getElementById('item-is-newly-added').checked = item.isNewlyAdded; // Updated field name
                 document.getElementById('item-is-trending').checked = item.isTrending;
             } else {
                 document.getElementById('menu-item-id').value = '';
@@ -581,7 +581,7 @@
                 imageUrl: document.getElementById('item-image-url').value,
                 category: document.getElementById('item-category').value,
                 inStock: document.getElementById('item-in-stock').checked,
-                isNew: document.getElementById('item-is-new').checked,
+                isNewlyAdded: document.getElementById('item-is-newly-added').checked, // Updated field name
                 isTrending: document.getElementById('item-is-trending').checked,
             };
 
@@ -627,7 +627,6 @@
         }
 
         async function deleteMenuItem(id, name) {
-            // Using confirm for simplicity, replace with custom modal for production
             if (!confirm(`Are you sure you want to delete "${name}"?`)) {
                 return;
             }
@@ -798,11 +797,10 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.message || 'Failed to fetch QR code.');
+                    throw new Error(data.message || 'Failed to fetch QR code or status.');
                 }
 
                 if (data.status === 'qr_available' && data.qr) {
-                    // Generate QR code image from the data string
                     new QRious({
                         element: qrImage,
                         value: data.qr,
