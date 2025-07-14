@@ -3,7 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const QRCode = require('qrcode');
+const QRCode = require = require('qrcode');
 const path = require('path');
 const dotenv = require('dotenv');
 const cron = require('node-cron');
@@ -39,8 +39,8 @@ let currentRetryAttempt = 0;
 let whatsappClient = null; // Initialize whatsappClient to null
 
 // Path to the session folder created by whatsapp-web.js LocalAuth
-// This folder needs to be cleared on critical failures to force a fresh QR
 const sessionDir = path.join(__dirname, '.wwebjs_auth', 'session-whatsapp-bot');
+const singletonLockPath = path.join(sessionDir, 'SingletonLock'); // Path to the problematic lock file
 
 // MongoDB Models
 const Product = require('./models/Product');
@@ -56,7 +56,6 @@ const qrRateLimit = rateLimit({
 });
 
 // IMPORTANT: Trust proxy headers if your app is behind a load balancer/proxy (like Koyeb)
-// This is crucial for secure cookies and correct IP detection.
 app.set('trust proxy', 1); 
 
 // Middleware
@@ -67,13 +66,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Session middleware for basic authentication
 app.use(session({
     secret: process.env.SESSION_SECRET || 'supersecretkey', // Use a strong, random secret in production
-    resave: false, // Don't save session if unmodified
-    saveUninitialized: false, // Don't create session until something is stored
+    resave: false, 
+    saveUninitialized: false, 
     cookie: { 
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
-        httpOnly: true, // Prevent client-side JS from accessing cookie
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        sameSite: 'lax' // Recommended for CSRF protection and compatibility
+        secure: process.env.NODE_ENV === 'production', 
+        httpOnly: true, 
+        maxAge: 24 * 60 * 60 * 1000, 
+        sameSite: 'lax' 
     }
 }));
 
@@ -127,14 +126,10 @@ let qrCodeData = 'Initializing WhatsApp Client...'; // Initial status message
 // Global error handlers to catch unhandled exceptions and rejections
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    // Application specific logging, cleanup, or exit
 });
 
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
-    // Application specific logging, cleanup, or exit
-    // In production, consider a graceful shutdown here.
-    // process.exit(1); // Exit with a failure code
 });
 
 /**
@@ -203,6 +198,22 @@ const initializeWhatsAppClient = async () => {
 
     currentRetryAttempt++; // Increment attempt counter
 
+    // --- CRITICAL FIX: Explicitly remove SingletonLock before launching browser ---
+    try {
+        // Check if the SingletonLock file exists and remove it
+        await fs.access(singletonLockPath); // Throws if file doesn't exist
+        console.log(`[WhatsApp Init] Found existing SingletonLock at: ${singletonLockPath}. Attempting to remove.`);
+        await fs.unlink(singletonLockPath); // Delete the file
+        console.log('[WhatsApp Init] SingletonLock removed successfully.');
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            console.log('[WhatsApp Init] SingletonLock does not exist, proceeding.');
+        } else {
+            console.warn(`[WhatsApp Init] Warning: Could not access or remove SingletonLock: ${err.message}. This might indicate a permission issue or another process holding the file.`);
+        }
+    }
+    // --- END CRITICAL FIX ---
+
     whatsappClient = new Client({
         authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Use a specific client ID
         puppeteer: {
@@ -226,7 +237,7 @@ const initializeWhatsAppClient = async () => {
                 '--no-first-run',
                 '--no-default-browser-check',
                 '--no-zygote',
-                // '--single-process', // Removed: Can sometimes cause issues in complex setups
+                // Removed '--single-process' as it can sometimes cause issues
                 '--memory-pressure-off',
                 '--disable-background-networking',
                 '--disable-default-apps',
@@ -290,14 +301,11 @@ const initializeWhatsAppClient = async () => {
 
     whatsappClient.on('disconnected', (reason) => {
         console.warn('[WhatsApp Disconnected] WhatsApp Client was disconnected:', reason);
-        // On disconnection, destroy client and retry, but don't clear session immediately
-        // unless it's a persistent issue. Let's try without clearing session first.
         destroyClientAndRetry(false, `disconnected (${reason})`); 
     });
 
     whatsappClient.on('auth_failure', (msg) => {
         console.error('[WhatsApp Auth Failure] WhatsApp Authentication Failure:', msg);
-        // On auth failure, destroy client and retry, clearing session to force new QR
         destroyClientAndRetry(true, `auth_failure (${msg})`);
     });
 
@@ -321,7 +329,6 @@ const initializeWhatsAppClient = async () => {
         console.error(`Error name: ${error.name}, Error code: ${error.code || 'N/A'}`);
         console.error(error.stack); // Log full stack trace for debugging
 
-        // If initialization fails, destroy client and retry, clearing session
         destroyClientAndRetry(true, `initialization_failed (${error.message})`);
     }
 };
@@ -333,8 +340,6 @@ initializeWhatsAppClient();
 
 // Health check endpoint for deployment platforms
 app.get('/health', (req, res) => {
-    // Return 200 OK if the server is running.
-    // For a more robust check, you might verify DB connection or WhatsApp client status.
     res.status(200).send('OK');
 });
 
@@ -349,7 +354,6 @@ app.post('/admin/login', async (req, res) => {
     if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
         req.session.isAuthenticated = true;
         console.log('[Admin Login] Admin login successful. Session set.');
-        // Explicitly save session to ensure it's persisted before redirect
         req.session.save(err => {
             if (err) {
                 console.error('[Admin Login] Error saving session:', err);
