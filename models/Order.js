@@ -1,5 +1,5 @@
 // models/Order.js
-const mongoose = require('mongoose');
+import mongoose from 'mongoose'; // Use import for ES modules
 
 const orderItemSchema = new mongoose.Schema({
     product: {
@@ -66,5 +66,5 @@ orderSchema.pre('save', function(next) {
     next();
 });
 
-module.exports = mongoose.model('Order', orderSchema);
+export default mongoose.model('Order', orderSchema); // Use export default for ES modules
 
