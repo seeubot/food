@@ -880,65 +880,37 @@
 
             socket.on('connect', () => {
                 console.log('Connected to Socket.IO server');
-                qrStatus.textContent = 'Connected to server. Waiting for QR code...';
                 qrError.classList.add('hidden');
             });
 
+            // Listen for the structured QR and status data
             socket.on('qr', (data) => {
-                console.log('QR Code received:', data);
-                qrCodeImage.src = data;
-                qrCodeImage.classList.remove('hidden');
-                qrCodePlaceholder.classList.add('hidden');
-                qrStatus.textContent = 'Scan this QR code with your WhatsApp app.';
-                qrStatus.classList.remove('text-red-500');
-                qrStatus.classList.add('text-blue-500');
-                qrError.classList.add('hidden');
-            });
+                console.log('QR/Status received:', data);
+                // Update QR image
+                if (data.image) {
+                    qrCodeImage.src = data.image;
+                    qrCodeImage.classList.remove('hidden');
+                    qrCodePlaceholder.classList.add('hidden');
+                } else {
+                    qrCodeImage.classList.add('hidden');
+                    qrCodePlaceholder.classList.remove('hidden');
+                }
 
-            socket.on('ready', () => {
-                console.log('WhatsApp Client is ready!');
-                qrCodeImage.classList.add('hidden');
-                qrCodePlaceholder.classList.remove('hidden');
-                qrCodePlaceholder.textContent = 'WhatsApp Client is ready!';
-                qrStatus.textContent = 'WhatsApp Client is ready!';
-                qrStatus.classList.remove('text-red-500', 'text-blue-500');
-                qrStatus.classList.add('text-green-500');
-                qrError.classList.add('hidden');
-            });
+                // Update status text
+                qrStatus.textContent = data.status;
 
-            socket.on('authenticated', () => {
-                console.log('WhatsApp Client Authenticated');
-                qrCodeImage.classList.add('hidden');
-                qrCodePlaceholder.classList.remove('hidden');
-                qrCodePlaceholder.textContent = 'WhatsApp Client Authenticated!';
-                qrStatus.textContent = 'WhatsApp Client Authenticated!';
-                qrStatus.classList.remove('text-red-500', 'text-blue-500');
-                qrStatus.classList.add('text-green-500');
-                qrError.classList.add('hidden');
-            });
-
-            socket.on('auth_failure', (msg) => {
-                console.error('AUTHENTICATION FAILURE', msg);
-                qrCodeImage.classList.add('hidden');
-                qrCodePlaceholder.classList.remove('hidden');
-                qrCodePlaceholder.textContent = `Auth Failure: ${msg}`;
-                qrStatus.textContent = `Auth Failure: ${msg}`;
-                qrStatus.classList.remove('text-blue-500', 'text-green-500');
-                qrStatus.classList.add('text-red-500');
-                qrError.textContent = 'Authentication failed. Please refresh or check server logs.';
-                qrError.classList.remove('hidden');
-            });
-
-            socket.on('disconnected', (reason) => {
-                console.log('Disconnected from Socket.IO server', reason);
-                qrCodeImage.classList.add('hidden');
-                qrCodePlaceholder.classList.remove('hidden');
-                qrCodePlaceholder.textContent = `Disconnected: ${reason}. Reconnecting...`;
-                qrStatus.textContent = `Disconnected: ${reason}. Reconnecting...`;
-                qrStatus.classList.remove('text-blue-500', 'text-green-500');
-                qrStatus.classList.add('text-red-500');
-                qrError.textContent = 'Connection lost. Please refresh or check server status.';
-                qrError.classList.remove('hidden');
+                // Update status color based on readiness
+                if (data.isReady) {
+                    qrStatus.classList.remove('text-red-500', 'text-blue-500');
+                    qrStatus.classList.add('text-green-500');
+                } else if (data.status.includes('Auth Failure') || data.status.includes('Disconnected')) {
+                    qrStatus.classList.remove('text-blue-500', 'text-green-500');
+                    qrStatus.classList.add('text-red-500');
+                } else {
+                    qrStatus.classList.remove('text-red-500', 'text-green-500');
+                    qrStatus.classList.add('text-blue-500');
+                }
+                qrError.classList.add('hidden'); // Clear any previous error messages
             });
 
             socket.on('connect_error', (err) => {
@@ -952,6 +924,18 @@
                 qrError.textContent = 'Could not connect to the backend. Please ensure the server is running.';
                 qrError.classList.remove('hidden');
             });
+
+            socket.on('disconnect', (reason) => {
+                console.log('Disconnected from Socket.IO server', reason);
+                qrCodeImage.classList.add('hidden');
+                qrCodePlaceholder.classList.remove('hidden');
+                qrCodePlaceholder.textContent = `Disconnected: ${reason}. Reconnecting...`;
+                qrStatus.textContent = `Disconnected: ${reason}. Reconnecting...`;
+                qrStatus.classList.remove('text-blue-500', 'text-green-500');
+                qrStatus.classList.add('text-red-500');
+                qrError.textContent = 'Connection lost. Please refresh or check server status.';
+                qrError.classList.remove('hidden');
+            });
         }
 
         async function refreshQrStatus() {
@@ -961,24 +945,8 @@
             qrStatus.classList.add('text-blue-500');
             try {
                 const data = await apiCall('/api/whatsapp/qr');
-                if (data.qrCode && data.qrCode.startsWith('data:image/png;base64,')) {
-                    qrCodeImage.src = data.qrCode;
-                    qrCodeImage.classList.remove('hidden');
-                    qrCodePlaceholder.classList.add('hidden');
-                    qrStatus.textContent = 'QR code refreshed. Scan again if needed.';
-                } else {
-                    qrCodeImage.classList.add('hidden');
-                    qrCodePlaceholder.classList.remove('hidden');
-                    qrCodePlaceholder.textContent = data.qrCode; // This will be the text status like "WhatsApp Client is ready!"
-                    qrStatus.textContent = data.qrCode;
-                    if (data.qrCode.includes('ready') || data.qrCode.includes('Authenticated')) {
-                        qrStatus.classList.remove('text-red-500', 'text-blue-500');
-                        qrStatus.classList.add('text-green-500');
-                    } else {
-                         qrStatus.classList.remove('text-red-500', 'text-green-500');
-                         qrStatus.classList.add('text-blue-500');
-                    }
-                }
+                // The socket.on('qr') listener will handle updating the UI based on the response
+                // No need to duplicate the display logic here
             } catch (err) {
                 qrError.textContent = err.message || 'Failed to refresh QR code. Check server logs.';
                 qrError.classList.remove('hidden');
