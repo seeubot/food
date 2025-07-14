@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A WhatsApp bot for ordering food",
   "main": "server.js",
-  "type": "module",  <-- ADD THIS LINE
+  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
