@@ -44,7 +44,7 @@ UserSchema.pre('save', async function (next) {
 
 const User = mongoose.model('User', UserSchema);
 
-// Menu Item Model
+// MenuItem Model with suppressReservedKeysWarning
 const MenuItemSchema = new mongoose.Schema({
     name: { type: String, required: true },
     description: { type: String },
@@ -55,7 +55,7 @@ const MenuItemSchema = new mongoose.Schema({
     isNew: { type: Boolean, default: false },
     isTrending: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
-});
+}, { suppressReservedKeysWarning: true }); // <--- Added this option to suppress the warning
 
 const MenuItem = mongoose.model('MenuItem', MenuItemSchema);
 
@@ -376,7 +376,7 @@ authRouter.post('/login', async (req, res) => {
 
 // Menu Management Routes
 const menuRouter = express.Router();
-app.use('/api/menu', authenticateToken, menuRouter); // Protect menu routes
+app.use('/api/menu', menuRouter); // No authentication for fetching menu items on public menu
 
 // Get all menu items
 menuRouter.get('/', async (req, res) => {
@@ -389,8 +389,8 @@ menuRouter.get('/', async (req, res) => {
     }
 });
 
-// Add a new menu item
-menuRouter.post('/', async (req, res) => {
+// Add a new menu item (protected for dashboard)
+menuRouter.post('/', authenticateToken, async (req, res) => {
     const { name, description, price, imageUrl, category, isAvailable, isNew, isTrending } = req.body;
     try {
         const newItem = new MenuItem({ name, description, price, imageUrl, category, isAvailable, isNew, isTrending });
@@ -402,8 +402,8 @@ menuRouter.post('/', async (req, res) => {
     }
 });
 
-// Update a menu item
-menuRouter.put('/:id', async (req, res) => {
+// Update a menu item (protected for dashboard)
+menuRouter.put('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     try {
@@ -418,8 +418,8 @@ menuRouter.put('/:id', async (req, res) => {
     }
 });
 
-// Delete a menu item
-menuRouter.delete('/:id', async (req, res) => {
+// Delete a menu item (protected for dashboard)
+menuRouter.delete('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         const deletedItem = await MenuItem.findByIdAndDelete(id);
@@ -457,7 +457,7 @@ orderRouter.post('/place', async (req, res) => {
         for (const item of items) {
             const menuItem = await MenuItem.findById(item.itemId);
             if (!menuItem || !menuItem.isAvailable) {
-                return res.status(400).json({ message: `Item "${item.itemId}" not found or not available.` });
+                return res.status(400).json({ message: `Item "${item.name}" (ID: ${item.itemId}) not found or not available.` });
             }
             orderItems.push({
                 menuItemId: menuItem._id,
@@ -564,7 +564,8 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => { // Use server.listen for socket.io
     console.log(`Server running on port ${PORT}`);
     console.log(`Dashboard served from /`);
-    console.log(`WhatsApp QR code available at ${API_BASE_URL}/api/whatsapp/qr`);
+    // Removed API_BASE_URL from here as it's a frontend concept
+    console.log(`WhatsApp QR code endpoint: /api/whatsapp/qr`);
     console.log('Remember to set JWT_SECRET, MENU_URL, FAQ_URL, REMINDER_INTERVAL_DAYS, and ADMIN_WHATSAPP_NUMBER in your .env file!');
 });
 
