@@ -159,6 +159,8 @@
             try {
                 const statusResponse = await fetch('/api/qr-status');
                 if (!statusResponse.ok) {
+                    // If not authenticated, the server will redirect, but client-side fetch won't follow.
+                    // Check for 401 specifically to handle this.
                     if (statusResponse.status === 401) {
                         window.location.href = '/admin/login'; // Redirect to login if not authenticated
                         return;
