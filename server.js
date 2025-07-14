@@ -3,11 +3,7 @@
 // --- 1. Import necessary modules ---
 const express = require('express');
 const mongoose = require('mongoose');
-const dotenv = require('dotenv'); // Make sure this is imported first
-
-// Load environment variables from .env file FIRST
-dotenv.config();
-
+// dotenv is no longer needed as variables are hardcoded
 const path = require('path');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
@@ -18,19 +14,27 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal'); // For displaying QR in console
 const fs = require('fs'); // For file system operations (QR image storage)
 
-// --- 2. Initialize Express App and Environment Variables ---
+// --- 2. Initialize Express App and Hardcoded Environment Variables ---
 const app = express();
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key'; // **IMPORTANT**: Change this to a strong, random secret in production
-const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`; // Base URL for your web menu/dashboard
+
+// --- HARDCODED ENVIRONMENT VARIABLES ---
+// !! WARNING: Hardcoding sensitive information is NOT recommended for production !!
+// !! It poses security risks and makes configuration management difficult.    !!
+const PORT = 3000;
+const JWT_SECRET = 'supersecretkeythatshouldberandomandlong'; // **IMPORTANT**: Change this to a strong, random secret in production
+const MONGODB_URI = "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
+const WHATSAPP_SESSION_PATH = './whatsapp_sessions';
+const APP_BASE_URL = `https://jolly-phebe-seeutech-5259d95c.koyeb.app`; // UPDATED: Your Koyeb app URL
+// --- END HARDCODED ENVIRONMENT VARIABLES ---
+
 
 // Log loaded environment variables for debugging
-console.log('--- Environment Variables Status ---');
-console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'Loaded' : 'NOT LOADED');
-console.log('PORT:', process.env.PORT || 'Defaulted to 3000');
-console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'Loaded' : 'NOT LOADED');
-console.log('WHATSAPP_SESSION_PATH:', process.env.WHATSAPP_SESSION_PATH || './whatsapp_sessions');
-console.log('APP_BASE_URL:', process.env.APP_BASE_URL || `http://localhost:${PORT}`);
+console.log('--- Environment Variables Status (Hardcoded) ---');
+console.log('MONGODB_URI:', MONGODB_URI ? 'Loaded' : 'NOT LOADED');
+console.log('PORT:', PORT);
+console.log('JWT_SECRET:', JWT_SECRET ? 'Loaded' : 'NOT LOADED');
+console.log('WHATSAPP_SESSION_PATH:', WHATSAPP_SESSION_PATH);
+console.log('APP_BASE_URL:', APP_BASE_URL);
 console.log('------------------------------------');
 
 
@@ -41,15 +45,7 @@ app.use(cors()); // Allow all CORS for development, restrict in production
 app.use(express.static(path.join(__dirname, 'public'))); // Serve static files
 
 // --- 4. MongoDB Connection ---
-const MONGODB_URI = process.env.MONGODB_URI;
-
-// Robust check for MONGODB_URI
-if (!MONGODB_URI) {
-    console.error('CRITICAL ERROR: MONGODB_URI environment variable is not defined.');
-    console.error('Please ensure you have a .env file in your project root with MONGODB_URI set,');
-    console.error('or that it is configured in your deployment environment (e.g., Koyeb).');
-    process.exit(1); // Exit the application if no MongoDB URI is found
-}
+// No robust check for MONGODB_URI needed as it's hardcoded now
 
 mongoose.connect(MONGODB_URI)
     .then(() => {
@@ -331,7 +327,6 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
 
 // --- 9. WhatsApp Web.js Integration ---
 
-const WHATSAPP_SESSION_PATH = process.env.WHATSAPP_SESSION_PATH || './whatsapp_sessions';
 let qrCodeData = null; // To store QR code as base64 for web display
 let whatsappClientStatus = 'disconnected'; // 'disconnected', 'connecting', 'ready', 'qr_available', 'authenticated', 'auth_failure'
 
