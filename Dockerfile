@@ -56,7 +56,8 @@ EXPOSE 3000
 # It's highly recommended to manage these via your deployment platform's environment variables
 # rather than hardcoding them in the Dockerfile for production.
 ENV PUPPETEER_EXECUTABLE_PATH="/usr/bin/google-chrome"
-ENV ADMIN_PHONE_NUMBER="YOUR_ADMIN_PHONE_NUMBER_HERE" # IMPORTANT: Replace with your actual admin WhatsApp number
+# IMPORTANT: Replace with your actual admin WhatsApp number
+ENV ADMIN_PHONE_NUMBER="918897350151" 
 
 # Command to run the application
 # Use 'node --experimental-modules server.js' for ES module support
