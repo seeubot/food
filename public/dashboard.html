@@ -3,845 +3,1071 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Food Business</title>
-    <!-- Tailwind CSS CDN -->
+    <title>WhatsApp Bot Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f4f7f6;
-            color: #333;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .sidebar {
-            background-color: #2c3e50; /* Dark blue-gray */
-            color: #ecf0f1; /* Light text */
-            transition: width 0.3s ease;
+        /* Tailwind CSS will handle dark mode based on 'dark' class on <html> */
+        html.dark {
+            /* This class will be toggled by JavaScript */
         }
-        .sidebar a {
-            padding: 1rem 1.5rem;
+        /* Custom scrollbar for better aesthetics in dark mode */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e0e0e0;
+            border-radius: 10px;
+        }
+        html.dark ::-webkit-scrollbar-track {
+            background: #374151; /* gray-700 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        html.dark ::-webkit-scrollbar-thumb {
+            background: #6b7280; /* gray-600 */
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        html.dark ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563; /* gray-500 */
+        }
+
+        /* Basic modal backdrop styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
             display: flex;
             align-items: center;
-            gap: 1rem;
-            border-radius: 0.75rem;
-            margin: 0.5rem 1rem;
-            transition: background-color 0.2s ease, color 0.2s ease;
-        }
-        .sidebar a:hover, .sidebar a.active {
-            background-color: #34495e; /* Slightly lighter on hover/active */
-            color: #ffffff;
-        }
-        .main-content {
-            background-color: #ffffff;
-            border-radius: 1.5rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-        .table-header {
-            background-color: #f8f9fa;
-        }
-        .btn-primary {
-            background-color: #3b82f6;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            transition: background-color 0.2s ease;
-        }
-        .btn-primary:hover {
-            background-color: #2563eb;
-        }
-        .btn-secondary {
-            background-color: #6b7280;
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            transition: background-color 0.2s ease;
-        }
-        .btn-secondary:hover {
-            background-color: #4b5563;
-        }
-        .modal {
-            background-color: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            z-index: 999;
         }
         .modal-content {
-            border-radius: 1rem;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        }
-        .form-input {
+            background-color: white;
+            padding: 2rem;
             border-radius: 0.5rem;
-            border: 1px solid #d1d5db;
-            padding: 0.75rem 1rem;
-            width: 100%;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 500px;
+            position: relative;
         }
-        .form-input:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        html.dark .modal-content {
+            background-color: #1f2937; /* gray-800 */
+            color: white;
         }
-        /* Message box styling */
-        .message-box {
-            animation: fadeInOut 3s forwards;
-        }
-        @keyframes fadeInOut {
-            0% { opacity: 0; transform: translateY(20px); }
-            10% { opacity: 1; transform: translateY(0); }
-            90% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(20px); }
-        }
-        .status-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .status-dot.green { background-color: #28a745; }
-        .status-dot.yellow { background-color: #ffc107; }
-        .status-dot.red { background-color: #dc3545; }
-        .status-dot.blue { background-color: #007bff; }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="min-h-screen flex flex-col transition-colors duration-300 ease-in-out">
 
-    <!-- Login Page -->
-    <div id="login-page" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">Admin Login</h2>
+    <!-- Tailwind CSS Configuration for dark mode -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Enable dark mode based on 'dark' class on <html>
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+
+    <!-- Login Section -->
+    <div id="login-section" class="min-h-screen flex items-center justify-center bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-white transition-colors duration-300 ease-in-out">
+        <div class="p-8 rounded-lg shadow-xl w-full max-w-md bg-white dark:bg-gray-800">
+            <h2 class="text-3xl font-bold mb-6 text-center">Admin Login</h2>
             <form id="login-form">
                 <div class="mb-4">
-                    <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Username:</label>
-                    <input type="text" id="username" name="username" class="form-input" required>
+                    <label class="block text-sm font-medium mb-2" for="login-username">Username</label>
+                    <input
+                        type="text"
+                        id="login-username"
+                        class="w-full p-3 rounded-lg border bg-gray-50 border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        required
+                    />
                 </div>
                 <div class="mb-6">
-                    <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Password:</label>
-                    <input type="password" id="password" name="password" class="form-input" required>
+                    <label class="block text-sm font-medium mb-2" for="login-password">Password</label>
+                    <input
+                        type="password"
+                        id="login-password"
+                        class="w-full p-3 rounded-lg border bg-gray-50 border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        required
+                    />
                 </div>
-                <button type="submit" class="btn-primary w-full">Login</button>
+                <p id="login-error" class="text-red-500 text-center mb-4 hidden"></p>
+                <button
+                    type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out"
+                >
+                    Login
+                </button>
             </form>
-            <p id="login-error" class="text-red-500 text-center mt-4 hidden"></p>
         </div>
     </div>
 
     <!-- Main Dashboard Layout -->
-    <div id="dashboard-layout" class="flex flex-1 hidden">
-        <!-- Sidebar -->
-        <aside class="sidebar w-64 p-4 flex flex-col justify-between">
-            <div>
-                <div class="text-2xl font-bold text-center mb-8">Admin Panel</div>
-                <nav>
-                    <ul>
-                        <li><a href="#" class="active" data-section="dashboard-overview"><i class="fas fa-tachometer-alt mr-3"></i> Dashboard</a></li>
-                        <li><a href="#" data-section="menu-items"><i class="fas fa-utensils mr-3"></i> Menu Items</a></li>
-                        <li><a href="#" data-section="orders"><i class="fas fa-clipboard-list mr-3"></i> Orders</a></li>
-                        <li><a href="#" data-section="users"><i class="fas fa-users mr-3"></i> Users</a></li>
-                        <li><a href="#" data-section="whatsapp-connect"><i class="fab fa-whatsapp mr-3"></i> WhatsApp Bot</a></li>
-                    </ul>
-                </nav>
-            </div>
-            <div class="mt-8">
-                <button id="logout-btn" class="w-full text-left py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center gap-3">
-                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
+    <div id="dashboard-layout" class="hidden min-h-screen flex-col md:flex-row bg-gray-100 dark:bg-gray-900 transition-colors duration-300 ease-in-out">
+
+        <!-- Sidebar/Navigation for larger screens -->
+        <nav class="hidden md:flex flex-col w-64 p-6 shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors duration-300 ease-in-out">
+            <div class="mb-8 text-2xl font-bold text-blue-600">Admin Panel</div>
+            <ul class="flex-grow">
+                <li class="mb-4">
+                    <button id="nav-dashboard" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-blue-600 hover:text-white transition duration-200 ease-in-out text-gray-700 dark:text-gray-300">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m0 0l-7 7m7-7v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg> Dashboard
+                    </button>
+                </li>
+                <li class="mb-4">
+                    <button id="nav-menu" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-blue-600 hover:text-white transition duration-200 ease-in-out text-gray-700 dark:text-gray-300">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg> Menu Management
+                    </button>
+                </li>
+                <li class="mb-4">
+                    <button id="nav-orders" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-blue-600 hover:text-white transition duration-200 ease-in-out text-gray-700 dark:text-gray-300">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg> Order Panel
+                    </button>
+                </li>
+                <li class="mb-4">
+                    <button id="nav-qr" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-blue-600 hover:text-white transition duration-200 ease-in-out text-gray-700 dark:text-gray-300">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 10h.01M6 14h.01M12 10h.01M12 14h.01M18 10h.01M18 14h.01M16 18H8a2 2 0 01-2-2V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2z"></path></svg> QR Authentication
+                    </button>
+                </li>
+            </ul>
+            <div class="mt-auto">
+                <button id="theme-toggle-sidebar" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out mb-4 text-gray-700 dark:text-gray-300">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.325 6.786l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg> <span id="theme-text-sidebar">Dark Mode</span>
+                </button>
+                <button id="logout-button-sidebar" class="w-full text-left flex items-center p-3 rounded-lg bg-red-600 hover:bg-red-700 text-white transition duration-300 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> Logout
                 </button>
             </div>
-        </aside>
+        </nav>
+
+        <!-- Top Bar for Mobile/Tablet -->
+        <header class="md:hidden flex items-center justify-between p-4 shadow-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors duration-300 ease-in-out">
+            <div class="text-xl font-bold text-blue-600">Admin Panel</div>
+            <div class="flex items-center gap-4">
+                <button id="theme-toggle-topbar" class="p-2 rounded-full hover:bg-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.325 6.786l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                </button>
+                <button id="logout-button-topbar" class="p-2 rounded-full bg-red-600 hover:bg-red-700 text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </button>
+            </div>
+        </header>
 
         <!-- Main Content Area -->
-        <main class="flex-1 p-8 overflow-auto">
-            <div class="main-content p-8">
-                <!-- Dashboard Overview Section -->
-                <section id="dashboard-overview-section" class="dashboard-section">
-                    <h2 class="text-3xl font-bold mb-6 text-gray-800">Dashboard Overview</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div class="bg-blue-100 p-6 rounded-xl shadow-md flex items-center">
-                            <i class="fas fa-shopping-bag text-4xl text-blue-600 mr-4"></i>
-                            <div>
-                                <p class="text-gray-600">Total Orders</p>
-                                <p class="text-3xl font-bold text-blue-800" id="total-orders">0</p>
+        <main class="flex-grow overflow-auto p-4 md:p-8">
+            <!-- Dashboard Content -->
+            <section id="dashboard-content" class="page-content flex flex-col items-center justify-center h-full text-gray-900 dark:text-white">
+                <h1 class="text-4xl md:text-5xl font-extrabold mb-6 text-center">Welcome to Your Dashboard!</h1>
+                <p class="text-lg md:text-xl text-center max-w-2xl">
+                    Manage your menu, track orders, and keep your WhatsApp bot connected.
+                </p>
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
+                    <div class="p-6 rounded-lg shadow-lg text-center bg-white dark:bg-gray-800">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                        <h3 class="text-xl font-semibold mb-2">Menu Management</h3>
+                        <p class="text-sm">Add, edit, and remove food items.</p>
+                    </div>
+                    <div class="p-6 rounded-lg shadow-lg text-center bg-white dark:bg-gray-800">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        <h3 class="text-xl font-semibold mb-2">Order Panel</h3>
+                        <p class="text-sm">View and manage customer orders.</p>
+                    </div>
+                    <div class="p-6 rounded-lg shadow-lg text-center bg-white dark:bg-gray-800">
+                        <svg class="w-12 h-12 mx-auto mb-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 10h.01M6 14h.01M12 10h.01M12 14h.01M18 10h.01M18 14h.01M16 18H8a2 2 0 01-2-2V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2z"></path></svg>
+                        <h3 class="text-xl font-semibold mb-2">QR Authentication</h3>
+                        <p class="text-sm">Connect your WhatsApp bot.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Menu Management Section -->
+            <section id="menu-management-section" class="page-content hidden p-4 md:p-8 text-gray-900 dark:text-white">
+                <h1 class="text-3xl md:text-4xl font-bold mb-6">Menu Management</h1>
+
+                <button id="add-menu-item-btn" class="mb-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center transition duration-300 ease-in-out">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Add New Item
+                </button>
+
+                <!-- Category Filters -->
+                <div class="flex flex-wrap gap-3 mb-6">
+                    <button data-category="All" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200">All</button>
+                    <button data-category="Indian" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">Indian</button>
+                    <button data-category="Chinese" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">Chinese</button>
+                    <button data-category="Snacks" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">Snacks</button>
+                    <button data-category="Main Course" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">Main Course</button>
+                    <button data-category="Appetizer" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">Appetizer</button>
+                    <button data-category="Dessert" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">Dessert</button>
+                    <button data-category="Beverage" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">Beverage</button>
+                    <button data-category="Side Dish" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">Side Dish</button>
+                    <button data-category="General" class="category-filter-btn px-4 py-2 rounded-full font-semibold bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-blue-600 hover:text-white transition-colors duration-200">General</button>
+                </div>
+
+                <p id="menu-loading" class="hidden">Loading menu items...</p>
+                <p id="menu-error" class="text-red-500 mb-4 hidden"></p>
+
+                <div id="menu-items-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <!-- Menu items will be dynamically loaded here -->
+                </div>
+
+                <!-- Menu Item Modal -->
+                <div id="menu-item-modal" class="modal-backdrop hidden">
+                    <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <h2 id="modal-title" class="text-2xl font-bold mb-6">Add New Menu Item</h2>
+                        <form id="menu-item-form">
+                            <input type="hidden" id="menu-item-id">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="item-name">Name</label>
+                                    <input type="text" id="item-name" name="name" class="w-full p-2 rounded-lg border bg-gray-50 border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white" required />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2" for="item-price">Price (Rs.)</label>
+                                    <input type="number" id="item-price" name="price" class="w-full p-2 rounded-lg border bg-gray-50 border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white" required min="0" step="0.01" />
+                                </div>
                             </div>
-                        </div>
-                        <div class="bg-green-100 p-6 rounded-xl shadow-md flex items-center">
-                            <i class="fas fa-dollar-sign text-4xl text-green-600 mr-4"></i>
-                            <div>
-                                <p class="text-gray-600">Total Revenue</p>
-                                <p class="text-3xl font-bold text-green-800" id="total-revenue">$0.00</p>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2" for="item-description">Description</label>
+                                <textarea id="item-description" name="description" rows="3" class="w-full p-2 rounded-lg border bg-gray-50 border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
                             </div>
-                        </div>
-                        <div class="bg-purple-100 p-6 rounded-xl shadow-md flex items-center">
-                            <i class="fas fa-users text-4xl text-purple-600 mr-4"></i>
-                            <div>
-                                <p class="text-gray-600">Total Users</p>
-                                <p class="text-3xl font-bold text-purple-800" id="total-users">0</p>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2" for="item-imageUrl">Image URL</label>
+                                <input type="url" id="item-imageUrl" name="imageUrl" class="w-full p-2 rounded-lg border bg-gray-50 border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
                             </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2" for="item-category">Category</label>
+                                <select id="item-category" name="category" class="w-full p-2 rounded-lg border bg-gray-50 border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                    <option value="Main Course">Main Course</option>
+                                    <option value="Appetizer">Appetizer</option>
+                                    <option value="Dessert">Dessert</option>
+                                    <option value="Beverage">Beverage</option>
+                                    <option value="Side Dish">Side Dish</option>
+                                    <option value="Indian">Indian</option>
+                                    <option value="Chinese">Chinese</option>
+                                    <option value="Snacks">Snacks</option>
+                                    <option value="General">General</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="item-isAvailable" name="isAvailable" class="mr-2 h-4 w-4 text-blue-600 rounded" />
+                                    <label class="text-sm font-medium" for="item-isAvailable">Available</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="item-isNew" name="isNew" class="mr-2 h-4 w-4 text-blue-600 rounded" />
+                                    <label class="text-sm font-medium" for="item-isNew">New Item</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="item-isTrending" name="isTrending" class="mr-2 h-4 w-4 text-blue-600 rounded" />
+                                    <label class="text-sm font-medium" for="item-isTrending">Trending</label>
+                                </div>
+                            </div>
+                            <p id="menu-form-error" class="text-red-500 text-center mb-4 hidden"></p>
+                            <div class="flex justify-end gap-4">
+                                <button type="button" id="cancel-menu-item-modal" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-white dark:hover:bg-gray-700 transition duration-300 ease-in-out">
+                                    Cancel
+                                </button>
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out">
+                                    Save Item
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Order Management Section -->
+            <section id="order-management-section" class="page-content hidden p-4 md:p-8 text-gray-900 dark:text-white">
+                <h1 class="text-3xl md:text-4xl font-bold mb-6">Order Management</h1>
+
+                <p id="orders-loading" class="hidden">Loading orders...</p>
+                <p id="orders-error" class="text-red-500 mb-4 hidden"></p>
+
+                <div class="overflow-x-auto rounded-lg shadow-lg">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Order ID</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Customer</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Items</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Order Date</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body" class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <!-- Orders will be dynamically loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Order Status Modal -->
+                <div id="order-status-modal" class="modal-backdrop hidden">
+                    <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <h2 class="text-2xl font-bold mb-6">Update Order Status</h2>
+                        <input type="hidden" id="current-order-id">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2" for="new-order-status">New Status</label>
+                            <select id="new-order-status" class="w-full p-2 rounded-lg border bg-gray-50 border-gray-300 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                <option value="Pending">Pending</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Preparing">Preparing</option>
+                                <option value="Out for Delivery">Out for Delivery</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
                         </div>
-                    </div>
-                    <!-- More dashboard widgets can be added here -->
-                </section>
-
-                <!-- Menu Items Management Section -->
-                <section id="menu-items-section" class="dashboard-section hidden">
-                    <h2 class="text-3xl font-bold mb-6 text-gray-800">Menu Items Management</h2>
-                    <button class="btn-primary mb-6 flex items-center" onclick="showMenuItemModal()"><i class="fas fa-plus mr-2"></i> Add New Item</button>
-
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white rounded-xl shadow-md">
-                            <thead class="table-header">
-                                <tr>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Image</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Name</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Category</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Price</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Stock</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Status</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="menu-items-table-body">
-                                <!-- Menu items will be loaded here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- Orders Management Section -->
-                <section id="orders-section" class="dashboard-section hidden">
-                    <h2 class="text-3xl font-bold mb-6 text-gray-800">Orders Management</h2>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white rounded-xl shadow-md">
-                            <thead class="table-header">
-                                <tr>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Order ID</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Customer</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Items</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Total</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Status</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Order Date</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="orders-table-body">
-                                <!-- Orders will be loaded here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- Users Management Section -->
-                <section id="users-section" class="dashboard-section hidden">
-                    <h2 class="text-3xl font-bold mb-6 text-gray-800">Users Management</h2>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white rounded-xl shadow-md">
-                            <thead class="table-header">
-                                <tr>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">User ID</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Name</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">WhatsApp ID</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Phone</th>
-                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Registered On</th>
-                                </tr>
-                            </thead>
-                            <tbody id="users-table-body">
-                                <!-- Users will be loaded here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- WhatsApp Connect Section -->
-                <section id="whatsapp-connect-section" class="dashboard-section hidden">
-                    <h2 class="text-3xl font-bold mb-6 text-gray-800">WhatsApp Bot Connection</h2>
-                    <div class="bg-white p-6 rounded-xl shadow-md">
-                        <div class="flex items-center mb-4">
-                            <p class="text-lg font-semibold mr-4">Bot Status:</p>
-                            <span id="whatsapp-status-dot" class="status-dot red"></span>
-                            <span id="whatsapp-status-text" class="text-lg font-medium text-gray-700">Disconnected</span>
-                        </div>
-                        <p class="text-gray-600 mb-4">
-                            To connect your WhatsApp bot, scan the QR code below using your WhatsApp mobile app (WhatsApp Web / Linked Devices option).
-                            Ensure your server is running and accessible.
-                        </p>
-                        <div id="qr-code-container" class="flex justify-center items-center bg-gray-50 p-6 rounded-lg border border-gray-200 min-h-[200px] relative">
-                            <img id="whatsapp-qr-image" src="" alt="WhatsApp QR Code" class="max-w-full max-h-64 object-contain hidden">
-                            <p id="qr-loading-text" class="text-gray-500">Loading QR code...</p>
-                        </div>
-                        <div class="mt-6 flex justify-center">
-                            <button class="btn-primary flex items-center" onclick="getWhatsAppQrCode()">
-                                <i class="fas fa-qrcode mr-2"></i> Refresh QR / Check Status
+                        <p id="order-status-error" class="text-red-500 text-center mb-4 hidden"></p>
+                        <div class="flex justify-end gap-4">
+                            <button type="button" id="cancel-order-status-modal" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-white dark:hover:bg-gray-700 transition duration-300 ease-in-out">
+                                Cancel
+                            </button>
+                            <button type="button" id="update-order-status-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out">
+                                Update Status
                             </button>
                         </div>
-                        <p class="text-sm text-gray-500 mt-4 text-center">
-                            Note: The QR code will disappear once the bot is successfully connected.
-                            If the bot disconnects, you may need to refresh and re-scan.
-                        </p>
                     </div>
-                </section>
-            </div>
+                </div>
+            </section>
+
+            <!-- QR Authentication Section -->
+            <section id="qr-authentication-section" class="page-content hidden p-4 md:p-8 flex flex-col items-center justify-center h-full text-gray-900 dark:text-white">
+                <h1 class="text-3xl md:text-4xl font-bold mb-6 text-center">WhatsApp Bot QR Authentication</h1>
+                <div class="p-6 rounded-lg shadow-xl text-center bg-white dark:bg-gray-800">
+                    <img id="qr-code-image" src="" alt="WhatsApp QR Code" class="w-64 h-64 mx-auto rounded-lg mb-4 border border-gray-300 hidden" />
+                    <div id="qr-code-placeholder" class="w-64 h-64 flex items-center justify-center mx-auto mb-4 bg-gray-200 rounded-lg text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                        Loading QR Code...
+                    </div>
+                    <p id="qr-status" class="text-lg font-semibold mb-4 text-blue-500">Connecting to WhatsApp Client...</p>
+                    <p id="qr-error" class="text-red-500 mb-4 hidden"></p>
+                    <button id="refresh-qr-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center mx-auto transition duration-300 ease-in-out">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356-2A8.001 8.001 0 004 12c0 2.972 1.15 5.727 3.059 7.779L10 21m2-2l-3.059 3.059A8.001 8.001 0 0020 12c0-2.972-1.15-5.727-3.059-7.779L14 3"></path></svg> Refresh QR Status
+                    </button>
+                </div>
+            </section>
         </main>
+
+        <!-- Bottom Navigation for Mobile -->
+        <nav class="md:hidden flex justify-around p-3 shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors duration-300 ease-in-out">
+            <button id="nav-dashboard-mobile" class="flex flex-col items-center p-2 rounded-lg text-gray-700 dark:text-gray-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m0 0l-7 7m7-7v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                <span class="text-xs mt-1">Dashboard</span>
+            </button>
+            <button id="nav-menu-mobile" class="flex flex-col items-center p-2 rounded-lg text-gray-700 dark:text-gray-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                <span class="text-xs mt-1">Menu</span>
+            </button>
+            <button id="nav-orders-mobile" class="flex flex-col items-center p-2 rounded-lg text-gray-700 dark:text-gray-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                <span class="text-xs mt-1">Orders</span>
+            </button>
+            <button id="nav-qr-mobile" class="flex flex-col items-center p-2 rounded-lg text-gray-700 dark:text-gray-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 10h.01M6 14h.01M12 10h.01M12 14h.01M18 10h.01M18 14h.01M16 18H8a2 2 0 01-2-2V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2z"></path></svg>
+                <span class="text-xs mt-1">QR</span>
+            </button>
+        </nav>
     </div>
 
-    <!-- Menu Item Modal (Add/Edit) -->
-    <div id="menu-item-modal" class="modal fixed inset-0 flex items-center justify-center z-50 hidden">
-        <div class="modal-content bg-white p-8 rounded-xl w-full max-w-lg">
-            <h3 id="menu-item-modal-title" class="text-2xl font-bold mb-6 text-gray-800">Add New Menu Item</h3>
-            <form id="menu-item-form">
-                <input type="hidden" id="menu-item-id">
-                <div class="mb-4">
-                    <label for="item-name" class="block text-gray-700 text-sm font-bold mb-2">Name:</label>
-                    <input type="text" id="item-name" name="name" class="form-input" required>
-                </div>
-                <div class="mb-4">
-                    <label for="item-description" class="block text-gray-700 text-sm font-bold mb-2">Description:</label>
-                    <textarea id="item-description" name="description" class="form-input"></textarea>
-                </div>
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label for="item-price" class="block text-gray-700 text-sm font-bold mb-2">Price ($):</label>
-                        <input type="number" id="item-price" name="price" class="form-input" step="0.01" required>
-                    </div>
-                    <div>
-                        <label for="item-original-price" class="block text-gray-700 text-sm font-bold mb-2">Original Price ($) (Optional):</label>
-                        <input type="number" id="item-original-price" name="originalPrice" class="form-input" step="0.01">
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <label for="item-image-url" class="block text-gray-700 text-sm font-bold mb-2">Image URL:</label>
-                    <input type="url" id="item-image-url" name="imageUrl" class="form-input" required>
-                </div>
-                <div class="mb-4">
-                    <label for="item-category" class="block text-gray-700 text-sm font-bold mb-2">Category:</label>
-                    <input type="text" id="item-category" name="category" class="form-input" required>
-                </div>
-                <div class="flex items-center space-x-4 mb-6">
-                    <label class="flex items-center text-gray-700">
-                        <input type="checkbox" id="item-in-stock" name="inStock" class="mr-2 h-4 w-4 text-blue-600 rounded"> In Stock
-                    </label>
-                    <label class="flex items-center text-gray-700">
-                        <input type="checkbox" id="item-is-newly-added" name="isNewlyAdded" class="mr-2 h-4 w-4 text-green-600 rounded"> New Item
-                    </label>
-                    <label class="flex items-center text-gray-700">
-                        <input type="checkbox" id="item-is-trending" name="isTrending" class="mr-2 h-4 w-4 text-purple-600 rounded"> Trending
-                    </label>
-                </div>
-                <div class="flex justify-end space-x-4">
-                    <button type="button" class="btn-secondary" onclick="hideMenuItemModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Item</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- Socket.IO Client Library -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
     <script>
-        const API_BASE_URL = window.location.origin;
-        let authToken = localStorage.getItem('adminToken');
+        // --- Configuration ---
+        const API_BASE_URL = window.location.origin; // Dynamically set API_BASE_URL to current origin for Koyeb deployment
+
+        // --- DOM Elements ---
+        const loginSection = document.getElementById('login-section');
+        const dashboardLayout = document.getElementById('dashboard-layout');
+        const loginForm = document.getElementById('login-form');
+        const loginUsernameInput = document.getElementById('login-username');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginError = document.getElementById('login-error');
+
+        const navButtons = {
+            dashboard: document.getElementById('nav-dashboard'),
+            menu: document.getElementById('nav-menu'),
+            orders: document.getElementById('nav-orders'),
+            qr: document.getElementById('nav-qr'),
+            dashboardMobile: document.getElementById('nav-dashboard-mobile'),
+            menuMobile: document.getElementById('nav-menu-mobile'),
+            ordersMobile: document.getElementById('nav-orders-mobile'),
+            qrMobile: document.getElementById('nav-qr-mobile'),
+        };
+
+        const pageContents = {
+            dashboard: document.getElementById('dashboard-content'),
+            menu: document.getElementById('menu-management-section'),
+            orders: document.getElementById('order-management-section'),
+            qr: document.getElementById('qr-authentication-section'),
+        };
+
+        const themeToggleSidebar = document.getElementById('theme-toggle-sidebar');
+        const themeToggleTopbar = document.getElementById('theme-toggle-topbar');
+        const themeTextSidebar = document.getElementById('theme-text-sidebar');
+        const logoutButtonSidebar = document.getElementById('logout-button-sidebar');
+        const logoutButtonTopbar = document.getElementById('logout-button-topbar');
+
+        // Menu Management Elements
+        const addMenuItemBtn = document.getElementById('add-menu-item-btn');
+        const menuItemsGrid = document.getElementById('menu-items-grid');
+        const menuLoading = document.getElementById('menu-loading');
+        const menuError = document.getElementById('menu-error');
+        const menuItemModal = document.getElementById('menu-item-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const menuItemForm = document.getElementById('menu-item-form');
+        const menuItemIdInput = document.getElementById('menu-item-id');
+        const itemNameInput = document.getElementById('item-name');
+        const itemPriceInput = document.getElementById('item-price');
+        const itemDescriptionInput = document.getElementById('item-description');
+        const itemImageUrlInput = document.getElementById('item-imageUrl');
+        const itemCategorySelect = document.getElementById('item-category');
+        const itemIsAvailableCheckbox = document.getElementById('item-isAvailable');
+        const itemIsNewCheckbox = document.getElementById('item-isNew');
+        const itemIsTrendingCheckbox = document.getElementById('item-isTrending');
+        const cancelMenuItemModalBtn = document.getElementById('cancel-menu-item-modal');
+        const menuFormError = document.getElementById('menu-form-error');
+        const categoryFilterButtons = document.querySelectorAll('.category-filter-btn');
+
+
+        // Order Management Elements
+        const ordersTableBody = document.getElementById('orders-table-body');
+        const ordersLoading = document.getElementById('orders-loading');
+        const ordersError = document.getElementById('orders-error');
+        const orderStatusModal = document.getElementById('order-status-modal');
+        const currentOrderIdInput = document.getElementById('current-order-id');
+        const newOrderStatusSelect = document.getElementById('new-order-status');
+        const cancelOrderStatusModalBtn = document.getElementById('cancel-order-status-modal');
+        const updateOrderStatusBtn = document.getElementById('update-order-status-btn');
+        const orderStatusError = document.getElementById('order-status-error');
+
+        // QR Authentication Elements
+        const qrCodeImage = document.getElementById('qr-code-image');
+        const qrCodePlaceholder = document.getElementById('qr-code-placeholder');
+        const qrStatus = document.getElementById('qr-status');
+        const qrError = document.getElementById('qr-error');
+        const refreshQrBtn = document.getElementById('refresh-qr-btn');
+
+        let currentTheme = localStorage.getItem('theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        let currentToken = localStorage.getItem('jwtToken');
+        let currentActivePage = 'dashboard';
+        let allMenuItems = []; // Store all fetched menu items for filtering
+        let currentFilterCategory = 'All'; // Default filter category
 
         // --- Utility Functions ---
 
-        function showMessage(message, type = 'info') {
-            const messageBox = document.createElement('div');
-            messageBox.className = `message-box fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-50`;
-            if (type === 'success') {
-                messageBox.classList.add('bg-green-500');
-            } else if (type === 'error') {
-                messageBox.classList.add('bg-red-500');
-            } else {
-                messageBox.classList.add('bg-blue-500');
-            }
-            messageBox.textContent = message;
-            document.body.appendChild(messageBox);
-
-            setTimeout(() => {
-                messageBox.remove();
-            }, 3000);
-        }
-
-        // --- Authentication Logic ---
-
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const loginError = document.getElementById('login-error');
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    authToken = data.token;
-                    localStorage.setItem('adminToken', authToken);
-                    loginError.classList.add('hidden');
-                    document.getElementById('login-page').classList.add('hidden');
-                    document.getElementById('dashboard-layout').classList.remove('hidden');
-                    showMessage('Login successful!', 'success');
-                    loadDashboardData();
-                    showSection('dashboard-overview');
-                } else {
-                    loginError.textContent = data.message || 'Login failed.';
-                    loginError.classList.remove('hidden');
-                    showMessage(data.message || 'Login failed.', 'error');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                loginError.textContent = 'Network error. Please try again.';
-                loginError.classList.remove('hidden');
-                showMessage('Network error during login.', 'error');
-            }
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            authToken = null;
-            localStorage.removeItem('adminToken');
-            document.getElementById('dashboard-layout').classList.add('hidden');
-            document.getElementById('login-page').classList.remove('hidden');
-            document.getElementById('login-form').reset();
-            document.getElementById('login-error').classList.add('hidden');
-            showMessage('Logged out successfully.', 'info');
-        });
-
-        function checkLoginStatus() {
-            if (authToken) {
-                document.getElementById('login-page').classList.add('hidden');
-                document.getElementById('dashboard-layout').classList.remove('hidden');
-                loadDashboardData();
-                showSection('dashboard-overview');
-            } else {
-                document.getElementById('login-page').classList.remove('hidden');
-                document.getElementById('dashboard-layout').classList.add('hidden');
-            }
-        }
-
-        // --- Navigation Logic ---
-
-        document.querySelectorAll('.sidebar a').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                document.querySelectorAll('.sidebar a').forEach(navLink => navLink.classList.remove('active'));
-                this.classList.add('active');
-                showSection(this.dataset.section);
-            });
-        });
-
-        function showSection(sectionId) {
-            document.querySelectorAll('.dashboard-section').forEach(section => {
-                section.classList.add('hidden');
-            });
-            document.getElementById(`${sectionId}-section`).classList.remove('hidden');
-
-            if (sectionId === 'menu-items') {
-                fetchMenuItemsDashboard();
-            } else if (sectionId === 'orders') {
-                fetchOrders();
-            } else if (sectionId === 'users') {
-                fetchUsers();
-            } else if (sectionId === 'dashboard-overview') {
-                loadDashboardData();
-            } else if (sectionId === 'whatsapp-connect') {
-                getWhatsAppQrCode();
-            }
-        }
-
-        // --- Data Loading Functions ---
-
-        async function loadDashboardData() {
-            try {
-                const [ordersRes, usersRes, menuRes] = await Promise.all([
-                    fetchWithAuth(`${API_BASE_URL}/api/admin/orders`),
-                    fetchWithAuth(`${API_BASE_URL}/api/admin/users`),
-                    fetchWithAuth(`${API_BASE_URL}/api/admin/menu`)
-                ]);
-
-                const orders = await ordersRes.json();
-                const users = await usersRes.json();
-                const menuItems = await menuRes.json();
-
-                if (!ordersRes.ok || !usersRes.ok || !menuRes.ok) {
-                    throw new Error('Failed to fetch dashboard data.');
-                }
-
-                document.getElementById('total-orders').textContent = orders.length;
-                const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-                document.getElementById('total-revenue').textContent = `$${totalRevenue.toFixed(2)}`;
-                document.getElementById('total-users').textContent = users.length;
-
-            } catch (error) {
-                console.error('Error loading dashboard data:', error);
-                showMessage('Failed to load dashboard data.', 'error');
-                if (error.message.includes('401') || error.message.includes('403')) {
-                     showMessage('Session expired or unauthorized. Please log in again.', 'error');
-                     setTimeout(() => logout(), 1500);
-                }
-            }
-        }
-
-        // Helper for fetching with authentication
-        async function fetchWithAuth(url, options = {}) {
+        // API Call Helper
+        async function apiCall(url, method = 'GET', data = null, token = null) {
             const headers = {
-                ...options.headers,
-                'Authorization': `Bearer ${authToken}`
+                'Content-Type': 'application/json',
             };
-            return fetch(url, { ...options, headers });
-        }
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
 
-        // --- Menu Items Management ---
+            const config = {
+                method,
+                headers,
+            };
 
-        async function fetchMenuItemsDashboard() {
+            if (data) {
+                config.body = JSON.stringify(data);
+            }
+
             try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu`);
+                const response = await fetch(`${API_BASE_URL}${url}`, config);
+                const responseData = await response.json();
                 if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        showMessage('Session expired or unauthorized. Please log in again.', 'error');
-                        setTimeout(() => logout(), 1500);
-                        return;
-                    }
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error(responseData.message || 'Something went wrong with the API call.');
                 }
-                const menuItems = await response.json();
-                renderMenuItemsTable(menuItems);
+                return responseData;
             } catch (error) {
-                console.error('Error fetching menu items for dashboard:', error);
-                showMessage('Failed to load menu items.', 'error');
+                console.error('API Call Error:', error);
+                throw error;
             }
         }
 
-        function renderMenuItemsTable(items) {
-            const tableBody = document.getElementById('menu-items-table-body');
-            tableBody.innerHTML = '';
-            if (items.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">No menu items found.</td></tr>';
-                return;
-            }
-
-            items.forEach(item => {
-                const row = tableBody.insertRow();
-                row.className = 'border-b last:border-b-0';
-                row.innerHTML = `
-                    <td class="py-3 px-4"><img src="${item.imageUrl || 'https://placehold.co/50x50/CCCCCC/333333?text=No'}" alt="${item.name}" class="w-12 h-12 object-cover rounded-md"></td>
-                    <td class="py-3 px-4 font-medium">${item.name}</td>
-                    <td class="py-3 px-4">${item.category || 'N/A'}</td>
-                    <td class="py-3 px-4">$${item.price.toFixed(2)}</td>
-                    <td class="py-3 px-4">
-                        <span class="px-2 py-1 rounded-full text-xs font-semibold ${item.inStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                            ${item.inStock ? 'In Stock' : 'Out of Stock'}
-                        </span>
-                    </td>
-                    <td class="py-3 px-4">
-                        ${item.isNewlyAdded ? '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mr-1">New</span>' : ''}
-                        ${item.isTrending ? '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Trending</span>' : ''}
-                    </td>
-                    <td class="py-3 px-4 text-right">
-                        <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="editMenuItem('${item._id}')"><i class="fas fa-edit"></i></button>
-                        <button class="text-red-600 hover:text-red-800" onclick="deleteMenuItem('${item._id}', '${item.name}')"><i class="fas fa-trash-alt"></i></button>
-                    </td>
-                `;
-            });
-        }
-
-        function showMenuItemModal(item = {}) {
-            const modal = document.getElementById('menu-item-modal');
-            const form = document.getElementById('menu-item-form');
-            document.getElementById('menu-item-modal-title').textContent = item._id ? 'Edit Menu Item' : 'Add New Menu Item';
-            form.reset();
-
-            if (item._id) {
-                document.getElementById('menu-item-id').value = item._id;
-                document.getElementById('item-name').value = item.name;
-                document.getElementById('item-description').value = item.description || '';
-                document.getElementById('item-price').value = item.price;
-                document.getElementById('item-original-price').value = item.originalPrice || '';
-                document.getElementById('item-image-url').value = item.imageUrl || '';
-                document.getElementById('item-category').value = item.category || '';
-                document.getElementById('item-in-stock').checked = item.inStock;
-                document.getElementById('item-is-newly-added').checked = item.isNewlyAdded; // Updated field name
-                document.getElementById('item-is-trending').checked = item.isTrending;
+        // --- Theme Management ---
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                if (themeTextSidebar) themeTextSidebar.textContent = 'Light Mode';
+                // Update SVG for dark mode (Moon icon)
+                themeToggleSidebar.querySelector('svg path').setAttribute('d', 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z');
+                themeToggleTopbar.querySelector('svg path').setAttribute('d', 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z');
             } else {
-                document.getElementById('menu-item-id').value = '';
-                document.getElementById('item-in-stock').checked = true;
+                document.documentElement.classList.remove('dark');
+                if (themeTextSidebar) themeTextSidebar.textContent = 'Dark Mode';
+                // Update SVG for light mode (Sun icon)
+                themeToggleSidebar.querySelector('svg path').setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.325 6.786l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z');
+                themeToggleTopbar.querySelector('svg path').setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.325 6.786l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z');
             }
-            modal.classList.remove('hidden');
+            // Re-render menu items to apply theme-specific classes if any
+            if (currentActivePage === 'menu') {
+                renderMenuItems(allMenuItems, currentFilterCategory);
+            }
+            // Re-render orders to apply theme-specific classes if any
+            if (currentActivePage === 'orders') {
+                fetchOrders();
+            }
         }
 
-        function hideMenuItemModal() {
-            document.getElementById('menu-item-modal').classList.add('hidden');
+        function toggleTheme() {
+            currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(currentTheme);
         }
 
-        document.getElementById('menu-item-form').addEventListener('submit', async (e) => {
+        // --- Navigation ---
+        function showPage(pageId) {
+            Object.values(pageContents).forEach(section => section.classList.add('hidden'));
+            document.getElementById(pageId).classList.remove('hidden');
+            currentActivePage = pageId.replace('-content', '').replace('-section', ''); // Store current active page
+            updateActiveNavButtons();
+        }
+
+        function updateActiveNavButtons() {
+            // Remove active classes from all nav buttons
+            Object.values(navButtons).forEach(btn => {
+                if (btn) {
+                    btn.classList.remove('bg-blue-600', 'text-white');
+                    btn.classList.add(currentTheme === 'dark' ? 'text-gray-300' : 'text-gray-700');
+                }
+            });
+
+            // Add active class to the current page's nav button
+            const activeNavButton = navButtons[currentActivePage];
+            const activeNavButtonMobile = navButtons[`${currentActivePage}Mobile`];
+
+            if (activeNavButton) {
+                activeNavButton.classList.add('bg-blue-600', 'text-white');
+                activeNavButton.classList.remove(currentTheme === 'dark' ? 'text-gray-300' : 'text-gray-700');
+            }
+            if (activeNavButtonMobile) {
+                activeNavButtonMobile.classList.add('text-blue-600');
+                activeNavButtonMobile.classList.remove(currentTheme === 'dark' ? 'text-gray-300' : 'text-gray-700');
+            }
+        }
+
+        // --- Authentication ---
+        function checkAuth() {
+            if (currentToken) {
+                loginSection.classList.add('hidden');
+                dashboardLayout.classList.remove('hidden');
+                showPage('dashboard-content'); // Show dashboard after login
+            } else {
+                loginSection.classList.remove('hidden');
+                dashboardLayout.classList.add('hidden');
+            }
+        }
+
+        async function handleLogin(e) {
             e.preventDefault();
-            const itemId = document.getElementById('menu-item-id').value;
-            const formData = {
-                name: document.getElementById('item-name').value,
-                description: document.getElementById('item-description').value,
-                price: parseFloat(document.getElementById('item-price').value),
-                originalPrice: parseFloat(document.getElementById('item-original-price').value) || undefined,
-                imageUrl: document.getElementById('item-image-url').value,
-                category: document.getElementById('item-category').value,
-                inStock: document.getElementById('item-in-stock').checked,
-                isNewlyAdded: document.getElementById('item-is-newly-added').checked, // Updated field name
-                isTrending: document.getElementById('item-is-trending').checked,
+            loginError.classList.add('hidden');
+            const username = loginUsernameInput.value;
+            const password = loginPasswordInput.value;
+
+            try {
+                const data = await apiCall('/api/auth/login', 'POST', { username, password });
+                localStorage.setItem('jwtToken', data.token);
+                currentToken = data.token;
+                checkAuth();
+            } catch (err) {
+                loginError.textContent = err.message || 'Login failed. Please check your credentials.';
+                loginError.classList.remove('hidden');
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('jwtToken');
+            currentToken = null;
+            checkAuth();
+        }
+
+        // --- Menu Management Functions ---
+        function renderMenuItems(itemsToRender, filterCategory) {
+            menuItemsGrid.innerHTML = ''; // Clear previous items
+
+            const filteredItems = filterCategory === 'All'
+                ? itemsToRender
+                : itemsToRender.filter(item => item.category === filterCategory);
+
+            if (filteredItems.length === 0) {
+                menuItemsGrid.innerHTML = `<p class="col-span-full text-center text-lg ${currentTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}">No menu items found for this category. Add some!</p>`;
+                return;
+            }
+
+            filteredItems.forEach(item => {
+                const itemCard = document.createElement('div');
+                itemCard.className = `p-4 rounded-lg shadow-lg flex flex-col ${currentTheme === 'dark' ? 'bg-gray-800' : 'bg-white'}`;
+                itemCard.dataset.itemData = JSON.stringify(item); // Store full item data for editing
+
+                itemCard.innerHTML = `
+                    <div class="relative w-full h-48 rounded-md overflow-hidden mb-4">
+                        <img
+                            src="${item.imageUrl || 'https://placehold.co/400x300/E0E0E0/333333?text=No+Image'}"
+                            alt="${item.name}"
+                            class="w-full h-full object-cover"
+                            onerror="this.onerror=null;this.src='https://placehold.co/400x300/E0E0E0/333333?text=Image+Not+Found';"
+                        />
+                        ${item.isNew ? '<span class="absolute top-2 left-2 bg-blue-600 text-white text-xs font-semibold px-2 py-1 rounded-full">NEW</span>' : ''}
+                        ${item.isTrending ? '<span class="absolute top-2 right-2 bg-purple-600 text-white text-xs font-semibold px-2 py-1 rounded-full">TRENDING</span>' : ''}
+                    </div>
+                    <h3 class="text-xl font-semibold mb-1">${item.name}</h3>
+                    <p class="text-sm mb-2 flex-grow ${currentTheme === 'dark' ? 'text-gray-300' : 'text-gray-600'}">${item.description}</p>
+                    <div class="flex items-center justify-between mt-auto pt-2">
+                        <p class="text-2xl font-bold">Rs. ${item.price.toFixed(2)}</p>
+                        <div class="flex gap-2">
+                            <button data-id="${item._id}" class="edit-menu-item-btn bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full transition duration-300 ease-in-out" title="Edit">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                            </button>
+                            <button data-id="${item._id}" class="delete-menu-item-btn bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition duration-300 ease-in-out" title="Delete">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-xs mt-2">
+                        ${item.isAvailable ? '<span class="bg-green-500 text-white px-2 py-1 rounded-full">Available</span>' : '<span class="bg-red-500 text-white px-2 py-1 rounded-full">Unavailable</span>'}
+                        <span class="px-2 py-1 rounded-full ${currentTheme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}">${item.category}</span>
+                    </div>
+                `;
+                menuItemsGrid.appendChild(itemCard);
+            });
+
+            // Attach event listeners to dynamically created buttons
+            document.querySelectorAll('.edit-menu-item-btn').forEach(button => {
+                button.addEventListener('click', (e) => openMenuItemModal(e.currentTarget.dataset.id));
+            });
+            document.querySelectorAll('.delete-menu-item-btn').forEach(button => {
+                button.addEventListener('click', (e) => deleteMenuItem(e.currentTarget.dataset.id));
+            });
+        }
+
+        async function fetchMenuItems() {
+            menuLoading.classList.remove('hidden');
+            menuError.classList.add('hidden');
+            menuItemsGrid.innerHTML = ''; // Clear previous items
+
+            try {
+                const items = await apiCall('/api/menu', 'GET', null, currentToken);
+                allMenuItems = items; // Store all fetched items
+                menuLoading.classList.add('hidden');
+                renderMenuItems(allMenuItems, currentFilterCategory); // Render with current filter
+            } catch (err) {
+                menuLoading.classList.add('hidden');
+                menuError.textContent = err.message || 'Failed to fetch menu items.';
+                menuError.classList.remove('hidden');
+            }
+        }
+
+        function handleCategoryFilter(event) {
+            categoryFilterButtons.forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-800', 'dark:bg-gray-700', 'dark:text-gray-200');
+            });
+            event.target.classList.add('bg-blue-600', 'text-white');
+            event.target.classList.remove('bg-gray-200', 'text-gray-800', 'dark:bg-gray-700', 'dark:text-gray-200');
+
+            currentFilterCategory = event.target.dataset.category;
+            renderMenuItems(allMenuItems, currentFilterCategory);
+        }
+
+        function openMenuItemModal(itemId = null) {
+            menuItemForm.reset(); // Clear form
+            menuItemIdInput.value = ''; // Clear hidden ID
+            menuFormError.classList.add('hidden');
+
+            if (itemId) {
+                modalTitle.textContent = 'Edit Menu Item';
+                const itemToEdit = allMenuItems.find(item => item._id === itemId); // Find from allMenuItems
+                if (itemToEdit) {
+                    menuItemIdInput.value = itemToEdit._id;
+                    itemNameInput.value = itemToEdit.name;
+                    itemPriceInput.value = itemToEdit.price;
+                    itemDescriptionInput.value = itemToEdit.description;
+                    itemImageUrlInput.value = itemToEdit.imageUrl;
+                    itemCategorySelect.value = itemToEdit.category;
+                    itemIsAvailableCheckbox.checked = itemToEdit.isAvailable;
+                    itemIsNewCheckbox.checked = itemToEdit.isNew;
+                    itemIsTrendingCheckbox.checked = itemToEdit.isTrending;
+                } else {
+                    menuFormError.textContent = 'Failed to load item for editing.';
+                    menuFormError.classList.remove('hidden');
+                }
+            } else {
+                modalTitle.textContent = 'Add New Menu Item';
+                // Set defaults for new item
+                itemIsAvailableCheckbox.checked = true;
+                itemIsNewCheckbox.checked = false;
+                itemIsTrendingCheckbox.checked = false;
+                itemCategorySelect.value = 'Main Course'; // Default category
+            }
+            menuItemModal.classList.remove('hidden');
+        }
+
+        async function handleMenuItemSubmit(e) {
+            e.preventDefault();
+            menuFormError.classList.add('hidden');
+
+            const id = menuItemIdInput.value;
+            const itemData = {
+                name: itemNameInput.value,
+                description: itemDescriptionInput.value,
+                price: parseFloat(itemPriceInput.value),
+                imageUrl: itemImageUrlInput.value,
+                category: itemCategorySelect.value,
+                isAvailable: itemIsAvailableCheckbox.checked,
+                isNew: itemIsNewCheckbox.checked,
+                isTrending: itemIsTrendingCheckbox.checked,
             };
 
-            const method = itemId ? 'PUT' : 'POST';
-            const url = itemId ? `${API_BASE_URL}/api/admin/menu/${itemId}` : `${API_BASE_URL}/api/admin/menu`;
-
             try {
-                const response = await fetchWithAuth(url, {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    showMessage(data.message, 'success');
-                    hideMenuItemModal();
-                    fetchMenuItemsDashboard();
+                if (id) {
+                    await apiCall(`/api/menu/${id}`, 'PUT', itemData, currentToken);
+                    console.log('Menu item updated successfully!');
                 } else {
-                    throw new Error(data.message || 'Failed to save item.');
+                    await apiCall('/api/menu', 'POST', itemData, currentToken);
+                    console.log('Menu item added successfully!');
                 }
-            } catch (error) {
-                console.error('Error saving menu item:', error);
-                showMessage(`Error saving item: ${error.message}`, 'error');
-            }
-        });
-
-        async function editMenuItem(id) {
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu`);
-                if (!response.ok) throw new Error('Failed to fetch menu items.');
-                const menuItems = await response.json();
-                const itemToEdit = menuItems.find(item => item._id === id);
-                if (itemToEdit) {
-                    showMenuItemModal(itemToEdit);
-                } else {
-                    showMessage('Menu item not found.', 'error');
-                }
-            } catch (error) {
-                console.error('Error fetching item for edit:', error);
-                showMessage('Could not load item for editing.', 'error');
+                menuItemModal.classList.add('hidden');
+                fetchMenuItems(); // Refresh list
+            } catch (err) {
+                menuFormError.textContent = err.message || 'Failed to save menu item.';
+                menuFormError.classList.remove('hidden');
             }
         }
 
-        async function deleteMenuItem(id, name) {
-            if (!confirm(`Are you sure you want to delete "${name}"?`)) {
-                return;
-            }
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu/${id}`, {
-                    method: 'DELETE'
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    showMessage(data.message, 'success');
-                    fetchMenuItemsDashboard();
-                } else {
-                    throw new Error(data.message || 'Failed to delete item.');
+        async function deleteMenuItem(id) {
+            // Using a custom modal for confirmation instead of window.confirm
+            const confirmDelete = await showConfirmationModal('Are you sure you want to delete this menu item?');
+            if (confirmDelete) {
+                menuError.classList.add('hidden');
+                try {
+                    await apiCall(`/api/menu/${id}`, 'DELETE', null, currentToken);
+                    console.log('Menu item deleted successfully!');
+                    fetchMenuItems(); // Refresh list
+                } catch (err) {
+                    menuError.textContent = err.message || 'Failed to delete menu item.';
+                    menuError.classList.remove('hidden');
                 }
-            } catch (error) {
-                console.error('Error deleting menu item:', error);
-                showMessage(`Error deleting item: ${error.message}`, 'error');
             }
         }
 
-        // --- Orders Management ---
-
+        // --- Order Management Functions ---
         async function fetchOrders() {
+            ordersLoading.classList.remove('hidden');
+            ordersError.classList.add('hidden');
+            ordersTableBody.innerHTML = ''; // Clear previous orders
+
             try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders`);
-                if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        showMessage('Session expired or unauthorized. Please log in again.', 'error');
-                        setTimeout(() => logout(), 1500);
-                        return;
-                    }
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                const orders = await apiCall('/api/orders', 'GET', null, currentToken);
+                ordersLoading.classList.add('hidden');
+
+                if (orders.length === 0) {
+                    ordersTableBody.innerHTML = `<tr><td colspan="7" class="px-4 py-4 text-center text-sm ${currentTheme === 'dark' ? 'text-gray-400' : 'text-gray-600'}">No orders found.</td></tr>`;
+                    return;
                 }
-                const orders = await response.json();
-                renderOrdersTable(orders);
-            } catch (error) {
-                console.error('Error fetching orders:', error);
-                showMessage('Failed to load orders.', 'error');
-            }
-        }
 
-        function renderOrdersTable(orders) {
-            const tableBody = document.getElementById('orders-table-body');
-            tableBody.innerHTML = '';
-            if (orders.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">No orders found.</td></tr>';
-                return;
-            }
+                orders.forEach(order => {
+                    const row = document.createElement('tr');
+                    row.className = `border-b ${currentTheme === 'dark' ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`;
 
-            orders.forEach(order => {
-                const row = tableBody.insertRow();
-                row.className = 'border-b last:border-b-0';
-                const orderItemsHtml = order.items.map(item => `${item.name} (x${item.quantity})`).join(', ');
-                const customerName = order.userId ? order.userId.name : 'N/A';
-                const customerWhatsappId = order.userId ? order.userId.whatsappId : 'N/A';
-                const orderDate = new Date(order.orderDate).toLocaleString();
+                    const getStatusColorClass = (status) => {
+                        switch (status) {
+                            case 'Pending': return 'bg-yellow-500';
+                            case 'Confirmed': return 'bg-blue-500';
+                            case 'Preparing': return 'bg-orange-500';
+                            case 'Out for Delivery': return 'bg-purple-500';
+                            case 'Delivered': return 'bg-green-500';
+                            case 'Cancelled': return 'bg-red-500';
+                            default: return 'bg-gray-500';
+                        }
+                    };
 
-                row.innerHTML = `
-                    <td class="py-3 px-4 text-sm">${order._id.substring(0, 8)}...</td>
-                    <td class="py-3 px-4">
-                        <p class="font-medium">${customerName}</p>
-                        <p class="text-xs text-gray-500">WA: ${customerWhatsappId}</p>
-                    </td>
-                    <td class="py-3 px-4 text-sm">${orderItemsHtml}</td>
-                    <td class="py-3 px-4 font-bold">$${order.totalAmount.toFixed(2)}</td>
-                    <td class="py-3 px-4">
-                        <select class="form-input text-sm" onchange="updateOrderStatus('${order._id}', this.value)">
-                            ${['pending', 'accepted', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'].map(statusOption => `
-                                <option value="${statusOption}" ${order.status === statusOption ? 'selected' : ''}>
-                                    ${statusOption.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())}
-                                </option>
-                            `).join('')}
-                        </select>
-                    </td>
-                    <td class="py-3 px-4 text-sm">${orderDate}</td>
-                    <td class="py-3 px-4 text-right">
-                        <button class="text-blue-600 hover:text-blue-800" onclick="viewOrderDetails('${order._id}')"><i class="fas fa-info-circle"></i></button>
-                    </td>
-                `;
-            });
-        }
+                    const getStatusIconSVG = (status) => {
+                        switch (status) {
+                            case 'Pending': return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                            case 'Confirmed': return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                            case 'Preparing': return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>';
+                            case 'Out for Delivery': return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17l-2 2m2-2l2 2m-2-2V7m-4 5h4m4 0h4m-4 0a3 3 0 01-3 3H7a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v5z"></path></svg>';
+                            case 'Delivered': return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m0 0l-7 7m7-7v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>';
+                            case 'Cancelled': return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+                            default: return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9.228a4.5 4.5 0 116.364 0L12 11.69l-2.228-2.228zm0 0A4.5 4.5 0 005.636 5.636m12.728 12.728A4.5 4.5 0 0018.364 18.364m-2.228-2.228l-2.228-2.228m2.228 2.228L12 11.69"></path></svg>';
+                        }
+                    };
 
-        async function updateOrderStatus(orderId, newStatus) {
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders/${orderId}/status`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
+                    row.innerHTML = `
+                        <td class="px-4 py-4 whitespace-nowrap text-sm">${order._id.substring(0, 8)}...</td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm">${order.customerName} (${order.customerId.split('@')[0]})</td>
+                        <td class="px-4 py-4 text-sm">
+                            ${order.items.map(item => `<div>${item.name} (x${item.quantity})</div>`).join('')}
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm">Rs. ${order.totalAmount.toFixed(2)}</td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm">
+                            <span class="px-2 py-1 rounded-full text-white text-xs font-semibold flex items-center justify-center gap-1 ${getStatusColorClass(order.status)}">
+                                ${getStatusIconSVG(order.status)} ${order.status}
+                            </span>
+                        </td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm">${new Date(order.orderDate).toLocaleString()}</td>
+                        <td class="px-4 py-4 whitespace-nowrap text-sm">
+                            <button data-id="${order._id}" data-status="${order.status}" class="edit-order-status-btn bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full transition duration-300 ease-in-out" title="Update Status">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                            </button>
+                        </td>
+                    `;
+                    ordersTableBody.appendChild(row);
                 });
 
-                const data = await response.json();
-                if (response.ok) {
-                    showMessage(data.message, 'success');
-                    fetchOrders();
-                } else {
-                    throw new Error(data.message || 'Failed to update order status.');
-                }
-            } catch (error) {
-                console.error('Error updating order status:', error);
-                showMessage(`Error updating status: ${error.message}`, 'error');
+                document.querySelectorAll('.edit-order-status-btn').forEach(button => {
+                    button.addEventListener('click', (e) => openOrderStatusModal(e.currentTarget.dataset.id, e.currentTarget.dataset.status));
+                });
+
+            } catch (err) {
+                ordersLoading.classList.add('hidden');
+                ordersError.textContent = err.message || 'Failed to fetch orders.';
+                ordersError.classList.remove('hidden');
             }
         }
 
-        function viewOrderDetails(orderId) {
-            showMessage(`Viewing details for Order ID: ${orderId}`, 'info');
-            console.log(`View details for order: ${orderId}`);
+        function openOrderStatusModal(orderId, currentStatus) {
+            currentOrderIdInput.value = orderId;
+            newOrderStatusSelect.value = currentStatus;
+            orderStatusError.classList.add('hidden');
+            orderStatusModal.classList.remove('hidden');
         }
 
-        // --- Users Management ---
+        async function handleStatusUpdate() {
+            const orderId = currentOrderIdInput.value;
+            const newStatus = newOrderStatusSelect.value;
+            orderStatusError.classList.add('hidden');
 
-        async function fetchUsers() {
             try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users`);
-                if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
-                        showMessage('Session expired or unauthorized. Please log in again.', 'error');
-                        setTimeout(() => logout(), 1500);
-                        return;
-                    }
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const users = await response.json();
-                renderUsersTable(users);
-            } catch (error) {
-                console.error('Error fetching users:', error);
-                showMessage('Failed to load users.', 'error');
+                await apiCall(`/api/orders/${orderId}/status`, 'PUT', { status: newStatus }, currentToken);
+                console.log('Order status updated successfully!');
+                orderStatusModal.classList.add('hidden');
+                fetchOrders(); // Refresh orders
+            } catch (err) {
+                orderStatusError.textContent = err.message || 'Failed to update order status.';
+                orderStatusError.classList.remove('hidden');
             }
         }
 
-        function renderUsersTable(users) {
-            const tableBody = document.getElementById('users-table-body');
-            tableBody.innerHTML = '';
-            if (users.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No users found.</td></tr>';
-                return;
-            }
+        // --- QR Authentication Functions ---
+        let socket;
 
-            users.forEach(user => {
-                const row = tableBody.insertRow();
-                row.className = 'border-b last:border-b-0';
-                const registeredDate = new Date(user.createdAt).toLocaleString();
-                row.innerHTML = `
-                    <td class="py-3 px-4 text-sm">${user._id.substring(0, 8)}...</td>
-                    <td class="py-3 px-4 font-medium">${user.name}</td>
-                    <td class="py-3 px-4 text-sm">${user.whatsappId}</td>
-                    <td class="py-3 px-4 text-sm">${user.phone || 'N/A'}</td>
-                    <td class="py-3 px-4 text-sm">${registeredDate}</td>
-                `;
+        function initializeSocketIO() {
+            if (socket) {
+                socket.disconnect(); // Disconnect existing socket if any
+            }
+            socket = io(API_BASE_URL);
+
+            socket.on('connect', () => {
+                console.log('Connected to Socket.IO server');
+                qrStatus.textContent = 'Connected to server. Waiting for QR code...';
+                qrError.classList.add('hidden');
+            });
+
+            socket.on('qr', (data) => {
+                console.log('QR Code received:', data);
+                qrCodeImage.src = data;
+                qrCodeImage.classList.remove('hidden');
+                qrCodePlaceholder.classList.add('hidden');
+                qrStatus.textContent = 'Scan this QR code with your WhatsApp app.';
+                qrStatus.classList.remove('text-red-500');
+                qrStatus.classList.add('text-blue-500');
+                qrError.classList.add('hidden');
+            });
+
+            socket.on('ready', () => {
+                console.log('WhatsApp Client is ready!');
+                qrCodeImage.classList.add('hidden');
+                qrCodePlaceholder.classList.remove('hidden');
+                qrCodePlaceholder.textContent = 'WhatsApp Client is ready!';
+                qrStatus.textContent = 'WhatsApp Client is ready!';
+                qrStatus.classList.remove('text-red-500', 'text-blue-500');
+                qrStatus.classList.add('text-green-500');
+                qrError.classList.add('hidden');
+            });
+
+            socket.on('authenticated', () => {
+                console.log('WhatsApp Client Authenticated');
+                qrCodeImage.classList.add('hidden');
+                qrCodePlaceholder.classList.remove('hidden');
+                qrCodePlaceholder.textContent = 'WhatsApp Client Authenticated!';
+                qrStatus.textContent = 'WhatsApp Client Authenticated!';
+                qrStatus.classList.remove('text-red-500', 'text-blue-500');
+                qrStatus.classList.add('text-green-500');
+                qrError.classList.add('hidden');
+            });
+
+            socket.on('auth_failure', (msg) => {
+                console.error('AUTHENTICATION FAILURE', msg);
+                qrCodeImage.classList.add('hidden');
+                qrCodePlaceholder.classList.remove('hidden');
+                qrCodePlaceholder.textContent = `Auth Failure: ${msg}`;
+                qrStatus.textContent = `Auth Failure: ${msg}`;
+                qrStatus.classList.remove('text-blue-500', 'text-green-500');
+                qrStatus.classList.add('text-red-500');
+                qrError.textContent = 'Authentication failed. Please refresh or check server logs.';
+                qrError.classList.remove('hidden');
+            });
+
+            socket.on('disconnected', (reason) => {
+                console.log('Disconnected from Socket.IO server', reason);
+                qrCodeImage.classList.add('hidden');
+                qrCodePlaceholder.classList.remove('hidden');
+                qrCodePlaceholder.textContent = `Disconnected: ${reason}. Reconnecting...`;
+                qrStatus.textContent = `Disconnected: ${reason}. Reconnecting...`;
+                qrStatus.classList.remove('text-blue-500', 'text-green-500');
+                qrStatus.classList.add('text-red-500');
+                qrError.textContent = 'Connection lost. Please refresh or check server status.';
+                qrError.classList.remove('hidden');
+            });
+
+            socket.on('connect_error', (err) => {
+                console.error('Socket.IO connection error:', err);
+                qrCodeImage.classList.add('hidden');
+                qrCodePlaceholder.classList.remove('hidden');
+                qrCodePlaceholder.textContent = 'Connection Error.';
+                qrStatus.textContent = 'Connection Error.';
+                qrStatus.classList.remove('text-blue-500', 'text-green-500');
+                qrStatus.classList.add('text-red-500');
+                qrError.textContent = 'Could not connect to the backend. Please ensure the server is running.';
+                qrError.classList.remove('hidden');
             });
         }
 
-        // --- WhatsApp Connect Logic ---
-
-        async function getWhatsAppQrCode() {
-            const qrImage = document.getElementById('whatsapp-qr-image');
-            const qrLoadingText = document.getElementById('qr-loading-text');
-            const statusDot = document.getElementById('whatsapp-status-dot');
-            const statusText = document.getElementById('whatsapp-status-text');
-
-            qrImage.classList.add('hidden');
-            qrLoadingText.classList.remove('hidden');
-            statusDot.className = 'status-dot yellow';
-            statusText.textContent = 'Connecting...';
-
+        async function refreshQrStatus() {
+            qrError.classList.add('hidden');
+            qrStatus.textContent = 'Requesting new QR code...';
+            qrStatus.classList.remove('text-red-500', 'text-green-500');
+            qrStatus.classList.add('text-blue-500');
             try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/whatsapp/qr`);
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.message || 'Failed to fetch QR code or status.');
-                }
-
-                if (data.status === 'qr_available' && data.qr) {
-                    new QRious({
-                        element: qrImage,
-                        value: data.qr,
-                        size: 256
-                    });
-                    qrImage.classList.remove('hidden');
-                    qrLoadingText.classList.add('hidden');
-                    statusDot.className = 'status-dot yellow';
-                    statusText.textContent = 'QR Available (Scan with WhatsApp)';
-                    showMessage('Scan the QR code to connect your WhatsApp bot.', 'info');
-                } else if (data.status === 'ready') {
-                    qrImage.classList.add('hidden');
-                    qrLoadingText.classList.add('hidden');
-                    statusDot.className = 'status-dot green';
-                    statusText.textContent = 'Connected';
-                    showMessage('WhatsApp bot is already connected!', 'success');
+                const data = await apiCall('/api/whatsapp/qr');
+                if (data.qrCode && data.qrCode.startsWith('data:image/png;base64,')) {
+                    qrCodeImage.src = data.qrCode;
+                    qrCodeImage.classList.remove('hidden');
+                    qrCodePlaceholder.classList.add('hidden');
+                    qrStatus.textContent = 'QR code refreshed. Scan again if needed.';
                 } else {
-                    qrImage.classList.add('hidden');
-                    qrLoadingText.classList.remove('hidden');
-                    qrLoadingText.textContent = `Bot Status: ${data.status.replace(/_/g, ' ').toUpperCase()}. Trying to connect...`;
-                    statusDot.className = (data.status === 'disconnected' || data.status === 'auth_failure') ? 'status-dot red' : 'status-dot blue';
-                    statusText.textContent = data.status.replace(/_/g, ' ').toUpperCase();
-                    showMessage(`WhatsApp bot status: ${data.status.replace(/_/g, ' ').toUpperCase()}.`, 'info');
+                    qrCodeImage.classList.add('hidden');
+                    qrCodePlaceholder.classList.remove('hidden');
+                    qrCodePlaceholder.textContent = data.qrCode; // This will be the text status like "WhatsApp Client is ready!"
+                    qrStatus.textContent = data.qrCode;
+                    if (data.qrCode.includes('ready') || data.qrCode.includes('Authenticated')) {
+                        qrStatus.classList.remove('text-red-500', 'text-blue-500');
+                        qrStatus.classList.add('text-green-500');
+                    } else {
+                         qrStatus.classList.remove('text-red-500', 'text-green-500');
+                         qrStatus.classList.add('text-blue-500');
+                    }
                 }
-            } catch (error) {
-                console.error('Error fetching WhatsApp QR or status:', error);
-                qrImage.classList.add('hidden');
-                qrLoadingText.classList.remove('hidden');
-                qrLoadingText.textContent = 'Failed to get QR code. Check server logs.';
-                statusDot.className = 'status-dot red';
-                statusText.textContent = 'Error';
-                showMessage(`Error connecting WhatsApp bot: ${error.message}`, 'error');
-                if (error.message.includes('401') || error.message.includes('403')) {
-                     showMessage('Session expired or unauthorized. Please log in again.', 'error');
-                     setTimeout(() => logout(), 1500);
-                }
+            } catch (err) {
+                qrError.textContent = err.message || 'Failed to refresh QR code. Check server logs.';
+                qrError.classList.remove('hidden');
+                qrStatus.classList.remove('text-blue-500', 'text-green-500');
+                qrStatus.classList.add('text-red-500');
             }
         }
 
-        // --- Initial Load ---
-        document.addEventListener('DOMContentLoaded', checkLoginStatus);
+        // --- Custom Confirmation Modal (replaces window.confirm) ---
+        function showConfirmationModal(message) {
+            return new Promise((resolve) => {
+                const modalHtml = `
+                    <div id="confirmation-modal" class="modal-backdrop">
+                        <div class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                            <h2 class="text-xl font-bold mb-4">Confirm Action</h2>
+                            <p class="mb-6">${message}</p>
+                            <div class="flex justify-end gap-4">
+                                <button id="confirm-cancel-btn" class="py-2 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-white dark:hover:bg-gray-700 transition duration-300 ease-in-out">
+                                    Cancel
+                                </button>
+                                <button id="confirm-ok-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out">
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                const confirmationModal = document.getElementById('confirmation-modal');
+                const confirmOkBtn = document.getElementById('confirm-ok-btn');
+                const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+
+                confirmOkBtn.addEventListener('click', () => {
+                    confirmationModal.remove();
+                    resolve(true);
+                });
+
+                confirmCancelBtn.addEventListener('click', () => {
+                    confirmationModal.remove();
+                    resolve(false);
+                });
+            });
+        }
+
+
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            applyTheme(currentTheme); // Apply theme on load
+            checkAuth(); // Check authentication status
+
+            // Login Form
+            loginForm.addEventListener('submit', handleLogin);
+
+            // Navigation Buttons
+            navButtons.dashboard.addEventListener('click', () => showPage('dashboard-content'));
+            navButtons.menu.addEventListener('click', () => { showPage('menu-management-section'); fetchMenuItems(); });
+            navButtons.orders.addEventListener('click', () => { showPage('order-management-section'); fetchOrders(); });
+            navButtons.qr.addEventListener('click', () => { showPage('qr-authentication-section'); initializeSocketIO(); refreshQrStatus(); });
+
+            // Mobile Navigation Buttons
+            navButtons.dashboardMobile.addEventListener('click', () => showPage('dashboard-content'));
+            navButtons.menuMobile.addEventListener('click', () => { showPage('menu-management-section'); fetchMenuItems(); });
+            navButtons.ordersMobile.addEventListener('click', () => { showPage('order-management-section'); fetchOrders(); });
+            navButtons.qrMobile.addEventListener('click', () => { showPage('qr-authentication-section'); initializeSocketIO(); refreshQrStatus(); });
+
+            // Theme Toggles
+            themeToggleSidebar.addEventListener('click', toggleTheme);
+            themeToggleTopbar.addEventListener('click', toggleTheme);
+
+            // Logout Buttons
+            logoutButtonSidebar.addEventListener('click', handleLogout);
+            logoutButtonTopbar.addEventListener('click', handleLogout);
+
+            // Menu Management Listeners
+            addMenuItemBtn.addEventListener('click', () => openMenuItemModal());
+            cancelMenuItemModalBtn.addEventListener('click', () => menuItemModal.classList.add('hidden'));
+            menuItemForm.addEventListener('submit', handleMenuItemSubmit);
+            categoryFilterButtons.forEach(button => {
+                button.addEventListener('click', handleCategoryFilter);
+            });
+
+            // Order Management Listeners
+            cancelOrderStatusModalBtn.addEventListener('click', () => orderStatusModal.classList.add('hidden'));
+            updateOrderStatusBtn.addEventListener('click', handleStatusUpdate);
+
+            // QR Authentication Listener
+            refreshQrBtn.addEventListener('click', refreshQrStatus);
+        });
     </script>
 </body>
 </html>
