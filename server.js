@@ -101,74 +101,85 @@ let isWhatsappClientReady = false; // Flag to indicate client readiness
 
 const initializeWhatsappClient = () => {
     console.log('Initializing WhatsApp Client...');
-    whatsappClient = new Client({
-        authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Stores session data locally
-        puppeteer: {
-            headless: true, // Run in headless mode for deployment
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process', // This might help on some environments
-                '--disable-gpu'
-            ],
-        },
-    });
+    try {
+        whatsappClient = new Client({
+            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Stores session data locally
+            puppeteer: {
+                headless: true, // Run in headless mode for deployment
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process', // This might help on some environments
+                    '--disable-gpu',
+                    // Additional arguments for better stability on headless Linux environments
+                    '--disable-features=site-per-process',
+                    '--disable-web-security',
+                    '--disable-sync',
+                    '--disable-infobars',
+                    '--window-size=1920,1080', // Explicit window size
+                    '--ignore-certificate-errors', // Can sometimes help with SSL issues
+                    '--incognito', // Starts a clean session each time (might help if session data gets corrupted)
+                    '--enable-features=NetworkService,NetworkServiceInProcess' // Experimental, but sometimes helps
+                ],
+            },
+        });
 
-    whatsappClient.on('qr', async (qr) => {
-        console.log('QR RECEIVED', qr);
-        qrCodeData = await qrcode.toDataURL(qr); // Convert QR string to data URL
-        io.emit('qr', qrCodeData); // Emit QR code to connected dashboard clients
-        isWhatsappClientReady = false; // Client is not ready until 'ready' event
-    });
+        whatsappClient.on('qr', async (qr) => {
+            console.log('QR RECEIVED', qr);
+            qrCodeData = await qrcode.toDataURL(qr); // Convert QR string to data URL
+            io.emit('qr', qrCodeData); // Emit QR code to connected dashboard clients
+            isWhatsappClientReady = false; // Client is not ready until 'ready' event
+        });
 
-    whatsappClient.on('ready', () => {
-        console.log('WhatsApp Client is ready!');
-        qrCodeData = 'WhatsApp Client is ready!'; // Update status
-        io.emit('qr', qrCodeData); // Inform dashboard
-        isWhatsappClientReady = true; // Set client as ready
-    });
+        whatsappClient.on('ready', () => {
+            console.log('WhatsApp Client is ready!');
+            qrCodeData = 'WhatsApp Client is ready!'; // Update status
+            io.emit('qr', qrCodeData); // Inform dashboard
+            isWhatsappClientReady = true; // Set client as ready
+        });
 
-    whatsappClient.on('authenticated', () => {
-        console.log('WhatsApp Client Authenticated');
-        qrCodeData = 'WhatsApp Client Authenticated!';
-        io.emit('qr', qrCodeData);
-    });
+        whatsappClient.on('authenticated', () => {
+            console.log('WhatsApp Client Authenticated');
+            qrCodeData = 'WhatsApp Client Authenticated!';
+            io.emit('qr', qrCodeData);
+        });
 
-    whatsappClient.on('auth_failure', msg => {
-        console.error('AUTHENTICATION FAILURE', msg);
-        qrCodeData = `Auth Failure: ${msg}`;
-        io.emit('qr', qrCodeData);
-        isWhatsappClientReady = false;
-    });
+        whatsappClient.on('auth_failure', msg => {
+            console.error('AUTHENTICATION FAILURE', msg);
+            qrCodeData = `Auth Failure: ${msg}`;
+            io.emit('qr', qrCodeData);
+            isWhatsappClientReady = false;
+        });
 
-    whatsappClient.on('disconnected', (reason) => {
-        console.log('WhatsApp Client Disconnected', reason);
-        qrCodeData = `Disconnected: ${reason}. Reconnecting...`;
-        io.emit('qr', qrCodeData);
-        isWhatsappClientReady = false;
-        // Attempt to re-initialize or restart the client
-        setTimeout(() => initializeWhatsappClient(), 5000); // Try to re-initialize after 5 seconds
-    });
+        whatsappClient.on('disconnected', (reason) => {
+            console.log('WhatsApp Client Disconnected', reason);
+            qrCodeData = `Disconnected: ${reason}. Reconnecting...`;
+            io.emit('qr', qrCodeData);
+            isWhatsappClientReady = false;
+            // Attempt to re-initialize or restart the client
+            console.log('Attempting to re-initialize WhatsApp Client in 5 seconds...');
+            setTimeout(() => initializeWhatsappClient(), 5000); // Try to re-initialize after 5 seconds
+        });
 
-    whatsappClient.on('message', async (msg) => {
-        console.log('MESSAGE RECEIVED', msg.body);
+        whatsappClient.on('message', async (msg) => {
+            console.log('MESSAGE RECEIVED', msg.body);
 
-        const chat = await msg.getChat();
-        // Ensure the customerId is in the format expected by WhatsApp-web.js (e.g., 919876543210@c.us)
-        const customerId = msg.from;
-        const customerName = chat.name || customerId.split('@')[0]; // Use chat name or phone number
+            const chat = await msg.getChat();
+            // Ensure the customerId is in the format expected by WhatsApp-web.js (e.g., 919876543210@c.us)
+            const customerId = msg.from;
+            const customerName = chat.name || customerId.split('@')[0]; // Use chat name or phone number
 
-        let responseText = '';
+            let responseText = '';
 
-        // Convert message to lowercase for case-insensitive matching
-        const lowerCaseMsg = msg.body.toLowerCase();
+            // Convert message to lowercase for case-insensitive matching
+            const lowerCaseMsg = msg.body.toLowerCase();
 
-        if (lowerCaseMsg.includes('hi') || lowerCaseMsg.includes('hello') || lowerCaseMsg.includes('hey')) {
-            responseText = `Hello ${customerName}! Welcome to our food business!
+            if (lowerCaseMsg.includes('hi') || lowerCaseMsg.includes('hello') || lowerCaseMsg.includes('hey')) {
+                responseText = `Hello ${customerName}! Welcome to our food business!
 How can I help you today?
 
 *1. Web Menu:* Browse our delicious menu and order online.
@@ -177,57 +188,66 @@ How can I help you today?
 *4. Help/Support:* Get assistance.
 
 Please reply with the number of the option you'd like to choose.`;
-        } else if (lowerCaseMsg.includes('1') || lowerCaseMsg.includes('menu')) {
-            responseText = `Here's our delicious web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}
+            } else if (lowerCaseMsg.includes('1') || lowerCaseMsg.includes('menu')) {
+                responseText = `Here's our delicious web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}
 You can browse and place your order directly from there!`;
-        } else if (lowerCaseMsg.includes('2') || lowerCaseMsg.includes('orders')) {
-            // Fetch past orders for this customer
-            const customerOrders = await Order.find({ customerId: customerId }).sort({ orderDate: -1 }).limit(5);
+            } else if (lowerCaseMsg.includes('2') || lowerCaseMsg.includes('orders')) {
+                // Fetch past orders for this customer
+                const customerOrders = await Order.find({ customerId: customerId }).sort({ orderDate: -1 }).limit(5);
 
-            if (customerOrders.length > 0) {
-                responseText = `Here are your recent orders:\n\n`;
-                customerOrders.forEach((order, index) => {
-                    responseText += `*Order #${index + 1}* (ID: ${order._id.toString().substring(0, 8)}...)\n`;
-                    responseText += `Status: *${order.status}*\n`;
-                    responseText += `Total: Rs. ${order.totalAmount.toFixed(2)}\n`;
-                    responseText += `Date: ${order.orderDate.toLocaleDateString()}\n`;
-                    responseText += `Items: ${order.items.map(item => `${item.name} (x${item.quantity})`).join(', ')}\n\n`;
-                });
-                responseText += `To place a new order, visit our web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
-            } else {
-                responseText = `You haven't placed any orders yet. Visit our web menu to start ordering: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
-            }
-        } else if (lowerCaseMsg.includes('3') || lowerCaseMsg.includes('profile')) {
-            responseText = `Your profile details:
+                if (customerOrders.length > 0) {
+                    responseText = `Here are your recent orders:\n\n`;
+                    customerOrders.forEach((order, index) => {
+                        responseText += `*Order #${index + 1}* (ID: ${order._id.toString().substring(0, 8)}...)\n`;
+                        responseText += `Status: *${order.status}*\n`;
+                        responseText += `Total: Rs. ${order.totalAmount.toFixed(2)}\n`;
+                        responseText += `Date: ${order.orderDate.toLocaleDateString()}\n`;
+                        responseText += `Items: ${order.items.map(item => `${item.name} (x${item.quantity})`).join(', ')}\n\n`;
+                    });
+                    responseText += `To place a new order, visit our web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
+                } else {
+                    responseText = `You haven't placed any orders yet. Visit our web menu to start ordering: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
+                }
+            } else if (lowerCaseMsg.includes('3') || lowerCaseMsg.includes('profile')) {
+                responseText = `Your profile details:
 Phone Number: ${customerId.split('@')[0]}
 Name: ${customerName}
 (More profile features coming soon!)`;
-        } else if (lowerCaseMsg.includes('4') || lowerCaseMsg.includes('help') || lowerCaseMsg.includes('support')) {
-            responseText = `For any assistance, you can:
+            } else if (lowerCaseMsg.includes('4') || lowerCaseMsg.includes('help') || lowerCaseMsg.includes('support')) {
+                responseText = `For any assistance, you can:
 - Call us at: +91 12345 67890
 - Email us at: support@yourfoodbusiness.com
 - Visit our FAQ: ${process.env.FAQ_URL || 'https://your-food-business.com/faq'}
 
 We are here to help!`;
-        } else if (lowerCaseMsg.includes('order')) {
-            // This is a simplified order creation. In a real scenario, you'd have a more guided flow.
-            // For now, it will just direct them to the menu.
-            responseText = `To place an order, please visit our web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
-        }
-        else {
-            responseText = `I'm sorry, I didn't understand that.
+            } else if (lowerCaseMsg.includes('order')) {
+                // This is a simplified order creation. In a real scenario, you'd have a more guided flow.
+                // For now, it will just direct them to the menu.
+                responseText = `To place an order, please visit our web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
+            }
+            else {
+                responseText = `I'm sorry, I didn't understand that.
 Please choose from the options below:
 
 *1. Web Menu:* Browse our delicious menu and order online.
 *2. Orders:* Check your past orders.
 *3. Profile:* View your profile details.
 *4. Help/Support:* Get assistance.`;
-        }
+            }
 
-        await msg.reply(responseText);
-    });
+            await msg.reply(responseText);
+        });
 
-    whatsappClient.initialize();
+        whatsappClient.initialize();
+    } catch (error) {
+        console.error('Error initializing WhatsApp Client:', error);
+        qrCodeData = `Initialization Error: ${error.message}. Check server logs.`;
+        io.emit('qr', qrCodeData);
+        isWhatsappClientReady = false;
+        // Attempt to re-initialize after a delay
+        console.log('Attempting to re-initialize WhatsApp Client after an error in 10 seconds...');
+        setTimeout(() => initializeWhatsappClient(), 10000);
+    }
 };
 
 // Initialize WhatsApp client on server start
