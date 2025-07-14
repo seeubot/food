@@ -3,173 +3,848 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>Admin Dashboard - Food Business</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+            background-color: #f4f7f6;
+            color: #333;
         }
         .sidebar {
-            width: 250px;
-            min-width: 250px;
+            background-color: #2c3e50; /* Dark blue-gray */
+            color: #ecf0f1; /* Light text */
+            transition: width 0.3s ease;
         }
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                min-width: unset;
-            }
-            .main-content {
-                margin-left: 0 !important;
-            }
+        .sidebar a {
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            border-radius: 0.75rem;
+            margin: 0.5rem 1rem;
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
+        .sidebar a:hover, .sidebar a.active {
+            background-color: #34495e; /* Slightly lighter on hover/active */
+            color: #ffffff;
+        }
+        .main-content {
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        .table-header {
+            background-color: #f8f9fa;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            transition: background-color 0.2s ease;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-secondary {
+            background-color: #6b7280;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            transition: background-color 0.2s ease;
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563;
+        }
+        .modal {
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+        .modal-content {
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        .form-input {
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        /* Message box styling */
+        .message-box {
+            animation: fadeInOut 3s forwards;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(20px); }
+        }
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-dot.green { background-color: #28a745; }
+        .status-dot.yellow { background-color: #ffc107; }
+        .status-dot.red { background-color: #dc3545; }
+        .status-dot.blue { background-color: #007bff; }
     </style>
 </head>
-<body class="flex flex-col md:flex-row min-h-screen bg-gray-100">
+<body class="flex flex-col min-h-screen">
 
-    <!-- Sidebar -->
-    <aside class="sidebar bg-gray-800 text-white p-6 flex flex-col space-y-4 shadow-lg md:h-screen">
-        <h1 class="text-3xl font-bold text-center mb-6">Bot Admin</h1>
-        <nav class="flex flex-col space-y-2">
-            <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out" data-section="dashboard">
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2 2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                Dashboard
-            </a>
-            <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out" data-section="orders">
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                Orders
-            </a>
-            <a href="#" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out" data-section="menu">
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m7-7V3"></path></svg>
-                Menu Management
-            </a>
-            <a href="/admin/logout" class="nav-link flex items-center p-3 rounded-lg hover:bg-red-600 transition duration-200 ease-in-out bg-red-700 mt-auto">
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                Logout
-            </a>
-        </nav>
-    </aside>
-
-    <!-- Main Content Area -->
-    <main class="main-content flex-1 p-6 md:ml-6 bg-white rounded-lg shadow-md m-4">
-        <!-- Dashboard Section -->
-        <section id="dashboard-section" class="content-section active">
-            <h2 class="text-3xl font-bold text-gray-800 mb-6">Dashboard Overview</h2>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                <div class="bg-blue-500 text-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                    <div>
-                        <p class="text-sm opacity-90">Total Orders</p>
-                        <p class="text-4xl font-bold" id="totalOrders">0</p>
-                    </div>
-                    <svg class="w-12 h-12 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+    <!-- Login Page -->
+    <div id="login-page" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-3xl font-bold text-center mb-6 text-gray-800">Admin Login</h2>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Username:</label>
+                    <input type="text" id="username" name="username" class="form-input" required>
                 </div>
-                <div class="bg-green-500 text-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                    <div>
-                        <p class="text-sm opacity-90">Pending Orders</p>
-                        <p class="text-4xl font-bold" id="pendingOrders">0</p>
-                    </div>
-                    <svg class="w-12 h-12 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <div class="mb-6">
+                    <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Password:</label>
+                    <input type="password" id="password" name="password" class="form-input" required>
                 </div>
-                <div class="bg-purple-500 text-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                    <div>
-                        <p class="text-sm opacity-90">Total Menu Items</p>
-                        <p class="text-4xl font-bold" id="totalMenuItems">0</p>
+                <button type="submit" class="btn-primary w-full">Login</button>
+            </form>
+            <p id="login-error" class="text-red-500 text-center mt-4 hidden"></p>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Layout -->
+    <div id="dashboard-layout" class="flex flex-1 hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar w-64 p-4 flex flex-col justify-between">
+            <div>
+                <div class="text-2xl font-bold text-center mb-8">Admin Panel</div>
+                <nav>
+                    <ul>
+                        <li><a href="#" class="active" data-section="dashboard-overview"><i class="fas fa-tachometer-alt mr-3"></i> Dashboard</a></li>
+                        <li><a href="#" data-section="menu-items"><i class="fas fa-utensils mr-3"></i> Menu Items</a></li>
+                        <li><a href="#" data-section="orders"><i class="fas fa-clipboard-list mr-3"></i> Orders</a></li>
+                        <li><a href="#" data-section="users"><i class="fas fa-users mr-3"></i> Users</a></li>
+                        <li><a href="#" data-section="whatsapp-connect"><i class="fab fa-whatsapp mr-3"></i> WhatsApp Bot</a></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="mt-8">
+                <button id="logout-btn" class="w-full text-left py-3 px-6 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center gap-3">
+                    <i class="fas fa-sign-out-alt mr-3"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 p-8 overflow-auto">
+            <div class="main-content p-8">
+                <!-- Dashboard Overview Section -->
+                <section id="dashboard-overview-section" class="dashboard-section">
+                    <h2 class="text-3xl font-bold mb-6 text-gray-800">Dashboard Overview</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="bg-blue-100 p-6 rounded-xl shadow-md flex items-center">
+                            <i class="fas fa-shopping-bag text-4xl text-blue-600 mr-4"></i>
+                            <div>
+                                <p class="text-gray-600">Total Orders</p>
+                                <p class="text-3xl font-bold text-blue-800" id="total-orders">0</p>
+                            </div>
+                        </div>
+                        <div class="bg-green-100 p-6 rounded-xl shadow-md flex items-center">
+                            <i class="fas fa-dollar-sign text-4xl text-green-600 mr-4"></i>
+                            <div>
+                                <p class="text-gray-600">Total Revenue</p>
+                                <p class="text-3xl font-bold text-green-800" id="total-revenue">$0.00</p>
+                            </div>
+                        </div>
+                        <div class="bg-purple-100 p-6 rounded-xl shadow-md flex items-center">
+                            <i class="fas fa-users text-4xl text-purple-600 mr-4"></i>
+                            <div>
+                                <p class="text-gray-600">Total Users</p>
+                                <p class="text-3xl font-bold text-purple-800" id="total-users">0</p>
+                            </div>
+                        </div>
                     </div>
-                    <svg class="w-12 h-12 opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m7-7V3"></path></svg>
+                    <!-- More dashboard widgets can be added here -->
+                </section>
+
+                <!-- Menu Items Management Section -->
+                <section id="menu-items-section" class="dashboard-section hidden">
+                    <h2 class="text-3xl font-bold mb-6 text-gray-800">Menu Items Management</h2>
+                    <button class="btn-primary mb-6 flex items-center" onclick="showMenuItemModal()"><i class="fas fa-plus mr-2"></i> Add New Item</button>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-xl shadow-md">
+                            <thead class="table-header">
+                                <tr>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Image</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Name</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Category</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Price</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Stock</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Status</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="menu-items-table-body">
+                                <!-- Menu items will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Orders Management Section -->
+                <section id="orders-section" class="dashboard-section hidden">
+                    <h2 class="text-3xl font-bold mb-6 text-gray-800">Orders Management</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-xl shadow-md">
+                            <thead class="table-header">
+                                <tr>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Order ID</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Customer</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Items</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Total</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Status</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Order Date</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table-body">
+                                <!-- Orders will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Users Management Section -->
+                <section id="users-section" class="dashboard-section hidden">
+                    <h2 class="text-3xl font-bold mb-6 text-gray-800">Users Management</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-xl shadow-md">
+                            <thead class="table-header">
+                                <tr>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">User ID</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Name</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">WhatsApp ID</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Phone</th>
+                                    <th class="py-3 px-4 text-left text-sm font-semibold text-gray-600">Registered On</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <!-- Users will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- WhatsApp Connect Section -->
+                <section id="whatsapp-connect-section" class="dashboard-section hidden">
+                    <h2 class="text-3xl font-bold mb-6 text-gray-800">WhatsApp Bot Connection</h2>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <div class="flex items-center mb-4">
+                            <p class="text-lg font-semibold mr-4">Bot Status:</p>
+                            <span id="whatsapp-status-dot" class="status-dot red"></span>
+                            <span id="whatsapp-status-text" class="text-lg font-medium text-gray-700">Disconnected</span>
+                        </div>
+                        <p class="text-gray-600 mb-4">
+                            To connect your WhatsApp bot, scan the QR code below using your WhatsApp mobile app (WhatsApp Web / Linked Devices option).
+                            Ensure your server is running and accessible.
+                        </p>
+                        <div id="qr-code-container" class="flex justify-center items-center bg-gray-50 p-6 rounded-lg border border-gray-200 min-h-[200px] relative">
+                            <img id="whatsapp-qr-image" src="" alt="WhatsApp QR Code" class="max-w-full max-h-64 object-contain hidden">
+                            <p id="qr-loading-text" class="text-gray-500">Loading QR code...</p>
+                        </div>
+                        <div class="mt-6 flex justify-center">
+                            <button class="btn-primary flex items-center" onclick="getWhatsAppQrCode()">
+                                <i class="fas fa-qrcode mr-2"></i> Refresh QR / Check Status
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-4 text-center">
+                            Note: The QR code will disappear once the bot is successfully connected.
+                            If the bot disconnects, you may need to refresh and re-scan.
+                        </p>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Menu Item Modal (Add/Edit) -->
+    <div id="menu-item-modal" class="modal fixed inset-0 flex items-center justify-center z-50 hidden">
+        <div class="modal-content bg-white p-8 rounded-xl w-full max-w-lg">
+            <h3 id="menu-item-modal-title" class="text-2xl font-bold mb-6 text-gray-800">Add New Menu Item</h3>
+            <form id="menu-item-form">
+                <input type="hidden" id="menu-item-id">
+                <div class="mb-4">
+                    <label for="item-name" class="block text-gray-700 text-sm font-bold mb-2">Name:</label>
+                    <input type="text" id="item-name" name="name" class="form-input" required>
                 </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                <h3 class="text-2xl font-semibold text-gray-800 mb-4">WhatsApp Bot Status</h3>
-                <div id="qrCodeContainer" class="flex flex-col items-center justify-center">
-                    <p class="text-gray-600 mb-2" id="qrStatus">Loading QR Code...</p>
-                    <img id="qrCodeImage" src="" alt="WhatsApp QR Code" class="w-64 h-64 border border-gray-300 rounded-lg shadow-sm" style="display:none;">
-                    <p class="text-sm text-gray-500 mt-2">Scan this QR code with your WhatsApp app to connect the bot.</p>
+                <div class="mb-4">
+                    <label for="item-description" class="block text-gray-700 text-sm font-bold mb-2">Description:</label>
+                    <textarea id="item-description" name="description" class="form-input"></textarea>
                 </div>
-            </div>
-        </section>
-
-        <!-- Orders Section -->
-        <section id="orders-section" class="content-section hidden">
-            <h2 class="text-3xl font-bold text-gray-800 mb-6">Orders Management</h2>
-            <div class="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WhatsApp</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordered At</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ordersTableBody" class="bg-white divide-y divide-gray-200">
-                        <!-- Orders will be loaded here by JavaScript -->
-                    </tbody>
-                </table>
-                <div id="noOrdersMessage" class="text-center py-4 text-gray-500 hidden">No orders found.</div>
-            </div>
-        </section>
-
-        <!-- Menu Management Section -->
-        <section id="menu-section" class="content-section hidden">
-            <h2 class="text-3xl font-bold text-gray-800 mb-6">Menu Management</h2>
-
-            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Add New Menu Item</h3>
-                <form id="menuItemForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label for="itemName" class="block text-gray-700 text-sm font-semibold mb-2">Item Name:</label>
-                        <input type="text" id="itemName" name="itemName" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        <label for="item-price" class="block text-gray-700 text-sm font-bold mb-2">Price ($):</label>
+                        <input type="number" id="item-price" name="price" class="form-input" step="0.01" required>
                     </div>
                     <div>
-                        <label for="itemPrice" class="block text-gray-700 text-sm font-semibold mb-2">Price (₹):</label>
-                        <input type="number" id="itemPrice" name="itemPrice" step="0.01" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        <label for="item-original-price" class="block text-gray-700 text-sm font-bold mb-2">Original Price ($) (Optional):</label>
+                        <input type="number" id="item-original-price" name="originalPrice" class="form-input" step="0.01">
                     </div>
-                    <div class="md:col-span-2">
-                        <label for="itemDescription" class="block text-gray-700 text-sm font-semibold mb-2">Description:</label>
-                        <textarea id="itemDescription" name="itemDescription" rows="3" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label for="itemImageUrl" class="block text-gray-700 text-sm font-semibold mb-2">Image URL:</label>
-                        <input type="url" id="itemImageUrl" name="itemImageUrl" class="shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., https://example.com/image.jpg">
-                    </div>
-                    <div class="md:col-span-2">
-                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-200 ease-in-out transform hover:scale-105">
-                            Add Item
-                        </button>
-                    </div>
-                </form>
-                <div id="menuMessageBox" class="mt-4 p-3 rounded-lg hidden"></div>
-            </div>
+                </div>
+                <div class="mb-4">
+                    <label for="item-image-url" class="block text-gray-700 text-sm font-bold mb-2">Image URL:</label>
+                    <input type="url" id="item-image-url" name="imageUrl" class="form-input" required>
+                </div>
+                <div class="mb-4">
+                    <label for="item-category" class="block text-gray-700 text-sm font-bold mb-2">Category:</label>
+                    <input type="text" id="item-category" name="category" class="form-input" required>
+                </div>
+                <div class="flex items-center space-x-4 mb-6">
+                    <label class="flex items-center text-gray-700">
+                        <input type="checkbox" id="item-in-stock" name="inStock" class="mr-2 h-4 w-4 text-blue-600 rounded"> In Stock
+                    </label>
+                    <label class="flex items-center text-gray-700">
+                        <input type="checkbox" id="item-is-new" name="isNew" class="mr-2 h-4 w-4 text-green-600 rounded"> New Item
+                    </label>
+                    <label class="flex items-center text-gray-700">
+                        <input type="checkbox" id="item-is-trending" name="isTrending" class="mr-2 h-4 w-4 text-purple-600 rounded"> Trending
+                    </label>
+                </div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" class="btn-secondary" onclick="hideMenuItemModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            <div class="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
-                <h3 class="text-2xl font-semibold text-gray-800 mb-4">Existing Menu Items</h3>
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (₹)</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="menuItemsTableBody" class="bg-white divide-y divide-gray-200">
-                        <!-- Menu items will be loaded here by JavaScript -->
-                    </tbody>
-                </table>
-                <div id="noMenuItemsMessage" class="text-center py-4 text-gray-500 hidden">No menu items added yet.</div>
-            </div>
-        </section>
-    </main>
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <script>
+        const API_BASE_URL = window.location.origin;
+        let authToken = localStorage.getItem('adminToken');
 
-    <script src="/js/dashboard.js"></script>
+        // --- Utility Functions ---
+
+        function showMessage(message, type = 'info') {
+            const messageBox = document.createElement('div');
+            messageBox.className = `message-box fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-50`;
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-500');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500');
+            } else {
+                messageBox.classList.add('bg-blue-500');
+            }
+            messageBox.textContent = message;
+            document.body.appendChild(messageBox);
+
+            setTimeout(() => {
+                messageBox.remove();
+            }, 3000);
+        }
+
+        // --- Authentication Logic ---
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginError = document.getElementById('login-error');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    authToken = data.token;
+                    localStorage.setItem('adminToken', authToken);
+                    loginError.classList.add('hidden');
+                    document.getElementById('login-page').classList.add('hidden');
+                    document.getElementById('dashboard-layout').classList.remove('hidden');
+                    showMessage('Login successful!', 'success');
+                    loadDashboardData();
+                    showSection('dashboard-overview');
+                } else {
+                    loginError.textContent = data.message || 'Login failed.';
+                    loginError.classList.remove('hidden');
+                    showMessage(data.message || 'Login failed.', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                loginError.textContent = 'Network error. Please try again.';
+                loginError.classList.remove('hidden');
+                showMessage('Network error during login.', 'error');
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            authToken = null;
+            localStorage.removeItem('adminToken');
+            document.getElementById('dashboard-layout').classList.add('hidden');
+            document.getElementById('login-page').classList.remove('hidden');
+            document.getElementById('login-form').reset();
+            document.getElementById('login-error').classList.add('hidden');
+            showMessage('Logged out successfully.', 'info');
+        });
+
+        function checkLoginStatus() {
+            if (authToken) {
+                document.getElementById('login-page').classList.add('hidden');
+                document.getElementById('dashboard-layout').classList.remove('hidden');
+                loadDashboardData();
+                showSection('dashboard-overview');
+            } else {
+                document.getElementById('login-page').classList.remove('hidden');
+                document.getElementById('dashboard-layout').classList.add('hidden');
+            }
+        }
+
+        // --- Navigation Logic ---
+
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.sidebar a').forEach(navLink => navLink.classList.remove('active'));
+                this.classList.add('active');
+                showSection(this.dataset.section);
+            });
+        });
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.dashboard-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            document.getElementById(`${sectionId}-section`).classList.remove('hidden');
+
+            if (sectionId === 'menu-items') {
+                fetchMenuItemsDashboard();
+            } else if (sectionId === 'orders') {
+                fetchOrders();
+            } else if (sectionId === 'users') {
+                fetchUsers();
+            } else if (sectionId === 'dashboard-overview') {
+                loadDashboardData();
+            } else if (sectionId === 'whatsapp-connect') {
+                getWhatsAppQrCode(); // Load QR code/status when WhatsApp section is opened
+            }
+        }
+
+        // --- Data Loading Functions ---
+
+        async function loadDashboardData() {
+            try {
+                const [ordersRes, usersRes, menuRes] = await Promise.all([
+                    fetchWithAuth(`${API_BASE_URL}/api/admin/orders`),
+                    fetchWithAuth(`${API_BASE_URL}/api/admin/users`),
+                    fetchWithAuth(`${API_BASE_URL}/api/admin/menu`)
+                ]);
+
+                const orders = await ordersRes.json();
+                const users = await usersRes.json();
+                const menuItems = await menuRes.json();
+
+                if (!ordersRes.ok || !usersRes.ok || !menuRes.ok) {
+                    throw new Error('Failed to fetch dashboard data.');
+                }
+
+                document.getElementById('total-orders').textContent = orders.length;
+                const totalRevenue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+                document.getElementById('total-revenue').textContent = `$${totalRevenue.toFixed(2)}`;
+                document.getElementById('total-users').textContent = users.length;
+
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                showMessage('Failed to load dashboard data.', 'error');
+                if (error.message.includes('401') || error.message.includes('403')) {
+                     showMessage('Session expired or unauthorized. Please log in again.', 'error');
+                     setTimeout(() => logout(), 1500);
+                }
+            }
+        }
+
+        // Helper for fetching with authentication
+        async function fetchWithAuth(url, options = {}) {
+            const headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${authToken}`
+            };
+            return fetch(url, { ...options, headers });
+        }
+
+        // --- Menu Items Management ---
+
+        async function fetchMenuItemsDashboard() {
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu`);
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        showMessage('Session expired or unauthorized. Please log in again.', 'error');
+                        setTimeout(() => logout(), 1500);
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const menuItems = await response.json();
+                renderMenuItemsTable(menuItems);
+            } catch (error) {
+                console.error('Error fetching menu items for dashboard:', error);
+                showMessage('Failed to load menu items.', 'error');
+            }
+        }
+
+        function renderMenuItemsTable(items) {
+            const tableBody = document.getElementById('menu-items-table-body');
+            tableBody.innerHTML = '';
+            if (items.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">No menu items found.</td></tr>';
+                return;
+            }
+
+            items.forEach(item => {
+                const row = tableBody.insertRow();
+                row.className = 'border-b last:border-b-0';
+                row.innerHTML = `
+                    <td class="py-3 px-4"><img src="${item.imageUrl || 'https://placehold.co/50x50/CCCCCC/333333?text=No'}" alt="${item.name}" class="w-12 h-12 object-cover rounded-md"></td>
+                    <td class="py-3 px-4 font-medium">${item.name}</td>
+                    <td class="py-3 px-4">${item.category || 'N/A'}</td>
+                    <td class="py-3 px-4">$${item.price.toFixed(2)}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold ${item.inStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${item.inStock ? 'In Stock' : 'Out of Stock'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        ${item.isNew ? '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mr-1">New</span>' : ''}
+                        ${item.isTrending ? '<span class="px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Trending</span>' : ''}
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="editMenuItem('${item._id}')"><i class="fas fa-edit"></i></button>
+                        <button class="text-red-600 hover:text-red-800" onclick="deleteMenuItem('${item._id}', '${item.name}')"><i class="fas fa-trash-alt"></i></button>
+                    </td>
+                `;
+            });
+        }
+
+        function showMenuItemModal(item = {}) {
+            const modal = document.getElementById('menu-item-modal');
+            const form = document.getElementById('menu-item-form');
+            document.getElementById('menu-item-modal-title').textContent = item._id ? 'Edit Menu Item' : 'Add New Menu Item';
+            form.reset();
+
+            if (item._id) {
+                document.getElementById('menu-item-id').value = item._id;
+                document.getElementById('item-name').value = item.name;
+                document.getElementById('item-description').value = item.description || '';
+                document.getElementById('item-price').value = item.price;
+                document.getElementById('item-original-price').value = item.originalPrice || '';
+                document.getElementById('item-image-url').value = item.imageUrl || '';
+                document.getElementById('item-category').value = item.category || '';
+                document.getElementById('item-in-stock').checked = item.inStock;
+                document.getElementById('item-is-new').checked = item.isNew;
+                document.getElementById('item-is-trending').checked = item.isTrending;
+            } else {
+                document.getElementById('menu-item-id').value = '';
+                document.getElementById('item-in-stock').checked = true;
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function hideMenuItemModal() {
+            document.getElementById('menu-item-modal').classList.add('hidden');
+        }
+
+        document.getElementById('menu-item-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const itemId = document.getElementById('menu-item-id').value;
+            const formData = {
+                name: document.getElementById('item-name').value,
+                description: document.getElementById('item-description').value,
+                price: parseFloat(document.getElementById('item-price').value),
+                originalPrice: parseFloat(document.getElementById('item-original-price').value) || undefined,
+                imageUrl: document.getElementById('item-image-url').value,
+                category: document.getElementById('item-category').value,
+                inStock: document.getElementById('item-in-stock').checked,
+                isNew: document.getElementById('item-is-new').checked,
+                isTrending: document.getElementById('item-is-trending').checked,
+            };
+
+            const method = itemId ? 'PUT' : 'POST';
+            const url = itemId ? `${API_BASE_URL}/api/admin/menu/${itemId}` : `${API_BASE_URL}/api/admin/menu`;
+
+            try {
+                const response = await fetchWithAuth(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(data.message, 'success');
+                    hideMenuItemModal();
+                    fetchMenuItemsDashboard();
+                } else {
+                    throw new Error(data.message || 'Failed to save item.');
+                }
+            } catch (error) {
+                console.error('Error saving menu item:', error);
+                showMessage(`Error saving item: ${error.message}`, 'error');
+            }
+        });
+
+        async function editMenuItem(id) {
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu`);
+                if (!response.ok) throw new Error('Failed to fetch menu items.');
+                const menuItems = await response.json();
+                const itemToEdit = menuItems.find(item => item._id === id);
+                if (itemToEdit) {
+                    showMenuItemModal(itemToEdit);
+                } else {
+                    showMessage('Menu item not found.', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching item for edit:', error);
+                showMessage('Could not load item for editing.', 'error');
+            }
+        }
+
+        async function deleteMenuItem(id, name) {
+            // Using confirm for simplicity, replace with custom modal for production
+            if (!confirm(`Are you sure you want to delete "${name}"?`)) {
+                return;
+            }
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(data.message, 'success');
+                    fetchMenuItemsDashboard();
+                } else {
+                    throw new Error(data.message || 'Failed to delete item.');
+                }
+            } catch (error) {
+                console.error('Error deleting menu item:', error);
+                showMessage(`Error deleting item: ${error.message}`, 'error');
+            }
+        }
+
+        // --- Orders Management ---
+
+        async function fetchOrders() {
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders`);
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        showMessage('Session expired or unauthorized. Please log in again.', 'error');
+                        setTimeout(() => logout(), 1500);
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const orders = await response.json();
+                renderOrdersTable(orders);
+            } catch (error) {
+                console.error('Error fetching orders:', error);
+                showMessage('Failed to load orders.', 'error');
+            }
+        }
+
+        function renderOrdersTable(orders) {
+            const tableBody = document.getElementById('orders-table-body');
+            tableBody.innerHTML = '';
+            if (orders.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">No orders found.</td></tr>';
+                return;
+            }
+
+            orders.forEach(order => {
+                const row = tableBody.insertRow();
+                row.className = 'border-b last:border-b-0';
+                const orderItemsHtml = order.items.map(item => `${item.name} (x${item.quantity})`).join(', ');
+                const customerName = order.userId ? order.userId.name : 'N/A';
+                const customerWhatsappId = order.userId ? order.userId.whatsappId : 'N/A';
+                const orderDate = new Date(order.orderDate).toLocaleString();
+
+                row.innerHTML = `
+                    <td class="py-3 px-4 text-sm">${order._id.substring(0, 8)}...</td>
+                    <td class="py-3 px-4">
+                        <p class="font-medium">${customerName}</p>
+                        <p class="text-xs text-gray-500">WA: ${customerWhatsappId}</p>
+                    </td>
+                    <td class="py-3 px-4 text-sm">${orderItemsHtml}</td>
+                    <td class="py-3 px-4 font-bold">$${order.totalAmount.toFixed(2)}</td>
+                    <td class="py-3 px-4">
+                        <select class="form-input text-sm" onchange="updateOrderStatus('${order._id}', this.value)">
+                            ${['pending', 'accepted', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'].map(statusOption => `
+                                <option value="${statusOption}" ${order.status === statusOption ? 'selected' : ''}>
+                                    ${statusOption.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </td>
+                    <td class="py-3 px-4 text-sm">${orderDate}</td>
+                    <td class="py-3 px-4 text-right">
+                        <button class="text-blue-600 hover:text-blue-800" onclick="viewOrderDetails('${order._id}')"><i class="fas fa-info-circle"></i></button>
+                    </td>
+                `;
+            });
+        }
+
+        async function updateOrderStatus(orderId, newStatus) {
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders/${orderId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(data.message, 'success');
+                    fetchOrders();
+                } else {
+                    throw new Error(data.message || 'Failed to update order status.');
+                }
+            } catch (error) {
+                console.error('Error updating order status:', error);
+                showMessage(`Error updating status: ${error.message}`, 'error');
+            }
+        }
+
+        function viewOrderDetails(orderId) {
+            showMessage(`Viewing details for Order ID: ${orderId}`, 'info');
+            console.log(`View details for order: ${orderId}`);
+        }
+
+        // --- Users Management ---
+
+        async function fetchUsers() {
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users`);
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        showMessage('Session expired or unauthorized. Please log in again.', 'error');
+                        setTimeout(() => logout(), 1500);
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const users = await response.json();
+                renderUsersTable(users);
+            } catch (error) {
+                console.error('Error fetching users:', error);
+                showMessage('Failed to load users.', 'error');
+            }
+        }
+
+        function renderUsersTable(users) {
+            const tableBody = document.getElementById('users-table-body');
+            tableBody.innerHTML = '';
+            if (users.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No users found.</td></tr>';
+                return;
+            }
+
+            users.forEach(user => {
+                const row = tableBody.insertRow();
+                row.className = 'border-b last:border-b-0';
+                const registeredDate = new Date(user.createdAt).toLocaleString();
+                row.innerHTML = `
+                    <td class="py-3 px-4 text-sm">${user._id.substring(0, 8)}...</td>
+                    <td class="py-3 px-4 font-medium">${user.name}</td>
+                    <td class="py-3 px-4 text-sm">${user.whatsappId}</td>
+                    <td class="py-3 px-4 text-sm">${user.phone || 'N/A'}</td>
+                    <td class="py-3 px-4 text-sm">${registeredDate}</td>
+                `;
+            });
+        }
+
+        // --- WhatsApp Connect Logic ---
+
+        async function getWhatsAppQrCode() {
+            const qrImage = document.getElementById('whatsapp-qr-image');
+            const qrLoadingText = document.getElementById('qr-loading-text');
+            const statusDot = document.getElementById('whatsapp-status-dot');
+            const statusText = document.getElementById('whatsapp-status-text');
+
+            qrImage.classList.add('hidden');
+            qrLoadingText.classList.remove('hidden');
+            statusDot.className = 'status-dot yellow';
+            statusText.textContent = 'Connecting...';
+
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/whatsapp/qr`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to fetch QR code.');
+                }
+
+                if (data.status === 'qr_available' && data.qr) {
+                    // Generate QR code image from the data string
+                    new QRious({
+                        element: qrImage,
+                        value: data.qr,
+                        size: 256
+                    });
+                    qrImage.classList.remove('hidden');
+                    qrLoadingText.classList.add('hidden');
+                    statusDot.className = 'status-dot yellow';
+                    statusText.textContent = 'QR Available (Scan with WhatsApp)';
+                    showMessage('Scan the QR code to connect your WhatsApp bot.', 'info');
+                } else if (data.status === 'ready') {
+                    qrImage.classList.add('hidden');
+                    qrLoadingText.classList.add('hidden');
+                    statusDot.className = 'status-dot green';
+                    statusText.textContent = 'Connected';
+                    showMessage('WhatsApp bot is already connected!', 'success');
+                } else {
+                    qrImage.classList.add('hidden');
+                    qrLoadingText.classList.remove('hidden');
+                    qrLoadingText.textContent = `Bot Status: ${data.status.replace(/_/g, ' ').toUpperCase()}. Trying to connect...`;
+                    statusDot.className = (data.status === 'disconnected' || data.status === 'auth_failure') ? 'status-dot red' : 'status-dot blue';
+                    statusText.textContent = data.status.replace(/_/g, ' ').toUpperCase();
+                    showMessage(`WhatsApp bot status: ${data.status.replace(/_/g, ' ').toUpperCase()}.`, 'info');
+                }
+            } catch (error) {
+                console.error('Error fetching WhatsApp QR or status:', error);
+                qrImage.classList.add('hidden');
+                qrLoadingText.classList.remove('hidden');
+                qrLoadingText.textContent = 'Failed to get QR code. Check server logs.';
+                statusDot.className = 'status-dot red';
+                statusText.textContent = 'Error';
+                showMessage(`Error connecting WhatsApp bot: ${error.message}`, 'error');
+                if (error.message.includes('401') || error.message.includes('403')) {
+                     showMessage('Session expired or unauthorized. Please log in again.', 'error');
+                     setTimeout(() => logout(), 1500);
+                }
+            }
+        }
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', checkLoginStatus);
+    </script>
 </body>
 </html>
 
