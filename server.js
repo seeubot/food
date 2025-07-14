@@ -57,6 +57,7 @@ const QR_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 const MAX_RETRY_ATTEMPTS = 20; // Increased retry attempts
 let currentRetryAttempt = 0;
 let whatsappClient = null; // Initialize whatsappClient to null
+let isInitializing = false; // Flag to prevent concurrent initialization attempts
 
 // Path to the session folder created by whatsapp-web.js LocalAuth
 const sessionDir = path.join(__dirname, '.wwebjs_auth', 'session-whatsapp-bot');
@@ -204,6 +205,8 @@ const destroyClientAndRetry = async (clearSession = false, reason = 'unknown') =
     const delay = 10000 * (currentRetryAttempt + 1); 
     console.log(`[WhatsApp Retry Helper] Waiting ${delay / 1000} seconds before next initialization attempt.`);
     
+    // Ensure the initialization flag is reset before scheduling the next attempt
+    isInitializing = false; 
     setTimeout(() => {
         initializeWhatsAppClient();
     }, delay);
@@ -211,17 +214,22 @@ const destroyClientAndRetry = async (clearSession = false, reason = 'unknown') =
 
 
 const initializeWhatsAppClient = async () => {
-    console.log(`[WhatsApp Init] Attempting to initialize WhatsApp Client (Attempt ${currentRetryAttempt + 1}/${MAX_RETRY_ATTEMPTS})...`);
-    
-    if (whatsappClient && whatsappClient.isReady) {
-        console.log('[WhatsApp Init] WhatsApp Client already ready, skipping re-initialization.');
-        currentRetryAttempt = 0; // Reset retry counter on successful connection
+    if (isInitializing) {
+        console.log('[WhatsApp Init] Initialization already in progress, skipping.');
         return;
     }
+    isInitializing = true;
+
+    console.log(`[WhatsApp Init] Attempting to initialize WhatsApp Client (Attempt ${currentRetryAttempt + 1}/${MAX_RETRY_ATTEMPTS})...`);
+    
+    // Ensure whatsappClient is null before attempting to create a new one
+    // This helps prevent issues if a previous attempt left it in a weird state.
+    whatsappClient = null; 
 
     if (currentRetryAttempt >= MAX_RETRY_ATTEMPTS) {
         console.error(`[WhatsApp Init CRITICAL] Max retry attempts (${MAX_RETRY_ATTEMPTS}) reached. WhatsApp client could not be initialized.`);
         qrCodeData = 'Initialization failed: Max retries reached. Please check server logs for details.';
+        isInitializing = false; // Reset flag
         return; // Stop trying
     }
 
@@ -247,93 +255,101 @@ const initializeWhatsAppClient = async () => {
     const puppeteerExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome';
     console.log(`[WhatsApp Init] Using Puppeteer executable path: ${puppeteerExecutablePath}`);
 
-    whatsappClient = new Client({
-        authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Use a specific client ID
-        puppeteer: {
-            headless: true,
-            args: [
-                '--no-sandbox', // Essential for Docker/container environments
-                '--disable-setuid-sandbox', // Essential for Docker/container environments
-                '--disable-dev-shm-usage', // Essential for Docker/headless environments to prevent OOM
-                '--no-zygote', // Helps with stability in some environments
-                '--disable-gpu', // Generally good for headless environments
-                '--disable-background-networking', // Reduce background network activity
-                '--disable-sync', // Disable Chrome Sync
-                '--disable-features=IsolateOrigins,site-per-process', // More specific site isolation control
-                '--disable-features=BlockInsecurePrivateNetworkRequests', // Can help with local network access
-                '--shm-size=1gb', // Explicitly set shared memory size, sometimes needed for larger operations
-                '--single-process', // Can sometimes help with resource usage, but can also cause issues.
-                '--window-size=1920,1080', // Set a default window size for consistency
-                '--ignore-certificate-errors' // Useful for testing/dev, but be cautious in production
-            ],
-            timeout: 120000, // 2 minutes for browser launch
-            executablePath: puppeteerExecutablePath, // Default to common path for Docker
-            ignoreDefaultArgs: ['--disable-extensions'], // Prevents "Chrome is being controlled by automated test software"
-            defaultViewport: null, // Important for responsive pages
-            ignoreHTTPSErrors: true // Ignore HTTPS errors, useful for some environments
-        }
-    });
-
-    whatsappClient.on('qr', qr => {
-        qrcode.generate(qr, { small: true });
-        qrCodeData = qr; // Store raw QR data
-        whatsappQRData = qr; // Store for API endpoint
-        qrCodeGeneratedAt = Date.now();
-        qrCodeAccessToken = generateQRAccessToken();
-        console.log('[WhatsApp QR] QR RECEIVED. Access Token generated (valid for 5 mins):', qrCodeAccessToken);
-        currentRetryAttempt = 0; // Reset retry counter on QR generation
-    });
-
-    whatsappClient.on('ready', () => {
-        console.log('[WhatsApp Ready] WhatsApp Client is ready and connected!');
-        qrCodeData = 'WhatsApp Client is ready!';
-        whatsappQRData = null; // Clear QR data when connected
-        qrCodeAccessToken = null; // Invalidate token when connected
-        currentRetryAttempt = 0; // Reset retry counter on successful connection
-    });
-
-    whatsappClient.on('message', async msg => {
-        console.log(`[WhatsApp Message] from ${msg.from}: ${msg.body}`);
-        const userMessage = msg.body.toLowerCase();
-
-        if (userMessage === '!ping') {
-            msg.reply('pong');
-        } else if (userMessage.includes('hi') || userMessage.includes('hello')) {
-            msg.reply('👋 Hello there! How can I assist you today? You can view our menu or place an order.');
-        } else if (userMessage.includes('menu')) {
-            msg.reply(`Here's our delicious menu: ${WEB_MENU_URL} 🍽️`);
-        } else if (userMessage.includes('order')) {
-            msg.reply(`Ready to order? Visit our web menu here: ${WEB_MENU_URL} 🛒`);
-        } else if (userMessage.includes('help')) {
-            msg.reply('I can help you with placing an order! Just say "menu" to see what\'s available, or visit our website directly.');
-        }
-    });
-
-    whatsappClient.on('disconnected', (reason) => {
-        console.warn('[WhatsApp Disconnected] WhatsApp Client was disconnected:', reason);
-        destroyClientAndRetry(false, `disconnected (${reason})`); 
-    });
-
-    whatsappClient.on('auth_failure', (msg) => {
-        console.error('[WhatsApp Auth Failure] WhatsApp Authentication Failure:', msg);
-        destroyClientAndRetry(true, `auth_failure (${msg})`);
-    });
-
-    whatsappClient.on('change_state', state => {
-        console.log('[WhatsApp State] WhatsApp Client State Changed:', state);
-    });
-
-    whatsappClient.on('loading_screen', (percent, message) => {
-        console.log(`[WhatsApp Loading] Loading WhatsApp: ${percent}% - ${message}`);
-        qrCodeData = `Loading WhatsApp: ${percent}% - ${message}`;
-    });
-
     try {
-        console.log('[WhatsApp Init] Calling whatsappClient.initialize()...');
+        whatsappClient = new Client({
+            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot' }), // Use a specific client ID
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox', // Essential for Docker/container environments
+                    '--disable-setuid-sandbox', // Essential for Docker/container environments
+                    '--disable-dev-shm-usage', // Essential for Docker/headless environments to prevent OOM
+                    '--no-zygote', // Helps with stability in some environments
+                    '--disable-gpu', // Generally good for headless environments
+                    '--disable-background-networking', // Reduce background network activity
+                    '--disable-sync', // Disable Chrome Sync
+                    '--disable-features=IsolateOrigins,site-per-process', // More specific site isolation control
+                    '--disable-features=BlockInsecurePrivateNetworkRequests', // Can help with local network access
+                    '--shm-size=1gb', // Explicitly set shared memory size, sometimes needed for larger operations
+                    '--single-process', // Can sometimes help with resource usage, but can also cause issues.
+                    '--window-size=1920,1080', // Set a default window size for consistency
+                    '--ignore-certificate-errors' // Useful for testing/dev, but be cautious in production
+                ],
+                timeout: 180000, // Increased to 3 minutes for browser launch
+                executablePath: puppeteerExecutablePath, // Default to common path for Docker
+                ignoreDefaultArgs: ['--disable-extensions'], // Prevents "Chrome is being controlled by automated test software"
+                defaultViewport: null, // Important for responsive pages
+                ignoreHTTPSErrors: true // Ignore HTTPS errors, useful for some environments
+            }
+        });
+
+        // Check if instantiation actually returned a client
+        if (!whatsappClient) {
+            throw new Error("WhatsApp Client instantiation returned null or undefined.");
+        }
+
+        whatsappClient.on('qr', qr => {
+            qrcode.generate(qr, { small: true });
+            qrCodeData = qr; // Store raw QR data
+            whatsappQRData = qr; // Store for API endpoint
+            qrCodeGeneratedAt = Date.now();
+            qrCodeAccessToken = generateQRAccessToken();
+            console.log('[WhatsApp QR] QR RECEIVED. Access Token generated (valid for 5 mins):', qrCodeAccessToken);
+            currentRetryAttempt = 0; // Reset retry counter on QR generation
+        });
+
+        whatsappClient.on('ready', () => {
+            console.log('[WhatsApp Ready] WhatsApp Client is ready and connected!');
+            qrCodeData = 'WhatsApp Client is ready!';
+            whatsappQRData = null; // Clear QR data when connected
+            qrCodeAccessToken = null; // Invalidate token when connected
+            currentRetryAttempt = 0; // Reset retry counter on successful connection
+            isInitializing = false; // Reset flag on success
+        });
+
+        whatsappClient.on('message', async msg => {
+            console.log(`[WhatsApp Message] from ${msg.from}: ${msg.body}`);
+            const userMessage = msg.body.toLowerCase();
+
+            if (userMessage === '!ping') {
+                msg.reply('pong');
+            } else if (userMessage.includes('hi') || userMessage.includes('hello')) {
+                msg.reply('👋 Hello there! How can I assist you today? You can view our menu or place an order.');
+            } else if (userMessage.includes('menu')) {
+                msg.reply(`Here's our delicious menu: ${WEB_MENU_URL} 🍽️`);
+            } else if (userMessage.includes('order')) {
+                msg.reply(`Ready to order? Visit our web menu here: ${WEB_MENU_URL} 🛒`);
+            } else if (userMessage.includes('help')) {
+                msg.reply('I can help you with placing an order! Just say "menu" to see what\'s available, or visit our website directly.');
+            }
+        });
+
+        whatsappClient.on('disconnected', (reason) => {
+            console.warn('[WhatsApp Disconnected] WhatsApp Client was disconnected:', reason);
+            destroyClientAndRetry(false, `disconnected (${reason})`); 
+        });
+
+        whatsappClient.on('auth_failure', (msg) => {
+            console.error('[WhatsApp Auth Failure] WhatsApp Authentication Failure:', msg);
+            destroyClientAndRetry(true, `auth_failure (${msg})`);
+        });
+
+        whatsappClient.on('change_state', state => {
+            console.log('[WhatsApp State] WhatsApp Client State Changed:', state);
+        });
+
+        whatsappClient.on('loading_screen', (percent, message) => {
+            console.log(`[WhatsApp Loading] Loading WhatsApp: ${percent}% - ${message}`);
+            qrCodeData = `Loading WhatsApp: ${percent}% - ${message}`;
+        });
+
+        console.log('[WhatsApp Init] Client instance created. Calling initialize()...');
         // Add a small delay before initialization to allow resources to settle
         await new Promise(resolve => setTimeout(resolve, 5000)); 
         await whatsappClient.initialize();
         console.log('[WhatsApp Init] whatsappClient.initialize() finished successfully.');
+        currentRetryAttempt = 0; // Reset retry counter on successful connection
+        // isInitializing is already set to false in the 'ready' event for success
     } catch (error) {
         console.error(`[WhatsApp Init CRITICAL] Failed to initialize WhatsApp Client: ${error.message}`);
         console.error(`Error name: ${error.name}, Error code: ${error.code || 'N/A'}`);
@@ -341,6 +357,7 @@ const initializeWhatsAppClient = async () => {
 
         // Increment retry attempt only on actual initialization failure
         currentRetryAttempt++; 
+        isInitializing = false; // Reset flag on failure before retrying
         destroyClientAndRetry(true, `initialization_failed (${error.message})`);
     }
 };
