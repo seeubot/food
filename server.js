@@ -119,7 +119,7 @@ const initializeWhatsappClient1 = () => {
 
     try {
         whatsappClient_1 = new Client({
-            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot-1' }), // Unique clientId for bot 1
+            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot-1', dataPath: './.wwebjs_auth/' }), // Explicit dataPath
             puppeteer: {
                 headless: true, // Run in headless mode for deployment
                 args: [
@@ -131,25 +131,34 @@ const initializeWhatsappClient1 = () => {
                     '--no-zygote',
                     '--single-process', // This might help on some environments
                     '--disable-gpu',
-                    // Additional arguments for better stability on headless Linux environments
+                    // Enhanced arguments for better stability in headless environments
                     '--disable-features=site-per-process',
                     '--disable-web-security',
                     '--disable-sync',
                     '--disable-infobars',
-                    '--window-size=1920,1080', // Explicit window size
-                    '--ignore-certificate-errors', // Can sometimes help with SSL issues
-                    '--incognito', // Starts a clean session each time (might help if session data gets corrupted)
-                    '--enable-features=NetworkService,NetworkServiceInProcess' // Experimental, but sometimes helps
+                    '--window-size=1920,1080',
+                    '--ignore-certificate-errors',
+                    '--incognito',
+                    '--enable-features=NetworkService,NetworkServiceInProcess',
+                    '--disable-site-isolation-trials', // Added for stability
+                    '--font-render-hinting=none', // Added for font rendering issues
                 ],
             },
         });
 
         whatsappClient_1.on('qr', async (qr) => {
-            console.log('QR 1 RECEIVED');
+            console.log('QR 1 RECEIVED from whatsapp-web.js');
             // Display QR in terminal
             qrcodeTerminal.generate(qr, { small: true });
             // Convert QR string to data URL for web display
-            qrCodeImageBase64_1 = await qrcode.toDataURL(qr);
+            try {
+                qrCodeImageBase64_1 = await qrcode.toDataURL(qr);
+                console.log('QR 1 image successfully converted to base64.');
+            } catch (qrError) {
+                console.error('Error converting QR 1 to base64:', qrError);
+                qrCodeImageBase64_1 = null; // Ensure it's null if conversion fails
+            }
+
             whatsappStatusMessage_1 = 'Scan this QR code for Bot 1 with your WhatsApp app.';
             isWhatsappClientReady_1 = false;
             emitQrAndStatus1(); // Emit QR code to connected dashboard clients
@@ -300,7 +309,7 @@ const initializeWhatsappClient2 = () => {
 
     try {
         whatsappClient_2 = new Client({
-            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot-2' }), // Unique clientId for bot 2
+            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot-2', dataPath: './.wwebjs_auth/' }), // Explicit dataPath
             puppeteer: {
                 headless: true, // Run in headless mode for deployment
                 args: [
@@ -312,25 +321,34 @@ const initializeWhatsappClient2 = () => {
                     '--no-zygote',
                     '--single-process', // This might help on some environments
                     '--disable-gpu',
-                    // Additional arguments for better stability on headless Linux environments
+                    // Enhanced arguments for better stability in headless environments
                     '--disable-features=site-per-process',
                     '--disable-web-security',
                     '--disable-sync',
                     '--disable-infobars',
-                    '--window-size=1920,1080', // Explicit window size
-                    '--ignore-certificate-errors', // Can sometimes help with SSL issues
-                    '--incognito', // Starts a clean session each time (might help if session data gets corrupted)
-                    '--enable-features=NetworkService,NetworkServiceInProcess' // Experimental, but sometimes helps
+                    '--window-size=1920,1080',
+                    '--ignore-certificate-errors',
+                    '--incognito',
+                    '--enable-features=NetworkService,NetworkServiceInProcess',
+                    '--disable-site-isolation-trials', // Added for stability
+                    '--font-render-hinting=none', // Added for font rendering issues
                 ],
             },
         });
 
         whatsappClient_2.on('qr', async (qr) => {
-            console.log('QR 2 RECEIVED');
+            console.log('QR 2 RECEIVED from whatsapp-web.js');
             // Display QR in terminal
             qrcodeTerminal.generate(qr, { small: true });
             // Convert QR string to data URL for web display
-            qrCodeImageBase64_2 = await qrcode.toDataURL(qr);
+            try {
+                qrCodeImageBase64_2 = await qrcode.toDataURL(qr);
+                console.log('QR 2 image successfully converted to base64.');
+            } catch (qrError) {
+                console.error('Error converting QR 2 to base64:', qrError);
+                qrCodeImageBase64_2 = null; // Ensure it's null if conversion fails
+            }
+
             whatsappStatusMessage_2 = 'Scan this QR code for Bot 2 with your WhatsApp app.';
             isWhatsappClientReady_2 = false;
             emitQrAndStatus2(); // Emit QR code to connected dashboard clients
