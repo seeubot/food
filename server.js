@@ -98,9 +98,9 @@ const authenticateToken = (req, res, next) => {
 // --- WhatsApp Client State Management ---
 class WhatsAppClientManager {
     constructor(clientId, clientName) {
-        this.clientId = clientId;
-        this.clientName = clientName;
-        this.qrCodeImage = null; // This will now remain null to prevent sending QR to frontend
+        this.clientId = clientId; // Will always be 'whatsapp-bot-1'
+        this.clientName = clientName; // Will always be 'WhatsApp Bot'
+        this.qrCodeImage = null; // This will hold the base64 QR image when available
         this.statusMessage = `Initializing ${clientName}...`;
         this.isReady = false;
         this.client = null;
@@ -110,16 +110,26 @@ class WhatsAppClientManager {
     }
 
     emitStatus() {
-        const eventName = this.clientId === 'whatsapp-bot-1' ? 'qr1' : 'qr2';
-        io.emit(eventName, {
-            image: this.qrCodeImage, // This will be null if QR is needed
+        // Now only one event 'qrStatus' is emitted
+        io.emit('qrStatus', {
+            image: this.qrCodeImage,
             status: this.statusMessage,
             isReady: this.isReady
         });
-        console.log(`Emitted ${eventName}:`, { status: this.statusMessage, isReady: this.isReady, hasImage: !!this.qrCodeImage });
+        console.log(`Emitted qrStatus:`, { status: this.statusMessage, isReady: this.isReady, hasImage: !!this.qrCodeImage });
     }
 
-    // Removed generateQRImage as it's no longer used for frontend display
+    // Function to generate a base64 QR image
+    async generateQRImage(qr) {
+        try {
+            // Generate QR code as a data URL (base64 image)
+            const dataUrl = await qrcode.toDataURL(qr);
+            return dataUrl;
+        } catch (error) {
+            console.error(`Error generating QR image for ${this.clientName}:`, error);
+            return null;
+        }
+    }
 
     async initialize() {
         if (this.initializationAttempts >= this.maxInitializationAttempts) {
@@ -134,7 +144,7 @@ class WhatsAppClientManager {
         console.log(`Initializing ${this.clientName} (attempt ${this.initializationAttempts}/${this.maxInitializationAttempts})`);
         
         this.statusMessage = `Initializing ${this.clientName}...`;
-        this.qrCodeImage = null;
+        this.qrCodeImage = null; // Clear any old QR image
         this.isReady = false;
         this.emitStatus();
 
@@ -151,7 +161,7 @@ class WhatsAppClientManager {
             // Create new client with enhanced configuration
             this.client = new Client({
                 authStrategy: new LocalAuth({ 
-                    clientId: this.clientId,
+                    clientId: this.clientId, // Will use 'whatsapp-bot-1'
                     dataPath: `./.wwebjs_auth/`
                 }),
                 puppeteer: {
@@ -211,19 +221,19 @@ class WhatsAppClientManager {
         this.client.on('qr', async (qr) => {
             console.log(`QR received for ${this.clientName}`);
             
-            // Display QR in terminal (for initial setup)
+            // Display QR in terminal (for initial setup/debugging, still useful for local dev)
             qrcodeTerminal.generate(qr, { small: true });
             
-            // Do NOT generate QR image for frontend display
-            this.qrCodeImage = null; 
-            this.statusMessage = `Scan the QR code displayed in your server's terminal for ${this.clientName}.`;
+            // Generate QR image for frontend display
+            this.qrCodeImage = await this.generateQRImage(qr); 
+            this.statusMessage = `Scan the QR code below for ${this.clientName}.`; // Update message
             this.isReady = false;
             this.emitStatus();
         });
 
         this.client.on('ready', () => {
             console.log(`${this.clientName} is ready!`);
-            this.qrCodeImage = null;
+            this.qrCodeImage = null; // Clear QR image once ready
             this.statusMessage = `${this.clientName} is ready!`;
             this.isReady = true;
             this.initializationAttempts = 0; // Reset attempts on successful connection
@@ -232,7 +242,7 @@ class WhatsAppClientManager {
 
         this.client.on('authenticated', () => {
             console.log(`${this.clientName} authenticated`);
-            this.qrCodeImage = null;
+            this.qrCodeImage = null; // Clear QR image once authenticated
             this.statusMessage = `${this.clientName} authenticated!`;
             this.isReady = true;
             this.emitStatus();
@@ -241,7 +251,7 @@ class WhatsAppClientManager {
         this.client.on('auth_failure', (msg) => {
             console.error(`Authentication failure for ${this.clientName}:`, msg);
             this.qrCodeImage = null;
-            this.statusMessage = `Auth Failure: ${msg}. Re-scan QR from terminal.`;
+            this.statusMessage = `Auth Failure: ${msg}. Please refresh and try again.`; // Updated message
             this.isReady = false;
             this.emitStatus();
             
@@ -268,18 +278,10 @@ class WhatsAppClientManager {
             this.emitStatus();
         });
 
-        // Add message handler for client 1 (primary bot)
-        if (this.clientId === 'whatsapp-bot-1') {
-            this.client.on('message', async (msg) => {
-                await this.handleMessage(msg);
-            });
-        } 
-        // Add message handler for client 2 (secondary bot)
-        if (this.clientId === 'whatsapp-bot-2') {
-            this.client.on('message', async (msg) => {
-                await this.handleMessage(msg);
-            });
-        }
+        // Message handler for the single bot
+        this.client.on('message', async (msg) => {
+            await this.handleMessage(msg);
+        });
     }
 
     async handleMessage(msg) {
@@ -388,17 +390,15 @@ class WhatsAppClientManager {
     }
 }
 
-// --- Initialize WhatsApp Clients ---
-const whatsappClient1 = new WhatsAppClientManager('whatsapp-bot-1', 'WhatsApp Bot 1');
-const whatsappClient2 = new WhatsAppClientManager('whatsapp-bot-2', 'WhatsApp Bot 2');
+// --- Initialize WhatsApp Client ---
+const whatsappClient = new WhatsAppClientManager('whatsapp-bot-1', 'WhatsApp Bot'); // Only one client
 
 // --- Socket.IO Connection Handling ---
 io.on('connection', (socket) => {
     console.log('Client connected to socket');
     
     // Send current status when client connects
-    whatsappClient1.emitStatus();
-    whatsappClient2.emitStatus();
+    whatsappClient.emitStatus();
     
     socket.on('disconnect', () => {
         console.log('Client disconnected from socket');
@@ -412,13 +412,9 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        whatsapp1: {
-            isReady: whatsappClient1.isReady,
-            status: whatsappClient1.statusMessage
-        },
-        whatsapp2: {
-            isReady: whatsappClient2.isReady,
-            status: whatsappClient2.statusMessage
+        whatsappBot: { // Renamed from whatsapp1
+            isReady: whatsappClient.isReady,
+            status: whatsappClient.statusMessage
         }
     });
 });
@@ -701,31 +697,18 @@ app.delete('/api/orders/:id', authenticateToken, async (req, res) => {
 // Get WhatsApp status (protected)
 app.get('/api/whatsapp/status', authenticateToken, (req, res) => {
     res.json({
-        client1: {
-            isReady: whatsappClient1.isReady,
-            status: whatsappClient1.statusMessage
-        },
-        client2: {
-            isReady: whatsappClient2.isReady,
-            status: whatsappClient2.statusMessage
+        client: { // Renamed from client1
+            isReady: whatsappClient.isReady,
+            status: whatsappClient.statusMessage
         }
     });
 });
 
 // Restart WhatsApp client (protected)
-app.post('/api/whatsapp/restart/:clientId', authenticateToken, async (req, res) => {
+app.post('/api/whatsapp/restart', authenticateToken, async (req, res) => { // Removed :clientId
     try {
-        const { clientId } = req.params;
-        
-        if (clientId === '1') {
-            await whatsappClient1.initialize();
-            res.json({ message: 'WhatsApp Client 1 restart initiated' });
-        } else if (clientId === '2') {
-            await whatsappClient2.initialize();
-            res.json({ message: 'WhatsApp Client 2 restart initiated' });
-        } else {
-            res.status(400).json({ message: 'Invalid client ID' });
-        }
+        await whatsappClient.initialize();
+        res.json({ message: 'WhatsApp Client restart initiated' });
     } catch (error) {
         console.error('Error restarting WhatsApp client:', error);
         res.status(500).json({ message: 'Server error restarting WhatsApp client' });
@@ -735,19 +718,17 @@ app.post('/api/whatsapp/restart/:clientId', authenticateToken, async (req, res) 
 // Send message through WhatsApp (protected)
 app.post('/api/whatsapp/send', authenticateToken, async (req, res) => {
     try {
-        const { clientId, to, message } = req.body;
+        const { to, message } = req.body; // Removed clientId
         
-        if (!clientId || !to || !message) {
-            return res.status(400).json({ message: 'Client ID, recipient, and message are required' });
+        if (!to || !message) {
+            return res.status(400).json({ message: 'Recipient and message are required' });
         }
 
-        const client = clientId === '1' ? whatsappClient1 : whatsappClient2;
-        
-        if (!client.isReady) {
+        if (!whatsappClient.isReady) {
             return res.status(400).json({ message: 'WhatsApp client is not ready' });
         }
 
-        await client.client.sendMessage(to, message);
+        await whatsappClient.client.sendMessage(to, message);
         res.json({ message: 'Message sent successfully' });
     } catch (error) {
         console.error('Error sending WhatsApp message:', error);
@@ -808,10 +789,9 @@ async function startServer() {
             console.log(`Dashboard: http://localhost:${PORT}`);
         });
 
-        // Initialize WhatsApp clients
-        console.log('Initializing WhatsApp clients...');
-        await whatsappClient1.initialize();
-        await whatsappClient2.initialize();
+        // Initialize WhatsApp client
+        console.log('Initializing WhatsApp client...');
+        await whatsappClient.initialize();
 
     } catch (error) {
         console.error('Error starting server:', error);
@@ -824,8 +804,7 @@ process.on('SIGINT', async () => {
     console.log('\nReceived SIGINT, shutting down gracefully...');
     
     try {
-        await whatsappClient1.destroy();
-        await whatsappClient2.destroy();
+        await whatsappClient.destroy(); // Only one client to destroy
         await mongoose.connection.close();
         server.close(() => {
             console.log('Server closed');
@@ -841,8 +820,7 @@ process.on('SIGTERM', async () => {
     console.log('\nReceived SIGTERM, shutting down gracefully...');
     
     try {
-        await whatsappClient1.destroy();
-        await whatsappClient2.destroy();
+        await whatsappClient.destroy(); // Only one client to destroy
         await mongoose.connection.close();
         server.close(() => {
             console.log('Server closed');
