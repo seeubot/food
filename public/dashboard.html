@@ -144,8 +144,13 @@
                     </button>
                 </li>
                 <li class="mb-4">
-                    <button id="nav-qr" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-blue-600 hover:text-white transition duration-200 ease-in-out text-gray-700 dark:text-gray-300">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 10h.01M6 14h.01M12 10h.01M12 14h.01M18 10h.01M18 14h.01M16 18H8a2 2 0 01-2-2V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2z"></path></svg> QR Authentication
+                    <button id="nav-qr1" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-blue-600 hover:text-white transition duration-200 ease-in-out text-gray-700 dark:text-gray-300">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 10h.01M6 14h.01M12 10h.01M12 14h.01M18 10h.01M18 14h.01M16 18H8a2 2 0 01-2-2V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2z"></path></svg> QR Bot 1
+                    </button>
+                </li>
+                <li class="mb-4">
+                    <button id="nav-qr2" class="w-full text-left flex items-center p-3 rounded-lg hover:bg-blue-600 hover:text-white transition duration-200 ease-in-out text-gray-700 dark:text-gray-300">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 10h.01M6 14h.01M12 10h.01M12 14h.01M18 10h.01M18 14h.01M16 18H8a2 2 0 01-2-2V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2z"></path></svg> QR Bot 2
                     </button>
                 </li>
             </ul>
@@ -349,18 +354,34 @@
                 </div>
             </section>
 
-            <!-- QR Authentication Section -->
-            <section id="qr-authentication-section" class="page-content hidden p-4 md:p-8 flex flex-col items-center justify-center h-full text-gray-900 dark:text-white">
-                <h1 class="text-3xl md:text-4xl font-bold mb-6 text-center">WhatsApp Bot QR Authentication</h1>
+            <!-- QR Authentication Section 1 (Existing) -->
+            <section id="qr-authentication-section-1" class="page-content hidden p-4 md:p-8 flex flex-col items-center justify-center h-full text-gray-900 dark:text-white">
+                <h1 class="text-3xl md:text-4xl font-bold mb-6 text-center">WhatsApp Bot 1 QR Authentication</h1>
                 <div class="p-6 rounded-lg shadow-xl text-center bg-white dark:bg-gray-800">
-                    <img id="qr-code-image" src="" alt="WhatsApp QR Code" class="w-64 h-64 mx-auto rounded-lg mb-4 border border-gray-300 hidden" />
-                    <div id="qr-code-placeholder" class="w-64 h-64 flex items-center justify-center mx-auto mb-4 bg-gray-200 rounded-lg text-gray-600 dark:bg-gray-700 dark:text-gray-400">
-                        Loading QR Code...
+                    <img id="qr-code-image-1" src="" alt="WhatsApp QR Code 1" class="w-64 h-64 mx-auto rounded-lg mb-4 border border-gray-300 hidden" />
+                    <div id="qr-code-placeholder-1" class="w-64 h-64 flex items-center justify-center mx-auto mb-4 bg-gray-200 rounded-lg text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                        Loading QR Code 1...
                     </div>
-                    <p id="qr-status" class="text-lg font-semibold mb-4 text-blue-500">Connecting to WhatsApp Client...</p>
-                    <p id="qr-error" class="text-red-500 mb-4 hidden"></p>
-                    <button id="refresh-qr-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center mx-auto transition duration-300 ease-in-out">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356-2A8.001 8.001 0 004 12c0 2.972 1.15 5.727 3.059 7.779L10 21m2-2l-3.059 3.059A8.001 8.001 0 0020 12c0-2.972-1.15-5.727-3.059-7.779L14 3"></path></svg> Refresh QR Status
+                    <p id="qr-status-1" class="text-lg font-semibold mb-4 text-blue-500">Connecting to WhatsApp Client 1...</p>
+                    <p id="qr-error-1" class="text-red-500 mb-4 hidden"></p>
+                    <button id="refresh-qr-btn-1" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center mx-auto transition duration-300 ease-in-out">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356-2A8.001 8.001 0 004 12c0 2.972 1.15 5.727 3.059 7.779L10 21m2-2l-3.059 3.059A8.001 8.001 0 0020 12c0-2.972-1.15-5.727-3.059-7.779L14 3"></path></svg> Refresh QR Status 1
+                    </button>
+                </div>
+            </section>
+
+            <!-- QR Authentication Section 2 (NEW) -->
+            <section id="qr-authentication-section-2" class="page-content hidden p-4 md:p-8 flex flex-col items-center justify-center h-full text-gray-900 dark:text-white">
+                <h1 class="text-3xl md:text-4xl font-bold mb-6 text-center">WhatsApp Bot 2 QR Authentication</h1>
+                <div class="p-6 rounded-lg shadow-xl text-center bg-white dark:bg-gray-800">
+                    <img id="qr-code-image-2" src="" alt="WhatsApp QR Code 2" class="w-64 h-64 mx-auto rounded-lg mb-4 border border-gray-300 hidden" />
+                    <div id="qr-code-placeholder-2" class="w-64 h-64 flex items-center justify-center mx-auto mb-4 bg-gray-200 rounded-lg text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                        Loading QR Code 2...
+                    </div>
+                    <p id="qr-status-2" class="text-lg font-semibold mb-4 text-blue-500">Connecting to WhatsApp Client 2...</p>
+                    <p id="qr-error-2" class="text-red-500 mb-4 hidden"></p>
+                    <button id="refresh-qr-btn-2" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center mx-auto transition duration-300 ease-in-out">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356-2A8.001 8.001 0 004 12c0 2.972 1.15 5.727 3.059 7.779L10 21m2-2l-3.059 3.059A8.001 8.001 0 0020 12c0-2.972-1.15-5.727-3.059-7.779L14 3"></path></svg> Refresh QR Status 2
                     </button>
                 </div>
             </section>
@@ -380,9 +401,13 @@
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                 <span class="text-xs mt-1">Orders</span>
             </button>
-            <button id="nav-qr-mobile" class="flex flex-col items-center p-2 rounded-lg text-gray-700 dark:text-gray-300">
+            <button id="nav-qr1-mobile" class="flex flex-col items-center p-2 rounded-lg text-gray-700 dark:text-gray-300">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 10h.01M6 14h.01M12 10h.01M12 14h.01M18 10h.01M18 14h.01M16 18H8a2 2 0 01-2-2V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2z"></path></svg>
-                <span class="text-xs mt-1">QR</span>
+                <span class="text-xs mt-1">QR 1</span>
+            </button>
+            <button id="nav-qr2-mobile" class="flex flex-col items-center p-2 rounded-lg text-gray-700 dark:text-gray-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 10h.01M6 14h.01M12 10h.01M12 14h.01M18 10h.01M18 14h.01M16 18H8a2 2 0 01-2-2V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2z"></path></svg>
+                <span class="text-xs mt-1">QR 2</span>
             </button>
         </nav>
     </div>
@@ -406,18 +431,21 @@
             dashboard: document.getElementById('nav-dashboard'),
             menu: document.getElementById('nav-menu'),
             orders: document.getElementById('nav-orders'),
-            qr: document.getElementById('nav-qr'),
+            qr1: document.getElementById('nav-qr1'), // New ID for Bot 1
+            qr2: document.getElementById('nav-qr2'), // New ID for Bot 2
             dashboardMobile: document.getElementById('nav-dashboard-mobile'),
             menuMobile: document.getElementById('nav-menu-mobile'),
             ordersMobile: document.getElementById('nav-orders-mobile'),
-            qrMobile: document.getElementById('nav-qr-mobile'),
+            qr1Mobile: document.getElementById('nav-qr1-mobile'), // New ID for Bot 1 Mobile
+            qr2Mobile: document.getElementById('nav-qr2-mobile'), // New ID for Bot 2 Mobile
         };
 
         const pageContents = {
             dashboard: document.getElementById('dashboard-content'),
             menu: document.getElementById('menu-management-section'),
             orders: document.getElementById('order-management-section'),
-            qr: document.getElementById('qr-authentication-section'),
+            qr1: document.getElementById('qr-authentication-section-1'), // New ID for Bot 1 section
+            qr2: document.getElementById('qr-authentication-section-2'), // New ID for Bot 2 section
         };
 
         const themeToggleSidebar = document.getElementById('theme-toggle-sidebar');
@@ -459,12 +487,20 @@
         const updateOrderStatusBtn = document.getElementById('update-order-status-btn');
         const orderStatusError = document.getElementById('order-status-error');
 
-        // QR Authentication Elements
-        const qrCodeImage = document.getElementById('qr-code-image');
-        const qrCodePlaceholder = document.getElementById('qr-code-placeholder');
-        const qrStatus = document.getElementById('qr-status');
-        const qrError = document.getElementById('qr-error');
-        const refreshQrBtn = document.getElementById('refresh-qr-btn');
+        // QR Authentication Elements for Bot 1
+        const qrCodeImage1 = document.getElementById('qr-code-image-1');
+        const qrCodePlaceholder1 = document.getElementById('qr-code-placeholder-1');
+        const qrStatus1 = document.getElementById('qr-status-1');
+        const qrError1 = document.getElementById('qr-error-1');
+        const refreshQrBtn1 = document.getElementById('refresh-qr-btn-1');
+
+        // QR Authentication Elements for Bot 2 (NEW)
+        const qrCodeImage2 = document.getElementById('qr-code-image-2');
+        const qrCodePlaceholder2 = document.getElementById('qr-code-placeholder-2');
+        const qrStatus2 = document.getElementById('qr-status-2');
+        const qrError2 = document.getElementById('qr-error-2');
+        const refreshQrBtn2 = document.getElementById('refresh-qr-btn-2');
+
 
         let currentTheme = localStorage.getItem('theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         let currentToken = localStorage.getItem('jwtToken');
@@ -539,7 +575,7 @@
         function showPage(pageId) {
             Object.values(pageContents).forEach(section => section.classList.add('hidden'));
             document.getElementById(pageId).classList.remove('hidden');
-            currentActivePage = pageId.replace('-content', '').replace('-section', ''); // Store current active page
+            currentActivePage = pageId.replace('-content', '').replace('-section-1', '').replace('-section-2', ''); // Store current active page
             updateActiveNavButtons();
         }
 
@@ -869,91 +905,150 @@
             }
         }
 
-        // --- QR Authentication Functions ---
-        let socket;
+        // --- QR Authentication Functions for Bot 1 ---
+        let socket1; // Socket for Bot 1
 
-        function initializeSocketIO() {
-            if (socket) {
-                socket.disconnect(); // Disconnect existing socket if any
+        function initializeSocketIO1() {
+            if (socket1) {
+                socket1.disconnect(); // Disconnect existing socket if any
             }
-            socket = io(API_BASE_URL);
+            socket1 = io(API_BASE_URL); // Connect to default namespace
 
-            socket.on('connect', () => {
-                console.log('Connected to Socket.IO server');
-                qrError.classList.add('hidden');
+            socket1.on('connect', () => {
+                console.log('Connected to Socket.IO server (Bot 1)');
+                qrError1.classList.add('hidden');
             });
 
-            // Listen for the structured QR and status data
-            socket.on('qr', (data) => {
-                console.log('QR/Status received:', data);
-                // Update QR image
+            socket1.on('qr1', (data) => { // Listen for 'qr1' event
+                console.log('QR/Status received (Bot 1):', data);
                 if (data.image) {
-                    qrCodeImage.src = data.image;
-                    qrCodeImage.classList.remove('hidden');
-                    qrCodePlaceholder.classList.add('hidden');
+                    qrCodeImage1.src = data.image;
+                    qrCodeImage1.classList.remove('hidden');
+                    qrCodePlaceholder1.classList.add('hidden');
                 } else {
-                    qrCodeImage.classList.add('hidden');
-                    qrCodePlaceholder.classList.remove('hidden');
+                    qrCodeImage1.classList.add('hidden');
+                    qrCodePlaceholder1.classList.remove('hidden');
                 }
-
-                // Update status text
-                qrStatus.textContent = data.status;
-
-                // Update status color based on readiness
-                if (data.isReady) {
-                    qrStatus.classList.remove('text-red-500', 'text-blue-500');
-                    qrStatus.classList.add('text-green-500');
-                } else if (data.status.includes('Auth Failure') || data.status.includes('Disconnected')) {
-                    qrStatus.classList.remove('text-blue-500', 'text-green-500');
-                    qrStatus.classList.add('text-red-500');
-                } else {
-                    qrStatus.classList.remove('text-red-500', 'text-green-500');
-                    qrStatus.classList.add('text-blue-500');
-                }
-                qrError.classList.add('hidden'); // Clear any previous error messages
+                qrStatus1.textContent = data.status;
+                updateQrStatusStyling(qrStatus1, data.isReady, data.status);
+                qrError1.classList.add('hidden');
             });
 
-            socket.on('connect_error', (err) => {
-                console.error('Socket.IO connection error:', err);
-                qrCodeImage.classList.add('hidden');
-                qrCodePlaceholder.classList.remove('hidden');
-                qrCodePlaceholder.textContent = 'Connection Error.';
-                qrStatus.textContent = 'Connection Error.';
-                qrStatus.classList.remove('text-blue-500', 'text-green-500');
-                qrStatus.classList.add('text-red-500');
-                qrError.textContent = 'Could not connect to the backend. Please ensure the server is running.';
-                qrError.classList.remove('hidden');
+            socket1.on('connect_error', (err) => {
+                console.error('Socket.IO connection error (Bot 1):', err);
+                qrCodeImage1.classList.add('hidden');
+                qrCodePlaceholder1.classList.remove('hidden');
+                qrCodePlaceholder1.textContent = 'Connection Error.';
+                qrStatus1.textContent = 'Connection Error.';
+                updateQrStatusStyling(qrStatus1, false, 'error');
+                qrError1.textContent = 'Could not connect to the backend for Bot 1. Please ensure the server is running.';
+                qrError1.classList.remove('hidden');
             });
 
-            socket.on('disconnect', (reason) => {
-                console.log('Disconnected from Socket.IO server', reason);
-                qrCodeImage.classList.add('hidden');
-                qrCodePlaceholder.classList.remove('hidden');
-                qrCodePlaceholder.textContent = `Disconnected: ${reason}. Reconnecting...`;
-                qrStatus.textContent = `Disconnected: ${reason}. Reconnecting...`;
-                qrStatus.classList.remove('text-blue-500', 'text-green-500');
-                qrStatus.classList.add('text-red-500');
-                qrError.textContent = 'Connection lost. Please refresh or check server status.';
-                qrError.classList.remove('hidden');
+            socket1.on('disconnect', (reason) => {
+                console.log('Disconnected from Socket.IO server (Bot 1)', reason);
+                qrCodeImage1.classList.add('hidden');
+                qrCodePlaceholder1.classList.remove('hidden');
+                qrCodePlaceholder1.textContent = `Disconnected: ${reason}. Reconnecting...`;
+                qrStatus1.textContent = `Disconnected: ${reason}. Reconnecting...`;
+                updateQrStatusStyling(qrStatus1, false, 'disconnected');
+                qrError1.textContent = 'Connection lost for Bot 1. Please refresh or check server status.';
+                qrError1.classList.remove('hidden');
             });
         }
 
-        async function refreshQrStatus() {
-            qrError.classList.add('hidden');
-            qrStatus.textContent = 'Requesting new QR code...';
-            qrStatus.classList.remove('text-red-500', 'text-green-500');
-            qrStatus.classList.add('text-blue-500');
+        async function refreshQrStatus1() {
+            qrError1.classList.add('hidden');
+            qrStatus1.textContent = 'Requesting new QR code for Bot 1...';
+            updateQrStatusStyling(qrStatus1, false, 'loading');
             try {
-                const data = await apiCall('/api/whatsapp/qr');
-                // The socket.on('qr') listener will handle updating the UI based on the response
-                // No need to duplicate the display logic here
+                // The socket.on('qr1') listener will handle updating the UI based on the response
+                await apiCall('/api/whatsapp/qr1');
             } catch (err) {
-                qrError.textContent = err.message || 'Failed to refresh QR code. Check server logs.';
-                qrError.classList.remove('hidden');
-                qrStatus.classList.remove('text-blue-500', 'text-green-500');
-                qrStatus.classList.add('text-red-500');
+                qrError1.textContent = err.message || 'Failed to refresh QR code for Bot 1. Check server logs.';
+                qrError1.classList.remove('hidden');
+                updateQrStatusStyling(qrStatus1, false, 'error');
             }
         }
+
+        // --- QR Authentication Functions for Bot 2 (NEW) ---
+        let socket2; // Socket for Bot 2
+
+        function initializeSocketIO2() {
+            if (socket2) {
+                socket2.disconnect(); // Disconnect existing socket if any
+            }
+            socket2 = io(API_BASE_URL); // Connect to default namespace
+
+            socket2.on('connect', () => {
+                console.log('Connected to Socket.IO server (Bot 2)');
+                qrError2.classList.add('hidden');
+            });
+
+            socket2.on('qr2', (data) => { // Listen for 'qr2' event
+                console.log('QR/Status received (Bot 2):', data);
+                if (data.image) {
+                    qrCodeImage2.src = data.image;
+                    qrCodeImage2.classList.remove('hidden');
+                    qrCodePlaceholder2.classList.add('hidden');
+                } else {
+                    qrCodeImage2.classList.add('hidden');
+                    qrCodePlaceholder2.classList.remove('hidden');
+                }
+                qrStatus2.textContent = data.status;
+                updateQrStatusStyling(qrStatus2, data.isReady, data.status);
+                qrError2.classList.add('hidden');
+            });
+
+            socket2.on('connect_error', (err) => {
+                console.error('Socket.IO connection error (Bot 2):', err);
+                qrCodeImage2.classList.add('hidden');
+                qrCodePlaceholder2.classList.remove('hidden');
+                qrCodePlaceholder2.textContent = 'Connection Error.';
+                qrStatus2.textContent = 'Connection Error.';
+                updateQrStatusStyling(qrStatus2, false, 'error');
+                qrError2.textContent = 'Could not connect to the backend for Bot 2. Please ensure the server is running.';
+                qrError2.classList.remove('hidden');
+            });
+
+            socket2.on('disconnect', (reason) => {
+                console.log('Disconnected from Socket.IO server (Bot 2)', reason);
+                qrCodeImage2.classList.add('hidden');
+                qrCodePlaceholder2.classList.remove('hidden');
+                qrCodePlaceholder2.textContent = `Disconnected: ${reason}. Reconnecting...`;
+                qrStatus2.textContent = `Disconnected: ${reason}. Reconnecting...`;
+                updateQrStatusStyling(qrStatus2, false, 'disconnected');
+                qrError2.textContent = 'Connection lost for Bot 2. Please refresh or check server status.';
+                qrError2.classList.remove('hidden');
+            });
+        }
+
+        async function refreshQrStatus2() {
+            qrError2.classList.add('hidden');
+            qrStatus2.textContent = 'Requesting new QR code for Bot 2...';
+            updateQrStatusStyling(qrStatus2, false, 'loading');
+            try {
+                // The socket.on('qr2') listener will handle updating the UI based on the response
+                await apiCall('/api/whatsapp/qr2');
+            } catch (err) {
+                qrError2.textContent = err.message || 'Failed to refresh QR code for Bot 2. Check server logs.';
+                qrError2.classList.remove('hidden');
+                updateQrStatusStyling(qrStatus2, false, 'error');
+            }
+        }
+
+        // Helper function for QR status styling
+        function updateQrStatusStyling(element, isReady, statusText) {
+            element.classList.remove('text-red-500', 'text-blue-500', 'text-green-500');
+            if (isReady) {
+                element.classList.add('text-green-500');
+            } else if (statusText.includes('Auth Failure') || statusText.includes('Disconnected') || statusText.includes('Error')) {
+                element.classList.add('text-red-500');
+            } else {
+                element.classList.add('text-blue-500');
+            }
+        }
+
 
         // --- Custom Confirmation Modal (replaces window.confirm) ---
         function showConfirmationModal(message) {
@@ -1005,13 +1100,15 @@
             navButtons.dashboard.addEventListener('click', () => showPage('dashboard-content'));
             navButtons.menu.addEventListener('click', () => { showPage('menu-management-section'); fetchMenuItems(); });
             navButtons.orders.addEventListener('click', () => { showPage('order-management-section'); fetchOrders(); });
-            navButtons.qr.addEventListener('click', () => { showPage('qr-authentication-section'); initializeSocketIO(); refreshQrStatus(); });
+            navButtons.qr1.addEventListener('click', () => { showPage('qr-authentication-section-1'); initializeSocketIO1(); refreshQrStatus1(); });
+            navButtons.qr2.addEventListener('click', () => { showPage('qr-authentication-section-2'); initializeSocketIO2(); refreshQrStatus2(); }); // New QR2 nav
 
             // Mobile Navigation Buttons
             navButtons.dashboardMobile.addEventListener('click', () => showPage('dashboard-content'));
             navButtons.menuMobile.addEventListener('click', () => { showPage('menu-management-section'); fetchMenuItems(); });
             navButtons.ordersMobile.addEventListener('click', () => { showPage('order-management-section'); fetchOrders(); });
-            navButtons.qrMobile.addEventListener('click', () => { showPage('qr-authentication-section'); initializeSocketIO(); refreshQrStatus(); });
+            navButtons.qr1Mobile.addEventListener('click', () => { showPage('qr-authentication-section-1'); initializeSocketIO1(); refreshQrStatus1(); });
+            navButtons.qr2Mobile.addEventListener('click', () => { showPage('qr-authentication-section-2'); initializeSocketIO2(); refreshQrStatus2(); }); // New QR2 mobile nav
 
             // Theme Toggles
             themeToggleSidebar.addEventListener('click', toggleTheme);
@@ -1033,8 +1130,10 @@
             cancelOrderStatusModalBtn.addEventListener('click', () => orderStatusModal.classList.add('hidden'));
             updateOrderStatusBtn.addEventListener('click', handleStatusUpdate);
 
-            // QR Authentication Listener
-            refreshQrBtn.addEventListener('click', refreshQrStatus);
+            // QR Authentication Listener for Bot 1
+            refreshQrBtn1.addEventListener('click', refreshQrStatus1);
+            // QR Authentication Listener for Bot 2 (NEW)
+            refreshQrBtn2.addEventListener('click', refreshQrStatus2);
         });
     </script>
 </body>
