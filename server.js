@@ -95,717 +95,783 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// --- WhatsApp Web JS Client 1 Setup ---
-let qrCodeImageBase64_1 = null; // Stores QR code image data (base64) for client 1
-let whatsappStatusMessage_1 = 'Initializing WhatsApp Client 1...'; // Stores status message for client 1
-let whatsappClient_1; // WhatsApp client instance 1
-let isWhatsappClientReady_1 = false; // Flag to indicate client 1 readiness
+// --- WhatsApp Client State Management ---
+class WhatsAppClientManager {
+    constructor(clientId, clientName) {
+        this.clientId = clientId;
+        this.clientName = clientName;
+        this.qrCodeImage = null;
+        this.statusMessage = `Initializing ${clientName}...`;
+        this.isReady = false;
+        this.client = null;
+        this.initializationAttempts = 0;
+        this.maxInitializationAttempts = 3;
+        this.reconnectTimeout = null;
+    }
 
-// Function to emit current QR and status for client 1 to all connected Socket.IO clients
-const emitQrAndStatus1 = () => {
-    io.emit('qr1', { // Using 'qr1' event for client 1
-        image: qrCodeImageBase64_1,
-        status: whatsappStatusMessage_1,
-        isReady: isWhatsappClientReady_1
-    });
-};
-
-const initializeWhatsappClient1 = () => {
-    console.log('Initializing WhatsApp Client 1...');
-    whatsappStatusMessage_1 = 'Initializing WhatsApp Client 1...';
-    qrCodeImageBase64_1 = null;
-    isWhatsappClientReady_1 = false;
-    emitQrAndStatus1(); // Emit initial state for client 1
-
-    try {
-        whatsappClient_1 = new Client({
-            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot-1', dataPath: './.wwebjs_auth/' }), // Explicit dataPath
-            puppeteer: {
-                headless: true, // Run in headless mode for deployment
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process', // This might help on some environments
-                    '--disable-gpu',
-                    // Enhanced arguments for better stability in headless environments
-                    '--disable-features=site-per-process',
-                    '--disable-web-security',
-                    '--disable-sync',
-                    '--disable-infobars',
-                    '--window-size=1920,1080',
-                    '--ignore-certificate-errors',
-                    '--incognito',
-                    '--enable-features=NetworkService,NetworkServiceInProcess',
-                    '--disable-site-isolation-trials', // Added for stability
-                    '--font-render-hinting=none', // Added for font rendering issues
-                ],
-            },
+    emitStatus() {
+        const eventName = this.clientId === 'whatsapp-bot-1' ? 'qr1' : 'qr2';
+        io.emit(eventName, {
+            image: this.qrCodeImage,
+            status: this.statusMessage,
+            isReady: this.isReady
         });
+        console.log(`Emitted ${eventName}:`, { status: this.statusMessage, isReady: this.isReady, hasImage: !!this.qrCodeImage });
+    }
 
-        whatsappClient_1.on('qr', async (qr) => {
-            console.log('QR 1 RECEIVED from whatsapp-web.js');
-            // Display QR in terminal
-            qrcodeTerminal.generate(qr, { small: true });
-            // Convert QR string to data URL for web display
-            try {
-                qrCodeImageBase64_1 = await qrcode.toDataURL(qr);
-                console.log('QR 1 image successfully converted to base64.');
-            } catch (qrError) {
-                console.error('Error converting QR 1 to base64:', qrError);
-                qrCodeImageBase64_1 = null; // Ensure it's null if conversion fails
+    async generateQRImage(qrString) {
+        try {
+            // Generate QR code with better error correction and size
+            const qrImage = await qrcode.toDataURL(qrString, {
+                errorCorrectionLevel: 'M',
+                type: 'image/png',
+                quality: 0.92,
+                margin: 1,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                },
+                width: 300
+            });
+            console.log(`QR image generated successfully for ${this.clientName}`);
+            return qrImage;
+        } catch (error) {
+            console.error(`Error generating QR image for ${this.clientName}:`, error);
+            return null;
+        }
+    }
+
+    async initialize() {
+        if (this.initializationAttempts >= this.maxInitializationAttempts) {
+            this.statusMessage = `${this.clientName} initialization failed after ${this.maxInitializationAttempts} attempts`;
+            this.isReady = false;
+            this.qrCodeImage = null;
+            this.emitStatus();
+            return;
+        }
+
+        this.initializationAttempts++;
+        console.log(`Initializing ${this.clientName} (attempt ${this.initializationAttempts}/${this.maxInitializationAttempts})`);
+        
+        this.statusMessage = `Initializing ${this.clientName}...`;
+        this.qrCodeImage = null;
+        this.isReady = false;
+        this.emitStatus();
+
+        try {
+            // Clean up existing client
+            if (this.client) {
+                try {
+                    await this.client.destroy();
+                } catch (destroyError) {
+                    console.warn(`Error destroying existing client for ${this.clientName}:`, destroyError);
+                }
             }
 
-            whatsappStatusMessage_1 = 'Scan this QR code for Bot 1 with your WhatsApp app.';
-            isWhatsappClientReady_1 = false;
-            emitQrAndStatus1(); // Emit QR code to connected dashboard clients
+            // Create new client with enhanced configuration
+            this.client = new Client({
+                authStrategy: new LocalAuth({ 
+                    clientId: this.clientId,
+                    dataPath: `./.wwebjs_auth/`
+                }),
+                puppeteer: {
+                    headless: true,
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas',
+                        '--no-first-run',
+                        '--no-zygote',
+                        '--single-process',
+                        '--disable-gpu',
+                        '--disable-features=site-per-process',
+                        '--disable-web-security',
+                        '--disable-sync',
+                        '--disable-infobars',
+                        '--window-size=1920,1080',
+                        '--ignore-certificate-errors',
+                        '--incognito',
+                        '--enable-features=NetworkService,NetworkServiceInProcess',
+                        '--disable-site-isolation-trials',
+                        '--font-render-hinting=none',
+                        '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-renderer-backgrounding'
+                    ],
+                    timeout: 60000 // 60 seconds timeout
+                },
+                webVersion: '2.2412.54', // Specify a stable web version
+                webVersionCache: {
+                    type: 'remote',
+                    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+                }
+            });
+
+            // Set up event handlers
+            this.setupEventHandlers();
+
+            // Initialize the client
+            await this.client.initialize();
+
+        } catch (error) {
+            console.error(`Error initializing ${this.clientName}:`, error);
+            this.statusMessage = `Initialization Error: ${error.message}`;
+            this.qrCodeImage = null;
+            this.isReady = false;
+            this.emitStatus();
+            
+            // Retry after delay
+            console.log(`Retrying ${this.clientName} initialization in 10 seconds...`);
+            this.reconnectTimeout = setTimeout(() => this.initialize(), 10000);
+        }
+    }
+
+    setupEventHandlers() {
+        this.client.on('qr', async (qr) => {
+            console.log(`QR received for ${this.clientName}`);
+            
+            // Display QR in terminal
+            qrcodeTerminal.generate(qr, { small: true });
+            
+            // Generate QR image
+            this.qrCodeImage = await this.generateQRImage(qr);
+            this.statusMessage = `Scan this QR code for ${this.clientName} with your WhatsApp app`;
+            this.isReady = false;
+            this.emitStatus();
         });
 
-        whatsappClient_1.on('ready', () => {
-            console.log('WhatsApp Client 1 is ready!');
-            qrCodeImageBase64_1 = null; // Clear QR image once ready
-            whatsappStatusMessage_1 = 'WhatsApp Client 1 is ready!';
-            isWhatsappClientReady_1 = true;
-            emitQrAndStatus1(); // Inform dashboard
+        this.client.on('ready', () => {
+            console.log(`${this.clientName} is ready!`);
+            this.qrCodeImage = null;
+            this.statusMessage = `${this.clientName} is ready!`;
+            this.isReady = true;
+            this.initializationAttempts = 0; // Reset attempts on successful connection
+            this.emitStatus();
         });
 
-        whatsappClient_1.on('authenticated', () => {
-            console.log('WhatsApp Client 1 Authenticated');
-            qrCodeImageBase64_1 = null; // Clear QR image once authenticated
-            whatsappStatusMessage_1 = 'WhatsApp Client 1 Authenticated!';
-            isWhatsappClientReady_1 = true;
-            emitQrAndStatus1();
+        this.client.on('authenticated', () => {
+            console.log(`${this.clientName} authenticated`);
+            this.qrCodeImage = null;
+            this.statusMessage = `${this.clientName} authenticated!`;
+            this.isReady = true;
+            this.emitStatus();
         });
 
-        whatsappClient_1.on('auth_failure', msg => {
-            console.error('AUTHENTICATION FAILURE 1', msg);
-            qrCodeImageBase64_1 = null;
-            whatsappStatusMessage_1 = `Auth Failure 1: ${msg}`;
-            isWhatsappClientReady_1 = false;
-            emitQrAndStatus1();
+        this.client.on('auth_failure', (msg) => {
+            console.error(`Authentication failure for ${this.clientName}:`, msg);
+            this.qrCodeImage = null;
+            this.statusMessage = `Auth Failure: ${msg}`;
+            this.isReady = false;
+            this.emitStatus();
+            
+            // Retry authentication
+            console.log(`Retrying ${this.clientName} authentication in 5 seconds...`);
+            this.reconnectTimeout = setTimeout(() => this.initialize(), 5000);
         });
 
-        whatsappClient_1.on('disconnected', (reason) => {
-            console.log('WhatsApp Client 1 Disconnected', reason);
-            qrCodeImageBase64_1 = null;
-            whatsappStatusMessage_1 = `Disconnected 1: ${reason}. Reconnecting...`;
-            isWhatsappClientReady_1 = false;
-            emitQrAndStatus1();
-            // Attempt to re-initialize or restart the client
-            console.log('Attempting to re-initialize WhatsApp Client 1 in 5 seconds...');
-            setTimeout(() => initializeWhatsappClient1(), 5000); // Try to re-initialize after 5 seconds
+        this.client.on('disconnected', (reason) => {
+            console.log(`${this.clientName} disconnected:`, reason);
+            this.qrCodeImage = null;
+            this.statusMessage = `Disconnected: ${reason}. Reconnecting...`;
+            this.isReady = false;
+            this.emitStatus();
+            
+            // Attempt to reconnect
+            console.log(`Attempting to reconnect ${this.clientName} in 5 seconds...`);
+            this.reconnectTimeout = setTimeout(() => this.initialize(), 5000);
         });
 
-        whatsappClient_1.on('message', async (msg) => {
-            console.log('MESSAGE RECEIVED (Bot 1)', msg.body);
+        this.client.on('loading_screen', (percent, message) => {
+            console.log(`${this.clientName} loading:`, percent, message);
+            this.statusMessage = `Loading: ${message} (${percent}%)`;
+            this.emitStatus();
+        });
 
-            const chat = await msg.getChat();
-            // Ensure the customerId is in the format expected by WhatsApp-web.js (e.g., 919876543210@c.us)
-            const customerId = msg.from;
-            const customerName = chat.name || customerId.split('@')[0]; // Use chat name or phone number
+        // Add message handler for client 1 (primary bot)
+        if (this.clientId === 'whatsapp-bot-1') {
+            this.client.on('message', async (msg) => {
+                await this.handleMessage(msg);
+            });
+        // Add message handler for client 2 (secondary bot)
+        if (this.clientId === 'whatsapp-bot-2') {
+            this.client.on('message', async (msg) => {
+                await this.handleMessage(msg);
+            });
+        }
+    }
 
-            let responseText = '';
-
-            // Convert message to lowercase for case-insensitive matching
-            const lowerCaseMsg = msg.body.toLowerCase();
-
-            if (lowerCaseMsg.includes('hi') || lowerCaseMsg.includes('hello') || lowerCaseMsg.includes('hey')) {
-                responseText = `Hello ${customerName}! Welcome to our food business!
-How can I help you today?
-
-*1. Web Menu:* Browse our delicious menu and order online.
-*2. Orders:* Check your past orders.
-*3. Profile:* View your profile details.
-*4. Help/Support:* Get assistance.
-
-Please reply with the number of the option you'd like to choose.`;
-            } else if (lowerCaseMsg.includes('1') || lowerCaseMsg.includes('menu')) {
-                responseText = `Here's our delicious web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}
-You can browse and place your order directly from there!`;
-            } else if (lowerCaseMsg.includes('2') || lowerCaseMsg.includes('orders')) {
-                // Fetch past orders for this customer
-                const customerOrders = await Order.find({ customerId: customerId }).sort({ orderDate: -1 }).limit(5);
-
-                if (customerOrders.length > 0) {
-                    responseText = `Here are your recent orders:\n\n`;
-                    customerOrders.forEach((order, index) => {
-                        responseText += `*Order #${index + 1}* (ID: ${order._id.toString().substring(0, 8)}...)\n`;
-                        responseText += `Status: *${order.status}*\n`;
-                        responseText += `Total: Rs. ${order.totalAmount.toFixed(2)}\n`;
-                        responseText += `Date: ${order.orderDate.toLocaleDateString()}\n`;
-                        responseText += `Items: ${order.items.map(item => `${item.name} (x${item.quantity})`).join(', ')}\n\n`;
-                    });
-                    responseText += `To place a new order, visit our web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
+    async handleMessage(msg) {
+        try {
+            if (msg.body && msg.from) {
+                console.log(`${this.clientName} received message from ${msg.from}: ${msg.body}`);
+                
+                // Basic bot response logic
+                const messageBody = msg.body.toLowerCase().trim();
+                
+                if (messageBody === 'hello' || messageBody === 'hi' || messageBody === 'hey') {
+                    await msg.reply('Hello! Welcome to our restaurant. Type "menu" to see our menu or "help" for assistance.');
+                } else if (messageBody === 'menu') {
+                    await this.sendMenu(msg);
+                } else if (messageBody === 'help') {
+                    await msg.reply('Available commands:\n- "menu" - View our menu\n- "order" - Place an order\n- "status" - Check order status\n- "contact" - Get contact information');
+                } else if (messageBody === 'contact') {
+                    await msg.reply('Contact us:\n📞 Phone: +1234567890\n📍 Address: 123 Restaurant St, City\n🕒 Hours: 9 AM - 10 PM');
+                } else if (messageBody.startsWith('order')) {
+                    await msg.reply('To place an order, please visit our menu first by typing "menu" and let us know which items you\'d like to order.');
+                } else if (messageBody === 'status') {
+                    await this.checkOrderStatus(msg);
                 } else {
-                    responseText = `You haven't placed any orders yet. Visit our web menu to start ordering: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
+                    // Default response for unrecognized messages
+                    await msg.reply('I didn\'t understand that. Type "help" to see available commands or "menu" to view our menu.');
                 }
-            } else if (lowerCaseMsg.includes('3') || lowerCaseMsg.includes('profile')) {
-                responseText = `Your profile details:
-Phone Number: ${customerId.split('@')[0]}
-Name: ${customerName}
-(More profile features coming soon!)`;
-            } else if (lowerCaseMsg.includes('4') || lowerCaseMsg.includes('help') || lowerCaseMsg.includes('support')) {
-                responseText = `For any assistance, you can:
-- Call us at: +91 12345 67890
-- Email us at: support@yourfoodbusiness.com
-- Visit our FAQ: ${process.env.FAQ_URL || 'https://your-food-business.com/faq'}
-
-We are here to help!`;
-            } else if (lowerCaseMsg.includes('order')) {
-                // This is a simplified order creation. In a real scenario, you'd have a more guided flow.
-                // For now, it will just direct them to the menu.
-                responseText = `To place an order, please visit our web menu: ${process.env.MENU_URL || 'https://your-food-business.com/menu'}`;
             }
-            else {
-                responseText = `I'm sorry, I didn't understand that.
-Please choose from the options below:
-
-*1. Web Menu:* Browse our delicious menu and order online.
-*2. Orders:* Check your past orders.
-*3. Profile:* View your profile details.
-*4. Help/Support:* Get assistance.`;
-            }
-
-            await msg.reply(responseText);
-        });
-
-        whatsappClient_1.initialize();
-    } catch (error) {
-        console.error('Error initializing WhatsApp Client 1:', error);
-        whatsappStatusMessage_1 = `Initialization Error 1: ${error.message}. Check server logs.`;
-        qrCodeImageBase64_1 = null;
-        isWhatsappClientReady_1 = false;
-        emitQrAndStatus1();
-        // Attempt to re-initialize after a delay
-        console.log('Attempting to re-initialize WhatsApp Client 1 after an error in 10 seconds...');
-        setTimeout(() => initializeWhatsappClient1(), 10000);
+        } catch (error) {
+            console.error(`Error handling message in ${this.clientName}:`, error);
+        }
     }
-};
 
-// --- WhatsApp Web JS Client 2 Setup ---
-let qrCodeImageBase64_2 = null; // Stores QR code image data (base64) for client 2
-let whatsappStatusMessage_2 = 'Initializing WhatsApp Client 2...'; // Stores status message for client 2
-let whatsappClient_2; // WhatsApp client instance 2
-let isWhatsappClientReady_2 = false; // Flag to indicate client 2 readiness
+    async sendMenu(msg) {
+        try {
+            const menuItems = await MenuItem.find({ isAvailable: true }).sort({ category: 1, name: 1 });
+            
+            if (menuItems.length === 0) {
+                await msg.reply('Sorry, our menu is currently not available. Please try again later.');
+                return;
+            }
 
-// Function to emit current QR and status for client 2 to all connected Socket.IO clients
-const emitQrAndStatus2 = () => {
-    io.emit('qr2', { // Using 'qr2' event for client 2
-        image: qrCodeImageBase64_2,
-        status: whatsappStatusMessage_2,
-        isReady: isWhatsappClientReady_2
+            let menuText = '🍽️ *Our Menu* 🍽️\n\n';
+            let currentCategory = '';
+            
+            menuItems.forEach(item => {
+                if (item.category !== currentCategory) {
+                    currentCategory = item.category;
+                    menuText += `*${currentCategory}*\n`;
+                    menuText += '─────────────\n';
+                }
+                
+                menuText += `• ${item.name}\n`;
+                if (item.description) {
+                    menuText += `  ${item.description}\n`;
+                }
+                menuText += `  💰 $${item.price.toFixed(2)}\n`;
+                if (item.isNew) menuText += '  🆕 New!\n';
+                if (item.isTrending) menuText += '  🔥 Trending!\n';
+                menuText += '\n';
+            });
+
+            menuText += 'To place an order, please let us know which items you\'d like!';
+            
+            await msg.reply(menuText);
+        } catch (error) {
+            console.error(`Error sending menu in ${this.clientName}:`, error);
+            await msg.reply('Sorry, there was an error retrieving the menu. Please try again later.');
+        }
+    }
+
+    async checkOrderStatus(msg) {
+        try {
+            const customerId = msg.from;
+            const recentOrder = await Order.findOne({ customerId }).sort({ orderDate: -1 });
+            
+            if (!recentOrder) {
+                await msg.reply('No recent orders found. Would you like to place an order?');
+                return;
+            }
+
+            let statusText = `📋 *Order Status*\n\n`;
+            statusText += `Order ID: ${recentOrder._id.toString().substring(0, 8)}\n`;
+            statusText += `Status: ${recentOrder.status}\n`;
+            statusText += `Total: $${recentOrder.totalAmount.toFixed(2)}\n`;
+            statusText += `Date: ${recentOrder.orderDate.toLocaleDateString()}\n\n`;
+            
+            statusText += `*Items:*\n`;
+            recentOrder.items.forEach(item => {
+                statusText += `• ${item.name} x${item.quantity} - $${(item.price * item.quantity).toFixed(2)}\n`;
+            });
+
+            await msg.reply(statusText);
+        } catch (error) {
+            console.error(`Error checking order status in ${this.clientName}:`, error);
+            await msg.reply('Sorry, there was an error checking your order status. Please try again later.');
+        }
+    }
+
+    destroy() {
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+        }
+        if (this.client) {
+            return this.client.destroy();
+        }
+    }
+}
+
+// --- Initialize WhatsApp Clients ---
+const whatsappClient1 = new WhatsAppClientManager('whatsapp-bot-1', 'WhatsApp Bot 1');
+const whatsappClient2 = new WhatsAppClientManager('whatsapp-bot-2', 'WhatsApp Bot 2');
+
+// --- Socket.IO Connection Handling ---
+io.on('connection', (socket) => {
+    console.log('Client connected to socket');
+    
+    // Send current status when client connects
+    whatsappClient1.emitStatus();
+    whatsappClient2.emitStatus();
+    
+    socket.on('disconnect', () => {
+        console.log('Client disconnected from socket');
     });
-};
-
-const initializeWhatsappClient2 = () => {
-    console.log('Initializing WhatsApp Client 2...');
-    whatsappStatusMessage_2 = 'Initializing WhatsApp Client 2...';
-    qrCodeImageBase64_2 = null;
-    isWhatsappClientReady_2 = false;
-    emitQrAndStatus2(); // Emit initial state for client 2
-
-    try {
-        whatsappClient_2 = new Client({
-            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot-2', dataPath: './.wwebjs_auth/' }), // Explicit dataPath
-            puppeteer: {
-                headless: true, // Run in headless mode for deployment
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process', // This might help on some environments
-                    '--disable-gpu',
-                    // Enhanced arguments for better stability in headless environments
-                    '--disable-features=site-per-process',
-                    '--disable-web-security',
-                    '--disable-sync',
-                    '--disable-infobars',
-                    '--window-size=1920,1080',
-                    '--ignore-certificate-errors',
-                    '--incognito',
-                    '--enable-features=NetworkService,NetworkServiceInProcess',
-                    '--disable-site-isolation-trials', // Added for stability
-                    '--font-render-hinting=none', // Added for font rendering issues
-                ],
-            },
-        });
-
-        whatsappClient_2.on('qr', async (qr) => {
-            console.log('QR 2 RECEIVED from whatsapp-web.js');
-            // Display QR in terminal
-            qrcodeTerminal.generate(qr, { small: true });
-            // Convert QR string to data URL for web display
-            try {
-                qrCodeImageBase64_2 = await qrcode.toDataURL(qr);
-                console.log('QR 2 image successfully converted to base64.');
-            } catch (qrError) {
-                console.error('Error converting QR 2 to base64:', qrError);
-                qrCodeImageBase64_2 = null; // Ensure it's null if conversion fails
-            }
-
-            whatsappStatusMessage_2 = 'Scan this QR code for Bot 2 with your WhatsApp app.';
-            isWhatsappClientReady_2 = false;
-            emitQrAndStatus2(); // Emit QR code to connected dashboard clients
-        });
-
-        whatsappClient_2.on('ready', () => {
-            console.log('WhatsApp Client 2 is ready!');
-            qrCodeImageBase64_2 = null; // Clear QR image once ready
-            whatsappStatusMessage_2 = 'WhatsApp Client 2 is ready!';
-            isWhatsappClientReady_2 = true;
-            emitQrAndStatus2(); // Inform dashboard
-        });
-
-        whatsappClient_2.on('authenticated', () => {
-            console.log('WhatsApp Client 2 Authenticated');
-            qrCodeImageBase64_2 = null; // Clear QR image once authenticated
-            whatsappStatusMessage_2 = 'WhatsApp Client 2 Authenticated!';
-            isWhatsappClientReady_2 = true;
-            emitQrAndStatus2();
-        });
-
-        whatsappClient_2.on('auth_failure', msg => {
-            console.error('AUTHENTICATION FAILURE 2', msg);
-            qrCodeImageBase64_2 = null;
-            whatsappStatusMessage_2 = `Auth Failure 2: ${msg}`;
-            isWhatsappClientReady_2 = false;
-            emitQrAndStatus2();
-        });
-
-        whatsappClient_2.on('disconnected', (reason) => {
-            console.log('WhatsApp Client 2 Disconnected', reason);
-            qrCodeImageBase64_2 = null;
-            whatsappStatusMessage_2 = `Disconnected 2: ${reason}. Reconnecting...`;
-            isWhatsappClientReady_2 = false;
-            emitQrAndStatus2();
-            // Attempt to re-initialize or restart the client
-            console.log('Attempting to re-initialize WhatsApp Client 2 in 5 seconds...');
-            setTimeout(() => initializeWhatsappClient2(), 5000); // Try to re-initialize after 5 seconds
-        });
-
-        // No message handling for client 2 by default, but can be added here
-        whatsappClient_2.on('message', async (msg) => {
-            console.log('MESSAGE RECEIVED (Bot 2):', msg.body);
-            // You can add distinct message handling logic for Bot 2 here if needed
-            // For example:
-            // if (msg.body.toLowerCase() === 'status') {
-            //     msg.reply('Bot 2 is active and ready!');
-            // }
-        });
-
-        whatsappClient_2.initialize();
-    } catch (error) {
-        console.error('Error initializing WhatsApp Client 2:', error);
-        whatsappStatusMessage_2 = `Initialization Error 2: ${error.message}. Check server logs.`;
-        qrCodeImageBase64_2 = null;
-        isWhatsappClientReady_2 = false;
-        emitQrAndStatus2();
-        // Attempt to re-initialize after a delay
-        console.log('Attempting to re-initialize WhatsApp Client 2 after an error in 10 seconds...');
-        setTimeout(() => initializeWhatsappClient2(), 10000);
-    }
-};
-
-
-// Initialize both WhatsApp clients on server start
-initializeWhatsappClient1();
-initializeWhatsappClient2();
-
-
-// --- Scheduled Notification Function ---
-const sendOrderReminderNotifications = async () => {
-    // This function will use client 1 (the primary bot) for notifications
-    if (!isWhatsappClientReady_1) {
-        console.log('WhatsApp client 1 not ready for sending scheduled notifications.');
-        return;
-    }
-
-    console.log('Running scheduled order reminder task...');
-    try {
-        // Find all unique customer IDs that have placed orders
-        const distinctCustomerIds = await Order.distinct('customerId');
-
-        for (const customerId of distinctCustomerIds) {
-            // Find the most recent order for this customer
-            const lastOrder = await Order.findOne({ customerId })
-                .sort({ orderDate: -1 })
-                .limit(1);
-
-            if (lastOrder) {
-                const now = new Date();
-                const lastOrderDate = lastOrder.orderDate;
-                const timeDiff = now.getTime() - lastOrderDate.getTime();
-                const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-                // Check if daysDiff is a multiple of 7 (or very close, e.g., within 1 day of a multiple of 7)
-                const REMINDER_INTERVAL_DAYS = parseInt(process.env.REMINDER_INTERVAL_DAYS || '7');
-                const isReminderDay = (daysDiff > 0 && daysDiff % REMINDER_INTERVAL_DAYS === 0) ||
-                                     (daysDiff > 0 && (daysDiff + 1) % REMINDER_INTERVAL_DAYS === 0) || // Check day before
-                                     (daysDiff > 0 && (daysDiff - 1) % REMINDER_INTERVAL_DAYS === 0); // Check day after
-
-                if (isReminderDay) {
-                    const message = `Hey ${lastOrder.customerName || lastOrder.customerId.split('@')[0]}!
-It's been a while since your last delicious order with us! 😋
-
-We miss you! Check out our latest menu and special offers:
-${process.env.MENU_URL || 'https://your-food-business.com/menu'}
-
-Looking forward to serving you again soon!`;
-
-                    try {
-                        await whatsappClient_1.sendMessage(customerId, message); // Use client 1
-                        console.log(`Sent reminder to ${customerId} (last ordered ${daysDiff} days ago) via Bot 1.`);
-                    } catch (sendError) {
-                        console.error(`Failed to send reminder to ${customerId} via Bot 1:`, sendError);
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error in scheduled order reminder task:', error);
-    }
-};
-
-// Schedule the task to run once every day at 09:00 AM (adjust as needed)
-cron.schedule('0 9 * * *', () => {
-    sendOrderReminderNotifications();
-}, {
-    scheduled: true,
-    timezone: "Asia/Kolkata" // Set your desired timezone
 });
 
-// --- Admin Notification Function for New Orders ---
-const notifyAdminOfNewOrder = async (order) => {
-    // This function will use client 1 (the primary bot) for notifications
-    if (!isWhatsappClientReady_1) {
-        console.log('WhatsApp client 1 not ready for sending admin notifications.');
-        return;
-    }
+// --- API Routes ---
 
-    const adminNumber = process.env.ADMIN_WHATSAPP_NUMBER;
-    if (!adminNumber) {
-        console.warn('ADMIN_WHATSAPP_NUMBER is not set in .env. Cannot send admin new order notification.');
-        return;
-    }
-
-    const orderItems = order.items.map(item => `${item.name} (x${item.quantity})`).join(', ');
-    const notificationMessage = `*🔔 New Order Alert! 🔔*
-
-*Order ID:* ${order._id.toString().substring(0, 8)}...
-*Customer:* ${order.customerName || order.customerId.split('@')[0]}
-*Contact:* ${order.customerId.split('@')[0]}
-*Items:* ${orderItems}
-*Total Amount:* Rs. ${order.totalAmount.toFixed(2)}
-*Status:* ${order.status}
-*Order Date:* ${order.orderDate.toLocaleString()}
-
-Please check the dashboard for more details.`;
-
-    try {
-        // Ensure the adminNumber is in the correct WhatsApp ID format (e.g., 919876543210@c.us)
-        const formattedAdminNumber = adminNumber.includes('@c.us') ? adminNumber : `${adminNumber}@c.us`;
-        await whatsappClient_1.sendMessage(formattedAdminNumber, notificationMessage); // Use client 1
-        console.log(`Admin notified about new order: ${order._id} via Bot 1`);
-    } catch (error) {
-        console.error(`Failed to send new order notification to admin (${adminNumber}) via Bot 1:`, error);
-    }
-};
-
-
-// --- API Endpoints (URL Rewriting using Express Router) ---
-
-// Auth Routes (Re-introduced)
-const authRouter = express.Router();
-app.use('/api/auth', authRouter);
-
-authRouter.post('/register', async (req, res) => {
-    const { username, password } = req.body;
-    try {
-        const newUser = new User({ username, password });
-        await newUser.save();
-        res.status(201).json({ message: 'User registered successfully!' });
-    } catch (error) {
-        if (error.code === 11000) { // Duplicate key error for unique username
-            return res.status(409).json({ message: 'Username already exists.' });
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        whatsapp1: {
+            isReady: whatsappClient1.isReady,
+            status: whatsappClient1.statusMessage
+        },
+        whatsapp2: {
+            isReady: whatsappClient2.isReady,
+            status: whatsappClient2.statusMessage
         }
+    });
+});
+
+// --- Authentication Routes (Re-introduced) ---
+
+// User registration (for initial setup)
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ message: 'Username and password are required' });
+        }
+
+        // Check if user already exists
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+
+        // Create new user
+        const user = new User({ username, password });
+        await user.save();
+
+        res.status(201).json({ message: 'User created successfully' });
+    } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ message: 'Error registering user.', error: error.message });
+        res.status(500).json({ message: 'Server error during registration' });
     }
 });
 
-authRouter.post('/login', async (req, res) => {
-    const { username, password } = req.body;
+// User login
+app.post('/api/auth/login', async (req, res) => {
     try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ message: 'Username and password are required' });
+        }
+
+        // Find user
         const user = await User.findOne({ username });
-        if (!user) return res.status(400).json({ message: 'Invalid credentials.' });
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
 
+        // Check password
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ message: 'Invalid credentials.' });
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
 
+        // Generate JWT token
         const token = jwt.sign(
-            { id: user._id, username: user.username },
+            { userId: user._id, username: user.username },
             process.env.JWT_SECRET || 'your_jwt_secret_key',
-            { expiresIn: '1h' } // Token expires in 1 hour
+            { expiresIn: '24h' }
         );
 
-        res.json({ message: 'Logged in successfully!', token });
+        res.json({ 
+            message: 'Login successful', 
+            token,
+            user: { id: user._id, username: user.username }
+        });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ message: 'Server error during login.', error: error.message });
+        res.status(500).json({ message: 'Server error during login' });
     }
 });
 
-// Menu Management Routes
-const menuRouter = express.Router();
-app.use('/api/menu', menuRouter);
+// --- Menu Management Routes ---
 
-// Get all menu items (public for customer menu, but protected for dashboard)
-menuRouter.get('/', (req, res, next) => {
-    // If request has Authorization header, it's likely from dashboard, authenticate it.
-    // Otherwise, allow public access for the customer menu.
-    if (req.headers['authorization']) {
-        authenticateToken(req, res, next);
-    } else {
-        next(); // Allow public access
-    }
-}, async (req, res) => {
+// Get all menu items
+app.get('/api/menu', async (req, res) => {
     try {
-        const menuItems = await MenuItem.find({});
+        const menuItems = await MenuItem.find().sort({ category: 1, name: 1 });
         res.json(menuItems);
     } catch (error) {
         console.error('Error fetching menu items:', error);
-        res.status(500).json({ message: 'Error fetching menu items.', error: error.message });
+        res.status(500).json({ message: 'Server error fetching menu items' });
     }
 });
 
-// Add a new menu item (protected for dashboard)
-menuRouter.post('/', authenticateToken, async (req, res) => {
-    const { name, description, price, imageUrl, category, isAvailable, isNew, isTrending } = req.body;
+// Get menu item by ID
+app.get('/api/menu/:id', async (req, res) => {
     try {
-        const newItem = new MenuItem({ name, description, price, imageUrl, category, isAvailable, isNew, isTrending });
-        await newItem.save();
-        res.status(201).json({ message: 'Menu item added successfully!', item: newItem });
-    } catch (error) {
-        console.error('Error adding menu item:', error);
-        res.status(400).json({ message: 'Error adding menu item.', error: error.message });
-    }
-});
-
-// Update a menu item (protected for dashboard)
-menuRouter.put('/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const updates = req.body;
-    try {
-        const updatedItem = await MenuItem.findByIdAndUpdate(id, updates, { new: true });
-        if (!updatedItem) {
-            return res.status(404).json({ message: 'Menu item not found.' });
+        const menuItem = await MenuItem.findById(req.params.id);
+        if (!menuItem) {
+            return res.status(404).json({ message: 'Menu item not found' });
         }
-        res.json({ message: 'Menu item updated successfully!', item: updatedItem });
+        res.json(menuItem);
+    } catch (error) {
+        console.error('Error fetching menu item:', error);
+        res.status(500).json({ message: 'Server error fetching menu item' });
+    }
+});
+
+// Create new menu item (protected)
+app.post('/api/menu', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, price, imageUrl, category, isAvailable, isNew, isTrending } = req.body;
+        
+        if (!name || !price) {
+            return res.status(400).json({ message: 'Name and price are required' });
+        }
+
+        const menuItem = new MenuItem({
+            name,
+            description,
+            price,
+            imageUrl,
+            category,
+            isAvailable,
+            isNew,
+            isTrending
+        });
+
+        const savedItem = await menuItem.save();
+        res.status(201).json(savedItem);
+    } catch (error) {
+        console.error('Error creating menu item:', error);
+        res.status(500).json({ message: 'Server error creating menu item' });
+    }
+});
+
+// Update menu item (protected)
+app.put('/api/menu/:id', authenticateToken, async (req, res) => {
+    try {
+        const { name, description, price, imageUrl, category, isAvailable, isNew, isTrending } = req.body;
+        
+        const updatedItem = await MenuItem.findByIdAndUpdate(
+            req.params.id,
+            { name, description, price, imageUrl, category, isAvailable, isNew, isTrending },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedItem) {
+            return res.status(404).json({ message: 'Menu item not found' });
+        }
+
+        res.json(updatedItem);
     } catch (error) {
         console.error('Error updating menu item:', error);
-        res.status(400).json({ message: 'Error updating menu item.', error: error.message });
+        res.status(500).json({ message: 'Server error updating menu item' });
     }
 });
 
-// Delete a menu item (protected for dashboard)
-menuRouter.delete('/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
+// Delete menu item (protected)
+app.delete('/api/menu/:id', authenticateToken, async (req, res) => {
     try {
-        const deletedItem = await MenuItem.findByIdAndDelete(id);
+        const deletedItem = await MenuItem.findByIdAndDelete(req.params.id);
         if (!deletedItem) {
-            return res.status(404).json({ message: 'Menu item not found.' });
+            return res.status(404).json({ message: 'Menu item not found' });
         }
-        res.json({ message: 'Menu item deleted successfully!' });
+        res.json({ message: 'Menu item deleted successfully' });
     } catch (error) {
         console.error('Error deleting menu item:', error);
-        res.status(500).json({ message: 'Error deleting menu item.', error: error.message });
+        res.status(500).json({ message: 'Server error deleting menu item' });
     }
 });
 
-// Order Management Routes
-const orderRouter = express.Router();
-app.use('/api/orders', orderRouter);
+// --- Order Management Routes ---
 
-// Endpoint for placing a new order from the web menu (public)
-orderRouter.post('/place', async (req, res) => {
-    // Expected body: { customerPhoneNumber: '919876543210', customerName: 'John Doe', items: [{ itemId: '...', quantity: 1 }] }
-    const { customerPhoneNumber, customerName, items } = req.body;
-
-    if (!customerPhoneNumber || !items || items.length === 0) {
-        return res.status(400).json({ message: 'Missing customer phone number or order items.' });
-    }
-
-    // Format customerId for WhatsApp-web.js
-    const customerId = customerPhoneNumber.includes('@c.us') ? customerPhoneNumber : `${customerPhoneNumber}@c.us`;
-
+// Get all orders (protected)
+app.get('/api/orders', authenticateToken, async (req, res) => {
     try {
+        const orders = await Order.find()
+            .populate('items.menuItemId')
+            .sort({ orderDate: -1 });
+        res.json(orders);
+    } catch (error) {
+        console.error('Error fetching orders:', error);
+        res.status(500).json({ message: 'Server error fetching orders' });
+    }
+});
+
+// Get order by ID (protected)
+app.get('/api/orders/:id', authenticateToken, async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id).populate('items.menuItemId');
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+        res.json(order);
+    } catch (error) {
+        console.error('Error fetching order:', error);
+        res.status(500).json({ message: 'Server error fetching order' });
+    }
+});
+
+// Create new order
+app.post('/api/orders', async (req, res) => {
+    try {
+        const { customerId, customerName, items } = req.body;
+        
+        if (!customerId || !items || items.length === 0) {
+            return res.status(400).json({ message: 'Customer ID and items are required' });
+        }
+
+        // Calculate total amount
         let totalAmount = 0;
         const orderItems = [];
 
-        // Fetch menu item details to validate and calculate total
         for (const item of items) {
-            const menuItem = await MenuItem.findById(item.itemId);
-            if (!menuItem || !menuItem.isAvailable) {
-                // Improved error message to include specific item ID for debugging
-                return res.status(400).json({ message: `Item with ID "${item.itemId}" not found or not available.` });
+            const menuItem = await MenuItem.findById(item.menuItemId);
+            if (!menuItem) {
+                return res.status(400).json({ message: `Menu item not found: ${item.menuItemId}` });
             }
+            
+            const quantity = item.quantity || 1;
+            const itemTotal = menuItem.price * quantity;
+            totalAmount += itemTotal;
+
             orderItems.push({
                 menuItemId: menuItem._id,
                 name: menuItem.name,
                 price: menuItem.price,
-                quantity: item.quantity,
+                quantity: quantity
             });
-            totalAmount += menuItem.price * item.quantity;
         }
 
-        const newOrder = new Order({
+        const order = new Order({
             customerId,
-            customerName: customerName || 'Guest',
+            customerName: customerName || 'Unknown',
             items: orderItems,
-            totalAmount,
-            status: 'Pending', // Initial status
+            totalAmount
         });
 
-        await newOrder.save();
-
-        // Notify admin about the new order (using primary bot)
-        await notifyAdminOfNewOrder(newOrder);
-
-        res.status(201).json({ message: 'Order placed successfully!', order: newOrder });
+        const savedOrder = await order.save();
+        res.status(201).json(savedOrder);
     } catch (error) {
-        console.error('Error placing new order:', error);
-        res.status(500).json({ message: 'Error placing order.', error: error.message });
+        console.error('Error creating order:', error);
+        res.status(500).json({ message: 'Server error creating order' });
     }
 });
 
-// Get all orders (protected for dashboard)
-orderRouter.get('/', authenticateToken, async (req, res) => {
+// Update order status (protected)
+app.put('/api/orders/:id', authenticateToken, async (req, res) => {
     try {
-        const orders = await Order.find({}).populate('items.menuItemId'); // Populate menu item details
-        res.json(orders);
-    } catch (error) {
-        console.error('Error fetching orders:', error);
-        res.status(500).json({ message: 'Error fetching orders.', error: error.message });
-    }
-});
-
-// Get a single order by ID (protected for dashboard)
-orderRouter.get('/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    try {
-        const order = await Order.findById(id).populate('items.menuItemId');
-        if (!order) {
-            return res.status(404).json({ message: 'Order not found.' });
+        const { status } = req.body;
+        
+        if (!status) {
+            return res.status(400).json({ message: 'Status is required' });
         }
-        res.json(order);
-    } catch (error) {
-        console.error('Error fetching order by ID:', error);
-        res.status(500).json({ message: 'Error fetching order.', error: error.message });
-    }
-});
 
-// Update order status (protected for dashboard)
-orderRouter.put('/:id/status', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body; // Expected status: 'Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'
-    try {
-        const updatedOrder = await Order.findByIdAndUpdate(id, { status }, { new: true });
+        const updatedOrder = await Order.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true, runValidators: true }
+        );
+
         if (!updatedOrder) {
-            return res.status(404).json({ message: 'Order not found.' });
+            return res.status(404).json({ message: 'Order not found' });
         }
-        res.json({ message: 'Order status updated successfully!', order: updatedOrder });
+
+        res.json(updatedOrder);
     } catch (error) {
-        console.error('Error updating order status:', error);
-        res.status(400).json({ message: 'Error updating order status.', error: error.message });
+        console.error('Error updating order:', error);
+        res.status(500).json({ message: 'Server error updating order' });
     }
 });
 
-// --- WhatsApp Web QR Code Endpoints (for dedicated QR panel) ---
-app.get('/api/whatsapp/qr1', (req, res) => {
+// Delete order (protected)
+app.delete('/api/orders/:id', authenticateToken, async (req, res) => {
+    try {
+        const deletedOrder = await Order.findByIdAndDelete(req.params.id);
+        if (!deletedOrder) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+        res.json({ message: 'Order deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting order:', error);
+        res.status(500).json({ message: 'Server error deleting order' });
+    }
+});
+
+// --- WhatsApp Management Routes ---
+
+// Get WhatsApp status (protected)
+app.get('/api/whatsapp/status', authenticateToken, (req, res) => {
     res.json({
-        image: qrCodeImageBase64_1, // Corrected typo here
-        status: whatsappStatusMessage_1,
-        isReady: isWhatsappClientReady_1
+        client1: {
+            isReady: whatsappClient1.isReady,
+            status: whatsappClient1.statusMessage
+        },
+        client2: {
+            isReady: whatsappClient2.isReady,
+            status: whatsappClient2.statusMessage
+        }
     });
 });
 
-app.get('/api/whatsapp/qr2', (req, res) => {
-    res.json({
-        image: qrCodeImageBase64_2,
-        status: whatsappStatusMessage_2,
-        isReady: isWhatsappClientReady_2
-    });
+// Restart WhatsApp client (protected)
+app.post('/api/whatsapp/restart/:clientId', authenticateToken, async (req, res) => {
+    try {
+        const { clientId } = req.params;
+        
+        if (clientId === '1') {
+            await whatsappClient1.initialize();
+            res.json({ message: 'WhatsApp Client 1 restart initiated' });
+        } else if (clientId === '2') {
+            await whatsappClient2.initialize();
+            res.json({ message: 'WhatsApp Client 2 restart initiated' });
+        } else {
+            res.status(400).json({ message: 'Invalid client ID' });
+        }
+    } catch (error) {
+        console.error('Error restarting WhatsApp client:', error);
+        res.status(500).json({ message: 'Server error restarting WhatsApp client' });
+    }
 });
 
+// Send message through WhatsApp (protected)
+app.post('/api/whatsapp/send', authenticateToken, async (req, res) => {
+    try {
+        const { clientId, to, message } = req.body;
+        
+        if (!clientId || !to || !message) {
+            return res.status(400).json({ message: 'Client ID, recipient, and message are required' });
+        }
 
-// --- Webhook Endpoint for WhatsApp (if using a proper webhook service like Twilio/MessageBird) ---
-app.post('/webhook/whatsapp', (req, res) => {
-    console.log('Received webhook event:', req.body);
-    // Process incoming WhatsApp messages here if using an external webhook provider
-    res.status(200).send('Webhook received!');
+        const client = clientId === '1' ? whatsappClient1 : whatsappClient2;
+        
+        if (!client.isReady) {
+            return res.status(400).json({ message: 'WhatsApp client is not ready' });
+        }
+
+        await client.client.sendMessage(to, message);
+        res.json({ message: 'Message sent successfully' });
+    } catch (error) {
+        console.error('Error sending WhatsApp message:', error);
+        res.status(500).json({ message: 'Server error sending message' });
+    }
 });
 
-
-// --- Serve Static Frontend Files (for Koyeb deployment) ---
-// This serves your HTML dashboard from the 'public' directory
+// --- Static Files & Frontend ---
 app.use(express.static(path.join(__dirname, 'public')));
 
-// For any other routes not matched by API endpoints, serve the index.html
+// Catch-all handler for SPA routing
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// --- Scheduled Tasks ---
 
-// --- Error Handling Middleware ---
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('Something broke!');
-});
-
-// --- Server Start ---
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => { // Use server.listen for socket.io
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Dashboard served from /`);
-    console.log(`WhatsApp QR code endpoint 1: /api/whatsapp/qr1`);
-    console.log(`WhatsApp QR code endpoint 2: /api/whatsapp/qr2`);
-    console.log('Remember to set JWT_SECRET, MENU_URL, FAQ_URL, REMINDER_INTERVAL_DAYS, and ADMIN_WHATSAPP_NUMBER in your .env file!');
-    console.log('Default admin user: "admin" with password "adminpassword". PLEASE CHANGE THIS IN PRODUCTION!');
-});
-
-// --- Socket.IO Connection ---
-io.on('connection', (socket) => {
-    console.log('A dashboard client connected via Socket.IO');
-    // Send current QR and status data for both clients to newly connected client
-    emitQrAndStatus1();
-    emitQrAndStatus2();
-
-    socket.on('disconnect', () => {
-        console.log('A dashboard client disconnected');
-    });
-});
-
-// --- Initial Admin User Creation (Optional, for first run) ---
-async function createDefaultAdminUser() {
+// Daily cleanup task (runs at 2 AM)
+cron.schedule('0 2 * * *', async () => {
+    console.log('Running daily cleanup task...');
+    
     try {
-        const adminUser = await User.findOne({ username: 'admin' });
-        if (!adminUser) {
-            const newAdmin = new User({ username: 'admin', password: 'adminpassword' }); // Change this password!
-            await newAdmin.save();
-            console.log('Default admin user "admin" created with password "adminpassword". PLEASE CHANGE THIS IN PRODUCTION!');
-        }
+        // Clean up old orders (older than 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const deletedOrders = await Order.deleteMany({
+            orderDate: { $lt: thirtyDaysAgo },
+            status: { $in: ['Delivered', 'Cancelled'] }
+        });
+        
+        console.log(`Cleaned up ${deletedOrders.deletedCount} old orders`);
     } catch (error) {
-        console.error('Error creating default admin user:', error);
+        console.error('Error in daily cleanup task:', error);
+    }
+});
+
+// --- Server Initialization ---
+
+const PORT = process.env.PORT || 3000;
+
+async function startServer() {
+    try {
+        // Create default admin user if none exists
+        const userCount = await User.countDocuments();
+        if (userCount === 0) {
+            const defaultUser = new User({
+                username: 'admin',
+                password: 'admin123' // Change this in production!
+            });
+            await defaultUser.save();
+            console.log('Default admin user created (username: admin, password: admin123)');
+        }
+
+        // Start server
+        server.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+            console.log(`Dashboard: http://localhost:${PORT}`);
+        });
+
+        // Initialize WhatsApp clients
+        console.log('Initializing WhatsApp clients...');
+        await whatsappClient1.initialize();
+        await whatsappClient2.initialize();
+
+    } catch (error) {
+        console.error('Error starting server:', error);
+        process.exit(1);
     }
 }
-// Call this function after MongoDB connection is established
-mongoose.connection.once('open', () => {
-    createDefaultAdminUser();
+
+// --- Graceful Shutdown ---
+process.on('SIGINT', async () => {
+    console.log('\nReceived SIGINT, shutting down gracefully...');
+    
+    try {
+        await whatsappClient1.destroy();
+        await whatsappClient2.destroy();
+        await mongoose.connection.close();
+        server.close(() => {
+            console.log('Server closed');
+            process.exit(0);
+        });
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+    }
 });
 
+process.on('SIGTERM', async () => {
+    console.log('\nReceived SIGTERM, shutting down gracefully...');
+    
+    try {
+        await whatsappClient1.destroy();
+        await whatsappClient2.destroy();
+        await mongoose.connection.close();
+        server.close(() => {
+            console.log('Server closed');
+            process.exit(0);
+        });
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+    }
+});
+
+// Start the server
+startServer();
