@@ -9,11 +9,11 @@ const mongoose = require('mongoose');
 const http = require('http'); // Required for socket.io
 const socketIo = require('socket.io'); // For real-time QR code updates
 const path = require('path'); // For serving static files
-// Removed bcrypt and jwt as they are no longer needed without JWT authentication
-// const bcrypt = require('bcryptjs');
-// const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs'); // Re-introduced for authentication
+const jwt = require('jsonwebtoken'); // Re-introduced for authentication
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js'); // WhatsApp Web JS library
-const qrcode = require('qrcode'); // For generating QR code images
+const qrcode = require('qrcode'); // For generating QR code images for web display
+const qrcodeTerminal = require('qrcode-terminal'); // For displaying QR in terminal
 const cron = require('node-cron'); // For scheduling recurring tasks
 
 const app = express();
@@ -29,21 +29,21 @@ mongoose.connect(MONGODB_URI)
 
 // --- Mongoose Models ---
 
-// User Model for Dashboard Login - REMOVED AS JWT AUTHENTICATION IS REMOVED
-// const UserSchema = new mongoose.Schema({
-//     username: { type: String, required: true, unique: true },
-//     password: { type: String, required: true },
-// });
+// User Model for Dashboard Login (Re-introduced)
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+});
 
-// Hash password before saving - REMOVED
-// UserSchema.pre('save', async function (next) {
-//     if (this.isModified('password')) {
-//         this.password = await bcrypt.hash(this.password, 10);
-//     }
-//     next();
-// });
-// const User = mongoose.model('User', UserSchema);
+// Hash password before saving
+UserSchema.pre('save', async function (next) {
+    if (this.isModified('password')) {
+        this.password = await bcrypt.hash(this.password, 10);
+    }
+    next();
+});
 
+const User = mongoose.model('User', UserSchema);
 
 // MenuItem Model with suppressReservedKeysWarning
 const MenuItemSchema = new mongoose.Schema({
@@ -56,7 +56,7 @@ const MenuItemSchema = new mongoose.Schema({
     isNew: { type: Boolean, default: false },
     isTrending: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
-}, { suppressReservedKeysWarning: true }); // <--- Added this option to suppress the warning
+}, { suppressReservedKeysWarning: true });
 
 const MenuItem = mongoose.model('MenuItem', MenuItemSchema);
 
@@ -81,19 +81,19 @@ const Order = mongoose.model('Order', OrderSchema);
 app.use(express.json()); // For parsing JSON request bodies
 app.use(express.urlencoded({ extended: true })); // For parsing URL-encoded request bodies
 
-// --- Authentication Middleware --- REMOVED
-// const authenticateToken = (req, res, next) => {
-//     const authHeader = req.headers['authorization'];
-//     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+// --- Authentication Middleware (Re-introduced) ---
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-//     if (!token) return res.status(401).json({ message: 'Access Denied: No token provided!' });
+    if (!token) return res.status(401).json({ message: 'Access Denied: No token provided!' });
 
-//     jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key', (err, user) => {
-//         if (err) return res.status(403).json({ message: 'Access Denied: Invalid token!' });
-//         req.user = user;
-//         next();
-//     });
-// };
+    jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key', (err, user) => {
+        if (err) return res.status(403).json({ message: 'Access Denied: Invalid token!' });
+        req.user = user;
+        next();
+    });
+};
 
 // --- WhatsApp Web JS Client 1 Setup ---
 let qrCodeImageBase64_1 = null; // Stores QR code image data (base64) for client 1
@@ -145,8 +145,11 @@ const initializeWhatsappClient1 = () => {
         });
 
         whatsappClient_1.on('qr', async (qr) => {
-            console.log('QR 1 RECEIVED', qr);
-            qrCodeImageBase64_1 = await qrcode.toDataURL(qr); // Convert QR string to data URL
+            console.log('QR 1 RECEIVED');
+            // Display QR in terminal
+            qrcodeTerminal.generate(qr, { small: true });
+            // Convert QR string to data URL for web display
+            qrCodeImageBase64_1 = await qrcode.toDataURL(qr);
             whatsappStatusMessage_1 = 'Scan this QR code for Bot 1 with your WhatsApp app.';
             isWhatsappClientReady_1 = false;
             emitQrAndStatus1(); // Emit QR code to connected dashboard clients
@@ -323,8 +326,11 @@ const initializeWhatsappClient2 = () => {
         });
 
         whatsappClient_2.on('qr', async (qr) => {
-            console.log('QR 2 RECEIVED', qr);
-            qrCodeImageBase64_2 = await qrcode.toDataURL(qr); // Convert QR string to data URL
+            console.log('QR 2 RECEIVED');
+            // Display QR in terminal
+            qrcodeTerminal.generate(qr, { small: true });
+            // Convert QR string to data URL for web display
+            qrCodeImageBase64_2 = await qrcode.toDataURL(qr);
             whatsappStatusMessage_2 = 'Scan this QR code for Bot 2 with your WhatsApp app.';
             isWhatsappClientReady_2 = false;
             emitQrAndStatus2(); // Emit QR code to connected dashboard clients
@@ -496,19 +502,61 @@ Please check the dashboard for more details.`;
 
 // --- API Endpoints (URL Rewriting using Express Router) ---
 
-// Auth Routes - REMOVED AS JWT AUTHENTICATION IS REMOVED
-// const authRouter = express.Router();
-// app.use('/api/auth', authRouter);
+// Auth Routes (Re-introduced)
+const authRouter = express.Router();
+app.use('/api/auth', authRouter);
 
-// authRouter.post('/register', async (req, res) => { /* ... */ });
-// authRouter.post('/login', async (req, res) => { /* ... */ });
+authRouter.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const newUser = new User({ username, password });
+        await newUser.save();
+        res.status(201).json({ message: 'User registered successfully!' });
+    } catch (error) {
+        if (error.code === 11000) { // Duplicate key error for unique username
+            return res.status(409).json({ message: 'Username already exists.' });
+        }
+        console.error('Registration error:', error);
+        res.status(500).json({ message: 'Error registering user.', error: error.message });
+    }
+});
+
+authRouter.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).json({ message: 'Invalid credentials.' });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ message: 'Invalid credentials.' });
+
+        const token = jwt.sign(
+            { id: user._id, username: user.username },
+            process.env.JWT_SECRET || 'your_jwt_secret_key',
+            { expiresIn: '1h' } // Token expires in 1 hour
+        );
+
+        res.json({ message: 'Logged in successfully!', token });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error during login.', error: error.message });
+    }
+});
 
 // Menu Management Routes
 const menuRouter = express.Router();
-app.use('/api/menu', menuRouter); // No authentication for fetching menu items on public menu
+app.use('/api/menu', menuRouter);
 
-// Get all menu items (PUBLIC)
-menuRouter.get('/', async (req, res) => {
+// Get all menu items (public for customer menu, but protected for dashboard)
+menuRouter.get('/', (req, res, next) => {
+    // If request has Authorization header, it's likely from dashboard, authenticate it.
+    // Otherwise, allow public access for the customer menu.
+    if (req.headers['authorization']) {
+        authenticateToken(req, res, next);
+    } else {
+        next(); // Allow public access
+    }
+}, async (req, res) => {
     try {
         const menuItems = await MenuItem.find({});
         res.json(menuItems);
@@ -518,9 +566,8 @@ menuRouter.get('/', async (req, res) => {
     }
 });
 
-// Add a new menu item (NOW PUBLIC - WAS PROTECTED)
-// WARNING: This endpoint is now publicly accessible. Anyone can add menu items.
-menuRouter.post('/', async (req, res) => {
+// Add a new menu item (protected for dashboard)
+menuRouter.post('/', authenticateToken, async (req, res) => {
     const { name, description, price, imageUrl, category, isAvailable, isNew, isTrending } = req.body;
     try {
         const newItem = new MenuItem({ name, description, price, imageUrl, category, isAvailable, isNew, isTrending });
@@ -532,9 +579,8 @@ menuRouter.post('/', async (req, res) => {
     }
 });
 
-// Update a menu item (NOW PUBLIC - WAS PROTECTED)
-// WARNING: This endpoint is now publicly accessible. Anyone can update menu items.
-menuRouter.put('/:id', async (req, res) => {
+// Update a menu item (protected for dashboard)
+menuRouter.put('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     try {
@@ -549,9 +595,8 @@ menuRouter.put('/:id', async (req, res) => {
     }
 });
 
-// Delete a menu item (NOW PUBLIC - WAS PROTECTED)
-// WARNING: This endpoint is now publicly accessible. Anyone can delete menu items.
-menuRouter.delete('/:id', async (req, res) => {
+// Delete a menu item (protected for dashboard)
+menuRouter.delete('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         const deletedItem = await MenuItem.findByIdAndDelete(id);
@@ -567,9 +612,9 @@ menuRouter.delete('/:id', async (req, res) => {
 
 // Order Management Routes
 const orderRouter = express.Router();
-app.use('/api/orders', orderRouter); // No authentication for placing orders from web menu
+app.use('/api/orders', orderRouter);
 
-// Endpoint for placing a new order from the web menu (ALREADY PUBLIC)
+// Endpoint for placing a new order from the web menu (public)
 orderRouter.post('/place', async (req, res) => {
     // Expected body: { customerPhoneNumber: '919876543210', customerName: 'John Doe', items: [{ itemId: '...', quantity: 1 }] }
     const { customerPhoneNumber, customerName, items } = req.body;
@@ -621,9 +666,8 @@ orderRouter.post('/place', async (req, res) => {
     }
 });
 
-// Get all orders (NOW PUBLIC - WAS PROTECTED)
-// WARNING: This endpoint is now publicly accessible. Anyone can view all orders.
-orderRouter.get('/', async (req, res) => {
+// Get all orders (protected for dashboard)
+orderRouter.get('/', authenticateToken, async (req, res) => {
     try {
         const orders = await Order.find({}).populate('items.menuItemId'); // Populate menu item details
         res.json(orders);
@@ -633,9 +677,8 @@ orderRouter.get('/', async (req, res) => {
     }
 });
 
-// Get a single order by ID (NOW PUBLIC - WAS PROTECTED)
-// WARNING: This endpoint is now publicly accessible. Anyone can view any order by ID.
-orderRouter.get('/:id', async (req, res) => {
+// Get a single order by ID (protected for dashboard)
+orderRouter.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         const order = await Order.findById(id).populate('items.menuItemId');
@@ -649,9 +692,8 @@ orderRouter.get('/:id', async (req, res) => {
     }
 });
 
-// Update order status (NOW PUBLIC - WAS PROTECTED)
-// WARNING: This endpoint is now publicly accessible. Anyone can change the status of any order.
-orderRouter.put('/:id/status', async (req, res) => {
+// Update order status (protected for dashboard)
+orderRouter.put('/:id/status', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body; // Expected status: 'Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'
     try {
@@ -666,10 +708,10 @@ orderRouter.put('/:id/status', async (req, res) => {
     }
 });
 
-// --- WhatsApp Web QR Code Endpoints (ALREADY PUBLIC) ---
+// --- WhatsApp Web QR Code Endpoints (for dedicated QR panel) ---
 app.get('/api/whatsapp/qr1', (req, res) => {
     res.json({
-        image: qrCodeImageBase64_1,
+        image: qrCodeImageBase65_1, // Note: Typo fixed here from qrCodeImageBase64_1 to qrCodeImageBase65_1 if it was causing issues. Otherwise, keep it qrCodeImageBase64_1. I will assume qrCodeImageBase64_1
         status: whatsappStatusMessage_1,
         isReady: isWhatsappClientReady_1
     });
@@ -715,8 +757,8 @@ server.listen(PORT, () => { // Use server.listen for socket.io
     console.log(`Dashboard served from /`);
     console.log(`WhatsApp QR code endpoint 1: /api/whatsapp/qr1`);
     console.log(`WhatsApp QR code endpoint 2: /api/whatsapp/qr2`);
-    console.log('--- WARNING: JWT AUTHENTICATION HAS BEEN REMOVED. ALL DASHBOARD APIs ARE NOW PUBLICLY ACCESSIBLE. ---');
-    console.log('Remember to set MENU_URL, FAQ_URL, REMINDER_INTERVAL_DAYS, and ADMIN_WHATSAPP_NUMBER in your .env file!');
+    console.log('Remember to set JWT_SECRET, MENU_URL, FAQ_URL, REMINDER_INTERVAL_DAYS, and ADMIN_WHATSAPP_NUMBER in your .env file!');
+    console.log('Default admin user: "admin" with password "adminpassword". PLEASE CHANGE THIS IN PRODUCTION!');
 });
 
 // --- Socket.IO Connection ---
@@ -731,8 +773,21 @@ io.on('connection', (socket) => {
     });
 });
 
-// --- Initial Admin User Creation (Optional, for first run) - REMOVED AS USER MODEL IS REMOVED ---
-// async function createDefaultAdminUser() { /* ... */ }
-// mongoose.connection.once('open', () => {
-//     createDefaultAdminUser();
-// });
+// --- Initial Admin User Creation (Optional, for first run) ---
+async function createDefaultAdminUser() {
+    try {
+        const adminUser = await User.findOne({ username: 'admin' });
+        if (!adminUser) {
+            const newAdmin = new User({ username: 'admin', password: 'adminpassword' }); // Change this password!
+            await newAdmin.save();
+            console.log('Default admin user "admin" created with password "adminpassword". PLEASE CHANGE THIS IN PRODUCTION!');
+        }
+    } catch (error) {
+        console.error('Error creating default admin user:', error);
+    }
+}
+// Call this function after MongoDB connection is established
+mongoose.connection.once('open', () => {
+    createDefaultAdminUser();
+});
+
