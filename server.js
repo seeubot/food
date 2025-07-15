@@ -711,7 +711,7 @@ orderRouter.put('/:id/status', authenticateToken, async (req, res) => {
 // --- WhatsApp Web QR Code Endpoints (for dedicated QR panel) ---
 app.get('/api/whatsapp/qr1', (req, res) => {
     res.json({
-        image: qrCodeImageBase65_1, // Note: Typo fixed here from qrCodeImageBase64_1 to qrCodeImageBase65_1 if it was causing issues. Otherwise, keep it qrCodeImageBase64_1. I will assume qrCodeImageBase64_1
+        image: qrCodeImageBase64_1, // Corrected typo here
         status: whatsappStatusMessage_1,
         isReady: isWhatsappClientReady_1
     });
