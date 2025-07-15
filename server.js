@@ -100,7 +100,7 @@ class WhatsAppClientManager {
     constructor(clientId, clientName) {
         this.clientId = clientId;
         this.clientName = clientName;
-        this.qrCodeImage = null;
+        this.qrCodeImage = null; // This will now remain null to prevent sending QR to frontend
         this.statusMessage = `Initializing ${clientName}...`;
         this.isReady = false;
         this.client = null;
@@ -112,34 +112,14 @@ class WhatsAppClientManager {
     emitStatus() {
         const eventName = this.clientId === 'whatsapp-bot-1' ? 'qr1' : 'qr2';
         io.emit(eventName, {
-            image: this.qrCodeImage,
+            image: this.qrCodeImage, // This will be null if QR is needed
             status: this.statusMessage,
             isReady: this.isReady
         });
         console.log(`Emitted ${eventName}:`, { status: this.statusMessage, isReady: this.isReady, hasImage: !!this.qrCodeImage });
     }
 
-    async generateQRImage(qrString) {
-        try {
-            // Generate QR code with better error correction and size
-            const qrImage = await qrcode.toDataURL(qrString, {
-                errorCorrectionLevel: 'M',
-                type: 'image/png',
-                quality: 0.92,
-                margin: 1,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                },
-                width: 300
-            });
-            console.log(`QR image generated successfully for ${this.clientName}`);
-            return qrImage;
-        } catch (error) {
-            console.error(`Error generating QR image for ${this.clientName}:`, error);
-            return null;
-        }
-    }
+    // Removed generateQRImage as it's no longer used for frontend display
 
     async initialize() {
         if (this.initializationAttempts >= this.maxInitializationAttempts) {
@@ -231,12 +211,12 @@ class WhatsAppClientManager {
         this.client.on('qr', async (qr) => {
             console.log(`QR received for ${this.clientName}`);
             
-            // Display QR in terminal
+            // Display QR in terminal (for initial setup)
             qrcodeTerminal.generate(qr, { small: true });
             
-            // Generate QR image
-            this.qrCodeImage = await this.generateQRImage(qr);
-            this.statusMessage = `Scan this QR code for ${this.clientName} with your WhatsApp app`;
+            // Do NOT generate QR image for frontend display
+            this.qrCodeImage = null; 
+            this.statusMessage = `Scan the QR code displayed in your server's terminal for ${this.clientName}.`;
             this.isReady = false;
             this.emitStatus();
         });
@@ -261,7 +241,7 @@ class WhatsAppClientManager {
         this.client.on('auth_failure', (msg) => {
             console.error(`Authentication failure for ${this.clientName}:`, msg);
             this.qrCodeImage = null;
-            this.statusMessage = `Auth Failure: ${msg}`;
+            this.statusMessage = `Auth Failure: ${msg}. Re-scan QR from terminal.`;
             this.isReady = false;
             this.emitStatus();
             
@@ -293,7 +273,7 @@ class WhatsAppClientManager {
             this.client.on('message', async (msg) => {
                 await this.handleMessage(msg);
             });
-        } // Removed the extra '}' here
+        } 
         // Add message handler for client 2 (secondary bot)
         if (this.clientId === 'whatsapp-bot-2') {
             this.client.on('message', async (msg) => {
@@ -705,14 +685,14 @@ app.put('/api/orders/:id', authenticateToken, async (req, res) => {
 // Delete order (protected)
 app.delete('/api/orders/:id', authenticateToken, async (req, res) => {
     try {
-        const deletedOrder = await Order.findByIdAndDelete(req.params.id);
-        if (!deletedOrder) {
-            return res.status(404).json({ message: 'Order not found' });
+        const deletedItem = await MenuItem.findByIdAndDelete(req.params.id);
+        if (!deletedItem) {
+            return res.status(404).json({ message: 'Menu item not found' });
         }
-        res.json({ message: 'Order deleted successfully' });
+        res.json({ message: 'Menu item deleted successfully' });
     } catch (error) {
-        console.error('Error deleting order:', error);
-        res.status(500).json({ message: 'Server error deleting order' });
+        console.error('Error deleting menu item:', error);
+        res.status(500).json({ message: 'Server error deleting menu item' });
     }
 });
 
