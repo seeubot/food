@@ -19,81 +19,73 @@
             transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        /* Light Mode Defaults */
+        /* Light Mode Defaults (New Theme) */
         body {
-            background-color: #FDFDFD; /* Soft Off-white background */
-            color: #333333; /* Dark grey text */
+            background-color: #F0F4F8; /* Light Blue-Gray */
+            color: #2C3E50; /* Dark Navy Blue */
         }
-        .bg-white { background-color: #FFFFFF; }
-        .text-gray-700 { color: #4A5568; }
-        .text-gray-600 { color: #718096; }
-        .text-gray-500 { color: #A0AEC0; }
-        .border-gray-300 { border-color: #CBD5E0; }
-        .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
-        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
-        .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+        .bg-card { background-color: #FFFFFF; } /* White for cards */
+        .text-primary { color: #2C3E50; }
+        .text-secondary { color: #7F8C8D; }
+        .border-default { border-color: #DCE4EC; }
+        .shadow-default { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
 
-        /* Dark Mode Overrides */
+        /* Dark Mode Overrides (New Theme) */
         html.dark body {
-            background-color: #1A1A1A; /* Very Dark Grey / Near Black */
-            color: #E0E0E0; /* Soft White text */
+            background-color: #1F2937; /* Dark Grey-Blue */
+            color: #F3F4F6; /* Off-white */
         }
-        html.dark .bg-white { background-color: #282828; } /* Card backgrounds */
-        html.dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2); }
-        html.dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2); }
-        html.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2); }
+        html.dark .bg-card { background-color: #374151; } /* Medium Dark Grey-Blue for cards */
+        html.dark .text-primary { color: #F3F4F6; }
+        html.dark .text-secondary { color: #9CA3AF; }
+        html.dark .border-default { border-color: #4B5563; }
+        html.dark .shadow-default { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2); }
 
-        html.dark .text-gray-700 { color: #E0E0E0; } /* Primary text in dark mode */
-        html.dark .text-gray-600 { color: #BBBBBB; } /* Secondary text/description */
-        html.dark .text-gray-500 { color: #777777; } /* Placeholder text, light grey */
-        html.dark .border-gray-300 { border-color: #555555; } /* Input borders */
-        html.dark .placeholder-gray-400::placeholder { color: #777777; } /* Placeholder color */
+        /* General Styling for all modes */
+        .bg-accent-primary { background-color: #FF7F50; } /* Coral */
+        .hover\:bg-accent-primary-dark:hover { background-color: #E56A3B; } /* Darker Coral */
+        .text-accent-primary { color: #FF7F50; }
+        .text-accent-secondary { color: #2ECC71; } /* Emerald Green */
+        .text-status-pending { color: #F39C12; } /* Orange */
+        .bg-status-pending { background-color: #F39C12; }
+        .text-status-confirmed { color: #3498DB; } /* Blue */
+        .bg-status-confirmed { background-color: #3498DB; }
+        .text-status-preparing { color: #9B59B6; } /* Purple */
+        .bg-status-preparing { background-color: #9B59B6; }
+        .text-status-out-for-delivery { color: #E67E22; } /* Dark Orange */
+        .bg-status-out-for-delivery { background-color: #E67E22; }
+        .text-status-delivered { color: #2ECC71; } /* Emerald Green */
+        .bg-status-delivered { background-color: #2ECC71; }
+        .text-status-cancelled { color: #E74C3C; } /* Red */
+        .bg-status-cancelled { background-color: #E74C3C; }
 
-        /* Specific dark mode styles for dashboard components */
-        html.dark .bg-gray-800 { background-color: #282828; }
-        html.dark .bg-gray-700 { background-color: #3A3A3A; }
-        html.dark .bg-gray-600 { background-color: #555555; }
-        html.dark .text-gray-100 { color: #E0E0E0; }
-        html.dark .text-gray-200 { color: #D0D0D0; }
-        html.dark .text-gray-300 { color: #BBBBBB; }
-        html.dark .text-gray-400 { color: #999999; }
-        html.dark .border-gray-600 { border-color: #4A4A4A; }
-        html.dark .border-gray-700 { border-color: #3A3A3A; }
 
-        /* Input specific dark mode styling */
-        html.dark input, html.dark select, html.dark textarea {
-            background-color: #3A3A3A; /* Darker background for inputs */
-            border-color: #555555;
-            color: #E0E0E0;
+        /* Input field styling */
+        input:not([type="checkbox"]), select, textarea {
+            @apply p-3 rounded-md border border-default focus:outline-none focus:ring-2 focus:ring-accent-primary transition-colors duration-200;
+            @apply bg-white text-primary placeholder-secondary; /* Light mode defaults */
         }
-        html.dark input:focus, html.dark select:focus, html.dark textarea:focus {
-            border-color: #FF6347;
-            box-shadow: 0 0 0 3px rgba(255, 99, 71, 0.5);
-        }
-
-        /* Custom scrollbar for better aesthetics */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #e0e0e0;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #FF6347; /* Tomato */
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #e55338; /* Darker Tomato */
+        html.dark input:not([type="checkbox"]), html.dark select, html.dark textarea {
+            @apply bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400; /* Dark mode overrides */
         }
 
-        /* Dark mode scrollbar */
-        html.dark ::-webkit-scrollbar-track {
-            background: #3A3A3A; /* Dark background for track */
+        /* Custom checkbox styling for vibrant accent */
+        .form-checkbox:checked {
+            background-color: #FF7F50; /* Coral */
+            border-color: #FF7F50;
         }
-        html.dark ::-webkit-scrollbar-thumb {
-            background: #FF6347; /* Tomato */
+        .form-checkbox:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 127, 80, 0.5); /* Coral shadow */
         }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #DCE4EC; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #FF7F50; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #E56A3B; }
+        html.dark ::-webkit-scrollbar-track { background: #4B5563; }
+        html.dark ::-webkit-scrollbar-thumb { background: #FF7F50; }
 
         /* Ensure Lucide icons are styled correctly */
         [data-lucide] {
@@ -101,184 +93,216 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col lg:flex-row bg-gray-900 text-gray-100">
+<body class="min-h-screen flex flex-col lg:flex-row bg-body text-primary">
+
+    <!-- Login Panel -->
+    <div id="login-panel" class="fixed inset-0 bg-body flex items-center justify-center z-50 p-4">
+        <div class="bg-card p-8 rounded-lg shadow-default w-full max-w-md text-primary">
+            <h2 class="text-3xl font-bold text-center text-accent-primary mb-6">Admin Login</h2>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="login-username" class="block text-sm font-medium text-primary mb-1">Username</label>
+                    <input type="text" id="login-username" name="username" required class="w-full">
+                </div>
+                <div>
+                    <label for="login-password" class="block text-sm font-medium text-primary mb-1">Password</label>
+                    <input type="password" id="login-password" name="password" required class="w-full">
+                </div>
+                <button type="submit" class="w-full bg-accent-primary text-white font-semibold py-3 rounded-md hover:bg-accent-primary-dark transition-colors shadow-default">
+                    Login
+                </button>
+            </form>
+            <p id="login-error-message" class="text-red-500 text-center mt-4 hidden"></p>
+        </div>
+    </div>
 
     <!-- Mobile Sidebar Toggle -->
-    <button id="mobile-sidebar-toggle" class="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-md bg-gray-800 text-gray-100 hover:bg-gray-700 transition-colors">
+    <button id="mobile-sidebar-toggle" class="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-md bg-card text-primary hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-default">
         <i data-lucide="menu" class="w-6 h-6"></i>
     </button>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 shadow-lg transform -translate-x-full lg:translate-x-0 lg:relative lg:flex-shrink-0 transition-transform duration-300 ease-in-out">
-        <div class="p-6 text-2xl font-bold text-tomato-500 border-b border-gray-700">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 bg-card shadow-lg transform -translate-x-full lg:translate-x-0 lg:relative lg:flex-shrink-0 transition-transform duration-300 ease-in-out">
+        <div class="p-6 text-2xl font-bold text-accent-primary border-b border-default">
             FoodBiz Admin
         </div>
         <nav class="mt-6">
             <ul>
                 <li>
-                    <button data-view="dashboard" class="nav-item flex items-center w-full px-6 py-3 text-lg font-medium rounded-r-full transition-colors duration-200 bg-tomato-700 text-white shadow-lg">
+                    <button data-view="dashboard" class="nav-item flex items-center w-full px-6 py-3 text-lg font-medium rounded-r-full transition-colors duration-200 bg-accent-primary text-white shadow-default">
                         <i data-lucide="home" class="w-6 h-6 mr-4"></i>
                         Dashboard
                     </button>
                 </li>
                 <li>
-                    <button data-view="whatsapp" class="nav-item flex items-center w-full px-6 py-3 text-lg font-medium rounded-r-full transition-colors duration-200 text-gray-300 hover:bg-gray-700 hover:text-white">
-                        <i data-lucide="message-circle-more" class="w-6 h-6 mr-4"></i>
-                        WhatsApp Bots
+                    <button data-view="qr-scan" class="nav-item flex items-center w-full px-6 py-3 text-lg font-medium rounded-r-full transition-colors duration-200 text-primary hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i data-lucide="qr-code" class="w-6 h-6 mr-4"></i>
+                        QR Scan
                     </button>
                 </li>
                 <li>
-                    <button data-view="menu" class="nav-item flex items-center w-full px-6 py-3 text-lg font-medium rounded-r-full transition-colors duration-200 text-gray-300 hover:bg-gray-700 hover:text-white">
+                    <button data-view="menu" class="nav-item flex items-center w-full px-6 py-3 text-lg font-medium rounded-r-full transition-colors duration-200 text-primary hover:bg-gray-100 dark:hover:bg-gray-700">
                         <i data-lucide="utensils" class="w-6 h-6 mr-4"></i>
                         Menu Management
                     </button>
                 </li>
                 <li>
-                    <button data-view="orders" class="nav-item flex items-center w-full px-6 py-3 text-lg font-medium rounded-r-full transition-colors duration-200 text-gray-300 hover:bg-gray-700 hover:text-white">
+                    <button data-view="orders" class="nav-item flex items-center w-full px-6 py-3 text-lg font-medium rounded-r-full transition-colors duration-200 text-primary hover:bg-gray-100 dark:hover:bg-gray-700">
                         <i data-lucide="clipboard-list" class="w-6 h-6 mr-4"></i>
                         Order Management
                     </button>
                 </li>
             </ul>
         </nav>
+        <div class="absolute bottom-6 w-full px-6">
+            <button id="logout-button" class="w-full bg-red-500 text-white font-semibold py-3 rounded-md hover:bg-red-600 transition-colors shadow-default flex items-center justify-center">
+                <i data-lucide="log-out" class="w-5 h-5 mr-2"></i> Logout
+            </button>
+            <button id="theme-toggle" class="w-full mt-4 bg-gray-200 dark:bg-gray-700 text-primary dark:text-gray-100 font-semibold py-3 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors shadow-default flex items-center justify-center">
+                <i id="sun-icon" data-lucide="sun" class="w-5 h-5 mr-2 hidden"></i>
+                <i id="moon-icon" data-lucide="moon" class="w-5 h-5 mr-2"></i>
+                Toggle Theme
+            </button>
+        </div>
     </aside>
 
     <!-- Main Content Area -->
     <main id="main-content" class="flex-1 p-6 lg:ml-64 overflow-auto">
         <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <!-- Dynamic content will be loaded here -->
-            <div id="dashboard-panel" class="panel bg-gray-800 p-6 rounded-lg shadow-md">
-                <h1 class="text-3xl font-bold text-white mb-6">Dashboard Overview</h1>
-                <p class="text-gray-300">
+            <div id="dashboard-panel" class="panel bg-card p-6 rounded-lg shadow-default">
+                <h1 class="text-3xl font-bold text-accent-primary mb-6">Dashboard Overview</h1>
+                <p class="text-secondary mb-8">
                     Welcome to your Food Business Admin Dashboard! Use the navigation on the left to manage your WhatsApp bots, menu, and orders.
                 </p>
-                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="p-6 bg-gray-700 rounded-lg shadow-md">
-                        <h2 class="text-xl font-semibold text-tomato-400 mb-2">Quick Access</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="p-6 bg-gray-100 dark:bg-gray-700 rounded-lg shadow-default">
+                        <h2 class="text-xl font-semibold text-accent-primary mb-2">Quick Access</h2>
                         <ul class="space-y-2">
                             <li>
-                                <button data-view="whatsapp" class="nav-item text-blue-400 hover:text-blue-300 flex items-center">
-                                    <i data-lucide="message-circle-more" class="w-5 h-5 mr-2"></i> Check Bot Status
+                                <button data-view="qr-scan" class="nav-item text-blue-500 hover:text-blue-600 flex items-center">
+                                    <i data-lucide="qr-code" class="w-5 h-5 mr-2"></i> Manage WhatsApp Bots
                                 </button>
                             </li>
                             <li>
-                                <button data-view="menu" class="nav-item text-blue-400 hover:text-blue-300 flex items-center">
+                                <button data-view="menu" class="nav-item text-blue-500 hover:text-blue-600 flex items-center">
                                     <i data-lucide="utensils" class="w-5 h-5 mr-2"></i> Manage Menu
                                 </button>
                             </li>
                             <li>
-                                <button data-view="orders" class="nav-item text-blue-400 hover:text-blue-300 flex items-center">
+                                <button data-view="orders" class="nav-item text-blue-500 hover:text-blue-600 flex items-center">
                                     <i data-lucide="clipboard-list" class="w-5 h-5 mr-2"></i> View Orders
                                 </button>
                             </li>
                         </ul>
                     </div>
-                    <div class="p-6 bg-gray-700 rounded-lg shadow-md">
-                        <h2 class="text-xl font-semibold text-tomato-400 mb-2">Recent Activity</h2>
-                        <p class="text-gray-300 text-sm">
+                    <div class="p-6 bg-gray-100 dark:bg-gray-700 rounded-lg shadow-default">
+                        <h2 class="text-xl font-semibold text-accent-primary mb-2">Recent Activity</h2>
+                        <p class="text-secondary text-sm">
                             * New Order #12345 (Pending) - 5 mins ago<br/>
                             * Bot 1 Connected - 1 hour ago<br/>
                             * Menu Item "Spicy Noodles" updated - Yesterday
                         </p>
-                        <p class="text-gray-400 text-xs mt-4">
+                        <p class="text-gray-500 text-xs mt-4">
                             (This section would dynamically show recent activities from your backend logs/data.)
                         </p>
                     </div>
-                    <div class="p-6 bg-gray-700 rounded-lg shadow-md">
-                        <h2 class="text-xl font-semibold text-tomato-400 mb-2">Key Metrics</h2>
-                        <p class="text-gray-300 text-sm">
-                            * Today's Orders: <span class="font-bold text-tomato-300">5</span><br/>
-                            * Total Revenue (Today): <span class="font-bold text-green-400">Rs. 1,250.00</span><br/>
-                            * Active Bots: <span class="font-bold text-blue-400">2/2</span>
+                    <div class="p-6 bg-gray-100 dark:bg-gray-700 rounded-lg shadow-default">
+                        <h2 class="text-xl font-semibold text-accent-primary mb-2">Key Metrics</h2>
+                        <p class="text-secondary text-sm">
+                            * Today's Orders: <span class="font-bold text-accent-primary">5</span><br/>
+                            * Total Revenue (Today): <span class="font-bold text-accent-secondary">Rs. 1,250.00</span><br/>
+                            * Active Bots: <span class="font-bold text-blue-500">2/2</span>
                         </p>
-                        <p class="text-gray-400 text-xs mt-4">
+                        <p class="text-gray-500 text-xs mt-4">
                             (This section would dynamically show real-time or daily statistics.)
                         </p>
                     </div>
                 </div>
             </div>
 
-            <div id="whatsapp-panel" class="panel hidden bg-gray-800 p-6 rounded-lg shadow-md">
-                <h1 class="text-3xl font-bold text-white mb-8">WhatsApp Bots Status</h1>
-                <div id="whatsapp-content" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- WhatsApp bot status will be rendered here -->
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-md flex flex-col items-center">
-                        <h2 class="text-xl font-semibold mb-4 text-tomato-400">WhatsApp Bot 1</h2>
-                        <div class="mb-4 text-lg flex items-center">
-                            Status: <span id="bot1-status-text" class="ml-2 font-medium text-yellow-400">Loading...</span>
-                            <i id="bot1-status-icon" data-lucide="alert-circle" class="w-5 h-5 ml-2 text-yellow-400"></i>
+            <div id="qr-scan-panel" class="panel hidden bg-card p-6 rounded-lg shadow-default">
+                <h1 class="text-3xl font-bold text-accent-primary mb-8">WhatsApp QR Scan</h1>
+                <p class="text-secondary mb-6">Scan the QR codes below with your WhatsApp app to connect your bots. The QR codes are also displayed in your server terminal.</p>
+                <div id="whatsapp-qr-content" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- WhatsApp bot QR and status will be rendered here -->
+                    <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-default flex flex-col items-center">
+                        <h2 class="text-xl font-semibold mb-4 text-accent-primary">WhatsApp Bot 1</h2>
+                        <div class="mb-4 text-lg flex items-center text-primary">
+                            Status: <span id="bot1-status-text" class="ml-2 font-medium text-status-pending">Loading...</span>
+                            <i id="bot1-status-icon" data-lucide="alert-circle" class="w-5 h-5 ml-2 text-status-pending"></i>
                         </div>
-                        <div id="bot1-qr-container" class="w-48 h-48 flex items-center justify-center bg-gray-700 rounded-md text-gray-400 text-sm">
+                        <div id="bot1-qr-container" class="w-48 h-48 flex items-center justify-center bg-gray-200 dark:bg-gray-600 rounded-md text-secondary text-sm">
                             Waiting for QR Code...
                         </div>
-                        <p class="mt-4 text-sm text-gray-400 text-center">
+                        <p class="mt-4 text-sm text-secondary text-center">
                             Scan the QR code with your WhatsApp app to connect Bot 1.
                         </p>
                     </div>
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-md flex flex-col items-center">
-                        <h2 class="text-xl font-semibold mb-4 text-tomato-400">WhatsApp Bot 2</h2>
-                        <div class="mb-4 text-lg flex items-center">
-                            Status: <span id="bot2-status-text" class="ml-2 font-medium text-yellow-400">Loading...</span>
-                            <i id="bot2-status-icon" data-lucide="alert-circle" class="w-5 h-5 ml-2 text-yellow-400"></i>
+                    <div class="bg-gray-100 dark:bg-gray-700 p-6 rounded-lg shadow-default flex flex-col items-center">
+                        <h2 class="text-xl font-semibold mb-4 text-accent-primary">WhatsApp Bot 2</h2>
+                        <div class="mb-4 text-lg flex items-center text-primary">
+                            Status: <span id="bot2-status-text" class="ml-2 font-medium text-status-pending">Loading...</span>
+                            <i id="bot2-status-icon" data-lucide="alert-circle" class="w-5 h-5 ml-2 text-status-pending"></i>
                         </div>
-                        <div id="bot2-qr-container" class="w-48 h-48 flex items-center justify-center bg-gray-700 rounded-md text-gray-400 text-sm">
+                        <div id="bot2-qr-container" class="w-48 h-48 flex items-center justify-center bg-gray-200 dark:bg-gray-600 rounded-md text-secondary text-sm">
                             Waiting for QR Code...
                         </div>
-                        <p class="mt-4 text-sm text-gray-400 text-center">
+                        <p class="mt-4 text-sm text-secondary text-center">
                             Scan the QR code with your WhatsApp app to connect Bot 2.
                         </p>
                     </div>
                 </div>
             </div>
 
-            <div id="menu-panel" class="panel hidden bg-gray-800 p-6 rounded-lg shadow-md">
-                <h1 class="text-3xl font-bold text-white mb-8">Menu Management</h1>
+            <div id="menu-panel" class="panel hidden bg-card p-6 rounded-lg shadow-default">
+                <h1 class="text-3xl font-bold text-accent-primary mb-8">Menu Management</h1>
                 <div class="flex flex-col md:flex-row justify-between items-center mb-4">
-                    <input type="text" id="menu-search-input" placeholder="Search menu items..." class="w-full md:w-1/3 p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 focus:outline-none focus:border-tomato-500 mb-4 md:mb-0">
+                    <input type="text" id="menu-search-input" placeholder="Search menu items..." class="w-full md:w-1/3">
                     <div class="flex flex-col md:flex-row gap-4 w-full md:w-2/3 md:justify-end">
-                        <select id="menu-category-filter" class="p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:border-tomato-500">
+                        <select id="menu-category-filter">
                             <option value="All">All Categories</option>
                         </select>
-                        <select id="menu-sort-order" class="p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:border-tomato-500">
+                        <select id="menu-sort-order">
                             <option value="name-asc">Name (A-Z)</option>
                             <option value="name-desc">Name (Z-A)</option>
                             <option value="price-asc">Price (Low to High)</option>
                             <option value="price-desc">Price (High to Low)</option>
                         </select>
-                        <button id="add-menu-item-btn" class="bg-tomato-500 hover:bg-tomato-600 text-gray-900 font-semibold py-3 px-5 rounded-md flex items-center justify-center transition-colors shadow-md">
+                        <button id="add-menu-item-btn" class="bg-accent-primary hover:bg-accent-primary-dark text-white font-semibold py-3 px-5 rounded-md flex items-center justify-center transition-colors shadow-default">
                             <i data-lucide="plus" class="w-5 h-5 mr-2"></i>
                             Add New Item
                         </button>
                     </div>
                 </div>
-                <div id="menu-items-table-container" class="overflow-x-auto rounded-lg border border-gray-700">
-                    <table class="min-w-full divide-y divide-gray-700">
-                        <thead class="bg-gray-700">
+                <div id="menu-items-table-container" class="overflow-x-auto rounded-lg border border-default">
+                    <table class="min-w-full divide-y divide-default">
+                        <thead class="bg-gray-100 dark:bg-gray-700">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Image</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Category</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Price</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Available</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">New</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Trending</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Image</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Name</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Category</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Price</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Available</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">New</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Trending</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="menu-items-table-body" class="bg-gray-800 divide-y divide-gray-700">
+                        <tbody id="menu-items-table-body" class="bg-card divide-y divide-default">
                             <!-- Menu items will be rendered here -->
-                            <tr><td colspan="8" class="text-center text-gray-400 py-8">Loading menu items...</td></tr>
+                            <tr><td colspan="8" class="text-center text-secondary py-8">Loading menu items...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <div id="orders-panel" class="panel hidden bg-gray-800 p-6 rounded-lg shadow-md">
-                <h1 class="text-3xl font-bold text-white mb-8">Order Management</h1>
+            <div id="orders-panel" class="panel hidden bg-card p-6 rounded-lg shadow-default">
+                <h1 class="text-3xl font-bold text-accent-primary mb-8">Order Management</h1>
                 <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-                    <input type="text" id="order-search-input" placeholder="Search orders by customer or ID..." class="w-full md:w-1/2 p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 focus:outline-none focus:border-tomato-500">
+                    <input type="text" id="order-search-input" placeholder="Search orders by customer or ID..." class="w-full md:w-1/2">
                     <div class="flex flex-col md:flex-row gap-4 w-full md:w-1/2 md:justify-end">
-                        <select id="order-status-filter" class="p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:border-tomato-500">
+                        <select id="order-status-filter">
                             <option value="All">All</option>
                             <option value="Pending">Pending</option>
                             <option value="Confirmed">Confirmed</option>
@@ -287,28 +311,28 @@
                             <option value="Delivered">Delivered</option>
                             <option value="Cancelled">Cancelled</option>
                         </select>
-                        <button id="refresh-orders-btn" class="bg-gray-700 hover:bg-gray-600 text-gray-100 font-semibold py-3 px-5 rounded-md flex items-center justify-center transition-colors shadow-md">
+                        <button id="refresh-orders-btn" class="bg-gray-200 dark:bg-gray-700 text-primary dark:text-gray-100 font-semibold py-3 px-5 rounded-md flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors shadow-default">
                             <i data-lucide="refresh-cw" class="w-5 h-5 mr-2"></i>
                             Refresh Orders
                         </button>
                     </div>
                 </div>
-                <div id="orders-table-container" class="overflow-x-auto rounded-lg border border-gray-700">
-                    <table class="min-w-full divide-y divide-gray-700">
-                        <thead class="bg-gray-700">
+                <div id="orders-table-container" class="overflow-x-auto rounded-lg border border-default">
+                    <table class="min-w-full divide-y divide-default">
+                        <thead class="bg-gray-100 dark:bg-gray-700">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Order ID</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Customer</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Items</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Total</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Order ID</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Customer</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Items</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Total</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Date</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="orders-table-body" class="bg-gray-800 divide-y divide-gray-700">
+                        <tbody id="orders-table-body" class="bg-card divide-y divide-default">
                             <!-- Orders will be rendered here -->
-                            <tr><td colspan="7" class="text-center text-gray-400 py-8">Loading orders...</td></tr>
+                            <tr><td colspan="7" class="text-center text-secondary py-8">Loading orders...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -318,58 +342,58 @@
 
     <!-- Menu Item Add/Edit Modal -->
     <div id="menu-item-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50 p-4">
-        <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md relative">
-            <h2 id="menu-modal-title" class="text-2xl font-bold text-white mb-6">Add New Menu Item</h2>
-            <button id="close-menu-item-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-100 transition-colors">
+        <div class="bg-card p-8 rounded-lg shadow-xl w-full max-w-md relative text-primary">
+            <h2 id="menu-modal-title" class="text-2xl font-bold text-accent-primary mb-6">Add New Menu Item</h2>
+            <button id="close-menu-item-modal" class="absolute top-4 right-4 text-secondary hover:text-primary transition-colors">
                 <i data-lucide="x-circle" class="w-6 h-6"></i>
             </button>
 
             <form id="menu-item-form" class="space-y-4">
                 <input type="hidden" id="menu-item-id">
                 <div>
-                    <label for="menu-name" class="block text-sm font-medium text-gray-300 mb-1">Name</label>
-                    <input type="text" id="menu-name" name="name" class="w-full p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:border-tomato-500" required>
+                    <label for="menu-name" class="block text-sm font-medium text-primary mb-1">Name</label>
+                    <input type="text" id="menu-name" name="name" class="w-full" required>
                 </div>
                 <div>
-                    <label for="menu-description" class="block text-sm font-medium text-gray-300 mb-1">Description</label>
-                    <textarea id="menu-description" name="description" rows="3" class="w-full p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:border-tomato-500"></textarea>
+                    <label for="menu-description" class="block text-sm font-medium text-primary mb-1">Description</label>
+                    <textarea id="menu-description" name="description" rows="3" class="w-full"></textarea>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label for="menu-price" class="block text-sm font-medium text-gray-300 mb-1">Price (Rs.)</label>
-                        <input type="number" id="menu-price" name="price" step="0.01" class="w-full p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:border-tomato-500" required>
+                        <label for="menu-price" class="block text-sm font-medium text-primary mb-1">Price (Rs.)</label>
+                        <input type="number" id="menu-price" name="price" step="0.01" class="w-full" required>
                     </div>
                     <div>
-                        <label for="menu-category" class="block text-sm font-medium text-gray-300 mb-1">Category</label>
-                        <input type="text" id="menu-category" name="category" class="w-full p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:border-tomato-500" required>
+                        <label for="menu-category" class="block text-sm font-medium text-primary mb-1">Category</label>
+                        <input type="text" id="menu-category" name="category" class="w-full" required>
                     </div>
                 </div>
                 <div>
-                    <label for="menu-image-url" class="block text-sm font-medium text-gray-300 mb-1">Image URL</label>
-                    <input type="url" id="menu-image-url" name="imageUrl" class="w-full p-3 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:border-tomato-500">
+                    <label for="menu-image-url" class="block text-sm font-medium text-primary mb-1">Image URL</label>
+                    <input type="url" id="menu-image-url" name="imageUrl" class="w-full">
                     <img id="menu-image-preview" src="" alt="Preview" class="mt-2 w-24 h-24 object-cover rounded-md hidden" onerror="this.onerror=null;this.src='https://placehold.co/96x96/E0E0E0/333333?text=No+Preview';">
                 </div>
 
                 <div class="flex items-center space-x-4">
-                    <label class="flex items-center text-gray-300">
-                        <input type="checkbox" id="menu-is-available" name="isAvailable" class="form-checkbox h-5 w-5 text-tomato-500 rounded border-gray-600 bg-gray-700 focus:ring-tomato-500">
+                    <label class="flex items-center text-primary">
+                        <input type="checkbox" id="menu-is-available" name="isAvailable" class="form-checkbox h-5 w-5 rounded">
                         <span class="ml-2 text-sm">Available</span>
                     </label>
-                    <label class="flex items-center text-gray-300">
-                        <input type="checkbox" id="menu-is-new" name="isNew" class="form-checkbox h-5 w-5 text-tomato-500 rounded border-gray-600 bg-gray-700 focus:ring-tomato-500">
+                    <label class="flex items-center text-primary">
+                        <input type="checkbox" id="menu-is-new" name="isNew" class="form-checkbox h-5 w-5 rounded">
                         <span class="ml-2 text-sm">New Item</span>
                     </label>
-                    <label class="flex items-center text-gray-300">
-                        <input type="checkbox" id="menu-is-trending" name="isTrending" class="form-checkbox h-5 w-5 text-tomato-500 rounded border-gray-600 bg-gray-700 focus:ring-tomato-500">
+                    <label class="flex items-center text-primary">
+                        <input type="checkbox" id="menu-is-trending" name="isTrending" class="form-checkbox h-5 w-5 rounded">
                         <span class="ml-2 text-sm">Trending</span>
                     </label>
                 </div>
 
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button type="button" id="cancel-menu-item-btn" class="px-5 py-2 rounded-md text-gray-300 border border-gray-600 hover:bg-gray-700 transition-colors">
+                    <button type="button" id="cancel-menu-item-btn" class="px-5 py-2 rounded-md text-secondary border border-default hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         Cancel
                     </button>
-                    <button type="submit" id="save-menu-item-btn" class="bg-tomato-500 hover:bg-tomato-600 text-gray-900 font-semibold px-5 py-2 rounded-md transition-colors shadow-md">
+                    <button type="submit" id="save-menu-item-btn" class="bg-accent-primary hover:bg-accent-primary-dark text-white font-semibold px-5 py-2 rounded-md transition-colors shadow-default">
                         Add Item
                     </button>
                 </div>
@@ -379,50 +403,50 @@
 
     <!-- Order Details Modal -->
     <div id="order-details-modal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50 p-4">
-        <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-2xl relative">
-            <h2 id="order-modal-title" class="text-2xl font-bold text-white mb-6">Order Details - ID: <span id="order-details-id"></span></h2>
-            <button id="close-order-details-modal" class="absolute top-4 right-4 text-gray-400 hover:text-gray-100 transition-colors">
+        <div class="bg-card p-8 rounded-lg shadow-xl w-full max-w-2xl relative text-primary">
+            <h2 id="order-modal-title" class="text-2xl font-bold text-accent-primary mb-6">Order Details - ID: <span id="order-details-id"></span></h2>
+            <button id="close-order-details-modal" class="absolute top-4 right-4 text-secondary hover:text-primary transition-colors">
                 <i data-lucide="x-circle" class="w-6 h-6"></i>
             </button>
 
             <div class="space-y-6">
                 <!-- Customer Info -->
-                <div class="bg-gray-700 p-5 rounded-lg">
-                    <h3 class="text-lg font-semibold text-tomato-400 mb-3">Customer Information</h3>
-                    <p class="text-gray-200">
+                <div class="bg-gray-100 dark:bg-gray-700 p-5 rounded-lg">
+                    <h3 class="text-lg font-semibold text-accent-primary mb-3">Customer Information</h3>
+                    <p class="text-primary">
                         <span class="font-medium">Name:</span> <span id="order-customer-name"></span>
                     </p>
-                    <p class="text-gray-200">
+                    <p class="text-primary">
                         <span class="font-medium">Phone:</span>
-                        <a id="order-customer-phone" href="#" class="text-blue-400 hover:underline"></a>
+                        <a id="order-customer-phone" href="#" class="text-blue-500 hover:underline"></a>
                     </p>
                 </div>
 
                 <!-- Order Summary -->
-                <div class="bg-gray-700 p-5 rounded-lg">
-                    <h3 class="text-lg font-semibold text-tomato-400 mb-3">Order Summary</h3>
-                    <ul id="order-details-items" class="divide-y divide-gray-600">
+                <div class="bg-gray-100 dark:bg-gray-700 p-5 rounded-lg">
+                    <h3 class="text-lg font-semibold text-accent-primary mb-3">Order Summary</h3>
+                    <ul id="order-details-items" class="divide-y divide-default">
                         <!-- Order items will be populated here -->
                     </ul>
-                    <div class="mt-4 pt-4 border-t border-gray-600 text-right">
-                        <p class="text-xl font-bold text-white">
+                    <div class="mt-4 pt-4 border-t border-default text-right">
+                        <p class="text-xl font-bold text-primary">
                             Total Amount: Rs. <span id="order-details-total"></span>
                         </p>
                     </div>
                 </div>
 
                 <!-- Status & Actions -->
-                <div class="bg-gray-700 p-5 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div class="bg-gray-100 dark:bg-gray-700 p-5 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h3 class="text-lg font-semibold text-tomato-400 mb-2">Order Status</h3>
+                        <h3 class="text-lg font-semibold text-accent-primary mb-2">Order Status</h3>
                         <span id="order-details-status-badge" class="px-4 py-2 inline-flex text-sm leading-5 font-semibold rounded-full"></span>
-                        <p class="text-gray-400 text-sm mt-1">
+                        <p class="text-secondary text-sm mt-1">
                             Ordered on: <span id="order-details-date"></span>
                         </p>
                     </div>
                     <div class="flex flex-col sm:flex-row items-center gap-3">
                         <label for="order-status-select-modal" class="sr-only">Change Status</label>
-                        <select id="order-status-select-modal" class="p-3 rounded-md bg-gray-600 border border-gray-500 text-gray-100 focus:outline-none focus:border-tomato-500">
+                        <select id="order-status-select-modal" class="p-3 rounded-md bg-gray-200 dark:bg-gray-600 border border-default text-primary dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-primary">
                             <option value="Pending">Pending</option>
                             <option value="Confirmed">Confirmed</option>
                             <option value="Preparing">Preparing</option>
@@ -435,7 +459,7 @@
             </div>
 
             <div class="flex justify-end mt-6">
-                <button type="button" id="close-order-details-btn" class="px-6 py-3 rounded-md bg-gray-700 text-gray-100 hover:bg-gray-600 font-semibold transition-colors shadow-md">
+                <button type="button" id="close-order-details-btn" class="px-6 py-3 rounded-md bg-gray-200 dark:bg-gray-700 text-primary dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 font-semibold transition-colors shadow-default">
                     Close
                 </button>
             </div>
@@ -449,15 +473,22 @@
         const API_BASE_URL = ''; // Use empty string for relative paths if served from same origin
 
         // --- DOM Elements ---
+        const loginPanel = document.getElementById('login-panel');
+        const loginForm = document.getElementById('login-form');
+        const loginErrorMessage = document.getElementById('login-error-message');
         const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
         const sidebar = document.getElementById('sidebar');
         const navItems = document.querySelectorAll('.nav-item');
         const panels = document.querySelectorAll('.panel');
         const mainContent = document.getElementById('main-content');
+        const logoutButton = document.getElementById('logout-button');
+        const themeToggle = document.getElementById('theme-toggle');
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
         const toastContainer = document.getElementById('toast-container');
 
-        // WhatsApp Panel Elements
-        const whatsappPanel = document.getElementById('whatsapp-panel');
+        // WhatsApp QR Scan Panel Elements
+        const qrScanPanel = document.getElementById('qr-scan-panel');
         const bot1StatusText = document.getElementById('bot1-status-text');
         const bot1StatusIcon = document.getElementById('bot1-status-icon');
         const bot1QrContainer = document.getElementById('bot1-qr-container');
@@ -511,6 +542,9 @@
         let allOrdersData = [];
         let currentEditingMenuItem = null;
         let currentViewingOrder = null;
+        let whatsappClient1Status = { image: null, status: 'Initializing...', isReady: false };
+        let whatsappClient2Status = { image: null, status: 'Initializing...', isReady: false };
+
 
         // --- Utility Functions ---
 
@@ -521,13 +555,13 @@
             let iconHtml = '';
 
             if (type === 'success') {
-                bgColor = 'bg-green-600';
+                bgColor = 'bg-accent-secondary'; /* Emerald Green */
                 iconHtml = '<i data-lucide="check-circle" class="w-5 h-5 mr-2"></i>';
             } else if (type === 'error') {
-                bgColor = 'bg-red-600';
+                bgColor = 'bg-red-500';
                 iconHtml = '<i data-lucide="alert-circle" class="w-5 h-5 mr-2"></i>';
             } else { // info
-                bgColor = 'bg-blue-600';
+                bgColor = 'bg-blue-500';
                 iconHtml = '<i data-lucide="info" class="w-5 h-5 mr-2"></i>';
             }
 
@@ -555,20 +589,20 @@
         // Loading Spinner HTML
         const loadingSpinnerHtml = `
             <div class="flex justify-center items-center py-8">
-                <i data-lucide="loader-2" class="animate-spin text-tomato-500 w-8 h-8"></i>
+                <i data-lucide="loader-2" class="animate-spin text-accent-primary w-8 h-8"></i>
             </div>
         `;
 
         // Get Status Color for Orders
         function getStatusColor(status) {
             switch (status) {
-                case 'Pending': return 'bg-yellow-600 text-yellow-100';
-                case 'Confirmed': return 'bg-blue-600 text-blue-100';
-                case 'Preparing': return 'bg-purple-600 text-purple-100';
-                case 'Out for Delivery': return 'bg-indigo-600 text-indigo-100';
-                case 'Delivered': return 'bg-green-600 text-green-100';
-                case 'Cancelled': return 'bg-red-600 text-red-100';
-                default: return 'bg-gray-600 text-gray-100';
+                case 'Pending': return 'bg-status-pending text-white';
+                case 'Confirmed': return 'bg-status-confirmed text-white';
+                case 'Preparing': return 'bg-status-preparing text-white';
+                case 'Out for Delivery': return 'bg-status-out-for-delivery text-white';
+                case 'Delivered': return 'bg-status-delivered text-white';
+                case 'Cancelled': return 'bg-status-cancelled text-white';
+                default: return 'bg-gray-500 text-white';
             }
         }
 
@@ -576,8 +610,12 @@
         function applyTheme(theme) {
             if (theme === 'dark') {
                 document.documentElement.classList.add('dark');
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
             } else {
                 document.documentElement.classList.remove('dark');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
             }
             // After applying theme, re-create Lucide icons to ensure they pick up new colors
             lucide.createIcons();
@@ -593,6 +631,72 @@
             applyTheme('light'); // Default to light
         }
 
+        // --- Authentication Logic ---
+        function checkAuth() {
+            const token = localStorage.getItem('jwtToken');
+            if (token) {
+                loginPanel.classList.add('hidden');
+                loginPanel.classList.remove('flex');
+                mainContent.classList.remove('hidden'); // Show main content
+                sidebar.classList.remove('hidden'); // Show sidebar
+                // Initialize data for panels
+                fetchInitialWhatsAppStatus();
+                fetchMenuItems();
+                fetchOrders();
+            } else {
+                loginPanel.classList.remove('hidden');
+                loginPanel.classList.add('flex');
+                mainContent.classList.add('hidden'); // Hide main content
+                sidebar.classList.add('hidden'); // Hide sidebar
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = e.target.elements['login-username'].value;
+            const password = e.target.elements['login-password'].value;
+            loginErrorMessage.classList.add('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Login failed.');
+                }
+
+                const data = await response.json();
+                localStorage.setItem('jwtToken', data.token);
+                showToast('Logged in successfully!', 'success');
+                checkAuth(); // Re-check auth to show dashboard
+            } catch (error) {
+                loginErrorMessage.textContent = error.message;
+                loginErrorMessage.classList.remove('hidden');
+                showToast(`Login failed: ${error.message}`, 'error');
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('jwtToken');
+            showToast('Logged out successfully!', 'info');
+            checkAuth(); // Re-check auth to show login panel
+        }
+
+        // --- API Helper with Auth Token ---
+        async function authenticatedFetch(url, options = {}) {
+            const token = localStorage.getItem('jwtToken');
+            const headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            };
+            return fetch(url, { ...options, headers });
+        }
+
+
         // --- Navigation Logic ---
         function showPanel(panelId) {
             panels.forEach(panel => {
@@ -602,13 +706,13 @@
 
             // Update active state in sidebar
             navItems.forEach(item => {
-                item.classList.remove('bg-tomato-700', 'text-white', 'shadow-lg');
-                item.classList.add('text-gray-300', 'hover:bg-gray-700', 'hover:text-white');
+                item.classList.remove('bg-accent-primary', 'text-white', 'shadow-default');
+                item.classList.add('text-primary', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
             });
             const activeNavItem = document.querySelector(`.nav-item[data-view="${panelId.replace('-panel', '')}"]`);
             if (activeNavItem) {
-                activeNavItem.classList.add('bg-tomato-700', 'text-white', 'shadow-lg');
-                activeNavItem.classList.remove('text-gray-300', 'hover:bg-gray-700', 'hover:text-white');
+                activeNavItem.classList.add('bg-accent-primary', 'text-white', 'shadow-default');
+                activeNavItem.classList.remove('text-primary', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
             }
 
             // Close sidebar on mobile after selection
@@ -619,35 +723,32 @@
             lucide.createIcons(); // Re-render icons on panel switch
         }
 
-        // --- WhatsApp Panel Functions ---
-        let whatsappClient1Status = { image: null, status: 'Loading...', isReady: false };
-        let whatsappClient2Status = { image: null, status: 'Loading...', isReady: false };
-
+        // --- WhatsApp QR Scan Panel Functions ---
         function updateWhatsAppPanel() {
             // Bot 1
             bot1StatusText.textContent = whatsappClient1Status.status;
-            bot1StatusText.className = `ml-2 font-medium ${whatsappClient1Status.isReady ? 'text-green-400' : 'text-yellow-400'}`;
+            bot1StatusText.className = `ml-2 font-medium ${whatsappClient1Status.isReady ? 'text-accent-secondary' : 'text-status-pending'}`;
             bot1StatusIcon.setAttribute('data-lucide', whatsappClient1Status.isReady ? 'check-circle' : 'alert-circle');
-            bot1StatusIcon.className = `w-5 h-5 ml-2 ${whatsappClient1Status.isReady ? 'text-green-400' : 'text-yellow-400'}`;
+            bot1StatusIcon.className = `w-5 h-5 ml-2 ${whatsappClient1Status.isReady ? 'text-accent-secondary' : 'text-status-pending'}`;
 
             if (whatsappClient1Status.image && !whatsappClient1Status.isReady) {
-                bot1QrContainer.innerHTML = `<div class="bg-white p-4 rounded-md"><img src="${whatsappClient1Status.image}" alt="QR Code 1" class="w-48 h-48 object-contain"></div>`;
+                bot1QrContainer.innerHTML = `<div class="bg-white dark:bg-gray-900 p-4 rounded-md"><img src="${whatsappClient1Status.image}" alt="QR Code 1" class="w-48 h-48 object-contain"></div>`;
             } else {
-                bot1QrContainer.innerHTML = `<div class="w-48 h-48 flex items-center justify-center bg-gray-700 rounded-md text-gray-400 text-sm">
+                bot1QrContainer.innerHTML = `<div class="w-48 h-48 flex items-center justify-center bg-gray-200 dark:bg-gray-600 rounded-md text-secondary text-sm">
                     ${whatsappClient1Status.isReady ? 'Bot 1 Connected' : 'Waiting for QR Code...'}
                 </div>`;
             }
 
             // Bot 2
             bot2StatusText.textContent = whatsappClient2Status.status;
-            bot2StatusText.className = `ml-2 font-medium ${whatsappClient2Status.isReady ? 'text-green-400' : 'text-yellow-400'}`;
+            bot2StatusText.className = `ml-2 font-medium ${whatsappClient2Status.isReady ? 'text-accent-secondary' : 'text-status-pending'}`;
             bot2StatusIcon.setAttribute('data-lucide', whatsappClient2Status.isReady ? 'check-circle' : 'alert-circle');
-            bot2StatusIcon.className = `w-5 h-5 ml-2 ${whatsappClient2Status.isReady ? 'text-green-400' : 'text-yellow-400'}`;
+            bot2StatusIcon.className = `w-5 h-5 ml-2 ${whatsappClient2Status.isReady ? 'text-accent-secondary' : 'text-status-pending'}`;
 
             if (whatsappClient2Status.image && !whatsappClient2Status.isReady) {
-                bot2QrContainer.innerHTML = `<div class="bg-white p-4 rounded-md"><img src="${whatsappClient2Status.image}" alt="QR Code 2" class="w-48 h-48 object-contain"></div>`;
+                bot2QrContainer.innerHTML = `<div class="bg-white dark:bg-gray-900 p-4 rounded-md"><img src="${whatsappClient2Status.image}" alt="QR Code 2" class="w-48 h-48 object-contain"></div>`;
             } else {
-                bot2QrContainer.innerHTML = `<div class="w-48 h-48 flex items-center justify-center bg-gray-700 rounded-md text-gray-400 text-sm">
+                bot2QrContainer.innerHTML = `<div class="w-48 h-48 flex items-center justify-center bg-gray-200 dark:bg-gray-600 rounded-md text-secondary text-sm">
                     ${whatsappClient2Status.isReady ? 'Bot 2 Connected' : 'Waiting for QR Code...'}
                 </div>`;
             }
@@ -671,10 +772,10 @@
 
         // --- Menu Panel Functions ---
         async function fetchMenuItems() {
-            menuItemsTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-400 py-8">${loadingSpinnerHtml}</td></tr>`;
+            menuItemsTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-secondary py-8">${loadingSpinnerHtml}</td></tr>`;
             lucide.createIcons(); // Render spinner icon
             try {
-                const response = await fetch(`${API_BASE_URL}/api/menu`);
+                const response = await authenticatedFetch(`${API_BASE_URL}/api/menu`); // Use authenticatedFetch
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -721,34 +822,34 @@
             });
 
             if (filteredAndSortedItems.length === 0) {
-                menuItemsTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-400 py-8">No menu items found. Try adjusting your filters or add a new item!</td></tr>`;
+                menuItemsTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-secondary py-8">No menu items found. Try adjusting your filters or add a new item!</td></tr>`;
                 return;
             }
 
             filteredAndSortedItems.forEach(item => {
                 const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-700 transition-colors';
+                row.className = 'hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors';
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap">
                         <img src="${item.imageUrl}" alt="${item.name}" class="w-16 h-16 rounded-md object-cover" onerror="this.onerror=null;this.src='https://placehold.co/64x64/E0E0E0/333333?text=No+Image';">
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-gray-200 font-medium">${item.name}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-gray-300">${item.category}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-gray-200">Rs. ${item.price.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-primary font-medium">${item.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-secondary">${item.category}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-primary">Rs. ${item.price.toFixed(2)}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <i data-lucide="${item.isAvailable ? 'check-circle' : 'x-circle'}" class="w-5 h-5 ${item.isAvailable ? 'text-green-500' : 'text-red-500'}"></i>
+                        <i data-lucide="${item.isAvailable ? 'check-circle' : 'x-circle'}" class="w-5 h-5 ${item.isAvailable ? 'text-accent-secondary' : 'text-red-500'}"></i>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <i data-lucide="${item.isNew ? 'check-circle' : 'x-circle'}" class="w-5 h-5 ${item.isNew ? 'text-blue-500' : 'text-gray-500'}"></i>
+                        <i data-lucide="${item.isNew ? 'check-circle' : 'x-circle'}" class="w-5 h-5 ${item.isNew ? 'text-blue-500' : 'text-secondary'}"></i>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <i data-lucide="${item.isTrending ? 'check-circle' : 'x-circle'}" class="w-5 h-5 ${item.isTrending ? 'text-purple-500' : 'text-gray-500'}"></i>
+                        <i data-lucide="${item.isTrending ? 'check-circle' : 'x-circle'}" class="w-5 h-5 ${item.isTrending ? 'text-purple-500' : 'text-secondary'}"></i>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button data-id="${item._id}" class="edit-menu-item-btn text-blue-400 hover:text-blue-500 mr-3 p-2 rounded-md hover:bg-gray-600 transition-colors" title="Edit Item">
+                        <button data-id="${item._id}" class="edit-menu-item-btn text-blue-500 hover:text-blue-600 mr-3 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Edit Item">
                             <i data-lucide="edit" class="w-5 h-5"></i>
                         </button>
-                        <button data-id="${item._id}" class="delete-menu-item-btn text-red-400 hover:text-red-500 p-2 rounded-md hover:bg-gray-600 transition-colors" title="Delete Item">
+                        <button data-id="${item._id}" class="delete-menu-item-btn text-red-500 hover:text-red-600 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Delete Item">
                             <i data-lucide="trash-2" class="w-5 h-5"></i>
                         </button>
                     </td>
@@ -757,7 +858,7 @@
             });
             lucide.createIcons(); // Re-render Lucide icons after updating innerHTML
 
-            // Attach event listeners for edit and delete buttons
+            // Attach event listeners to new "Edit" and "Delete" buttons
             document.querySelectorAll('.edit-menu-item-btn').forEach(btn => {
                 btn.onclick = (e) => openEditMenuItemModal(e.currentTarget.dataset.id);
             });
@@ -834,13 +935,13 @@
             try {
                 let response;
                 if (id) {
-                    response = await fetch(`${API_BASE_URL}/api/menu/${id}`, {
+                    response = await authenticatedFetch(`${API_BASE_URL}/api/menu/${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(itemData),
                     });
                 } else {
-                    response = await fetch(`${API_BASE_URL}/api/menu`, {
+                    response = await authenticatedFetch(`${API_BASE_URL}/api/menu`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(itemData),
@@ -866,7 +967,7 @@
                 return;
             }
             try {
-                const response = await fetch(`${API_BASE_URL}/api/menu/${id}`, {
+                const response = await authenticatedFetch(`${API_BASE_URL}/api/menu/${id}`, {
                     method: 'DELETE',
                 });
                 if (!response.ok) {
@@ -883,10 +984,10 @@
 
         // --- Orders Panel Functions ---
         async function fetchOrders() {
-            ordersTableBody.innerHTML = `<tr><td colspan="7" class="text-center text-gray-400 py-8">${loadingSpinnerHtml}</td></tr>`;
+            ordersTableBody.innerHTML = `<tr><td colspan="7" class="text-center text-secondary py-8">${loadingSpinnerHtml}</td></tr>`;
             lucide.createIcons(); // Render spinner icon
             try {
-                const response = await fetch(`${API_BASE_URL}/api/orders`);
+                const response = await authenticatedFetch(`${API_BASE_URL}/api/orders`); // Use authenticatedFetch
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -915,50 +1016,50 @@
             });
 
             if (filteredOrders.length === 0) {
-                ordersTableBody.innerHTML = `<tr><td colspan="7" class="text-center text-gray-400 py-8">No orders found matching your criteria.</td></tr>`;
+                ordersTableBody.innerHTML = `<tr><td colspan="7" class="text-center text-secondary py-8">No orders found matching your criteria.</td></tr>`;
                 return;
             }
 
             filteredOrders.forEach(order => {
                 const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-700 transition-colors';
+                row.className = 'hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors';
                 const itemsSummary = order.items.slice(0, 2).map(item => `${item.name} (x${item.quantity})`).join(', ') +
                                      (order.items.length > 2 ? `, ...and ${order.items.length - 2} more` : '');
                 const statusColorClass = getStatusColor(order.status);
 
                 row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-gray-200">${order._id.substring(0, 8)}...</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-primary">${order._id.substring(0, 8)}...</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-gray-200 font-medium">${order.customerName}</div>
-                        <div class="text-gray-400 text-sm">${order.customerId.split('@')[0]}</div>
+                        <div class="text-primary font-medium">${order.customerName}</div>
+                        <div class="text-secondary text-sm">${order.customerId.split('@')[0]}</div>
                     </td>
                     <td class="px-6 py-4">
-                        <ul class="list-disc list-inside text-gray-300 text-sm">
+                        <ul class="list-disc list-inside text-secondary text-sm">
                             ${order.items.slice(0, 2).map(item => `<li>${item.name} (x${item.quantity})</li>`).join('')}
-                            ${order.items.length > 2 ? `<li class="text-gray-400">...and ${order.items.length - 2} more</li>` : ''}
+                            ${order.items.length > 2 ? `<li class="text-secondary">...and ${order.items.length - 2} more</li>` : ''}
                         </ul>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-gray-200 font-medium">Rs. ${order.totalAmount.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-primary font-medium">Rs. ${order.totalAmount.toFixed(2)}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColorClass}">
                             ${order.status}
                         </span>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-gray-300 text-sm">
+                    <td class="px-6 py-4 whitespace-nowrap text-secondary text-sm">
                         ${new Date(order.orderDate).toLocaleDateString()}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button data-id="${order._id}" class="view-order-details-btn text-blue-400 hover:text-blue-500 mr-3 p-2 rounded-md hover:bg-gray-600 transition-colors" title="View Details">
+                        <button data-id="${order._id}" class="view-order-details-btn text-blue-500 hover:text-blue-600 mr-3 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="View Details">
                             <i data-lucide="clipboard-list" class="w-5 h-5"></i>
                         </button>
                         <div class="relative inline-block text-left z-10">
-                            <button type="button" data-id="${order._id}" class="status-dropdown-toggle inline-flex justify-center w-full rounded-md border border-gray-600 shadow-sm px-4 py-2 bg-gray-700 text-sm font-medium text-gray-300 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-tomato-500">
+                            <button type="button" data-id="${order._id}" class="status-dropdown-toggle inline-flex justify-center w-full rounded-md border border-default shadow-sm px-4 py-2 bg-gray-100 dark:bg-gray-700 text-primary dark:text-gray-100 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-body focus:ring-accent-primary">
                                 Update Status <i data-lucide="chevron-down" class="-mr-1 ml-2 h-5 w-5"></i>
                             </button>
-                            <div class="status-dropdown-menu origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none hidden">
+                            <div class="status-dropdown-menu origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5 focus:outline-none hidden">
                                 <div class="py-1">
                                     ${['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'].map(status => `
-                                        <button data-status="${status}" data-order-id="${order._id}" class="update-order-status-btn block w-full text-left px-4 py-2 text-sm ${status === order.status ? 'bg-tomato-700 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}">
+                                        <button data-status="${status}" data-order-id="${order._id}" class="update-order-status-btn block w-full text-left px-4 py-2 text-sm ${status === order.status ? 'bg-accent-primary text-white' : 'text-primary hover:bg-gray-100 dark:hover:bg-gray-700'}">
                                             ${status}
                                         </button>
                                     `).join('')}
@@ -982,7 +1083,9 @@
                     document.querySelectorAll('.status-dropdown-menu').forEach(menu => {
                         if (menu !== e.currentTarget.nextElementSibling) {
                             menu.classList.add('hidden');
-                            menu.previousElementSibling.querySelector('[data-lucide="chevron-up"]').setAttribute('data-lucide', 'chevron-down');
+                            // Find the icon within the toggler button and change it back
+                            const icon = menu.previousElementSibling.querySelector('[data-lucide]');
+                            if (icon) icon.setAttribute('data-lucide', 'chevron-down');
                         }
                     });
 
@@ -1005,7 +1108,9 @@
                     updateOrderStatus(orderId, newStatus);
                     // Close dropdown after selection
                     e.currentTarget.closest('.status-dropdown-menu').classList.add('hidden');
-                    e.currentTarget.closest('.status-dropdown-menu').previousElementSibling.querySelector('[data-lucide="chevron-up"]').setAttribute('data-lucide', 'chevron-down');
+                    const toggleBtn = e.currentTarget.closest('.status-dropdown-menu').previousElementSibling;
+                    const icon = toggleBtn.querySelector('[data-lucide]');
+                    if (icon) icon.setAttribute('data-lucide', 'chevron-down');
                     lucide.createIcons();
                 };
             });
@@ -1015,7 +1120,8 @@
                 if (!e.target.closest('.status-dropdown-toggle') && !e.target.closest('.status-dropdown-menu')) {
                     document.querySelectorAll('.status-dropdown-menu').forEach(menu => {
                         menu.classList.add('hidden');
-                        menu.previousElementSibling.querySelector('[data-lucide="chevron-up"]').setAttribute('data-lucide', 'chevron-down');
+                        const icon = menu.previousElementSibling.querySelector('[data-lucide]');
+                        if (icon) icon.setAttribute('data-lucide', 'chevron-down');
                     });
                     lucide.createIcons();
                 }
@@ -1038,7 +1144,7 @@
             orderDetailsItems.innerHTML = '';
             order.items.forEach(item => {
                 const li = document.createElement('li');
-                li.className = 'py-2 flex justify-between items-center text-gray-200';
+                li.className = 'py-2 flex justify-between items-center text-primary';
                 li.innerHTML = `
                     <span>${item.name} (x${item.quantity})</span>
                     <span>Rs. ${(item.price * item.quantity).toFixed(2)}</span>
@@ -1059,7 +1165,7 @@
 
         async function updateOrderStatus(orderId, newStatus) {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
+                const response = await authenticatedFetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: newStatus }),
@@ -1085,16 +1191,15 @@
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Initial panel load
-            showPanel('dashboard-panel');
-            // Initial data fetches
-            fetchInitialWhatsAppStatus();
-            fetchMenuItems();
-            fetchOrders();
+            checkAuth(); // Check authentication status on load
 
             // Render all Lucide icons on page load
             lucide.createIcons();
         });
+
+        // Login Form
+        loginForm.addEventListener('submit', handleLogin);
+        logoutButton.addEventListener('click', handleLogout);
 
         // Sidebar navigation
         navItems.forEach(item => {
@@ -1117,6 +1222,18 @@
                 sidebar.classList.remove('translate-x-0');
             }
         });
+
+        // Theme Toggle
+        themeToggle.addEventListener('click', () => {
+            if (document.documentElement.classList.contains('dark')) {
+                applyTheme('light');
+                localStorage.setItem('dashboard-theme', 'light');
+            } else {
+                applyTheme('dark');
+                localStorage.setItem('dashboard-theme', 'dark');
+            }
+        });
+
 
         // Menu Panel Event Listeners
         menuSearchInput.addEventListener('input', displayFilteredMenuItems);
@@ -1169,6 +1286,28 @@
         orderDetailsModal.addEventListener('click', (e) => {
             if (e.target === orderDetailsModal) {
                 closeOrderDetailsModal.click();
+            }
+        });
+
+        // Socket.IO for QR updates
+        const socket = io(API_BASE_URL);
+        socket.on('qr1', (data) => {
+            whatsappClient1Status = data;
+            updateWhatsAppPanel();
+            if (data.isReady) {
+                showToast('WhatsApp Bot 1 is ready!', 'success');
+            } else if (data.status.includes('Auth Failure') || data.status.includes('Disconnected')) {
+                showToast(`WhatsApp Bot 1: ${data.status}`, 'error');
+            }
+        });
+
+        socket.on('qr2', (data) => {
+            whatsappClient2Status = data;
+            updateWhatsAppPanel();
+            if (data.isReady) {
+                showToast('WhatsApp Bot 2 is ready!', 'success');
+            } else if (data.status.includes('Auth Failure') || data.status.includes('Disconnected')) {
+                showToast(`WhatsApp Bot 2: ${data.status}`, 'error');
             }
         });
 
