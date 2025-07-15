@@ -293,6 +293,7 @@ class WhatsAppClientManager {
             this.client.on('message', async (msg) => {
                 await this.handleMessage(msg);
             });
+        } // Removed the extra '}' here
         // Add message handler for client 2 (secondary bot)
         if (this.clientId === 'whatsapp-bot-2') {
             this.client.on('message', async (msg) => {
@@ -531,7 +532,7 @@ app.get('/api/menu/:id', async (req, res) => {
         }
         res.json(menuItem);
     } catch (error) {
-        console.error('Error fetching menu item:', error);
+            console.error('Error fetching menu item:', error);
         res.status(500).json({ message: 'Server error fetching menu item' });
     }
 });
@@ -875,3 +876,4 @@ process.on('SIGTERM', async () => {
 
 // Start the server
 startServer();
+
