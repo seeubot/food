@@ -1,5 +1,4 @@
-// index.js
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js'); // Added MessageMedia
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
@@ -22,6 +21,9 @@ const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for whatsapp-web.js sess
 const RECONNECT_DELAY_MS = 5000; // 5 seconds delay before trying to re-initialize
 const QR_EXPIRY_MS = 60000; // QR code considered expired after 60 seconds if not scanned
 const WEEKLY_NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // Check for notifications every 24 hours
+
+// Welcome Image URL
+const WELCOME_IMAGE_URL = "https://i.postimg.cc/t4B8fw2d/IMG-20250525-WA0003.jpg";
 
 // --- Express App Setup ---
 const app = express();
@@ -342,15 +344,25 @@ client.on('message', async msg => {
 
     // Basic bot functionalities
     if (msg.body === '!welcome') {
-        msg.reply(
-            `Hello! Welcome to our food business!
+        const welcomeMessage = `Hello! Welcome to our food business!
             \nCheck out our delicious menu here: ${baseUrl}/menu
             \nHow can I help you today?
             \nHere are some options you can try:
             1. Type *!profile* to view your profile details.
             2. Type *!orders* to see your recent orders.
-            3. Type *!help* for assistance.`
-        );
+            3. Type *!help* for assistance.`;
+
+        try {
+            // Create a MessageMedia object from the URL
+            const media = await MessageMedia.fromUrl(WELCOME_IMAGE_URL);
+            // Send the image with the welcome message as a caption
+            await client.sendMessage(msg.from, media, { caption: welcomeMessage });
+            console.log('Welcome image and message sent.');
+        } catch (error) {
+            console.error('Error sending welcome image:', error);
+            // Fallback to sending just the text message if image fails
+            msg.reply(welcomeMessage);
+        }
     } else if (msg.body === '!menu') {
         const menuUrl = `${baseUrl}/menu`;
         msg.reply(`Check out our delicious menu here: ${menuUrl}`);
