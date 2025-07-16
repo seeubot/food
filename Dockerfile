@@ -1,4 +1,3 @@
-# Use Node.js LTS version
 FROM node:18-alpine
 
 # Install necessary packages for Puppeteer
@@ -9,30 +8,31 @@ RUN apk add --no-cache \
     freetype-dev \
     harfbuzz \
     ca-certificates \
-    ttf-freefont \
-    ffmpeg
+    ttf-freefont
 
 # Set working directory
 WORKDIR /app
 
-# Copy everything first (simpler approach)
-COPY . .
+# Copy package files
+COPY package*.json ./
 
 # Install dependencies
-RUN npm install --production
+RUN npm install
 
-# Debug: List files to make sure index.js is there
-RUN ls -la /app/
-
-# Set environment variables for Puppeteer
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
-ENV NODE_ENV=production
+# Copy source code
+COPY . .
 
 # Create directory for WhatsApp session
-RUN mkdir -p /app/.wwebjs_auth
+RUN mkdir -p .wwebjs_auth
 
-# Expose port
+# Set permissions
+RUN chmod -R 755 .wwebjs_auth
+
+# Environment variables for Puppeteer
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+# Expose port (if needed)
 EXPOSE 3000
 
 # Start the application
