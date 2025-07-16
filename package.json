@@ -1,7 +1,7 @@
 {
-  "name": "whatsapp-koyeb-bot",
+  "name": "whatsapp-food-bot",
   "version": "1.0.0",
-  "description": "A WhatsApp bot hosted on Koyeb.",
+  "description": "An e-commerce food business bot with web panels.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -10,15 +10,22 @@
     "whatsapp",
     "bot",
     "koyeb",
-    "nodejs"
+    "nodejs",
+    "ecommerce",
+    "food",
+    "mongodb"
   ],
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "connect-mongo": "^5.1.0",
     "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "mongoose": "^8.4.4",
     "qrcode": "^1.5.3",
-    "whatsapp-web.js": "^1.23.0",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "whatsapp-web.js": "^1.23.0"
   },
   "engines": {
     "node": ">=18.0.0"
