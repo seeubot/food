@@ -1,13 +1,22 @@
 // index.js
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode'); // Use 'qrcode' for generating image data URLs
+const qrcode = require('qrcode');
 const express = require('express');
+const http = require('http'); // Required for Socket.IO
+const { Server } = require('socket.io'); // Required for Socket.IO
 const path = require('path');
 const fs = require('fs').promises; // Use promises version of fs for async/await
 
 // Initialize Express App
 const app = express();
-const PORT = process.env.PORT || 8080; // Koyeb uses PORT environment variable
+const server = http.createServer(app); // Create HTTP server for Socket.IO
+const io = new Server(server, {
+    cors: {
+        origin: "*", // Allow all origins for development/Koyeb deployment
+        methods: ["GET", "POST"]
+    }
+});
+const PORT = process.env.PORT || 8080;
 
 // Serve static files (optional, but good for a basic web interface)
 app.use(express.static(path.join(__dirname, 'public')));
@@ -60,7 +69,8 @@ client.on('qr', (qr) => {
             qrCodeDataURL = null;
         } else {
             qrCodeDataURL = url;
-            console.log('QR code available at / endpoint');
+            console.log('QR code generated and will be emitted to clients.');
+            io.emit('qrCode', qrCodeDataURL); // Emit QR code to all connected clients
         }
     });
 });
@@ -71,6 +81,7 @@ client.on('ready', () => {
     clientReady = true;
     qrCodeDataURL = null; // Clear QR code once connected
     console.log('WhatsApp bot is connected and operational.');
+    io.emit('status', 'ready'); // Emit status to all connected clients
 });
 
 // Event: Authenticated
@@ -85,6 +96,7 @@ client.on('auth_failure', async msg => {
     console.log('Attempting to re-authenticate. You might need to scan QR again.');
     clientReady = false; // Reset ready state
     qrCodeDataURL = null; // Clear old QR code
+    io.emit('status', 'auth_failure'); // Emit status to all connected clients
 
     // Attempt to delete session files to force a new QR scan
     try {
@@ -109,6 +121,7 @@ client.on('disconnected', (reason) => {
     clientReady = false; // Reset ready state
     qrCodeDataURL = null; // Clear old QR code
     console.log('Attempting to re-initialize...');
+    io.emit('status', 'disconnected'); // Emit status to all connected clients
     client.initialize(); // Attempt to re-initialize the client
 });
 
@@ -132,30 +145,32 @@ client.on('message', msg => {
 // Initialize the WhatsApp client
 client.initialize();
 
+// --- Socket.IO Connection Handling ---
+io.on('connection', (socket) => {
+    console.log('A user connected via WebSocket');
+
+    // On new connection, send current status
+    if (clientReady) {
+        socket.emit('status', 'ready');
+    } else if (qrCodeDataURL) {
+        socket.emit('qrCode', qrCodeDataURL);
+        socket.emit('status', 'qr_available');
+    } else {
+        socket.emit('status', 'loading');
+    }
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected from WebSocket');
+    });
+});
+
 // --- Express Routes ---
 
 // Main endpoint to display bot status and QR code
 app.get('/', async (req, res) => {
     try {
-        let htmlContent = await fs.readFile(path.join(__dirname, 'bot_status.html'), 'utf8');
-
-        // Hide all status sections initially
-        htmlContent = htmlContent.replace(/<div id="(loading-state|qr-code-state|connected-state)" class="status-section/g, '<div id="$1" class="status-section hidden');
-
-        if (clientReady) {
-            // Show connected state
-            htmlContent = htmlContent.replace('<div id="connected-state" class="status-section hidden', '<div id="connected-state" class="status-section');
-        } else if (qrCodeDataURL) {
-            // Show QR code state and inject QR code data URL
-            htmlContent = htmlContent.replace('<div id="qr-code-state" class="status-section hidden', '<div id="qr-code-state" class="status-section');
-            htmlContent = htmlContent.replace('src="" alt="WhatsApp QR Code"', `src="${qrCodeDataURL}" alt="WhatsApp QR Code"`);
-        } else {
-            // Show loading state
-            htmlContent = htmlContent.replace('<div id="loading-state" class="status-section hidden', '<div id="loading-state" class="status-section');
-        }
-
-        res.send(htmlContent);
-
+        const htmlContent = await fs.readFile(path.join(__dirname, 'bot_status.html'), 'utf8');
+        res.send(htmlContent); // Send the HTML template
     } catch (error) {
         console.error('Error serving bot_status.html:', error);
         res.status(500).send('<h1>Error loading bot status page.</h1><p>Please check server logs.</p>');
@@ -163,7 +178,7 @@ app.get('/', async (req, res) => {
 });
 
 // Start the Express server
-app.listen(PORT, () => {
+server.listen(PORT, () => { // Use server.listen instead of app.listen for Socket.IO
     console.log(`Server listening on port ${PORT}`);
     console.log('Waiting for WhatsApp client to be ready...');
     console.log('Visit the root URL of your deployment to check status and scan the QR.');
