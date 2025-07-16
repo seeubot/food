@@ -1,7 +1,7 @@
 # Use Node.js LTS version
 FROM node:18-alpine
 
-# Install necessary packages for Puppeteer
+# Install necessary packages for Puppeteer and media processing
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -10,6 +10,7 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
+    ffmpeg \
     && rm -rf /var/cache/apk/*
 
 # Set working directory
@@ -19,7 +20,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy application files
 COPY . .
