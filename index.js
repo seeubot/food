@@ -1,297 +1,128 @@
+// index.js
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
-const fs = require('fs');
+const express = require('express');
+const path = require('path');
+const fs = require('fs'); // Required for session management
 
-// Configuration strategies to try in order
-const configurations = [
-    // Strategy 1: Minimal configuration
-    {
-        name: 'Minimal',
-        config: {
-            authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
-            puppeteer: {
-                headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox'],
-                timeout: 30000
-            }
-        }
-    },
-    
-    // Strategy 2: Basic configuration
-    {
-        name: 'Basic',
-        config: {
-            authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
-            puppeteer: {
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu'
-                ],
-                timeout: 0
-            }
-        }
-    },
-    
-    // Strategy 3: Single process
-    {
-        name: 'Single Process',
-        config: {
-            authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
-            puppeteer: {
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--single-process',
-                    '--no-zygote'
-                ],
-                timeout: 45000
-            }
-        }
-    },
-    
-    // Strategy 4: With specific user data dir
-    {
-        name: 'User Data Dir',
-        config: {
-            authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
-            puppeteer: {
-                headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--user-data-dir=/tmp/chrome-' + Date.now(),
-                    '--disable-dev-shm-usage'
-                ],
-                timeout: 60000
-            }
-        }
-    }
-];
+// Initialize Express App
+const app = express();
+const PORT = process.env.PORT || 8080; // Koyeb uses PORT environment variable
 
-let currentConfigIndex = 0;
-let client;
-let isShuttingDown = false;
+// Serve static files (optional, but good for a basic web interface)
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Support responses
-const supportResponses = {
-    'help': `🤖 *Support Bot Help*
-
-Available commands:
-• help - Show this help menu
-• hours - Business hours
-• contact - Contact information
-• faq - Common questions
-• status - Service status
-• human - Connect with support
-
-Type any command to get started!`,
-    
-    'hours': `🕐 *Business Hours*
-Monday - Friday: 9:00 AM - 6:00 PM
-Saturday: 10:00 AM - 4:00 PM
-Sunday: Closed
-
-We'll respond during business hours.`,
-    
-    'contact': `📞 *Contact Information*
-📧 Email: support@yourcompany.com
-📱 Phone: +1-234-567-8900
-🌐 Website: https://yourcompany.com
-
-For urgent matters, please call us.`,
-    
-    'faq': `❓ *Common Questions*
-• Password reset: Visit our website
-• Delivery: 3-5 business days
-• Payments: All major cards accepted
-• Tracking: Check your email for details
-
-Type 'human' for personal assistance.`,
-    
-    'status': `✅ *Service Status*
-All systems operational
-Last updated: ${new Date().toLocaleString()}`,
-    
-    'human': `👨‍💼 *Human Support*
-Connecting you with our team...
-Please provide your name and issue description.
-Response time: 2 hours during business hours.`
-};
-
-// Clean up function
-function cleanup() {
-    try {
-        const { exec } = require('child_process');
-        exec('pkill -f chrome', () => {});
-        exec('pkill -f chromium', () => {});
-        
-        // Clean up temp directories
-        const tmpDirs = ['/tmp/chrome-user-data', '/tmp/puppeteer_dev_chrome_profile-'];
-        tmpDirs.forEach(dir => {
-            if (fs.existsSync(dir)) {
-                fs.rmSync(dir, { recursive: true, force: true });
-            }
-        });
-        
-        console.log('🧹 Cleanup completed');
-    } catch (error) {
-        console.log('Cleanup completed with minor errors');
-    }
-}
-
-// Setup event handlers
-function setupEvents(client) {
-    client.on('qr', (qr) => {
-        console.log('📱 Scan this QR code with WhatsApp:');
-        qrcode.generate(qr, { small: true });
-    });
-
-    client.on('ready', () => {
-        console.log('✅ Bot is ready and connected!');
-        currentConfigIndex = 0; // Reset on success
-    });
-
-    client.on('authenticated', () => {
-        console.log('✅ Authentication successful');
-    });
-
-    client.on('auth_failure', (msg) => {
-        console.error('❌ Auth failed:', msg);
-        console.log('💡 Delete wwebjs_auth folder and try again');
-    });
-
-    client.on('disconnected', (reason) => {
-        console.log('❌ Disconnected:', reason);
-        if (!isShuttingDown) {
-            setTimeout(() => initializeBot(), 10000);
-        }
-    });
-
-    client.on('message', handleMessage);
-    
-    client.on('error', (error) => {
-        console.error('❌ Client error:', error.message);
-    });
-}
-
-// Message handler
-async function handleMessage(message) {
-    try {
-        if (message.from.includes('@g.us') || message.isStatus) {
-            return;
-        }
-
-        const chat = await message.getChat();
-        const contact = await message.getContact();
-        const messageBody = message.body.toLowerCase().trim();
-
-        console.log(`📨 ${contact.name || contact.number}: ${message.body}`);
-
-        let response = '';
-
-        if (supportResponses[messageBody]) {
-            response = supportResponses[messageBody];
-        } else if (messageBody.includes('hello') || messageBody.includes('hi')) {
-            response = `👋 Hello! I'm your support bot. Type 'help' for available commands.`;
-        } else if (messageBody.includes('thank')) {
-            response = `You're welcome! 😊 Anything else I can help with?`;
-        } else if (messageBody.includes('bye')) {
-            response = `Goodbye! 👋 Contact us anytime for support.`;
-        } else {
-            response = `I received: "${message.body}"\n\nType 'help' for commands or 'human' for personal assistance.`;
-        }
-
-        await chat.sendMessage(response);
-        console.log('✅ Response sent');
-
-    } catch (error) {
-        console.error('❌ Message error:', error.message);
-    }
-}
-
-// Initialize bot with fallback strategies
-async function initializeBot() {
-    if (isShuttingDown) return;
-
-    const config = configurations[currentConfigIndex];
-    console.log(`🚀 Trying configuration: ${config.name} (${currentConfigIndex + 1}/${configurations.length})`);
-
-    try {
-        // Cleanup before each attempt
-        cleanup();
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // Destroy existing client
-        if (client) {
-            try {
-                await client.destroy();
-            } catch (e) {}
-        }
-
-        // Create new client
-        client = new Client(config.config);
-        setupEvents(client);
-
-        // Initialize with timeout
-        await Promise.race([
-            client.initialize(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 90000))
-        ]);
-
-    } catch (error) {
-        console.error(`❌ ${config.name} strategy failed:`, error.message);
-        
-        // Try next configuration
-        currentConfigIndex++;
-        if (currentConfigIndex < configurations.length) {
-            console.log(`🔄 Trying next strategy in 5 seconds...`);
-            setTimeout(() => initializeBot(), 5000);
-        } else {
-            console.log('❌ All strategies failed. Retrying from beginning in 30 seconds...');
-            currentConfigIndex = 0;
-            setTimeout(() => initializeBot(), 30000);
-        }
-    }
-}
-
-// Create auth directory
-if (!fs.existsSync('./wwebjs_auth')) {
-    fs.mkdirSync('./wwebjs_auth', { recursive: true });
-}
-
-// Graceful shutdown
-async function shutdown() {
-    console.log('\n🔄 Shutting down...');
-    isShuttingDown = true;
-    
-    try {
-        if (client) {
-            await client.destroy();
-        }
-        cleanup();
-        process.exit(0);
-    } catch (error) {
-        cleanup();
-        process.exit(1);
-    }
-}
-
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
-
-// Global error handlers
-process.on('unhandledRejection', (error) => {
-    console.error('❌ Unhandled rejection:', error.message);
+// Basic route for health check or status
+app.get('/', (req, res) => {
+    res.send('WhatsApp Bot Server is running! Check console for QR code if not connected.');
 });
 
-process.on('uncaughtException', (error) => {
-    console.error('❌ Uncaught exception:', error.message);
+// Path to store the session data
+const SESSION_FILE_PATH = './session.json';
+
+// Load the session data if it exists
+let sessionCfg;
+if (fs.existsSync(SESSION_FILE_PATH)) {
+    sessionCfg = require(SESSION_FILE_PATH);
+}
+
+// Initialize WhatsApp Client
+// Using LocalAuth for session management, which saves session data to a file.
+// Puppeteer arguments are crucial for running in a headless environment like Koyeb.
+const client = new Client({
+    authStrategy: new LocalAuth({
+        dataPath: './.wwebjs_auth' // Directory to store session files
+    }),
+    puppeteer: {
+        headless: true, // Run Chrome in headless mode (no GUI)
+        args: [
+            '--no-sandbox', // Required for Docker/containerized environments
+            '--disable-setuid-sandbox', // Required for Docker/containerized environments
+            '--disable-dev-shm-usage', // Overcomes limited resource problems
+            '--disable-accelerated-video-decode',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu', // Disable GPU hardware acceleration
+            '--single-process' // Use a single process instead of multiple
+        ]
+    }
 });
 
-// Start the bot
-console.log('🤖 WhatsApp Support Bot starting...');
-initializeBot();
+// Event: QR Code Generated
+// This event emits a QR code string that needs to be scanned by your WhatsApp mobile app.
+client.on('qr', (qr) => {
+    console.log('QR RECEIVED', qr);
+    qrcode.generate(qr, { small: true }); // Generate and display QR code in terminal
+    console.log('Please scan the QR code above with your WhatsApp app to connect the bot.');
+    console.log('If you are deploying on Koyeb, you will see this QR code in your deployment logs.');
+});
+
+// Event: Client Ready
+// This event fires when the client is successfully authenticated and ready to send/receive messages.
+client.on('ready', () => {
+    console.log('Client is ready!');
+    console.log('WhatsApp bot is connected and operational.');
+});
+
+// Event: Authenticated
+// This event fires after successful authentication. You can save session data here.
+client.on('authenticated', (session) => {
+    console.log('AUTHENTICATED', session);
+    // You can uncomment the following line if you want to manually save the session
+    // However, LocalAuth strategy handles this automatically.
+    // fs.writeFile(SESSION_FILE_PATH, JSON.stringify(session), function (err) {
+    //     if (err) {
+    //         console.error('Error saving session:', err);
+    //     }
+    // });
+});
+
+// Event: Authentication Failure
+// This event fires if authentication fails (e.g., session invalid).
+client.on('auth_failure', msg => {
+    console.error('AUTHENTICATION FAILURE', msg);
+    console.log('Attempting to re-authenticate. You might need to scan QR again.');
+    // Optionally, delete session file to force a new QR scan
+    if (fs.existsSync(SESSION_FILE_PATH)) {
+        fs.unlinkSync(SESSION_FILE_PATH);
+        console.log('Deleted old session file. Please restart the bot to get a new QR code.');
+    }
+});
+
+// Event: Disconnected
+// This event fires when the client is disconnected.
+client.on('disconnected', (reason) => {
+    console.log('Client disconnected', reason);
+    console.log('Attempting to re-initialize...');
+    client.initialize(); // Attempt to re-initialize the client
+});
+
+// Event: Message Received
+// This is the core logic for your bot to respond to messages.
+client.on('message', msg => {
+    console.log('MESSAGE RECEIVED', msg.body);
+
+    // Simple echo bot: replies with the same message
+    if (msg.body) {
+        msg.reply(`You said: "${msg.body}"`);
+    }
+
+    // Example of a command-based response
+    if (msg.body === '!ping') {
+        msg.reply('Pong!');
+    } else if (msg.body === '!status') {
+        msg.reply('I am online and ready to chat!');
+    }
+});
+
+// Initialize the WhatsApp client
+client.initialize();
+
+// Start the Express server
+app.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+    console.log('Waiting for WhatsApp client to be ready...');
+});
+
+
