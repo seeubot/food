@@ -1,374 +1,297 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
-const path = require('path');
 
-// Global error handlers
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('❌ Uncaught Exception:', error);
-});
-
-// Clean up function to kill any existing Chrome processes
-function cleanupChromeProcesses() {
-    const { exec } = require('child_process');
-    
-    // Kill any existing Chrome processes
-    exec('pkill -f chrome', () => {});
-    exec('pkill -f chromium', () => {});
-    exec('pkill -f "Google Chrome"', () => {});
-    
-    console.log('🧹 Cleaned up existing browser processes');
-}
-
-// Initialize with more robust configuration
-function createClient() {
-    return new Client({
-        authStrategy: new LocalAuth({
-            dataPath: './wwebjs_auth',
-            clientId: 'support-bot'
-        }),
-        puppeteer: {
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-ipc-flooding-protection',
-                '--disable-extensions',
-                '--disable-default-apps',
-                '--disable-component-extensions-with-background-pages',
-                '--disable-background-networking',
-                '--disable-sync',
-                '--metrics-recording-only',
-                '--no-report-upload',
-                '--disable-breakpad',
-                '--disable-crash-reporter',
-                '--disable-domain-reliability',
-                '--disable-component-update',
-                '--user-data-dir=/tmp/chrome-user-data',
-                '--remote-debugging-port=0'
-            ],
-            timeout: 30000,
-            handleSIGINT: false,
-            handleSIGTERM: false,
-            handleSIGHUP: false
+// Configuration strategies to try in order
+const configurations = [
+    // Strategy 1: Minimal configuration
+    {
+        name: 'Minimal',
+        config: {
+            authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
+            puppeteer: {
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                timeout: 30000
+            }
         }
-    });
-}
+    },
+    
+    // Strategy 2: Basic configuration
+    {
+        name: 'Basic',
+        config: {
+            authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu'
+                ],
+                timeout: 0
+            }
+        }
+    },
+    
+    // Strategy 3: Single process
+    {
+        name: 'Single Process',
+        config: {
+            authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--single-process',
+                    '--no-zygote'
+                ],
+                timeout: 45000
+            }
+        }
+    },
+    
+    // Strategy 4: With specific user data dir
+    {
+        name: 'User Data Dir',
+        config: {
+            authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--user-data-dir=/tmp/chrome-' + Date.now(),
+                    '--disable-dev-shm-usage'
+                ],
+                timeout: 60000
+            }
+        }
+    }
+];
 
+let currentConfigIndex = 0;
 let client;
 let isShuttingDown = false;
-let initializationAttempts = 0;
-const maxInitializationAttempts = 5;
 
 // Support responses
 const supportResponses = {
     'help': `🤖 *Support Bot Help*
 
 Available commands:
-• *help* - Show this help menu
-• *hours* - Business hours
-• *contact* - Contact information
-• *faq* - Frequently asked questions
-• *status* - Service status
-• *human* - Connect with human support
+• help - Show this help menu
+• hours - Business hours
+• contact - Contact information
+• faq - Common questions
+• status - Service status
+• human - Connect with support
 
 Type any command to get started!`,
-
+    
     'hours': `🕐 *Business Hours*
-
 Monday - Friday: 9:00 AM - 6:00 PM
 Saturday: 10:00 AM - 4:00 PM
 Sunday: Closed
 
-Timezone: UTC+0
-
-We'll respond to your messages during business hours.`,
-
+We'll respond during business hours.`,
+    
     'contact': `📞 *Contact Information*
-
 📧 Email: support@yourcompany.com
 📱 Phone: +1-234-567-8900
 🌐 Website: https://yourcompany.com
-📍 Address: 123 Business St, City, Country
 
-For urgent matters, please call our phone number.`,
+For urgent matters, please call us.`,
+    
+    'faq': `❓ *Common Questions*
+• Password reset: Visit our website
+• Delivery: 3-5 business days
+• Payments: All major cards accepted
+• Tracking: Check your email for details
 
-    'faq': `❓ *Frequently Asked Questions*
-
-*Q: How do I reset my password?*
-A: Visit our website and click "Forgot Password" or contact support.
-
-*Q: How long does delivery take?*
-A: Standard delivery is 3-5 business days.
-
-*Q: What payment methods do you accept?*
-A: We accept all major credit cards, PayPal, and bank transfers.
-
-*Q: How can I track my order?*
-A: You'll receive a tracking number via email once your order ships.
-
-Need more help? Type *human* to connect with our support team.`,
-
+Type 'human' for personal assistance.`,
+    
     'status': `✅ *Service Status*
-
-All systems operational:
-• Website: ✅ Online
-• Payment System: ✅ Online
-• Email Support: ✅ Online
-• Phone Support: ✅ Online
-
-Last updated: ${new Date().toLocaleString()}
-
-For real-time updates, visit our status page.`,
-
+All systems operational
+Last updated: ${new Date().toLocaleString()}`,
+    
     'human': `👨‍💼 *Human Support*
-
-I'm connecting you with our support team. Please wait while I transfer your conversation.
-
-In the meantime, please provide:
-• Your name
-• Order number (if applicable)
-• Brief description of your issue
-
-Our team will respond within 2 hours during business hours.
-
-Thank you for your patience! 🙏`
+Connecting you with our team...
+Please provide your name and issue description.
+Response time: 2 hours during business hours.`
 };
 
-// Setup client event handlers
-function setupClientEvents(client) {
+// Clean up function
+function cleanup() {
+    try {
+        const { exec } = require('child_process');
+        exec('pkill -f chrome', () => {});
+        exec('pkill -f chromium', () => {});
+        
+        // Clean up temp directories
+        const tmpDirs = ['/tmp/chrome-user-data', '/tmp/puppeteer_dev_chrome_profile-'];
+        tmpDirs.forEach(dir => {
+            if (fs.existsSync(dir)) {
+                fs.rmSync(dir, { recursive: true, force: true });
+            }
+        });
+        
+        console.log('🧹 Cleanup completed');
+    } catch (error) {
+        console.log('Cleanup completed with minor errors');
+    }
+}
+
+// Setup event handlers
+function setupEvents(client) {
     client.on('qr', (qr) => {
-        console.log('📱 QR Code generated. Scan with WhatsApp:');
+        console.log('📱 Scan this QR code with WhatsApp:');
         qrcode.generate(qr, { small: true });
     });
 
     client.on('ready', () => {
-        console.log('✅ WhatsApp Support Bot is ready!');
-        console.log('Bot is now connected and listening for messages...');
-        initializationAttempts = 0; // Reset attempts on successful connection
+        console.log('✅ Bot is ready and connected!');
+        currentConfigIndex = 0; // Reset on success
     });
 
     client.on('authenticated', () => {
-        console.log('✅ Authentication successful!');
+        console.log('✅ Authentication successful');
     });
 
     client.on('auth_failure', (msg) => {
-        console.error('❌ Authentication failed:', msg);
-        console.log('💡 Try deleting the wwebjs_auth folder and restart');
+        console.error('❌ Auth failed:', msg);
+        console.log('💡 Delete wwebjs_auth folder and try again');
     });
 
     client.on('disconnected', (reason) => {
-        console.log('❌ Client disconnected:', reason);
+        console.log('❌ Disconnected:', reason);
         if (!isShuttingDown) {
-            console.log('🔄 Attempting to reconnect in 15 seconds...');
-            setTimeout(() => {
-                if (!isShuttingDown) {
-                    initializeClient();
-                }
-            }, 15000);
+            setTimeout(() => initializeBot(), 10000);
         }
     });
 
-    client.on('message', async (message) => {
-        try {
-            // Ignore group messages and status updates
-            if (message.from.includes('@g.us') || message.isStatus) {
-                return;
-            }
-
-            const chat = await message.getChat();
-            const contact = await message.getContact();
-            const messageBody = message.body.toLowerCase().trim();
-
-            console.log(`📨 Message from ${contact.name || contact.number}: ${message.body}`);
-
-            let response = '';
-
-            // Check for specific commands
-            if (supportResponses[messageBody]) {
-                response = supportResponses[messageBody];
-            } else if (messageBody.includes('hello') || messageBody.includes('hi') || messageBody.includes('hey')) {
-                response = `👋 Hello ${contact.name || 'there'}! Welcome to our support bot.
-
-I'm here to help you 24/7. Type *help* to see available commands or describe your issue and I'll assist you.
-
-How can I help you today?`;
-            } else if (messageBody.includes('thank')) {
-                response = `You're welcome! 😊 
-
-Is there anything else I can help you with today? Type *help* for more options.`;
-            } else if (messageBody.includes('bye') || messageBody.includes('goodbye')) {
-                response = `Goodbye! 👋 
-
-Thank you for contacting us. If you need further assistance, feel free to message us anytime.
-
-Have a great day! 🌟`;
-            } else if (messageBody.includes('order') || messageBody.includes('delivery') || messageBody.includes('shipping')) {
-                response = `📦 *Order & Delivery Support*
-
-For order-related queries:
-• Check your email for order confirmation
-• Use tracking number to monitor delivery
-• Standard delivery: 3-5 business days
-• Express delivery: 1-2 business days
-
-Need specific help with your order? Type *human* to connect with our team.`;
-            } else if (messageBody.includes('payment') || messageBody.includes('refund') || messageBody.includes('billing')) {
-                response = `💳 *Payment & Billing Support*
-
-Payment issues:
-• Check your payment method
-• Verify billing address
-• Contact your bank if payment declined
-
-Refund requests:
-• Refunds processed within 5-7 business days
-• Original payment method will be credited
-
-For billing disputes, type *human* for assistance.`;
-            } else if (messageBody.includes('account') || messageBody.includes('login') || messageBody.includes('password')) {
-                response = `🔐 *Account Support*
-
-Account issues:
-• Reset password on our website
-• Check your email for verification
-• Clear browser cache and cookies
-
-Still having trouble? Type *human* to get personalized help from our team.`;
-            } else {
-                response = `🤖 I received your message: "${message.body}"
-
-I'm still learning! For immediate help, try these commands:
-• *help* - See all available commands
-• *faq* - Common questions
-• *human* - Connect with support team
-
-Or describe your issue and I'll do my best to help!`;
-            }
-
-            await chat.sendMessage(response);
-            console.log(`✅ Response sent to ${contact.name || contact.number}`);
-
-        } catch (error) {
-            console.error('❌ Error handling message:', error);
-            try {
-                const chat = await message.getChat();
-                await chat.sendMessage('❌ Sorry, I encountered an error. Please try again or type *human* for assistance.');
-            } catch (sendError) {
-                console.error('❌ Error sending error message:', sendError);
-            }
-        }
-    });
-
+    client.on('message', handleMessage);
+    
     client.on('error', (error) => {
-        console.error('❌ Client error:', error);
+        console.error('❌ Client error:', error.message);
     });
 }
 
-// Initialize client with retry logic
-async function initializeClient() {
-    if (isShuttingDown) return;
-
+// Message handler
+async function handleMessage(message) {
     try {
-        initializationAttempts++;
-        console.log(`🚀 Starting WhatsApp Support Bot (attempt ${initializationAttempts}/${maxInitializationAttempts})...`);
-
-        if (initializationAttempts > maxInitializationAttempts) {
-            console.error('❌ Maximum initialization attempts reached. Exiting...');
-            process.exit(1);
+        if (message.from.includes('@g.us') || message.isStatus) {
+            return;
         }
 
-        // Clean up any existing processes
-        cleanupChromeProcesses();
+        const chat = await message.getChat();
+        const contact = await message.getContact();
+        const messageBody = message.body.toLowerCase().trim();
 
-        // Wait a bit before creating client
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log(`📨 ${contact.name || contact.number}: ${message.body}`);
 
-        // Destroy existing client if it exists
+        let response = '';
+
+        if (supportResponses[messageBody]) {
+            response = supportResponses[messageBody];
+        } else if (messageBody.includes('hello') || messageBody.includes('hi')) {
+            response = `👋 Hello! I'm your support bot. Type 'help' for available commands.`;
+        } else if (messageBody.includes('thank')) {
+            response = `You're welcome! 😊 Anything else I can help with?`;
+        } else if (messageBody.includes('bye')) {
+            response = `Goodbye! 👋 Contact us anytime for support.`;
+        } else {
+            response = `I received: "${message.body}"\n\nType 'help' for commands or 'human' for personal assistance.`;
+        }
+
+        await chat.sendMessage(response);
+        console.log('✅ Response sent');
+
+    } catch (error) {
+        console.error('❌ Message error:', error.message);
+    }
+}
+
+// Initialize bot with fallback strategies
+async function initializeBot() {
+    if (isShuttingDown) return;
+
+    const config = configurations[currentConfigIndex];
+    console.log(`🚀 Trying configuration: ${config.name} (${currentConfigIndex + 1}/${configurations.length})`);
+
+    try {
+        // Cleanup before each attempt
+        cleanup();
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // Destroy existing client
         if (client) {
             try {
                 await client.destroy();
-            } catch (e) {
-                console.log('Previous client cleanup completed');
-            }
+            } catch (e) {}
         }
 
         // Create new client
-        client = createClient();
-        setupClientEvents(client);
+        client = new Client(config.config);
+        setupEvents(client);
 
         // Initialize with timeout
-        const initPromise = client.initialize();
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Initialization timeout')), 60000);
-        });
-
-        await Promise.race([initPromise, timeoutPromise]);
+        await Promise.race([
+            client.initialize(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 90000))
+        ]);
 
     } catch (error) {
-        console.error('❌ Failed to initialize client:', error.message);
+        console.error(`❌ ${config.name} strategy failed:`, error.message);
         
-        if (!isShuttingDown) {
-            const retryDelay = Math.min(10000 * initializationAttempts, 60000);
-            console.log(`🔄 Retrying in ${retryDelay/1000} seconds...`);
-            setTimeout(() => {
-                if (!isShuttingDown) {
-                    initializeClient();
-                }
-            }, retryDelay);
+        // Try next configuration
+        currentConfigIndex++;
+        if (currentConfigIndex < configurations.length) {
+            console.log(`🔄 Trying next strategy in 5 seconds...`);
+            setTimeout(() => initializeBot(), 5000);
+        } else {
+            console.log('❌ All strategies failed. Retrying from beginning in 30 seconds...');
+            currentConfigIndex = 0;
+            setTimeout(() => initializeBot(), 30000);
         }
     }
 }
 
-// Create auth directory if it doesn't exist
-const authDir = './wwebjs_auth';
-if (!fs.existsSync(authDir)) {
-    fs.mkdirSync(authDir, { recursive: true });
-}
-
-// Clean up tmp directory
-const tmpDir = '/tmp/chrome-user-data';
-if (fs.existsSync(tmpDir)) {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+// Create auth directory
+if (!fs.existsSync('./wwebjs_auth')) {
+    fs.mkdirSync('./wwebjs_auth', { recursive: true });
 }
 
 // Graceful shutdown
-const shutdown = async () => {
-    console.log('\n🔄 Shutting down bot...');
+async function shutdown() {
+    console.log('\n🔄 Shutting down...');
     isShuttingDown = true;
     
     try {
         if (client) {
             await client.destroy();
         }
-        cleanupChromeProcesses();
-        console.log('✅ Bot shut down successfully');
+        cleanup();
         process.exit(0);
     } catch (error) {
-        console.error('❌ Error during shutdown:', error);
-        cleanupChromeProcesses();
+        cleanup();
         process.exit(1);
     }
-};
+}
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+// Global error handlers
+process.on('unhandledRejection', (error) => {
+    console.error('❌ Unhandled rejection:', error.message);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught exception:', error.message);
+});
+
 // Start the bot
 console.log('🤖 WhatsApp Support Bot starting...');
-initializeClient();
+initializeBot();
