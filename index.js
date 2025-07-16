@@ -21,6 +21,7 @@ const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for whatsapp-web.js sess
 // New: Reconnection and QR expiry settings
 const RECONNECT_DELAY_MS = 5000; // 5 seconds delay before trying to re-initialize
 const QR_EXPIRY_MS = 60000; // QR code considered expired after 60 seconds if not scanned
+const WEEKLY_NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // Check for notifications every 24 hours
 
 // --- Express App Setup ---
 const app = express();
@@ -137,6 +138,14 @@ const adminSettingsSchema = new mongoose.Schema({
 });
 const AdminSettings = mongoose.model('AdminSettings', adminSettingsSchema);
 
+// NEW: Customer Notification Schema for weekly reminders
+const customerNotificationSchema = new mongoose.Schema({
+    customerPhone: { type: String, required: true, unique: true },
+    lastNotifiedDate: { type: Date, default: Date.now }
+});
+const CustomerNotification = mongoose.model('CustomerNotification', customerNotificationSchema);
+
+
 // --- Initial Data Setup ---
 async function initializeAdminAndSettings() {
     try {
@@ -242,6 +251,8 @@ client.on('ready', () => {
     if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
     console.log('WhatsApp bot is connected and operational.');
     io.emit('status', 'ready');
+    // Start weekly notification scheduler only when client is ready
+    setInterval(sendWeeklyNotifications, WEEKLY_NOTIFICATION_INTERVAL_MS);
 });
 
 client.on('authenticated', (session) => {
@@ -306,19 +317,41 @@ io.on('connection', (socket) => {
 });
 client.initialize();
 
+// Helper function to upsert customer notification entry
+async function updateCustomerNotification(customerPhone) {
+    try {
+        await CustomerNotification.findOneAndUpdate(
+            { customerPhone: customerPhone },
+            { $set: { lastNotifiedDate: new Date() } },
+            { upsert: true, new: true }
+        );
+        console.log(`Updated last notified date for ${customerPhone}`);
+    } catch (error) {
+        console.error(`Error updating customer notification for ${customerPhone}:`, error);
+    }
+}
 
 client.on('message', async msg => {
     console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body);
 
     const senderNumber = msg.from.split('@')[0];
+    const baseUrl = process.env.NODE_ENV === 'production' ? 'YOUR_KOYEB_URL' : 'http://localhost:8080'; // Replace YOUR_KOYEB_URL in production
+
+    // Update customer notification date on any message received
+    await updateCustomerNotification(senderNumber);
 
     // Basic bot functionalities
     if (msg.body === '!welcome') {
-        msg.reply('Hello! Welcome to our food business! How can I help you today?');
+        msg.reply(
+            `Hello! Welcome to our food business!
+            \nCheck out our delicious menu here: ${baseUrl}/menu
+            \nHow can I help you today?
+            \nHere are some options you can try:
+            1. Type *!profile* to view your profile details.
+            2. Type *!orders* to see your recent orders.
+            3. Type *!help* for assistance.`
+        );
     } else if (msg.body === '!menu') {
-        // Note: req.protocol and req.get('host') are not available in client.on('message') context.
-        // You need to hardcode or fetch the base URL from environment variables.
-        const baseUrl = process.env.NODE_ENV === 'production' ? 'YOUR_KOYEB_URL' : 'http://localhost:8080';
         const menuUrl = `${baseUrl}/menu`;
         msg.reply(`Check out our delicious menu here: ${menuUrl}`);
     } else if (msg.body === '!profile') {
@@ -342,9 +375,54 @@ client.on('message', async msg => {
     } else if (msg.body === '!help' || msg.body === '!support') {
         msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
     } else {
-        msg.reply('I received your message! Type !menu to see our offerings, or !help for assistance.');
+        msg.reply(`I received your message! Type *!menu* to see our offerings, or *!help* for assistance.`);
     }
 });
+
+// NEW: Function to send weekly notifications to users
+async function sendWeeklyNotifications() {
+    if (!clientReady) {
+        console.log('WhatsApp client not ready for sending weekly notifications. Skipping.');
+        return;
+    }
+
+    console.log('Checking for weekly notifications to send...');
+    try {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        // Find customers whose last notified date is older than 7 days
+        const customersToNotify = await CustomerNotification.find({
+            lastNotifiedDate: { $lte: sevenDaysAgo }
+        });
+
+        const products = await Product.find({ isAvailable: true });
+        if (products.length === 0) {
+            console.log('No products available to suggest in weekly notification. Skipping.');
+            return;
+        }
+
+        const baseUrl = process.env.NODE_ENV === 'production' ? 'YOUR_KOYEB_URL' : 'http://localhost:8080'; // Replace YOUR_KOYEB_URL in production
+        const menuUrl = `${baseUrl}/menu`;
+
+        for (const customer of customersToNotify) {
+            // Pick a random product to suggest
+            const randomProduct = products[Math.floor(Math.random() * products.length)];
+
+            const message = `👋 Hey there! It's been a while since your last order. How about trying our delicious *${randomProduct.name}* today? It's only ₹${randomProduct.price.toFixed(2)}!\n\nCheck out our full menu here: ${menuUrl}\n\nWe hope to serve you soon! 😊`;
+
+            try {
+                // Send message to customer
+                await client.sendMessage(customer.customerPhone + '@c.us', message);
+                // Update last notified date for this customer
+                await CustomerNotification.findByIdAndUpdate(customer._id, { lastNotifiedDate: new Date() });
+                console.log(`Sent weekly notification to ${customer.customerPhone}`);
+            } catch (msgError) {
+                console.error(`Error sending weekly notification to ${customer.customerPhone}:`, msgError);
+            }
+        }
+    } catch (error) {
+        console.error('Error in sendWeeklyNotifications:', error);
+    }
+}
 
 
 // --- Helper for Haversine Distance Calculation ---
@@ -690,6 +768,9 @@ app.post('/api/order', async (req, res) => {
             status: 'Pending'
         });
         await newOrder.save();
+
+        // Update customer notification date to reset weekly reminder timer
+        await updateCustomerNotification(customerPhone);
 
         // Notify Admin via WhatsApp
         if (clientReady) {
