@@ -18,6 +18,10 @@ const ADMIN_NUMBER = '918897350151'; // Admin WhatsApp number for notifications 
 const SESSION_SECRET = process.env.SESSION_SECRET || 'supersecretkeyforfoodbot'; // CHANGE THIS IN PRODUCTION!
 const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for whatsapp-web.js session files
 
+// New: Reconnection and QR expiry settings
+const RECONNECT_DELAY_MS = 5000; // 5 seconds delay before trying to re-initialize
+const QR_EXPIRY_MS = 60000; // QR code considered expired after 60 seconds if not scanned
+
 // --- Express App Setup ---
 const app = express();
 const server = http.createServer(app);
@@ -170,7 +174,10 @@ initializeAdminAndSettings();
 // --- WhatsApp Bot Setup ---
 let qrCodeDataURL = null;
 let clientReady = false;
+let reconnectTimer = null; // To control re-initialization attempts
+let qrExpiryTimer = null; // To track QR code validity
 
+// Ensure session directory exists
 (async () => {
     try {
         await fs.mkdir(SESSION_DIR_PATH, { recursive: true });
@@ -202,14 +209,27 @@ const client = new Client({
 
 client.on('qr', (qr) => {
     console.log('QR RECEIVED', qr);
+    // Clear any previous QR expiry timer
+    if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+
     qrcode.toDataURL(qr, { small: false }, (err, url) => {
         if (err) {
             console.error('Error generating QR code data URL:', err);
             qrCodeDataURL = null;
+            io.emit('status', 'qr_error');
         } else {
             qrCodeDataURL = url;
             console.log('QR code generated and will be emitted to clients.');
             io.emit('qrCode', qrCodeDataURL);
+            io.emit('status', 'qr_received');
+
+            // Set a timer to expire the QR if not scanned
+            qrExpiryTimer = setTimeout(() => {
+                qrCodeDataURL = null;
+                io.emit('qrCode', null); // Clear QR on frontend
+                io.emit('status', 'qr_expired');
+                console.log('QR code expired. Please restart bot or wait for new QR.');
+            }, QR_EXPIRY_MS);
         }
     });
 });
@@ -217,45 +237,75 @@ client.on('qr', (qr) => {
 client.on('ready', () => {
     console.log('Client is ready!');
     clientReady = true;
-    qrCodeDataURL = null;
+    qrCodeDataURL = null; // Clear QR once ready
+    if (reconnectTimer) clearTimeout(reconnectTimer); // Clear any pending reconnect
+    if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
     console.log('WhatsApp bot is connected and operational.');
     io.emit('status', 'ready');
 });
 
 client.on('authenticated', (session) => {
     console.log('AUTHENTICATED', session);
+    if (reconnectTimer) clearTimeout(reconnectTimer); // Clear any pending reconnect
+    io.emit('status', 'authenticated');
 });
 
 client.on('auth_failure', async msg => {
     console.error('AUTHENTICATION FAILURE', msg);
-    console.log('Attempting to re-authenticate. You might need to scan QR again.');
+    console.log('Attempting to re-authenticate. Clearing session files...');
     clientReady = false;
     qrCodeDataURL = null;
+    if (reconnectTimer) clearTimeout(reconnectTimer); // Clear any pending reconnect
+    if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
     io.emit('status', 'auth_failure');
 
     try {
-        const files = await fs.readdir(SESSION_DIR_PATH);
-        for (const file of files) {
-            if (file.startsWith('session-')) {
-                await fs.unlink(path.join(SESSION_DIR_PATH, file));
-                console.log(`Deleted old session file: ${file}`);
-            }
-        }
-        console.log('Deleted old session files. Please restart the bot to get a new QR code.');
+        // More aggressive session file deletion
+        await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
+        console.log('Deleted old session directory. Re-initializing client...');
     } catch (err) {
-        console.error('Error deleting old session files:', err);
+        console.error('Error deleting old session directory:', err);
+    } finally {
+        // Re-initialize after a delay
+        reconnectTimer = setTimeout(() => {
+            console.log(`Attempting to re-initialize client after ${RECONNECT_DELAY_MS / 1000} seconds.`);
+            client.initialize();
+            io.emit('status', 'reconnecting');
+        }, RECONNECT_DELAY_MS);
     }
-    client.initialize();
 });
 
 client.on('disconnected', (reason) => {
     console.log('Client disconnected', reason);
     clientReady = false;
     qrCodeDataURL = null;
-    console.log('Attempting to re-initialize...');
+    if (reconnectTimer) clearTimeout(reconnectTimer); // Clear any pending reconnect
+    if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
     io.emit('status', 'disconnected');
-    client.initialize();
+    console.log(`Attempting to re-initialize after ${RECONNECT_DELAY_MS / 1000} seconds...`);
+    // Re-initialize after a delay
+    reconnectTimer = setTimeout(() => {
+        client.initialize();
+        io.emit('status', 'reconnecting');
+    }, RECONNECT_DELAY_MS);
 });
+
+// Initial client initialization
+console.log('Initializing WhatsApp client...');
+io.on('connection', (socket) => {
+    console.log('A user connected to Socket.IO');
+    // Emit current status and QR code to newly connected clients
+    if (clientReady) {
+        socket.emit('status', 'ready');
+    } else if (qrCodeDataURL) {
+        socket.emit('status', 'qr_received');
+        socket.emit('qrCode', qrCodeDataURL);
+    } else {
+        socket.emit('status', 'initializing');
+    }
+});
+client.initialize();
+
 
 client.on('message', async msg => {
     console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body);
@@ -266,7 +316,10 @@ client.on('message', async msg => {
     if (msg.body === '!welcome') {
         msg.reply('Hello! Welcome to our food business! How can I help you today?');
     } else if (msg.body === '!menu') {
-        const menuUrl = `${req.protocol}://${req.get('host')}/menu`;
+        // Note: req.protocol and req.get('host') are not available in client.on('message') context.
+        // You need to hardcode or fetch the base URL from environment variables.
+        const baseUrl = process.env.NODE_ENV === 'production' ? 'YOUR_KOYEB_URL' : 'http://localhost:8080';
+        const menuUrl = `${baseUrl}/menu`;
         msg.reply(`Check out our delicious menu here: ${menuUrl}`);
     } else if (msg.body === '!profile') {
         msg.reply('Your profile details would be displayed here. (Feature under development)');
@@ -293,7 +346,6 @@ client.on('message', async msg => {
     }
 });
 
-client.initialize();
 
 // --- Helper for Haversine Distance Calculation ---
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -321,7 +373,8 @@ function isAuthenticated(req, res, next) {
 // Root route for bot status and QR display
 app.get('/', async (req, res) => {
     try {
-        const htmlContent = await fs.readFile(path.join(__dirname, 'bot_status.html'), 'utf8');
+        // Ensure the bot_status.html exists in the public directory
+        const htmlContent = await fs.readFile(path.join(__dirname, 'public', 'bot_status.html'), 'utf8');
         res.send(htmlContent);
     } catch (error) {
         console.error('Error serving bot_status.html:', error);
@@ -408,7 +461,7 @@ app.get('/admin/logout', (req, res) => {
 // Admin Dashboard (Protected - now serves the single-page app)
 app.get('/admin/dashboard', isAuthenticated, async (req, res) => {
     try {
-        const dashboardHtml = await fs.readFile(path.join(__dirname, 'admin_dashboard.html'), 'utf8');
+        const dashboardHtml = await fs.readFile(path.join(__dirname, 'public', 'admin_dashboard.html'), 'utf8');
         res.send(dashboardHtml);
     } catch (error) {
         console.error('Error serving admin_dashboard.html:', error);
@@ -537,7 +590,7 @@ app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
 // Public Web Menu Panel (Now serves menu_panel.html)
 app.get('/menu', async (req, res) => {
     try {
-        const menuPanelHtml = await fs.readFile(path.join(__dirname, 'menu_panel.html'), 'utf8');
+        const menuPanelHtml = await fs.readFile(path.join(__dirname, 'public', 'menu_panel.html'), 'utf8');
         res.send(menuPanelHtml);
     } catch (error) {
         console.error('Error serving menu_panel.html:', error);
@@ -559,9 +612,10 @@ app.get('/api/menu', async (req, res) => {
 // API for Public Shop Settings (only what's needed for delivery calculation)
 app.get('/api/public/settings', async (req, res) => {
     try {
-        const settings = await AdminSettings.findOne({}, 'shopLocation deliveryRates'); // Only fetch these fields
+        const settings = await AdminSettings.findOne({}, 'shopLocation deliveryRates shopName'); // Fetch shopName as well
         res.json(settings);
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error fetching public settings:', error);
         res.status(500).json({ message: 'Error fetching settings' });
     }
