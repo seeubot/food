@@ -1,20 +1,26 @@
 {
-  "name": "whatsapp-support-bot",
+  "name": "whatsapp-koyeb-bot",
   "version": "1.0.0",
-  "description": "WhatsApp Support Bot using whatsapp-web.js",
+  "description": "A WhatsApp bot hosted on Koyeb.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node index.js"
   },
-  "dependencies": {
-    "whatsapp-web.js": "^1.23.0",
-    "qrcode-terminal": "^0.12.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "keywords": ["whatsapp", "bot", "support", "automation"],
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "koyeb",
+    "nodejs"
+  ],
   "author": "Your Name",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.23.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
+
