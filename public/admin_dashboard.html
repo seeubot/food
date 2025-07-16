@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark"> <!-- Added 'dark' class for initial dark mode preference -->
+<html lang="en"> <!-- JS will set 'dark' class -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,7 +15,7 @@
             font-family: 'Inter', sans-serif;
             transition: background-color 0.3s ease, color 0.3s ease;
         }
-        /* Base dark mode styles for elements not covered by dark: utility */
+        /* Base dark mode styles applied via JS adding 'dark' class to html */
         html.dark {
             background-color: #1a202c; /* Dark background for the entire page */
             color: #e2e8f0; /* Light text color */
@@ -66,12 +66,17 @@
             color: white;
             font-weight: 600;
         }
-        .dark .nav-link.active {
+        html.dark .nav-link.active { /* Specific for dark mode active state */
             background-color: #059669; /* Green-600 for dark mode */
+            color: white;
+        }
+        /* Ensure views are hidden by default */
+        .admin-view {
+            display: none;
         }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex flex-col">
+<body class="bg-gray-100 min-h-screen flex flex-col">
     <!-- Header/Navbar -->
     <header class="bg-white dark:bg-gray-800 shadow-sm py-4 px-6 md:px-8">
         <div class="container mx-auto flex justify-between items-center">
@@ -90,7 +95,7 @@
         <aside class="lg:col-span-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 h-fit sticky top-4">
             <h2 class="text-xl font-bold text-gray-800 dark:text-white mb-4">Navigation</h2>
             <nav class="space-y-2">
-                <button id="nav-dashboard" class="nav-link w-full text-left flex items-center gap-3 py-2 px-4 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-200 active">
+                <button id="nav-dashboard" class="nav-link w-full text-left flex items-center gap-3 py-2 px-4 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-200">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </button>
                 <button id="nav-menu" class="nav-link w-full text-left flex items-center gap-3 py-2 px-4 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-200">
@@ -148,7 +153,7 @@
             </div>
 
             <!-- Menu Management View -->
-            <div id="view-menu" class="admin-view hidden">
+            <div id="view-menu" class="admin-view">
                 <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6">Menu Management</h2>
 
                 <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-4">Add/Edit Menu Item</h3>
@@ -197,7 +202,7 @@
             </div>
 
             <!-- Shop Settings View -->
-            <div id="view-settings" class="admin-view hidden">
+            <div id="view-settings" class="admin-view">
                 <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-6">Shop Settings</h2>
 
                 <form id="settings-form" class="space-y-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-inner">
@@ -242,6 +247,7 @@
 
         // Function to set theme
         function setTheme(theme) {
+            console.log('Setting theme to:', theme); // Debugging
             if (theme === 'dark') {
                 htmlElement.classList.add('dark');
                 localStorage.setItem('theme', 'dark');
@@ -275,6 +281,7 @@
         const adminViews = document.querySelectorAll('.admin-view');
 
         function showView(viewId) {
+            console.log('Showing view:', viewId); // Debugging
             adminViews.forEach(view => {
                 view.classList.add('hidden');
             });
@@ -373,12 +380,10 @@
                     body: JSON.stringify({ status: newStatus })
                 });
                 if (response.ok) {
-                    // alert(\`Order \${orderId.substring(0,6)} status updated to \${newStatus}!\`); // Replaced with custom notification
                     showNotification(`Order ${orderId.substring(0,6)} status updated to ${newStatus}!`, 'success');
                     fetchOrders(); // Refresh list
                 } else {
                     const errorData = await response.json();
-                    // alert(\`Failed to update order status: \${errorData.message || 'Unknown error'}\`); // Replaced with custom notification
                     showNotification(`Failed to update order status: ${errorData.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
