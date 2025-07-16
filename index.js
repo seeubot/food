@@ -3,9 +3,22 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 
-// Initialize the client
+// Global error handlers
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit the process, just log the error
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    // Don't exit the process, just log the error
+});
+
+// Initialize the client with better error handling
 const client = new Client({
-    authStrategy: new LocalAuth(),
+    authStrategy: new LocalAuth({
+        dataPath: './wwebjs_auth'
+    }),
     puppeteer: {
         headless: true,
         args: [
@@ -16,8 +29,15 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            '--disable-gpu'
-        ]
+            '--disable-gpu',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding'
+        ],
+        timeout: 60000,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
     }
 });
 
@@ -120,24 +140,29 @@ client.on('authenticated', () => {
 // Handle disconnection
 client.on('disconnected', (reason) => {
     console.log('❌ Client was disconnected:', reason);
+    // Attempt to reconnect after 5 seconds
+    setTimeout(() => {
+        console.log('🔄 Attempting to reconnect...');
+        initializeClient();
+    }, 5000);
 });
 
-// Main message handler
+// Main message handler with better error handling
 client.on('message', async (message) => {
-    // Ignore group messages and status updates
-    if (message.from.includes('@g.us') || message.isStatus) {
-        return;
-    }
-
-    const chat = await message.getChat();
-    const contact = await message.getContact();
-    const messageBody = message.body.toLowerCase().trim();
-
-    // Log incoming message
-    console.log(`📨 Message from ${contact.name || contact.number}: ${message.body}`);
-
-    // Auto-reply logic
     try {
+        // Ignore group messages and status updates
+        if (message.from.includes('@g.us') || message.isStatus) {
+            return;
+        }
+
+        const chat = await message.getChat();
+        const contact = await message.getContact();
+        const messageBody = message.body.toLowerCase().trim();
+
+        // Log incoming message
+        console.log(`📨 Message from ${contact.name || contact.number}: ${message.body}`);
+
+        // Auto-reply logic
         let response = '';
 
         // Check for specific commands
@@ -203,34 +228,79 @@ I'm still learning! For immediate help, try these commands:
 Or describe your issue and I'll do my best to help!`;
         }
 
-        // Send response
+        // Send response with error handling
         await chat.sendMessage(response);
         console.log(`✅ Response sent to ${contact.name || contact.number}`);
 
     } catch (error) {
         console.error('❌ Error handling message:', error);
-        await chat.sendMessage('❌ Sorry, I encountered an error. Please try again or type *human* for assistance.');
+        try {
+            const chat = await message.getChat();
+            await chat.sendMessage('❌ Sorry, I encountered an error. Please try again or type *human* for assistance.');
+        } catch (sendError) {
+            console.error('❌ Error sending error message:', sendError);
+        }
     }
 });
 
-// Handle errors
+// Handle all possible errors
 client.on('error', (error) => {
     console.error('❌ Client error:', error);
 });
 
-// Initialize the client
-console.log('🚀 Starting WhatsApp Support Bot...');
-client.initialize();
+client.on('loading_screen', (percent, message) => {
+    console.log('Loading...', percent, message);
+});
+
+client.on('change_state', (state) => {
+    console.log('State changed:', state);
+});
+
+// Function to initialize client with retry logic
+async function initializeClient() {
+    try {
+        console.log('🚀 Starting WhatsApp Support Bot...');
+        await client.initialize();
+    } catch (error) {
+        console.error('❌ Failed to initialize client:', error);
+        console.log('🔄 Retrying in 10 seconds...');
+        setTimeout(initializeClient, 10000);
+    }
+}
+
+// Create auth directory if it doesn't exist
+const authDir = './wwebjs_auth';
+if (!fs.existsSync(authDir)) {
+    fs.mkdirSync(authDir, { recursive: true });
+}
+
+// Start the bot
+initializeClient();
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
+const shutdown = async () => {
     console.log('\n🔄 Shutting down bot...');
-    await client.destroy();
-    process.exit(0);
+    try {
+        await client.destroy();
+        console.log('✅ Bot shut down successfully');
+        process.exit(0);
+    } catch (error) {
+        console.error('❌ Error during shutdown:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+// Additional error handling for specific events
+client.on('auth_failure', (msg) => {
+    console.error('❌ Authentication failed:', msg);
+    console.log('🔄 Please delete the wwebjs_auth folder and try again');
 });
 
-process.on('SIGTERM', async () => {
-    console.log('\n🔄 Shutting down bot...');
-    await client.destroy();
-    process.exit(0);
+client.on('remote_session_saved', () => {
+    console.log('✅ Remote session saved');
 });
+
+console.log('Bot is starting up. Please wait...');
