@@ -1,9 +1,9 @@
 // index.js
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode'); // Use 'qrcode' for generating image data URLs
 const express = require('express');
 const path = require('path');
-const fs = require('fs'); // Required for session management
+const fs = require('fs').promises; // Use promises version of fs for async/await
 
 // Initialize Express App
 const app = express();
@@ -12,26 +12,27 @@ const PORT = process.env.PORT || 8080; // Koyeb uses PORT environment variable
 // Serve static files (optional, but good for a basic web interface)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Basic route for health check or status
-app.get('/', (req, res) => {
-    res.send('WhatsApp Bot Server is running! Check console for QR code if not connected.');
-});
+// Variables to store the QR code data URL and client status
+let qrCodeDataURL = null;
+let clientReady = false;
 
 // Path to store the session data
-const SESSION_FILE_PATH = './session.json';
+const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for session files
 
-// Load the session data if it exists
-let sessionCfg;
-if (fs.existsSync(SESSION_FILE_PATH)) {
-    sessionCfg = require(SESSION_FILE_PATH);
-}
+// Ensure session directory exists
+(async () => {
+    try {
+        await fs.mkdir(SESSION_DIR_PATH, { recursive: true });
+        console.log('Session directory ensured:', SESSION_DIR_PATH);
+    } catch (err) {
+        console.error('Error ensuring session directory:', err);
+    }
+})();
 
 // Initialize WhatsApp Client
-// Using LocalAuth for session management, which saves session data to a file.
-// Puppeteer arguments are crucial for running in a headless environment like Koyeb.
 const client = new Client({
     authStrategy: new LocalAuth({
-        dataPath: './.wwebjs_auth' // Directory to store session files
+        dataPath: SESSION_DIR_PATH // Directory to store session files
     }),
     puppeteer: {
         headless: true, // Run Chrome in headless mode (no GUI)
@@ -44,62 +45,74 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--disable-gpu', // Disable GPU hardware acceleration
-            '--single-process' // Use a single process instead of multiple
+            '--single-process' // Use a single single process instead of multiple
         ]
     }
 });
 
 // Event: QR Code Generated
-// This event emits a QR code string that needs to be scanned by your WhatsApp mobile app.
 client.on('qr', (qr) => {
     console.log('QR RECEIVED', qr);
-    qrcode.generate(qr, { small: true }); // Generate and display QR code in terminal
-    console.log('Please scan the QR code above with your WhatsApp app to connect the bot.');
-    console.log('If you are deploying on Koyeb, you will see this QR code in your deployment logs.');
+    // Generate data URL for the QR code
+    qrcode.toDataURL(qr, { small: false }, (err, url) => { // Using small: false for better resolution on web
+        if (err) {
+            console.error('Error generating QR code data URL:', err);
+            qrCodeDataURL = null;
+        } else {
+            qrCodeDataURL = url;
+            console.log('QR code available at / endpoint');
+        }
+    });
 });
 
 // Event: Client Ready
-// This event fires when the client is successfully authenticated and ready to send/receive messages.
 client.on('ready', () => {
     console.log('Client is ready!');
+    clientReady = true;
+    qrCodeDataURL = null; // Clear QR code once connected
     console.log('WhatsApp bot is connected and operational.');
 });
 
 // Event: Authenticated
-// This event fires after successful authentication. You can save session data here.
 client.on('authenticated', (session) => {
     console.log('AUTHENTICATED', session);
-    // You can uncomment the following line if you want to manually save the session
-    // However, LocalAuth strategy handles this automatically.
-    // fs.writeFile(SESSION_FILE_PATH, JSON.stringify(session), function (err) {
-    //     if (err) {
-    //         console.error('Error saving session:', err);
-    //     }
-    // });
+    // LocalAuth strategy handles saving the session automatically.
 });
 
 // Event: Authentication Failure
-// This event fires if authentication fails (e.g., session invalid).
-client.on('auth_failure', msg => {
+client.on('auth_failure', async msg => {
     console.error('AUTHENTICATION FAILURE', msg);
     console.log('Attempting to re-authenticate. You might need to scan QR again.');
-    // Optionally, delete session file to force a new QR scan
-    if (fs.existsSync(SESSION_FILE_PATH)) {
-        fs.unlinkSync(SESSION_FILE_PATH);
-        console.log('Deleted old session file. Please restart the bot to get a new QR code.');
+    clientReady = false; // Reset ready state
+    qrCodeDataURL = null; // Clear old QR code
+
+    // Attempt to delete session files to force a new QR scan
+    try {
+        const files = await fs.readdir(SESSION_DIR_PATH);
+        for (const file of files) {
+            if (file.startsWith('session-')) { // LocalAuth creates files like session-data.json
+                await fs.unlink(path.join(SESSION_DIR_PATH, file));
+                console.log(`Deleted old session file: ${file}`);
+            }
+        }
+        console.log('Deleted old session files. Please restart the bot to get a new QR code.');
+    } catch (err) {
+        console.error('Error deleting old session files:', err);
     }
+    // Re-initialize to get a new QR code
+    client.initialize();
 });
 
 // Event: Disconnected
-// This event fires when the client is disconnected.
 client.on('disconnected', (reason) => {
     console.log('Client disconnected', reason);
+    clientReady = false; // Reset ready state
+    qrCodeDataURL = null; // Clear old QR code
     console.log('Attempting to re-initialize...');
     client.initialize(); // Attempt to re-initialize the client
 });
 
 // Event: Message Received
-// This is the core logic for your bot to respond to messages.
 client.on('message', msg => {
     console.log('MESSAGE RECEIVED', msg.body);
 
@@ -119,10 +132,40 @@ client.on('message', msg => {
 // Initialize the WhatsApp client
 client.initialize();
 
+// --- Express Routes ---
+
+// Main endpoint to display bot status and QR code
+app.get('/', async (req, res) => {
+    try {
+        let htmlContent = await fs.readFile(path.join(__dirname, 'bot_status.html'), 'utf8');
+
+        // Hide all status sections initially
+        htmlContent = htmlContent.replace(/<div id="(loading-state|qr-code-state|connected-state)" class="status-section/g, '<div id="$1" class="status-section hidden');
+
+        if (clientReady) {
+            // Show connected state
+            htmlContent = htmlContent.replace('<div id="connected-state" class="status-section hidden', '<div id="connected-state" class="status-section');
+        } else if (qrCodeDataURL) {
+            // Show QR code state and inject QR code data URL
+            htmlContent = htmlContent.replace('<div id="qr-code-state" class="status-section hidden', '<div id="qr-code-state" class="status-section');
+            htmlContent = htmlContent.replace('src="" alt="WhatsApp QR Code"', `src="${qrCodeDataURL}" alt="WhatsApp QR Code"`);
+        } else {
+            // Show loading state
+            htmlContent = htmlContent.replace('<div id="loading-state" class="status-section hidden', '<div id="loading-state" class="status-section');
+        }
+
+        res.send(htmlContent);
+
+    } catch (error) {
+        console.error('Error serving bot_status.html:', error);
+        res.status(500).send('<h1>Error loading bot status page.</h1><p>Please check server logs.</p>');
+    }
+});
+
 // Start the Express server
 app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
     console.log('Waiting for WhatsApp client to be ready...');
+    console.log('Visit the root URL of your deployment to check status and scan the QR.');
 });
-
 
