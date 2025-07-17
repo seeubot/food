@@ -219,21 +219,15 @@
                 </div>
             </div>
 
-            <!-- WhatsApp Bot Status & QR Management Section -->
+            <!-- WhatsApp Bot Status Section -->
             <section id="whatsapp-bot-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
-                <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status & QR</h2>
+                <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status</h2>
                 <div class="flex items-center space-x-4 mb-6">
                     <div id="bot-status-indicator" class="w-4 h-4 rounded-full bg-gray-500 animate-pulse"></div>
                     <p id="bot-status-text" class="text-lg text-gray-300">Loading status...</p>
                 </div>
-
-                <div id="qr-display-area" class="mt-4 text-center">
-                    <p id="qr-status-message" class="text-gray-300 mb-4">Initializing bot, please wait for QR code...</p>
-                    <img id="qr-code-img" src="" alt="QR Code" class="w-48 h-48 mx-auto border border-gray-700 rounded-md p-2 bg-white hidden">
-                    <p id="qr-expiry-message" class="text-red-400 mt-2 text-sm hidden">QR code expired. Please generate a new one.</p>
-                </div>
-                <div class="mt-6 text-center">
-                    <button id="generate-qr-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200">Generate New QR</button>
+                <div class="mt-4 text-center">
+                    <p class="text-gray-300">For QR code generation and connection, please visit the <a href="/" target="_blank" class="text-blue-400 hover:underline">public bot status panel</a>.</p>
                 </div>
             </section>
 
@@ -476,18 +470,11 @@
             document.getElementById(modalId).classList.add('hidden');
         }
 
-        // --- WhatsApp Bot Status & QR Management Display ---
+        // --- WhatsApp Bot Status Display (Admin Dashboard) ---
         const socket = io(); // Connect to Socket.IO
 
         const botStatusIndicator = document.getElementById('bot-status-indicator');
         const botStatusText = document.getElementById('bot-status-text');
-
-        // QR Management elements
-        const qrDisplayArea = document.getElementById('qr-display-area');
-        const qrStatusMessage = document.getElementById('qr-status-message');
-        const qrCodeImg = document.getElementById('qr-code-img');
-        const qrExpiryMessage = document.getElementById('qr-expiry-message');
-        const generateQrBtn = document.getElementById('generate-qr-btn');
 
         async function fetchBotStatus() {
             try {
@@ -496,14 +483,14 @@
                     throw new Error('Failed to fetch bot status.');
                 }
                 const data = await response.json();
-                updateBotStatusDisplay(data.status, data.qrCodeDataURL);
+                updateBotStatusDisplay(data.status); // No QR data expected here
             } catch (error) {
-                console.error('Error fetching bot status:', error);
-                updateBotStatusDisplay('error', null); // Set a general error status
+                console.error('Error fetching bot status for admin dashboard:', error);
+                updateBotStatusDisplay('error'); // Set a general error status
             }
         }
 
-        function updateBotStatusDisplay(status, qrDataURL = null) {
+        function updateBotStatusDisplay(status) {
             // Update main bot status section
             switch (status) {
                 case 'initializing':
@@ -512,7 +499,7 @@
                     break;
                 case 'qr_received':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
-                    botStatusText.textContent = 'Scan QR Code to connect!';
+                    botStatusText.textContent = 'QR Code received. Scan on public panel.';
                     break;
                 case 'qr_error':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
@@ -520,7 +507,7 @@
                     break;
                 case 'qr_expired':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
-                    botStatusText.textContent = 'QR Code expired. Generate new.';
+                    botStatusText.textContent = 'QR Code expired. Generate new on public panel.';
                     break;
                 case 'authenticated':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500';
@@ -532,11 +519,11 @@
                     break;
                 case 'auth_failure':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
-                    botStatusText.textContent = 'Authentication Failed! Generating new QR...';
+                    botStatusText.textContent = 'Authentication Failed! Please check public panel.';
                     break;
                 case 'disconnected':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 animate-pulse';
-                    botStatusText.textContent = 'Disconnected. Generating new QR...';
+                    botStatusText.textContent = 'Disconnected. Reconnecting...';
                     break;
                 case 'reconnecting':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
@@ -550,64 +537,12 @@
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
                     botStatusText.textContent = `Status: ${status}`;
             }
-
-            // Update QR Management section
-            qrCodeImg.classList.add('hidden');
-            qrExpiryMessage.classList.add('hidden');
-            generateQrBtn.disabled = false; // Enable button by default
-
-            if (status === 'qr_received' && qrDataURL) {
-                qrCodeImg.src = qrDataURL;
-                qrCodeImg.classList.remove('hidden');
-                qrStatusMessage.textContent = 'Scan this QR code with your WhatsApp to connect the bot:';
-            } else if (status === 'qr_expired') {
-                qrStatusMessage.textContent = 'QR code expired. Please generate a new one.';
-                qrExpiryMessage.classList.remove('hidden');
-            } else if (status === 'ready' || status === 'authenticated') {
-                qrStatusMessage.textContent = 'Bot is connected and online. No QR needed.';
-                generateQrBtn.disabled = true; // Disable button if already connected
-            } else if (status === 'initializing' || status === 'reconnecting' || status === 'auth_failure' || status === 'disconnected') {
-                qrStatusMessage.textContent = 'Bot is attempting to connect or re-generate QR. Please wait...';
-                generateQrBtn.disabled = true; // Disable button while auto-reconnecting/initializing
-            } else { // Fallback for other states or errors
-                qrStatusMessage.textContent = 'No QR code available. Click "Generate New QR" if bot is offline.';
-            }
         }
 
-        // Socket.IO listeners for real-time updates
+        // Socket.IO listener for real-time status updates
         socket.on('status', (status) => {
-            // When status changes, fetch the full status (including QR if available)
-            // This ensures we get the latest QR data if it was just generated
-            fetchBotStatus();
+            updateBotStatusDisplay(status);
         });
-
-        socket.on('qrCode', (qrDataURL) => {
-            // This listener specifically handles new QR codes being pushed
-            updateBotStatusDisplay('qr_received', qrDataURL);
-        });
-
-        // Event listener for the "Generate New QR" button
-        generateQrBtn.addEventListener('click', async () => {
-            showLoading();
-            try {
-                const response = await fetch('/api/admin/request-qr', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const result = await response.json();
-                if (!response.ok) {
-                    throw new Error(result.message || 'Failed to request QR.');
-                }
-                alert(result.message); // Show success message
-                // The socket.io 'status' or 'qrCode' event will update the UI
-            } catch (error) {
-                console.error('Error requesting new QR:', error);
-                alert(`Error requesting QR: ${error.message}`);
-            } finally {
-                hideLoading();
-            }
-        });
-
 
         // --- Orders Management ---
         async function fetchOrders() {
