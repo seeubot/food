@@ -192,14 +192,14 @@ function updateBotStatus(status, qrData = null) {
     io.emit('status', status);
     if (qrData) {
         qrCodeDataURL = qrData;
-        io.emit('qrCode', qrData);
+        io.emit('qrCode', qrData); // Emit QR code data for the public panel
     } else if (status === 'ready' || status === 'authenticated' || status === 'initializing' || status === 'reconnecting') {
         // Do not clear QR if bot is ready, authenticated, initializing, or reconnecting
         // This allows the QR to persist if it's still valid or if a new one is coming
     } else {
         // Clear QR for other statuses (disconnected, auth_failure, qr_error, qr_expired)
         qrCodeDataURL = null;
-        io.emit('qrCode', null);
+        io.emit('qrCode', null); // Clear QR code data for the public panel
     }
 }
 
@@ -308,7 +308,7 @@ io.on('connection', (socket) => {
     // Emit current status and QR code to newly connected clients
     socket.emit('status', botCurrentStatus); // Emit current status
     if (qrCodeDataURL) {
-        socket.emit('qrCode', qrCodeDataURL);
+        socket.emit('qrCode', qrCodeDataURL); // Emit QR code data if available
     }
 });
 
@@ -465,7 +465,7 @@ function isAuthenticated(req, res, next) {
     res.redirect('/admin/login');
 }
 
-// Root route for bot status and QR display
+// Root route for bot status and QR display (Public Panel)
 app.get('/', async (req, res) => {
     try {
         // Ensure the bot_status.html exists in the public directory
@@ -564,20 +564,20 @@ app.get('/admin/dashboard', isAuthenticated, async (req, res) => {
     }
 });
 
-// NEW API: Get bot status for dashboard
+// API: Get bot status for admin dashboard (NO QR data here)
 app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
     res.json({
         status: botCurrentStatus,
-        qrCodeDataURL: qrCodeDataURL // Send QR data if available
+        // Removed qrCodeDataURL from here, it's only for the public panel
     });
 });
 
-// NEW API: Request a new QR code for WhatsApp bot
-app.post('/api/admin/request-qr', isAuthenticated, async (req, res) => {
+// NEW PUBLIC API: Request a new QR code for WhatsApp bot (accessible from public panel)
+app.post('/api/public/request-qr', async (req, res) => {
     if (clientReady) {
         return res.status(400).json({ message: 'Bot is already connected. Disconnect it first if you need a new QR for re-authentication.' });
     }
-    console.log('Admin requested new QR. Clearing session files and re-initializing client...');
+    console.log('Public QR request received. Clearing session files and re-initializing client...');
     // Clear any existing QR expiry timer if a new request comes in
     if (qrExpiryTimer) {
         clearTimeout(qrExpiryTimer);
@@ -592,10 +592,10 @@ app.post('/api/admin/request-qr', isAuthenticated, async (req, res) => {
         // Continue even if deletion fails, client.initialize might still work
     } finally {
         // Set status to initializing and clear current QR data immediately
-        updateBotStatus('initializing'); // This will clear qrCodeDataURL
+        updateBotStatus('initializing'); // This will clear qrCodeDataURL and emit
         // Initialize the client; this will trigger 'qr' or 'ready' event
         client.initialize();
-        res.json({ message: 'Attempting to generate new QR code. Check dashboard for updates.' });
+        res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
     }
 });
 
