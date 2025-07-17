@@ -335,47 +335,59 @@ client.on('message', async msg => {
     console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body);
 
     const senderNumber = msg.from.split('@')[0];
-    const baseUrl = process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'; // Use YOUR_KOYEB_URL from env
+    // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
+    const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
     const menuUrl = `${baseUrl}/menu`;
 
     // Update customer notification date on any message received
     await updateCustomerNotification(senderNumber);
 
-    // Welcome message content
-    const welcomeMessage = `Hello! Welcome to our food business!
-            \nCheck out our delicious menu here: ${menuUrl}
-            \nHow can I help you today?
-            \nHere are some options you can try:
-            1. Type *!profile* to view your profile details.
-            2. Type *!orders* to see your recent orders.
-            3. Type *!help* for assistance.`;
+    // Welcome message content with numbered options
+    const welcomeMessage = `Hello! Welcome to Delicious Bites!
+            \nWhat would you like to do today? Please reply with the number:
+            \n1. View our delicious Menu
+            2. See my Recent Orders
+            3. Get Help/Support`;
 
-    // Handle specific commands first
-    if (msg.body === '!menu') {
-        msg.reply(`Check out our delicious menu here: ${menuUrl}`);
-    } else if (msg.body === '!profile') {
-        msg.reply('Your profile details would be displayed here. (Feature under development)');
-    } else if (msg.body === '!orders') {
-        try {
-            const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
-            if (customerOrders.length > 0) {
-                let orderList = 'Your recent orders:\n';
-                customerOrders.forEach((order, index) => {
-                    orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
-                });
-                msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
-            } else {
-                msg.reply('You have no recent orders. Why not place one now? Type !menu');
+    // Handle specific commands (case-insensitive and number-based)
+    const lowerCaseBody = msg.body.toLowerCase().trim();
+
+    switch (lowerCaseBody) {
+        case '1':
+        case '!menu':
+        case 'menu':
+            msg.reply(`Check out our delicious menu here: ${menuUrl}`);
+            break;
+        case '2':
+        case '!orders':
+        case 'orders':
+            try {
+                const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
+                if (customerOrders.length > 0) {
+                    let orderList = 'Your recent orders:\n';
+                    customerOrders.forEach((order, index) => {
+                        orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
+                    });
+                    msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
+                } else {
+                    msg.reply('You have no recent orders. Why not place one now? Reply with *1* for menu.');
+                }
+            } catch (error) {
+                console.error('Error fetching orders for bot:', error);
+                msg.reply('Sorry, I could not fetch your orders at the moment. Please try again later.');
             }
-        } catch (error) {
-            console.error('Error fetching orders for bot:', error);
-            msg.reply('Sorry, I could not fetch your orders at the moment. Please try again later.');
-        }
-    } else if (msg.body === '!help' || msg.body === '!support') {
-        msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
-    } else {
-        // Default response: send the welcome message for any other input
-        msg.reply(welcomeMessage);
+            break;
+        case '3':
+        case '!help':
+        case 'help':
+        case '!support':
+        case 'support':
+            msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
+            break;
+        default:
+            // Default response: send the welcome message for any other input
+            msg.reply(welcomeMessage);
+            break;
     }
 });
 
@@ -400,7 +412,8 @@ async function sendWeeklyNotifications() {
             return;
         }
 
-        const baseUrl = process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'; // Use YOUR_KOYEB_URL from env
+        // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
+        const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
         const menuUrl = `${baseUrl}/menu`;
 
         for (const customer of customersToNotify) {
@@ -813,7 +826,8 @@ app.post('/api/order', async (req, res) => {
 
         // Notify Admin via WhatsApp
         if (clientReady) {
-            const baseUrl = process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'; // Use YOUR_KOYEB_URL from env
+            // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
+            const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
             const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
                                  `Order ID: ${newOrder._id.toString().substring(0, 6)}...\n` +
                                  `Customer: ${newOrder.customerName}\n` +
@@ -858,7 +872,7 @@ server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
     console.log('Waiting for WhatsApp client to be ready...');
     console.log('Visit the root URL of your deployment to check status and scan the QR.');
-    console.log(`Admin login: ${process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'}/admin/login`);
-    console.log(`Public menu: ${process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'}/menu`);
+    console.log(`Admin login: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/admin/login`);
+    console.log(`Public menu: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/menu`);
 });
 
