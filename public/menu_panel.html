@@ -7,100 +7,175 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+        /* Base styles for the black and white theme */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000 !important; /* Pure black background */
+            color: #ffffff !important; /* Pure white text */
+            min-height: 100vh; /* Ensure body takes full height */
         }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+
+        /* General text colors to ensure visibility */
+        .text-gray-700, .text-gray-800 {
+            color: #ffffff !important; /* All main text is white */
+        }
+        .text-gray-600 {
+            color: #cccccc !important; /* Lighter gray for secondary text */
+        }
+        .text-gray-500 {
+            color: #888888 !important; /* Medium gray for placeholders/disabled */
+        }
+        .text-gray-400 {
+            color: #aaaaaa !important; /* Slightly lighter gray for icons/subtle elements */
+        }
+        .text-gray-300 {
+            color: #dddddd !important; /* Very light gray */
+        }
+        .text-gray-200 {
+            color: #eeeeee !important; /* Almost white */
+        }
+
+        /* Backgrounds for main panels/cards */
+        .bg-gray-100 { /* Override default body background if still present */
+            background-color: #000000 !important;
+        }
+        .bg-white, .bg-gray-800 { /* Main content cards, modals, headers */
+            background-color: #1a1a1a !important; /* Very dark gray */
+        }
+        .bg-gray-900 { /* Modal overlay */
+            background-color: #0a0a0a !important; /* Slightly darker for deeper contrast */
+        }
+
+        /* Inputs, Textareas */
+        input, textarea {
+            background-color: #222222 !important; /* Darker background for inputs */
+            border-color: #444444 !important; /* Dark gray border */
+            color: #ffffff !important; /* White text in inputs */
+            padding: 0.75rem 1rem !important; /* More padding for touch targets */
+            border-radius: 0.375rem !important; /* Rounded corners */
+        }
+        input::placeholder, textarea::placeholder {
+            color: #888888 !important; /* Placeholder text color */
+        }
+
+        /* Buttons */
+        button {
+            border-radius: 0.5rem !important; /* More rounded buttons */
+            padding: 0.75rem 1.5rem !important; /* Generous padding */
+            font-weight: 600 !important; /* Semi-bold text */
+            transition: all 0.2s ease-in-out !important; /* Smooth transitions */
+        }
+        /* Primary buttons (Add to Cart, Checkout, Place Order, Active Filter) */
+        .btn-primary { /* Primary action buttons like Add to Cart, Checkout, Place Order */
+            background-color: #ffffff !important; /* White background */
+            color: #000000 !important; /* Black text */
+            box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.2), 0 2px 4px -1px rgba(255, 255, 255, 0.1) !important;
+        }
+        .btn-primary:hover {
+            background-color: #e0e0e0 !important; /* Slightly darker white on hover */
+        }
+        /* Secondary buttons (Quantity change, Category filter inactive) */
+        .quantity-btn, .category-btn {
+            background-color: #333333 !important; /* Dark gray background */
+            color: #ffffff !important; /* White text */
+        }
+        .quantity-btn:hover, .category-btn:hover {
+            background-color: #444444 !important; /* Lighter gray on hover */
+        }
+        /* Active category button */
+        .category-btn.active {
+            background-color: #ffffff !important; /* White background for active category */
+            color: #000000 !important; /* Black text for active category */
         }
         .cart-badge {
-            animation: pulse 2s infinite;
+            background-color: #ffffff !important; /* White background for badge */
+            color: #000000 !important; /* Black text for badge */
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+        #locationBtn { /* Specific style for location button */
+            background-color: #333333 !important;
+            color: #ffffff !important;
+        }
+        #locationBtn:hover {
+            background-color: #444444 !important;
+        }
+
+        /* Borders and Dividers */
+        .border-white.border-opacity-20, .border-gray-700 {
+            border-color: #333333 !important; /* Consistent dark gray borders */
+        }
+
+        /* Shadows */
+        .shadow-md {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4) !important; /* Deeper shadows for depth */
+        }
+        .shadow-xl {
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.6) !important;
+        }
+
+        /* Specific text colors for status/icons */
+        .text-green-600 { color: #ffffff !important; } /* White for prices/available status */
+        .text-red-500 { color: #cccccc !important; } /* Light gray for "Out of Stock" / Trending badge */
+
+        /* Custom scrollbar for cart on small screens */
+        .overflow-y-auto::-webkit-scrollbar {
+            width: 8px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-track {
+            background: #222222;
+            border-radius: 10px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+            background: #555555;
+            border-radius: 10px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+            background: #777777;
+        }
+
+        /* Animations */
+        .cart-badge {
+            animation: none; /* Remove pulse animation as it might not fit the new theme */
         }
         .food-card {
-            transition: all 0.3s ease;
-            transform: translateY(0);
+            background-color: #1a1a1a !important; /* Match card background to theme */
+            border: 1px solid #333333 !important; /* Add subtle border */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
         }
         .food-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-            transition: all 0.3s ease;
-        }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #ee5a24, #ff6b6b);
-            transform: translateY(-2px);
-        }
-        .quantity-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            transition: all 0.3s ease;
-        }
-        .quantity-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(1.1);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5) !important;
         }
         .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            border-top: 3px solid #ffffff; /* White spinner */
         }
         .modal {
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(5px);
+            background: rgba(0, 0, 0, 0.8) !important; /* Darker overlay */
+            backdrop-filter: blur(8px) !important; /* Stronger blur */
         }
         .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            padding: 15px 20px;
-            border-radius: 10px;
-            color: white;
-            font-weight: 500;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            animation: slideIn 0.3s ease-out;
+            background: #1a1a1a !important; /* Notification background */
+            border: 1px solid #444444 !important;
+            color: #ffffff !important;
         }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        .success { background: linear-gradient(135deg, #00b894, #00cec9); }
-        .error { background: linear-gradient(135deg, #d63031, #e17055); }
-        .warning { background: linear-gradient(135deg, #fdcb6e, #e17055); }
+        .success { background-color: #28a745 !important; } /* Green for success */
+        .error { background-color: #dc3545 !important; } /* Red for error */
+        .warning { background-color: #ffc107 !important; color: #000000 !important; } /* Yellow for warning with black text */
     </style>
 </head>
 <body class="min-h-screen">
     <!-- Header -->
-    <header class="glass-card text-white p-4 sticky top-0 z-50">
+    <header class="bg-gray-800 text-white p-4 sticky top-0 z-50 shadow-md">
         <div class="container mx-auto flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold">🍽️ Delicious Bites</h1>
                 <p class="text-sm opacity-80">Where every bite is a delight!</p>
             </div>
             <div class="flex items-center space-x-4">
-                <button id="cartBtn" class="relative bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-full transition-all duration-300">
+                <button id="cartBtn" class="relative bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-full text-white transition-all duration-300">
                     <span class="text-lg">🛒</span>
-                    <span id="cartCount" class="cart-badge absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">0</span>
+                    <span id="cartCount" class="cart-badge absolute -top-2 -right-2 text-xs rounded-full w-6 h-6 flex items-center justify-center">0</span>
                 </button>
-                <button id="locationBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-full transition-all duration-300">
+                <button id="locationBtn" class="bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-full text-white transition-all duration-300">
                     📍 Location
                 </button>
             </div>
@@ -112,7 +187,7 @@
         <!-- Categories Filter -->
         <div class="mb-8">
             <div class="flex flex-wrap gap-2 justify-center">
-                <button class="category-btn active bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-full text-white transition-all duration-300" data-category="all">
+                <button class="category-btn active px-4 py-2 rounded-full text-base font-semibold transition-all duration-300" data-category="all">
                     All Items
                 </button>
             </div>
@@ -132,16 +207,16 @@
         <!-- Empty State -->
         <div id="emptyState" class="text-center py-12 text-white hidden">
             <div class="text-6xl mb-4">🍽️</div>
-            <p class="text-xl">No items found in this category</p>
+            <p class="text-xl">No items found in this category.</p>
         </div>
     </main>
 
     <!-- Cart Modal -->
     <div id="cartModal" class="modal fixed inset-0 hidden items-center justify-center z-50">
-        <div class="glass-card rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto shadow-xl">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-white">Your Cart</h2>
-                <button id="closeCartModal" class="text-white hover:text-gray-300 text-2xl">&times;</button>
+                <button id="closeCartModal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
             </div>
             
             <div id="cartItems" class="space-y-3 mb-4">
@@ -153,7 +228,7 @@
                 <p>Your cart is empty</p>
             </div>
             
-            <div id="cartSummary" class="border-t border-white border-opacity-20 pt-4 hidden">
+            <div id="cartSummary" class="border-t border-gray-700 pt-4 hidden">
                 <div class="flex justify-between text-white mb-2">
                     <span>Subtotal:</span>
                     <span id="subtotalAmount">₹0.00</span>
@@ -175,10 +250,10 @@
 
     <!-- Checkout Modal -->
     <div id="checkoutModal" class="modal fixed inset-0 hidden items-center justify-center z-50">
-        <div class="glass-card rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto shadow-xl">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-white">Checkout</h2>
-                <button id="closeCheckoutModal" class="text-white hover:text-gray-300 text-2xl">&times;</button>
+                <button id="closeCheckoutModal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
             </div>
             
             <form id="checkoutForm" class="space-y-4">
@@ -197,7 +272,7 @@
                     <textarea id="deliveryAddress" required rows="3" class="w-full px-3 py-2 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50" placeholder="Enter your complete delivery address"></textarea>
                 </div>
                 
-                <div class="bg-white bg-opacity-10 p-3 rounded-lg">
+                <div class="bg-gray-700 p-3 rounded-lg">
                     <div class="flex justify-between text-white mb-1">
                         <span>Subtotal:</span>
                         <span id="checkoutSubtotal">₹0.00</span>
@@ -221,10 +296,10 @@
 
     <!-- Location Modal -->
     <div id="locationModal" class="modal fixed inset-0 hidden items-center justify-center z-50">
-        <div class="glass-card rounded-lg p-6 max-w-md w-full mx-4">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-white">Set Your Location</h2>
-                <button id="closeLocationModal" class="text-white hover:text-gray-300 text-2xl">&times;</button>
+                <button id="closeLocationModal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
             </div>
             
             <div class="space-y-4">
@@ -241,10 +316,11 @@
                 <div class="space-y-2">
                     <input type="number" id="manualLat" step="any" placeholder="Latitude" class="w-full px-3 py-2 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50">
                     <input type="number" id="manualLng" step="any" placeholder="Longitude" class="w-full px-3 py-2 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50">
-                    <button id="setManualLocation" class="w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white py-2 rounded-lg transition-all duration-300">
+                    <button id="setManualLocation" class="bg-gray-500 hover:bg-gray-600 w-full text-white py-2 rounded-lg transition-all duration-300">
                         Set Location
                     </button>
                 </div>
+                <p id="locationStatus" class="text-sm text-gray-400 text-center mt-2"></p>
             </div>
         </div>
     </div>
@@ -266,6 +342,7 @@
         const cartModal = document.getElementById('cartModal');
         const checkoutModal = document.getElementById('checkoutModal');
         const locationModal = document.getElementById('locationModal');
+        const locationStatus = document.getElementById('locationStatus'); // Added location status element
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
@@ -286,13 +363,14 @@
                     showNotification('Your cart is empty!', 'warning');
                     return;
                 }
+                // Always try to get location before opening checkout if not already set
                 if (!customerLocation) {
-                    showNotification('Please set your location first!', 'warning');
+                    showNotification('Please set your location first to calculate delivery!', 'warning');
                     toggleModal('locationModal');
                     return;
                 }
-                toggleModal('cartModal');
-                toggleModal('checkoutModal');
+                toggleModal('cartModal'); // Close cart modal
+                toggleModal('checkoutModal'); // Open checkout modal
                 updateCheckoutSummary();
             });
             document.getElementById('closeCheckoutModal').addEventListener('click', () => toggleModal('checkoutModal'));
@@ -309,16 +387,22 @@
 
         // Load menu items
         async function loadMenu() {
+            console.log('loadMenu: Function started.');
             try {
                 const response = await fetch('/api/menu');
-                if (!response.ok) throw new Error('Failed to load menu');
+                if (!response.ok) {
+                    const errorText = await response.text(); // Get raw text for better debugging
+                    throw new Error(`Failed to load menu: ${response.status} - ${errorText}`);
+                }
                 
                 menuItems = await response.json();
+                console.log('loadMenu: Raw menu data received:', menuItems);
                 renderMenu();
                 renderCategories();
             } catch (error) {
-                console.error('Error loading menu:', error);
-                showNotification('Failed to load menu items', 'error');
+                console.error('loadMenu: Error loading menu:', error);
+                menuGrid.innerHTML = '<p class="col-span-full text-center text-red-500">Failed to load menu items. Please try again later.</p>';
+                showNotification('Failed to load menu items. Please check your internet connection or try again later.', 'error');
             } finally {
                 loadingState.classList.add('hidden');
             }
@@ -326,58 +410,72 @@
 
         // Load shop settings
         async function loadShopSettings() {
+            console.log('loadShopSettings: Function started.');
             try {
                 const response = await fetch('/api/public/settings');
-                if (!response.ok) throw new Error('Failed to load shop settings');
+                if (!response.ok) {
+                     const errorText = await response.text(); // Get raw text for better debugging
+                    throw new Error(`Failed to load shop settings: ${response.status} - ${errorText}`);
+                }
                 
                 shopSettings = await response.json();
+                console.log('loadShopSettings: Raw shop settings received:', shopSettings);
             } catch (error) {
-                console.error('Error loading shop settings:', error);
-                showNotification('Failed to load shop settings', 'error');
+                console.error('loadShopSettings: Error loading shop settings:', error);
+                showNotification('Failed to load shop settings. Delivery calculation might be affected.', 'error');
             }
         }
 
         // Render menu items
         function renderMenu(category = 'all') {
+            console.log('renderMenu: Function called with category:', category);
             const filteredItems = category === 'all' 
                 ? menuItems 
                 : menuItems.filter(item => item.category === category);
 
             if (filteredItems.length === 0) {
-                menuGrid.innerHTML = '';
+                console.log('renderMenu: No items to render or filteredItems is empty.');
+                menuGrid.innerHTML = ''; // Ensure grid is empty
                 emptyState.classList.remove('hidden');
                 return;
             }
 
             emptyState.classList.add('hidden');
             
-            menuGrid.innerHTML = filteredItems.map(item => `
-                <div class="food-card glass-card rounded-lg overflow-hidden">
-                    <img src="${item.imageUrl}" alt="${item.name}" class="w-full h-48 object-cover">
-                    <div class="p-4">
-                        <div class="flex justify-between items-start mb-2">
-                            <h3 class="text-lg font-semibold text-white">${item.name}</h3>
-                            ${item.isTrending ? '<span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full">🔥 Trending</span>' : ''}
-                        </div>
-                        <p class="text-gray-300 text-sm mb-3">${item.description || 'Delicious food item'}</p>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xl font-bold text-white">₹${item.price.toFixed(2)}</span>
-                            <button onclick="addToCart('${item._id}')" class="btn-primary px-4 py-2 rounded-lg text-white font-medium">
-                                Add to Cart
-                            </button>
+            menuGrid.innerHTML = filteredItems.map(item => {
+                // Ensure item.price is a number before calling toFixed
+                const displayPrice = typeof item.price === 'number' ? item.price.toFixed(2) : '0.00';
+                return `
+                    <div class="food-card rounded-lg overflow-hidden">
+                        <img src="${item.imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/400x300/cccccc/333333?text=Food+Item';" alt="${item.name}" class="w-full h-48 object-cover">
+                        <div class="p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="text-lg font-semibold text-white">${item.name}</h3>
+                                ${item.isTrending ? '<span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full">🔥 Trending</span>' : ''}
+                            </div>
+                            <p class="text-gray-300 text-sm mb-3">${item.description || 'Delicious food item'}</p>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xl font-bold text-white">₹${displayPrice}</span>
+                                <button onclick="addToCart('${item._id}')" class="btn-primary px-4 py-2 rounded-lg text-white font-medium ${!item.isAvailable ? 'opacity-50 cursor-not-allowed' : ''}" ${!item.isAvailable ? 'disabled' : ''}>
+                                    Add to Cart
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+            console.log('renderMenu: menuGrid.innerHTML updated with items.');
         }
 
         // Render categories
         function renderCategories() {
-            const categories = ['all', ...new Set(menuItems.map(item => item.category))];
+            console.log('renderCategories: Function started.');
+            // Filter out null/undefined categories and ensure uniqueness
+            const categories = ['all', ...new Set(menuItems.map(item => item.category).filter(cat => cat))];
             const categoryContainer = document.querySelector('.flex.flex-wrap.gap-2');
             
             categoryContainer.innerHTML = categories.map(category => `
-                <button class="category-btn ${category === 'all' ? 'active' : ''} bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-full text-white transition-all duration-300" data-category="${category}">
+                <button class="category-btn ${category === 'all' ? 'active' : ''} px-4 py-2 rounded-full text-base font-semibold transition-all duration-300" data-category="${category}">
                     ${category === 'all' ? 'All Items' : category}
                 </button>
             `).join('');
@@ -390,12 +488,16 @@
                     renderMenu(e.target.dataset.category);
                 });
             });
+            console.log('renderCategories: Category buttons rendered and listeners attached.');
         }
 
         // Add to cart
         function addToCart(itemId) {
             const item = menuItems.find(i => i._id === itemId);
-            if (!item) return;
+            if (!item || !item.isAvailable) { // Check isAvailable here too
+                showNotification('Item is not available!', 'warning');
+                return;
+            }
 
             const existingItem = cart.find(i => i._id === itemId);
             if (existingItem) {
@@ -447,20 +549,25 @@
             cartEmpty.classList.add('hidden');
             cartSummary.classList.remove('hidden');
 
-            cartItems.innerHTML = cart.map(item => `
-                <div class="flex items-center justify-between bg-white bg-opacity-10 p-3 rounded-lg">
-                    <div class="flex-1">
-                        <h4 class="text-white font-medium">${item.name}</h4>
-                        <p class="text-gray-300 text-sm">₹${item.price.toFixed(2)} each</p>
+            cartItems.innerHTML = cart.map(item => {
+                // Ensure item.price and item.quantity are numbers before toFixed
+                const itemTotalPrice = (typeof item.price === 'number' && typeof item.quantity === 'number') ? (item.price * item.quantity).toFixed(2) : '0.00';
+                return `
+                    <div class="flex items-center justify-between bg-gray-700 p-3 rounded-lg">
+                        <div class="flex-1">
+                            <h4 class="text-white font-medium">${item.name}</h4>
+                            <p class="text-gray-300 text-sm">₹${typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'} each</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="updateQuantity('${item._id}', -1)" class="quantity-btn w-8 h-8 rounded-full text-white flex items-center justify-center">-</button>
+                            <span class="text-white font-medium">${item.quantity}</span>
+                            <button onclick="updateQuantity('${item._id}', 1)" class="quantity-btn w-8 h-8 rounded-full text-white flex items-center justify-center">+</button>
+                            <button onclick="removeFromCart('${item._id}')" class="text-gray-400 hover:text-white ml-2">🗑️</button>
+                        </div>
+                        <span class="text-white font-semibold ml-4">₹${itemTotalPrice}</span>
                     </div>
-                    <div class="flex items-center space-x-2">
-                        <button onclick="updateQuantity('${item._id}', -1)" class="quantity-btn w-8 h-8 rounded-full text-white">-</button>
-                        <span class="text-white font-medium">${item.quantity}</span>
-                        <button onclick="updateQuantity('${item._id}', 1)" class="quantity-btn w-8 h-8 rounded-full text-white">+</button>
-                        <button onclick="removeFromCart('${item._id}')" class="text-red-400 hover:text-red-300 ml-2">🗑️</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             updateCartSummary();
         }
@@ -485,25 +592,37 @@
 
         // Get current location
         function getCurrentLocation() {
+            locationStatus.textContent = 'Getting your location...';
             if (!navigator.geolocation) {
+                locationStatus.textContent = 'Geolocation is not supported by your browser.';
                 showNotification('Geolocation is not supported by this browser', 'error');
                 return;
             }
 
             navigator.geolocation.getCurrentPosition(
-                (position) => {
+                async (position) => {
                     customerLocation = {
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude
                     };
-                    calculateDeliveryCost();
-                    toggleModal('locationModal');
+                    // Update hidden inputs for form submission
+                    document.getElementById('customerLatitude').value = customerLocation.latitude;
+                    document.getElementById('customerLongitude').value = customerLocation.longitude;
+
+                    locationStatus.textContent = `Location found! Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
+                    await calculateDeliveryCost();
+                    toggleModal('locationModal'); // Close location modal after successful fetch
                     showNotification('Location set successfully!', 'success');
                 },
                 (error) => {
                     console.error('Error getting location:', error);
-                    showNotification('Failed to get current location', 'error');
-                }
+                    locationStatus.textContent = 'Could not get location. Please try again or enter manually.';
+                    customerLocation = null; // Reset location
+                    deliveryCost = 0; // Reset delivery cost
+                    updateCartSummary(); // Update cart summary to reflect 0 delivery cost
+                    showNotification('Failed to get current location. Please try again or enter manually.', 'error');
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
@@ -513,19 +632,30 @@
             const lng = parseFloat(document.getElementById('manualLng').value);
 
             if (isNaN(lat) || isNaN(lng)) {
+                locationStatus.textContent = 'Please enter valid numbers for coordinates.';
                 showNotification('Please enter valid coordinates', 'error');
                 return;
             }
 
             customerLocation = { latitude: lat, longitude: lng };
-            calculateDeliverycost();
-            toggleModal('locationModal');
+            // Update hidden inputs for form submission
+            document.getElementById('customerLatitude').value = customerLocation.latitude;
+            document.getElementById('customerLongitude').value = customerLocation.longitude;
+
+            locationStatus.textContent = `Manual location set! Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
+            calculateDeliveryCost();
+            toggleModal('locationModal'); // Close location modal
             showNotification('Location set successfully!', 'success');
         }
 
-        // Calculate delivery cost
-        async function calculateDeliverycost() {
-            if (!customerLocation) return;
+        // Calculate delivery cost (renamed from calculateDeliverycost)
+        async function calculateDeliveryCost() {
+            if (!customerLocation || !shopSettings || !shopSettings.shopLocation || !shopSettings.deliveryRates) {
+                deliveryCost = 0;
+                updateCartSummary();
+                updateCheckoutSummary(); // Also update checkout summary if it's open
+                return;
+            }
 
             try {
                 const response = await fetch('/api/calculate-delivery-cost', {
@@ -536,14 +666,23 @@
                     body: JSON.stringify({ customerLocation })
                 });
 
-                if (!response.ok) throw new Error('Failed to calculate delivery cost');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to calculate delivery cost: ${response.status} - ${errorText}`);
+                }
 
                 const data = await response.json();
                 deliveryCost = data.transportTax;
                 updateCartSummary();
+                updateCheckoutSummary(); // Update checkout summary with new delivery cost
+                locationStatus.textContent += ` (Delivery: ₹${deliveryCost.toFixed(2)})`; // Update status with delivery cost
             } catch (error) {
                 console.error('Error calculating delivery cost:', error);
-                showNotification('Failed to calculate delivery cost', 'error');
+                deliveryCost = 0; // Default to 0 on error
+                updateCartSummary();
+                updateCheckoutSummary();
+                locationStatus.textContent = 'Error calculating delivery cost. Please try again.';
+                showNotification('Failed to calculate delivery cost. Please try again.', 'error');
             }
         }
 
@@ -556,10 +695,11 @@
             placeOrderBtn.innerHTML = '<div class="loading-spinner"></div> Placing Order...';
 
             try {
-                const formData = new FormData(e.target);
                 const customerName = document.getElementById('customerName').value;
                 const customerPhone = document.getElementById('customerPhone').value;
                 const deliveryAddress = document.getElementById('deliveryAddress').value;
+                const customerLatitude = document.getElementById('customerLatitude').value;
+                const customerLongitude = document.getElementById('customerLongitude').value;
 
                 const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 const totalAmount = subtotal + deliveryCost;
@@ -574,7 +714,10 @@
                     customerName,
                     customerPhone,
                     deliveryAddress,
-                    customerLocation,
+                    customerLocation: customerLatitude && customerLongitude ? {
+                        latitude: parseFloat(customerLatitude),
+                        longitude: parseFloat(customerLongitude)
+                    } : undefined,
                     subtotal,
                     transportTax: deliveryCost,
                     totalAmount
@@ -588,7 +731,10 @@
                     body: JSON.stringify(orderData)
                 });
 
-                if (!response.ok) throw new Error('Failed to place order');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Failed to place order: ${response.status} - ${errorText}`);
+                }
 
                 const result = await response.json();
                 
@@ -601,10 +747,11 @@
                 
                 // Reset form
                 document.getElementById('checkoutForm').reset();
-                
+                locationStatus.textContent = ''; // Clear location status after order
+
             } catch (error) {
                 console.error('Error placing order:', error);
-                showNotification('Failed to place order. Please try again.', 'error');
+                showNotification(`Failed to place order: ${error.message}. Please try again.`, 'error');
             } finally {
                 placeOrderBtn.disabled = false;
                 placeOrderBtn.innerHTML = 'Place Order';
@@ -640,3 +787,4 @@
     </script>
 </body>
 </html>
+
