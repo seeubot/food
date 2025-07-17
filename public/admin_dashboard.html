@@ -448,16 +448,21 @@
                 e.preventDefault();
                 const section = e.target.dataset.section;
                 showSection(`${section}-section`);
+                // Trigger data fetch for the newly shown section
                 if (section === 'orders') fetchOrders();
                 if (section === 'menu') fetchMenuItems();
-                if (section === 'customers') fetchCustomers(); // Call fetchCustomers
+                if (section === 'customers') fetchCustomers();
                 if (section === 'settings') fetchSettings();
             });
         });
 
         // Initial section display: Bot Status and Orders
-        showSection('bot-status-section'); // Show bot status by default
-        showSection('orders-section'); // Also show orders by default, or you can choose one.
+        // Note: Bot status is always visible, orders is the default data section
+        // You might want to remove one of these if you prefer only one active section at a time.
+        // For now, bot status is a fixed panel, and orders is the default content.
+        document.getElementById('bot-status-section').classList.remove('hidden');
+        showSection('orders-section');
+
 
         // --- Modals ---
         function openModal(modalId) {
@@ -545,13 +550,16 @@
             showLoading();
             try {
                 const response = await fetch('/api/admin/orders');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch orders.');
+                }
                 const orders = await response.json();
                 const tableBody = document.getElementById('orders-table-body');
                 tableBody.innerHTML = ''; // Clear previous orders
 
                 if (orders.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-gray-500">No orders found.</td></tr>';
-                    hideLoading();
                     return;
                 }
 
@@ -581,7 +589,7 @@
             } catch (error) {
                 console.error('Error fetching orders:', error);
                 const tableBody = document.getElementById('orders-table-body');
-                tableBody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-red-500">Error loading orders.</td></tr>';
+                tableBody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-red-500">Error loading orders: ${error.message}</td></tr>`;
             } finally {
                 hideLoading();
             }
@@ -595,11 +603,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: newStatus })
                 });
-                if (!response.ok) throw new Error('Failed to update order status');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to update order status.');
+                }
                 await fetchOrders(); // Refresh orders
             } catch (error) {
                 console.error('Error updating order status:', error);
-                alert('Failed to update order status. Please try again.'); // Using alert for simplicity, replace with custom modal
+                alert(`Failed to update order status. Please try again. Details: ${error.message}`);
             } finally {
                 hideLoading();
             }
@@ -609,6 +620,10 @@
             showLoading();
             try {
                 const response = await fetch(`/api/admin/orders/${orderId}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch order details.');
+                }
                 const order = await response.json();
                 const detailContent = document.getElementById('order-detail-content');
                 detailContent.innerHTML = `
@@ -633,7 +648,7 @@
                 openModal('order-detail-modal');
             } catch (error) {
                 console.error('Error fetching order details:', error);
-                alert('Failed to fetch order details.'); // Using alert for simplicity, replace with custom modal
+                alert(`Failed to fetch order details. Details: ${error.message}`);
             } finally {
                 hideLoading();
             }
@@ -656,13 +671,16 @@
             showLoading();
             try {
                 const response = await fetch('/api/admin/menu');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch menu items.');
+                }
                 const products = await response.json();
                 const tableBody = document.getElementById('menu-table-body');
                 tableBody.innerHTML = '';
 
                 if (products.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-gray-500">No menu items found.</td></tr>';
-                    hideLoading();
                     return;
                 }
 
@@ -692,7 +710,7 @@
             } catch (error) {
                 console.error('Error fetching menu items:', error);
                 const tableBody = document.getElementById('menu-table-body');
-                tableBody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-red-500">Error loading menu items.</td></tr>';
+                tableBody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-red-500">Error loading menu items: ${error.message}</td></tr>`;
             } finally {
                 hideLoading();
             }
@@ -728,11 +746,15 @@
             showLoading();
             try {
                 const response = await fetch(`/api/admin/menu/${productId}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch product for edit.');
+                }
                 const product = await response.json();
                 openProductModal(product);
             } catch (error) {
                 console.error('Error fetching product for edit:', error);
-                alert('Failed to load product for editing.');
+                alert(`Failed to load product for editing. Details: ${error.message}`);
             } finally {
                 hideLoading();
             }
@@ -750,6 +772,8 @@
             productData.isTrending = productData.isTrending === 'on';
             productData.price = parseFloat(productData.price);
 
+            console.log('Sending product data:', productData); // Frontend log of data being sent
+
             try {
                 let response;
                 if (productId) {
@@ -765,12 +789,15 @@
                         body: JSON.stringify(productData)
                     });
                 }
-                if (!response.ok) throw new Error('Failed to save product');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `Failed to save product. Server response: ${response.status}`);
+                }
                 closeModal('product-modal');
                 await fetchMenuItems(); // Refresh menu
             } catch (error) {
                 console.error('Error saving product:', error);
-                alert('Failed to save product. Please check your input.');
+                alert(`Failed to save product. Please check your input. Details: ${error.message}`);
             } finally {
                 hideLoading();
             }
@@ -785,11 +812,14 @@
                 const response = await fetch(`/api/admin/menu/${productId}`, {
                     method: 'DELETE'
                 });
-                if (!response.ok) throw new Error('Failed to delete product');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to delete product.');
+                }
                 await fetchMenuItems(); // Refresh menu
             } catch (error) {
                 console.error('Error deleting product:', error);
-                alert('Failed to delete product.');
+                alert(`Failed to delete product. Details: ${error.message}`);
             } finally {
                 hideLoading();
             }
@@ -800,13 +830,16 @@
             showLoading();
             try {
                 const response = await fetch('/api/admin/customers');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch customer data.');
+                }
                 const customers = await response.json();
                 const tableBody = document.getElementById('customers-table-body');
                 tableBody.innerHTML = '';
 
                 if (customers.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-gray-500">No customer data found.</td></tr>';
-                    hideLoading();
                     return;
                 }
 
@@ -834,7 +867,7 @@
             } catch (error) {
                 console.error('Error fetching customers:', error);
                 const tableBody = document.getElementById('customers-table-body');
-                tableBody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-red-500">Error loading customer data.</td></tr>';
+                tableBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error loading customer data: ${error.message}</td></tr>`;
             } finally {
                 hideLoading();
             }
@@ -855,6 +888,10 @@
             showLoading();
             try {
                 const response = await fetch('/api/admin/settings');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch settings.');
+                }
                 const settings = await response.json();
                 document.getElementById('shop-name').value = settings.shopName || '';
                 document.getElementById('shop-latitude').value = settings.shopLocation?.latitude || 0;
@@ -869,7 +906,7 @@
                 }
             } catch (error) {
                 console.error('Error fetching settings:', error);
-                alert('Failed to load settings.');
+                alert(`Failed to load settings. Details: ${error.message}`);
             } finally {
                 hideLoading();
             }
@@ -912,17 +949,22 @@
                 }
             });
 
+            console.log('Sending settings data:', settingsData); // Frontend log of data being sent
+
             try {
                 const response = await fetch('/api/admin/settings', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(settingsData)
                 });
-                if (!response.ok) throw new Error('Failed to save settings');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `Failed to save settings. Server response: ${response.status}`);
+                }
                 alert('Settings saved successfully!'); // Using alert for simplicity, replace with custom modal
             } catch (error) {
                 console.error('Error saving settings:', error);
-                alert('Failed to save settings. Please check your input.');
+                alert(`Failed to save settings. Please check your input. Details: ${error.message}`);
             } finally {
                 hideLoading();
             }
