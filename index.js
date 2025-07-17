@@ -590,15 +590,18 @@ app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
+        console.log(`Updating order ${id} to status: ${status}`); // Log update attempt
         const order = await Order.findByIdAndUpdate(id, { status }, { new: true });
         if (!order) {
+            console.warn(`Order ${id} not found for status update.`);
             return res.status(404).json({ message: 'Order not found' });
         }
+        console.log(`Order ${id} updated successfully to status: ${order.status}`);
         // Optional: Notify customer via WhatsApp about status update
         // client.sendMessage(order.customerPhone + '@c.us', `Your order #${order._id.toString().substring(0,6)} has been updated to: ${order.status}`);
         res.json(order);
     } catch (error) {
-        console.error('Error updating order status:', error);
+        console.error('Error updating order status:', error.message); // Log specific error
         res.status(500).json({ message: 'Error updating order status' });
     }
 });
@@ -609,7 +612,7 @@ app.get('/api/admin/menu', isAuthenticated, async (req, res) => {
         const products = await Product.find().sort({ name: 1 });
         res.json(products);
     } catch (error) {
-        console.error('Error fetching admin menu:', error);
+        console.error('Error fetching admin menu:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching menu items' });
     }
 });
@@ -620,40 +623,52 @@ app.get('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
         if (!product) return res.status(404).json({ message: 'Product not found' });
         res.json(product);
     } catch (error) {
-        console.error('Error fetching single product:', error);
+        console.error('Error fetching single product:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching product' });
     }
 });
 
 app.post('/api/admin/menu', isAuthenticated, async (req, res) => {
     try {
+        console.log('Attempting to add new menu item. Received body:', req.body); // Log received body
         const newProduct = new Product(req.body);
         await newProduct.save();
+        console.log('New menu item added successfully:', newProduct.name);
         res.status(201).json(newProduct);
     } catch (error) {
-        console.error('Error adding menu item:', error);
-        res.status(500).json({ message: 'Error adding menu item' });
+        console.error('Error adding menu item:', error.message); // Log specific error
+        res.status(500).json({ message: 'Error adding menu item', details: error.message }); // Send details to frontend for debugging
     }
 });
 
 app.put('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
     try {
-        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedProduct) return res.status(404).json({ message: 'Product not found' });
+        console.log(`Attempting to update menu item ${req.params.id}. Received body:`, req.body); // Log received body
+        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }); // runValidators ensures schema validation on update
+        if (!updatedProduct) {
+            console.warn(`Menu item ${req.params.id} not found for update.`);
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        console.log('Menu item updated successfully:', updatedProduct.name);
         res.json(updatedProduct);
     } catch (error) {
-        console.error('Error updating menu item:', error);
-        res.status(500).json({ message: 'Error updating menu item' });
+        console.error('Error updating menu item:', error.message); // Log specific error
+        res.status(500).json({ message: 'Error updating menu item', details: error.message }); // Send details to frontend for debugging
     }
 });
 
 app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
     try {
+        console.log(`Attempting to delete menu item ${req.params.id}.`);
         const deletedProduct = await Product.findByIdAndDelete(req.params.id);
-        if (!deletedProduct) return res.status(404).json({ message: 'Product not found' });
+        if (!deletedProduct) {
+            console.warn(`Menu item ${req.params.id} not found for deletion.`);
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        console.log('Menu item deleted successfully:', deletedProduct.name);
         res.json({ message: 'Product deleted successfully' });
     } catch (error) {
-        console.error('Error deleting menu item:', error);
+        console.error('Error deleting menu item:', error.message); // Log specific error
         res.status(500).json({ message: 'Error deleting menu item' });
     }
 });
@@ -662,20 +677,26 @@ app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
 app.get('/api/admin/settings', isAuthenticated, async (req, res) => {
     try {
         const settings = await AdminSettings.findOne();
+        if (!settings) {
+            console.warn('Admin settings not found in DB. Returning default structure.');
+            return res.json({ shopName: 'My Food Business', shopLocation: { latitude: 0, longitude: 0 }, deliveryRates: [] });
+        }
         res.json(settings);
     } catch (error) {
-        console.error('Error fetching admin settings:', error);
+        console.error('Error fetching admin settings:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching settings' });
     }
 });
 
 app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
     try {
-        const updatedSettings = await AdminSettings.findOneAndUpdate({}, req.body, { new: true, upsert: true });
+        console.log('Attempting to update admin settings. Received body:', req.body); // Log received body
+        const updatedSettings = await AdminSettings.findOneAndUpdate({}, req.body, { new: true, upsert: true, runValidators: true }); // runValidators ensures schema validation
+        console.log('Admin settings updated successfully.');
         res.json(updatedSettings);
     } catch (error) {
-        console.error('Error updating admin settings:', error);
-        res.status(500).json({ message: 'Error updating settings' });
+        console.error('Error updating admin settings:', error.message); // Log specific error
+        res.status(500).json({ message: 'Error updating settings', details: error.message }); // Send details to frontend for debugging
     }
 });
 
@@ -711,7 +732,7 @@ app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
         }
         res.json(customersData);
     } catch (error) {
-        console.error('Error fetching customer data:', error);
+        console.error('Error fetching customer data:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching customer data' });
     }
 });
@@ -734,7 +755,7 @@ app.get('/api/menu', async (req, res) => {
         const products = await Product.find({ isAvailable: true }).sort({ category: 1, name: 1 });
         res.json(products);
     } catch (error) {
-        console.error('Error fetching public menu:', error);
+        console.error('Error fetching public menu:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching menu items' });
     }
 });
@@ -746,7 +767,7 @@ app.get('/api/public/settings', async (req, res) => {
         res.json(settings);
     }
     catch (error) {
-        console.error('Error fetching public settings:', error);
+        console.error('Error fetching public settings:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching settings' });
     }
 });
@@ -789,7 +810,7 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
         res.json({ distance, transportTax });
 
     } catch (error) {
-        console.error('Error calculating delivery cost:', error);
+        console.error('Error calculating delivery cost:', error.message); // Log specific error
         res.status(500).json({ message: 'Error calculating delivery cost' });
     }
 });
@@ -847,7 +868,7 @@ app.post('/api/order', async (req, res) => {
 
         res.status(201).json({ message: 'Order placed successfully!', order: newOrder, orderId: newOrder._id }); // Return orderId for tracking
     } catch (error) {
-        console.error('Error placing order:', error);
+        console.error('Error placing order:', error.message); // Log specific error
         res.status(500).json({ message: 'Error placing order.' });
     }
 });
@@ -861,7 +882,7 @@ app.get('/api/order/:id', async (req, res) => {
         }
         res.json(order);
     } catch (error) {
-        console.error('Error fetching order for tracking:', error);
+        console.error('Error fetching order for tracking:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching order details.' });
     }
 });
