@@ -158,21 +158,16 @@ const CustomerNotification = mongoose.model('CustomerNotification', customerNoti
 // --- Initial Data Setup ---
 async function initializeAdminAndSettings() {
     try {
-        let adminUser = await User.findOne({ username: DEFAULT_ADMIN_USERNAME });
-        if (!adminUser) {
-            adminUser = new User({
-                username: DEFAULT_ADMIN_USERNAME,
-                password: DEFAULT_ADMIN_PASSWORD, // This will be hashed by the pre-save hook
-                isAdmin: true
-            });
-            await adminUser.save();
-            console.log(`Default admin user created: ${DEFAULT_ADMIN_USERNAME}/${DEFAULT_ADMIN_PASSWORD}`);
-            console.log('Admin user details after creation:', adminUser);
-        } else {
-            console.log(`Admin user '${DEFAULT_ADMIN_USERNAME}' already exists. Details:`, adminUser);
-            // Optional: If you want to update the password if it changes in env, add logic here.
-            // For now, it only creates if not found.
-        }
+        // Ensure the admin user exists and has isAdmin: true
+        const adminUser = await User.findOneAndUpdate(
+            { username: DEFAULT_ADMIN_USERNAME },
+            {
+                $setOnInsert: { password: await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10) }, // Only hash and set password on insert
+                $set: { isAdmin: true } // Always ensure isAdmin is true
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        console.log(`Admin user '${DEFAULT_ADMIN_USERNAME}' ensured. Details:`, adminUser);
 
         let settings = await AdminSettings.findOne();
         if (!settings) {
@@ -934,7 +929,7 @@ app.post('/api/order', async (req, res) => {
 
         // Notify Admin via WhatsApp
         if (clientReady) {
-            // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
+            // Use YOUR_KOYeb_URL if set, otherwise fallback to localhost for development
             const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
             const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
                                  `Order ID: ${newOrder._id.toString().substring(0, 6)}...\n` +
