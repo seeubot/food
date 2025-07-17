@@ -1,4 +1,5 @@
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js'); // Added MessageMedia
+// index.js
+const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
@@ -12,8 +13,8 @@ const MongoStore = require('connect-mongo');
 
 // --- Configuration ---
 const PORT = process.env.PORT || 8080;
-const MONGODB_URI = "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
-const ADMIN_NUMBER = '918897350151'; // Admin WhatsApp number for notifications (without +)
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
+const ADMIN_NUMBER = process.env.ADMIN_NUMBER || '918897350151'; // Admin WhatsApp number for notifications (without +)
 const SESSION_SECRET = process.env.SESSION_SECRET || 'supersecretkeyforfoodbot'; // CHANGE THIS IN PRODUCTION!
 const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for whatsapp-web.js session files
 
@@ -21,9 +22,6 @@ const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for whatsapp-web.js sess
 const RECONNECT_DELAY_MS = 5000; // 5 seconds delay before trying to re-initialize
 const QR_EXPIRY_MS = 60000; // QR code considered expired after 60 seconds if not scanned
 const WEEKLY_NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // Check for notifications every 24 hours
-
-// Welcome Image URL
-const WELCOME_IMAGE_URL = "https://i.postimg.cc/t4B8fw2d/IMG-20250525-WA0003.jpg";
 
 // --- Express App Setup ---
 const app = express();
@@ -337,34 +335,23 @@ client.on('message', async msg => {
     console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body);
 
     const senderNumber = msg.from.split('@')[0];
-    const baseUrl = process.env.NODE_ENV === 'production' ? 'YOUR_KOYEB_URL' : 'http://localhost:8080'; // Replace YOUR_KOYEB_URL in production
+    const baseUrl = process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'; // Use YOUR_KOYEB_URL from env
+    const menuUrl = `${baseUrl}/menu`;
 
     // Update customer notification date on any message received
     await updateCustomerNotification(senderNumber);
 
-    // Basic bot functionalities
-    if (msg.body === '!welcome') {
-        const welcomeMessage = `Hello! Welcome to our food business!
-            \nCheck out our delicious menu here: ${baseUrl}/menu
+    // Welcome message content
+    const welcomeMessage = `Hello! Welcome to our food business!
+            \nCheck out our delicious menu here: ${menuUrl}
             \nHow can I help you today?
             \nHere are some options you can try:
             1. Type *!profile* to view your profile details.
             2. Type *!orders* to see your recent orders.
             3. Type *!help* for assistance.`;
 
-        try {
-            // Create a MessageMedia object from the URL
-            const media = await MessageMedia.fromUrl(WELCOME_IMAGE_URL);
-            // Send the image with the welcome message as a caption
-            await client.sendMessage(msg.from, media, { caption: welcomeMessage });
-            console.log('Welcome image and message sent.');
-        } catch (error) {
-            console.error('Error sending welcome image:', error);
-            // Fallback to sending just the text message if image fails
-            msg.reply(welcomeMessage);
-        }
-    } else if (msg.body === '!menu') {
-        const menuUrl = `${baseUrl}/menu`;
+    // Handle specific commands first
+    if (msg.body === '!menu') {
         msg.reply(`Check out our delicious menu here: ${menuUrl}`);
     } else if (msg.body === '!profile') {
         msg.reply('Your profile details would be displayed here. (Feature under development)');
@@ -387,7 +374,8 @@ client.on('message', async msg => {
     } else if (msg.body === '!help' || msg.body === '!support') {
         msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
     } else {
-        msg.reply(`I received your message! Type *!menu* to see our offerings, or *!help* for assistance.`);
+        // Default response: send the welcome message for any other input
+        msg.reply(welcomeMessage);
     }
 });
 
@@ -412,7 +400,7 @@ async function sendWeeklyNotifications() {
             return;
         }
 
-        const baseUrl = process.env.NODE_ENV === 'production' ? 'YOUR_KOYEB_URL' : 'http://localhost:8080'; // Replace YOUR_KOYEB_URL in production
+        const baseUrl = process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'; // Use YOUR_KOYEB_URL from env
         const menuUrl = `${baseUrl}/menu`;
 
         for (const customer of customersToNotify) {
@@ -564,7 +552,8 @@ app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
     try {
         const orders = await Order.find().sort({ orderDate: -1 });
         res.json(orders);
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error fetching admin orders:', error);
         res.status(500).json({ message: 'Error fetching orders' });
     }
@@ -677,6 +666,44 @@ app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
     }
 });
 
+// NEW API: Get all customers with their last known location from orders
+app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
+    try {
+        const customerNotifications = await CustomerNotification.find({});
+        const customersData = [];
+        const settings = await AdminSettings.findOne({}, 'shopLocation'); // Get shop location for tracking
+
+        for (const customerNotif of customerNotifications) {
+            const latestOrder = await Order.findOne({ customerPhone: customerNotif.customerPhone })
+                                            .sort({ orderDate: -1 })
+                                            .select('customerName customerPhone customerLocation') // Select only needed fields
+                                            .lean(); // Return plain JavaScript objects
+
+            if (latestOrder) {
+                customersData.push({
+                    customerName: latestOrder.customerName,
+                    customerPhone: latestOrder.customerPhone,
+                    lastKnownLocation: latestOrder.customerLocation || null, // Can be null if order didn't have location
+                    shopLocation: settings ? settings.shopLocation : null // Include shop location
+                });
+            } else {
+                // If no order found, still list the customer from notifications but without location
+                customersData.push({
+                    customerName: 'N/A', // Or try to infer from other data if available
+                    customerPhone: customerNotif.customerPhone,
+                    lastKnownLocation: null,
+                    shopLocation: settings ? settings.shopLocation : null
+                });
+            }
+        }
+        res.json(customersData);
+    } catch (error) {
+        console.error('Error fetching customer data:', error);
+        res.status(500).json({ message: 'Error fetching customer data' });
+    }
+});
+
+
 // Public Web Menu Panel (Now serves menu_panel.html)
 app.get('/menu', async (req, res) => {
     try {
@@ -786,13 +813,14 @@ app.post('/api/order', async (req, res) => {
 
         // Notify Admin via WhatsApp
         if (clientReady) {
+            const baseUrl = process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'; // Use YOUR_KOYEB_URL from env
             const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
                                  `Order ID: ${newOrder._id.toString().substring(0, 6)}...\n` +
                                  `Customer: ${newOrder.customerName}\n` +
                                  `Phone: ${newOrder.customerPhone}\n` +
                                  `Total: ₹${newOrder.totalAmount.toFixed(2)}\n` +
                                  `Address: ${newOrder.deliveryAddress}\n\n` +
-                                 `View on Dashboard: ${req.protocol}://${req.get('host')}/admin/dashboard`;
+                                 `View on Dashboard: ${baseUrl}/admin/dashboard`;
             client.sendMessage(ADMIN_NUMBER + '@c.us', adminMessage)
                 .then(() => console.log('Admin notified via WhatsApp for new order'))
                 .catch(err => console.error('Error sending WhatsApp notification to admin:', err));
@@ -830,7 +858,7 @@ server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
     console.log('Waiting for WhatsApp client to be ready...');
     console.log('Visit the root URL of your deployment to check status and scan the QR.');
-    console.log(`Admin login: ${process.env.NODE_ENV === 'production' ? 'YOUR_KOYEB_URL' : 'http://localhost:8080'}/admin/login`);
-    console.log(`Public menu: ${process.env.NODE_ENV === 'production' ? 'YOUR_KOYEB_URL' : 'http://localhost:8080'}/menu`);
+    console.log(`Admin login: ${process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'}/admin/login`);
+    console.log(`Public menu: ${process.env.NODE_ENV === 'production' ? process.env.YOUR_KOYEB_URL : 'http://localhost:8080'}/menu`);
 });
 
