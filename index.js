@@ -58,7 +58,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- MongoDB Connection ---
 mongoose.connect(MONGODB_URI)
-    .then(() => console.log('MongoDB connected successfully'))
+    .then(() => {
+        console.log('MongoDB connected successfully');
+        // Initialize admin and settings ONLY after DB connection is established
+        initializeAdminAndSettings();
+    })
     .catch(err => console.error('MongoDB connection error:', err));
 
 // --- Mongoose Schemas ---
@@ -73,6 +77,7 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', async function(next) {
     if (this.isModified('password')) {
         this.password = await bcrypt.hash(this.password, 10);
+        console.log(`Password for user ${this.username} hashed.`);
     }
     next();
 });
@@ -153,11 +158,14 @@ async function initializeAdminAndSettings() {
         if (!adminUser) {
             adminUser = new User({
                 username: 'admin',
-                password: 'adminpassword',
+                password: 'adminpassword', // This will be hashed by the pre-save hook
                 isAdmin: true
             });
             await adminUser.save();
             console.log('Default admin user created: admin/adminpassword');
+            console.log('Admin user details after creation:', adminUser);
+        } else {
+            console.log('Admin user already exists. Details:', adminUser);
         }
 
         let settings = await AdminSettings.findOne();
@@ -174,11 +182,25 @@ async function initializeAdminAndSettings() {
             await settings.save();
             console.log('Default admin settings created.');
         }
+
+        // Start the Express server ONLY after admin and settings are initialized
+        server.listen(PORT, () => {
+            console.log(`Server listening on port ${PORT}`);
+            console.log('Initializing WhatsApp client...');
+            console.log('Visit the root URL of your deployment to check status and scan the QR.');
+            console.log(`Admin login: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/admin/login`);
+            console.log(`Public menu: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/menu`);
+        });
+
+        // Initial client initialization on server startup
+        client.initialize();
+
     } catch (error) {
         console.error('Error initializing admin and settings:', error);
+        // Exit process if initial setup fails critically
+        process.exit(1);
     }
 }
-initializeAdminAndSettings();
 
 // --- WhatsApp Bot Setup ---
 let qrCodeDataURL = null;
@@ -360,9 +382,7 @@ client.on('message', async msg => {
                 const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
                 if (customerOrders.length > 0) {
                     let orderList = 'Your recent orders:\n';
-                    customerOrders.forEach((order, index) => {
-                        orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
-                    });
+                    customerList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
                     msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
                 } else {
                     msg.reply('You have no recent orders. Why not place one now? Reply with *1* for menu.');
@@ -450,6 +470,13 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 
 // Admin Authentication Middleware
 function isAuthenticated(req, res, next) {
+    console.log('isAuthenticated check:', {
+        sessionId: req.session.id,
+        userId: req.session.userId,
+        isAdmin: req.session.isAdmin,
+        path: req.path
+    });
+
     if (req.session.userId && req.session.isAdmin) {
         return next();
     }
@@ -461,6 +488,7 @@ function isAuthenticated(req, res, next) {
     }
 
     // For regular page requests, redirect to login
+    console.log('Redirecting to admin login due to unauthorized access.');
     res.redirect('/admin/login');
 }
 
@@ -525,17 +553,28 @@ app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
     try {
         const user = await User.findOne({ username });
-        if (user && await user.comparePassword(password)) {
-            req.session.userId = user._id;
-            req.session.isAdmin = user.isAdmin;
-            if (user.isAdmin) {
-                return res.redirect('/admin/dashboard');
+        if (user) {
+            console.log(`Login attempt for user: ${username}, isAdmin: ${user.isAdmin}`);
+            if (await user.comparePassword(password)) {
+                req.session.userId = user._id;
+                req.session.isAdmin = user.isAdmin;
+                console.log(`Session established for ${username}: userId=${req.session.userId}, isAdmin=${req.session.isAdmin}`);
+
+                if (user.isAdmin) {
+                    return res.redirect('/admin/dashboard');
+                } else {
+                    req.session.message = 'You are not authorized to access the admin panel.';
+                    console.log(`User ${username} is not an admin. Redirecting to login.`);
+                    return res.redirect('/admin/login');
+                }
             } else {
-                req.session.message = 'You are not authorized to access the admin panel.';
+                req.session.message = 'Invalid username or password.';
+                console.log(`Invalid password for user: ${username}`);
                 return res.redirect('/admin/login');
             }
         } else {
             req.session.message = 'Invalid username or password.';
+            console.log(`User not found: ${username}`);
             return res.redirect('/admin/login');
         }
     } catch (error) {
@@ -548,6 +587,7 @@ app.post('/admin/login', async (req, res) => {
 app.get('/admin/logout', (req, res) => {
     req.session.destroy(err => {
         if (err) console.error('Error destroying session:', err);
+        console.log('Session destroyed. Redirecting to login.');
         res.redirect('/admin/login');
     });
 });
@@ -925,17 +965,4 @@ app.get('/api/order/:id', async (req, res) => {
         res.status(500).json({ message: 'Error fetching order details.' });
     }
 });
-
-
-// Start the Express server
-server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-    console.log('Initializing WhatsApp client...');
-    console.log('Visit the root URL of your deployment to check status and scan the QR.');
-    console.log(`Admin login: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/admin/login`);
-    console.log(`Public menu: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/menu`);
-});
-
-// Initial client initialization on server startup
-client.initialize();
 
