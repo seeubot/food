@@ -19,7 +19,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'supersecretkeyforfoodbot';
 const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for whatsapp-web.js session files
 
 // New: Reconnection and QR expiry settings
-const RECONNECT_DELAY_MS = 5000; // 5 seconds delay before trying to re-initialize
+const RECONNECT_DELAY_MS = 5000; // 5 seconds delay (used for internal timers, not auto-reconnect anymore)
 const QR_EXPIRY_MS = 60000; // QR code considered expired after 60 seconds if not scanned
 const WEEKLY_NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // Check for notifications every 24 hours
 
@@ -183,9 +183,8 @@ initializeAdminAndSettings();
 // --- WhatsApp Bot Setup ---
 let qrCodeDataURL = null;
 let clientReady = false;
-let reconnectTimer = null; // To control re-initialization attempts
 let qrExpiryTimer = null; // To track QR code validity
-let botCurrentStatus = 'initializing'; // Global variable to hold bot status
+let botCurrentStatus = 'offline_qr_needed'; // Initial status: bot is offline, needs QR
 
 // Update bot status and emit via Socket.IO
 function updateBotStatus(status, qrData = null) {
@@ -194,7 +193,7 @@ function updateBotStatus(status, qrData = null) {
     if (qrData) {
         qrCodeDataURL = qrData;
         io.emit('qrCode', qrData);
-    } else if (status !== 'qr_received') { // Clear QR if not receiving a new one
+    } else if (status !== 'qr_received' && status !== 'initializing') { // Clear QR if not receiving a new one or initializing
         qrCodeDataURL = null;
         io.emit('qrCode', null);
     }
@@ -244,7 +243,7 @@ client.on('qr', (qr) => {
 
             qrExpiryTimer = setTimeout(() => {
                 updateBotStatus('qr_expired');
-                console.log('QR code expired. Please restart bot or wait for new QR.');
+                console.log('QR code expired. Please request a new QR.');
             }, QR_EXPIRY_MS);
         }
     });
@@ -253,7 +252,6 @@ client.on('qr', (qr) => {
 client.on('ready', () => {
     console.log('Client is ready!');
     clientReady = true;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
     if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
     console.log('WhatsApp bot is connected and operational.');
     updateBotStatus('ready');
@@ -263,47 +261,33 @@ client.on('ready', () => {
 
 client.on('authenticated', (session) => {
     console.log('AUTHENTICATED', session);
-    if (reconnectTimer) clearTimeout(reconnectTimer);
     updateBotStatus('authenticated');
 });
 
 client.on('auth_failure', async msg => {
     console.error('AUTHENTICATION FAILURE', msg);
-    console.log('Attempting to re-authenticate. Clearing session files...');
+    console.log('Authentication failed. Clearing session files and waiting for manual QR request...');
     clientReady = false;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
     if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-    updateBotStatus('auth_failure');
+    updateBotStatus('auth_failure'); // Indicate auth failure, requires manual QR
 
     try {
         await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
-        console.log('Deleted old session directory. Re-initializing client...');
+        console.log('Deleted old session directory.');
     } catch (err) {
         console.error('Error deleting old session directory:', err);
-    } finally {
-        reconnectTimer = setTimeout(() => {
-            console.log(`Attempting to re-initialize client after ${RECONNECT_DELAY_MS / 1000} seconds.`);
-            client.initialize();
-            updateBotStatus('reconnecting');
-        }, RECONNECT_DELAY_MS);
     }
 });
 
 client.on('disconnected', (reason) => {
     console.log('Client disconnected', reason);
     clientReady = false;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
     if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-    updateBotStatus('disconnected');
-    console.log(`Attempting to re-initialize after ${RECONNECT_DELAY_MS / 1000} seconds...`);
-    reconnectTimer = setTimeout(() => {
-        client.initialize();
-        updateBotStatus('reconnecting');
-    }, RECONNECT_DELAY_MS);
+    updateBotStatus('disconnected'); // Indicate disconnected, requires manual QR
+    console.log('WhatsApp client disconnected. Waiting for manual QR request.');
 });
 
-// Initial client initialization
-console.log('Initializing WhatsApp client...');
+// Initial Socket.IO connection handling
 io.on('connection', (socket) => {
     console.log('A user connected to Socket.IO');
     // Emit current status and QR code to newly connected clients
@@ -312,7 +296,6 @@ io.on('connection', (socket) => {
         socket.emit('qrCode', qrCodeDataURL);
     }
 });
-client.initialize();
 
 // Helper function to upsert customer notification entry
 async function updateCustomerNotification(customerPhone) {
@@ -574,6 +557,24 @@ app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
     });
 });
 
+// NEW API: Request a new QR code for WhatsApp bot
+app.post('/api/admin/request-qr', isAuthenticated, (req, res) => {
+    if (clientReady) {
+        return res.status(400).json({ message: 'Bot is already connected. No new QR needed.' });
+    }
+    console.log('Admin requested new QR. Initializing client...');
+    // Clear any existing QR expiry timer if a new request comes in
+    if (qrExpiryTimer) {
+        clearTimeout(qrExpiryTimer);
+        qrExpiryTimer = null;
+    }
+    // Set status to initializing and clear current QR data immediately
+    updateBotStatus('initializing');
+    // Initialize the client; this will trigger 'qr' or 'ready' event
+    client.initialize();
+    res.json({ message: 'Attempting to generate new QR code. Check dashboard for updates.' });
+});
+
 
 // --- API for Admin Dashboard Orders ---
 app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
@@ -757,7 +758,7 @@ app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
 app.get('/menu', async (req, res) => {
     try {
         const menuPanelHtml = await fs.readFile(path.join(__dirname, 'public', 'menu_panel.html'), 'utf8');
-        res.send(menuPanelHtml);
+        res.send(htmlContent);
     } catch (error) {
         console.error('Error serving menu_panel.html:', error);
         res.status(500).send('<h1>Error loading Menu Panel.</h1><p>Please check server logs.</p>');
@@ -862,7 +863,7 @@ app.post('/api/order', async (req, res) => {
 
         // Notify Admin via WhatsApp
         if (clientReady) {
-            // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
+            // Use YOUR_KOYeb_URL if set, otherwise fallback to localhost for development
             const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
             const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
                                  `Order ID: ${newOrder._id.toString().substring(0, 6)}...\n` +
@@ -906,8 +907,7 @@ app.get('/api/order/:id', async (req, res) => {
 // Start the Express server
 server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
-    console.log('Waiting for WhatsApp client to be ready...');
-    console.log('Visit the root URL of your deployment to check status and scan the QR.');
+    console.log('WhatsApp client will not auto-initialize. Request QR from Admin Dashboard.');
     console.log(`Admin login: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/admin/login`);
     console.log(`Public menu: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/menu`);
 });
