@@ -326,6 +326,7 @@
 
         // --- Fetch Menu Items and Settings ---
         async function fetchMenuAndSettings() {
+            console.log('fetchMenuAndSettings: Function started.');
             showLoading();
             try {
                 const [menuResponse, settingsResponse] = await Promise.all([
@@ -333,17 +334,23 @@
                     fetch('/api/public/settings')
                 ]);
 
-                products = await menuResponse.json();
-                const settings = await settingsResponse.json();
+                const menuData = await menuResponse.json();
+                const settingsData = await settingsResponse.json();
 
-                shopLocation = settings.shopLocation;
+                console.log('fetchMenuAndSettings: Raw menu data received:', menuData);
+                console.log('fetchMenuAndSettings: Raw settings data received:', settingsData);
+
+                products = menuData; // Assign fetched menu data to global products array
+                shopLocation = settingsData.shopLocation;
                 // Ensure deliveryRates is an array before sorting
-                deliveryRates = Array.isArray(settings.deliveryRates) ? settings.deliveryRates.sort((a, b) => a.kms - b.kms) : [];
+                deliveryRates = Array.isArray(settingsData.deliveryRates) ? settingsData.deliveryRates.sort((a, b) => a.kms - b.kms) : [];
 
-                renderMenu(products);
+                console.log('fetchMenuAndSettings: Global products array after assignment:', products);
+
+                renderMenu(products); // Render all products initially
                 renderCategories(products);
             } catch (error) {
-                console.error('Error fetching menu or settings:', error);
+                console.error('fetchMenuAndSettings: Error fetching menu or settings:', error);
                 document.getElementById('menu-items-grid').innerHTML = '<p class="col-span-full text-center text-red-500">Failed to load menu. Please try again later.</p>';
                 showTemporaryMessage('Failed to load menu. Please try again later.', 'error');
             } finally {
@@ -352,10 +359,12 @@
         }
 
         function renderMenu(itemsToRender) {
+            console.log('renderMenu: Function called with itemsToRender:', itemsToRender);
             const menuGrid = document.getElementById('menu-items-grid');
             menuGrid.innerHTML = ''; // Clear previous items
 
             if (!itemsToRender || itemsToRender.length === 0) {
+                console.log('renderMenu: No items to render or itemsToRender is empty.');
                 document.getElementById('no-items-message').classList.remove('hidden');
                 return;
             } else {
@@ -380,14 +389,18 @@
                         </div>
                     </div>
                 `;
+                console.log('renderMenu: Generated product card for:', product.name, productCard);
                 menuGrid.innerHTML += productCard;
             });
+            console.log('renderMenu: menuGrid.innerHTML updated.');
         }
 
         function renderCategories(allProducts) {
+            console.log('renderCategories: Function called with allProducts:', allProducts);
             const categoriesContainer = document.querySelector('.filter-button').parentNode;
             // Filter out null/undefined categories and ensure uniqueness
             const uniqueCategories = [...new Set(allProducts.map(p => p.category).filter(cat => cat))];
+            console.log('renderCategories: Unique categories found:', uniqueCategories);
 
             // Clear existing dynamic categories, keep 'All' button
             document.querySelectorAll('.filter-button:not([data-category="All"])').forEach(btn => btn.remove());
@@ -398,12 +411,14 @@
                 button.dataset.category = category;
                 button.textContent = category;
                 categoriesContainer.appendChild(button);
+                console.log('renderCategories: Added category button for:', category);
             });
 
             // Add event listeners to new category buttons
             document.querySelectorAll('.filter-button').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const selectedCategory = e.target.dataset.category;
+                    console.log('Category filter clicked:', selectedCategory);
                     document.querySelectorAll('.filter-button').forEach(btn => {
                         btn.classList.remove('bg-green-500', 'text-black');
                         btn.classList.add('bg-gray-200', 'text-white');
@@ -425,6 +440,7 @@
             if (allButton) {
                 allButton.classList.add('bg-green-500', 'text-black');
                 allButton.classList.remove('bg-gray-200', 'text-white');
+                console.log('renderCategories: "All" button set as active.');
             }
         }
 
