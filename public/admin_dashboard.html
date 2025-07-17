@@ -189,8 +189,7 @@
         </div>
         <nav class="flex-grow">
             <ul class="space-y-4">
-                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="bot-status"><i class="fab fa-whatsapp mr-3"></i>Bot Status</a></li>
-                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="qr-management"><i class="fas fa-qrcode mr-3"></i>QR Management</a></li>
+                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="whatsapp-bot"><i class="fab fa-whatsapp mr-3"></i>WhatsApp Bot</a></li>
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="orders"><i class="fas fa-clipboard-list mr-3"></i>Orders</a></li>
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="menu"><i class="fas fa-utensils mr-3"></i>Menu</a></li>
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="customers"><i class="fas fa-users mr-3"></i>Customers</a></li>
@@ -220,20 +219,16 @@
                 </div>
             </div>
 
-            <!-- Bot Status Section -->
-            <section id="bot-status-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
-                <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status</h2>
-                <div class="flex items-center space-x-4">
+            <!-- WhatsApp Bot Status & QR Management Section -->
+            <section id="whatsapp-bot-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
+                <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status & QR</h2>
+                <div class="flex items-center space-x-4 mb-6">
                     <div id="bot-status-indicator" class="w-4 h-4 rounded-full bg-gray-500 animate-pulse"></div>
                     <p id="bot-status-text" class="text-lg text-gray-300">Loading status...</p>
                 </div>
-            </section>
 
-            <!-- QR Code Management Section -->
-            <section id="qr-management-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
-                <h2 class="text-3xl font-bold text-white mb-4">QR Code Management</h2>
                 <div id="qr-display-area" class="mt-4 text-center">
-                    <p id="qr-status-message" class="text-gray-300 mb-2">Fetching QR status...</p>
+                    <p id="qr-status-message" class="text-gray-300 mb-4">Initializing bot, please wait for QR code...</p>
                     <img id="qr-code-img" src="" alt="QR Code" class="w-48 h-48 mx-auto border border-gray-700 rounded-md p-2 bg-white hidden">
                     <p id="qr-expiry-message" class="text-red-400 mt-2 text-sm hidden">QR code expired. Please generate a new one.</p>
                 </div>
@@ -463,12 +458,12 @@
                 if (section === 'menu') fetchMenuItems();
                 if (section === 'customers') fetchCustomers();
                 if (section === 'settings') fetchSettings();
-                if (section === 'bot-status' || section === 'qr-management') fetchBotStatus(); // Fetch bot status when navigating to either bot-related section
+                if (section === 'whatsapp-bot') fetchBotStatus(); // Fetch bot status when navigating to its section
             });
         });
 
-        // Initial section display: Bot Status (default)
-        showSection('bot-status-section');
+        // Initial section display: WhatsApp Bot (default)
+        showSection('whatsapp-bot-section');
         fetchBotStatus(); // Initial fetch for bot status on page load
 
 
@@ -481,7 +476,7 @@
             document.getElementById(modalId).classList.add('hidden');
         }
 
-        // --- Bot Status and QR Management Display ---
+        // --- WhatsApp Bot Status & QR Management Display ---
         const socket = io(); // Connect to Socket.IO
 
         const botStatusIndicator = document.getElementById('bot-status-indicator');
@@ -504,7 +499,7 @@
                 updateBotStatusDisplay(data.status, data.qrCodeDataURL);
             } catch (error) {
                 console.error('Error fetching bot status:', error);
-                updateBotStatusDisplay('error', null);
+                updateBotStatusDisplay('error', null); // Set a general error status
             }
         }
 
@@ -537,17 +532,17 @@
                     break;
                 case 'auth_failure':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
-                    botStatusText.textContent = 'Authentication Failed! Generate new QR.';
+                    botStatusText.textContent = 'Authentication Failed! Generating new QR...';
                     break;
                 case 'disconnected':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500';
-                    botStatusText.textContent = 'Disconnected. Generate new QR.';
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 animate-pulse';
+                    botStatusText.textContent = 'Disconnected. Generating new QR...';
                     break;
-                case 'offline_qr_needed': // Initial state or after manual disconnect
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
-                    botStatusText.textContent = 'Bot is offline. Generate QR to connect.';
+                case 'reconnecting':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
+                    botStatusText.textContent = 'Reconnecting...';
                     break;
-                case 'error': // General error state
+                case 'error': // General error state from frontend fetch
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
                     botStatusText.textContent = 'Error fetching bot status.';
                     break;
@@ -566,22 +561,23 @@
                 qrCodeImg.classList.remove('hidden');
                 qrStatusMessage.textContent = 'Scan this QR code with your WhatsApp to connect the bot:';
             } else if (status === 'qr_expired') {
-                qrStatusMessage.textContent = 'QR code expired.';
+                qrStatusMessage.textContent = 'QR code expired. Please generate a new one.';
                 qrExpiryMessage.classList.remove('hidden');
             } else if (status === 'ready' || status === 'authenticated') {
-                qrStatusMessage.textContent = 'Bot is connected. No QR needed.';
+                qrStatusMessage.textContent = 'Bot is connected and online. No QR needed.';
                 generateQrBtn.disabled = true; // Disable button if already connected
-            } else if (status === 'initializing') {
-                qrStatusMessage.textContent = 'Initializing... Please wait for QR code.';
-                generateQrBtn.disabled = true; // Disable button while initializing
-            } else { // offline_qr_needed, disconnected, auth_failure, qr_error, error
-                qrStatusMessage.textContent = 'Bot is offline or disconnected. Click "Generate New QR" to connect.';
+            } else if (status === 'initializing' || status === 'reconnecting' || status === 'auth_failure' || status === 'disconnected') {
+                qrStatusMessage.textContent = 'Bot is attempting to connect or re-generate QR. Please wait...';
+                generateQrBtn.disabled = true; // Disable button while auto-reconnecting/initializing
+            } else { // Fallback for other states or errors
+                qrStatusMessage.textContent = 'No QR code available. Click "Generate New QR" if bot is offline.';
             }
         }
 
         // Socket.IO listeners for real-time updates
         socket.on('status', (status) => {
             // When status changes, fetch the full status (including QR if available)
+            // This ensures we get the latest QR data if it was just generated
             fetchBotStatus();
         });
 
