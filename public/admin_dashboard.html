@@ -218,6 +218,21 @@
                 </div>
             </div>
 
+            <!-- Bot Status Section -->
+            <section id="bot-status-section" class="bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+                <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status</h2>
+                <div class="flex items-center space-x-4">
+                    <div id="bot-status-indicator" class="w-4 h-4 rounded-full bg-gray-500 animate-pulse"></div>
+                    <p id="bot-status-text" class="text-lg text-gray-300">Initializing...</p>
+                </div>
+                <div id="qr-code-container" class="mt-4 text-center hidden">
+                    <p class="text-gray-300 mb-2">Scan this QR code with your WhatsApp to connect the bot:</p>
+                    <img id="qr-code-img" src="" alt="QR Code" class="w-48 h-48 mx-auto border border-gray-700 rounded-md p-2 bg-white">
+                    <p id="qr-expiry-message" class="text-red-400 mt-2 text-sm hidden">QR code expired. Please refresh the page or restart the bot if needed.</p>
+                </div>
+            </section>
+
+
             <!-- Orders Section -->
             <section id="orders-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8">
                 <h2 class="text-3xl font-bold text-white mb-6">Recent Orders</h2>
@@ -440,8 +455,9 @@
             });
         });
 
-        // Initial section display
-        showSection('orders-section');
+        // Initial section display: Bot Status and Orders
+        showSection('bot-status-section'); // Show bot status by default
+        showSection('orders-section'); // Also show orders by default, or you can choose one.
 
         // --- Modals ---
         function openModal(modalId) {
@@ -451,6 +467,78 @@
         function closeModal(modalId) {
             document.getElementById(modalId).classList.add('hidden');
         }
+
+        // --- Bot Status Display ---
+        const socket = io(); // Connect to Socket.IO
+
+        const botStatusIndicator = document.getElementById('bot-status-indicator');
+        const botStatusText = document.getElementById('bot-status-text');
+        const qrCodeContainer = document.getElementById('qr-code-container');
+        const qrCodeImg = document.getElementById('qr-code-img');
+        const qrExpiryMessage = document.getElementById('qr-expiry-message');
+
+        socket.on('status', (status) => {
+            console.log('Bot Status:', status);
+            qrCodeContainer.classList.add('hidden');
+            qrCodeImg.src = '';
+            qrExpiryMessage.classList.add('hidden');
+
+            switch (status) {
+                case 'initializing':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 animate-pulse';
+                    botStatusText.textContent = 'Initializing WhatsApp client...';
+                    break;
+                case 'qr_received':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
+                    botStatusText.textContent = 'Scan QR Code to connect!';
+                    qrCodeContainer.classList.remove('hidden');
+                    break;
+                case 'qr_error':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
+                    botStatusText.textContent = 'QR Code error. Check server logs.';
+                    break;
+                case 'qr_expired':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
+                    botStatusText.textContent = 'QR Code expired. Restart bot.';
+                    qrExpiryMessage.classList.remove('hidden');
+                    break;
+                case 'authenticated':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500';
+                    botStatusText.textContent = 'Authenticated. Waiting for ready...';
+                    break;
+                case 'ready':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-green-500';
+                    botStatusText.textContent = 'WhatsApp Bot is Ready and Online!';
+                    break;
+                case 'auth_failure':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
+                    botStatusText.textContent = 'Authentication Failed! Restarting...';
+                    break;
+                case 'disconnected':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 animate-pulse';
+                    botStatusText.textContent = 'Disconnected. Reconnecting...';
+                    break;
+                case 'reconnecting':
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
+                    botStatusText.textContent = 'Reconnecting...';
+                    break;
+                default:
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
+                    botStatusText.textContent = `Status: ${status}`;
+            }
+        });
+
+        socket.on('qrCode', (qrDataURL) => {
+            if (qrDataURL) {
+                qrCodeImg.src = qrDataURL;
+                qrCodeContainer.classList.remove('hidden');
+                qrExpiryMessage.classList.add('hidden');
+            } else {
+                qrCodeContainer.classList.add('hidden');
+                qrCodeImg.src = '';
+            }
+        });
+
 
         // --- Orders Management ---
         async function fetchOrders() {
@@ -552,8 +640,6 @@
         }
 
         // Listen for new orders via Socket.IO
-        // const socket = io(); // Already initialized in main script
-
         socket.on('newOrder', (order) => {
             console.log('New order received via Socket.IO:', order);
             // Only refresh if the orders section is currently visible
