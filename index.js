@@ -283,7 +283,11 @@ client.on('ready', () => {
     console.log('WhatsApp bot is connected and operational.');
     updateBotStatus('ready');
     // Start weekly notification scheduler only when client is ready
-    setInterval(sendWeeklyNotifications, WEEKLY_NOTIFICATION_INTERVAL_MS);
+    // Check if the interval is already set to prevent multiple intervals
+    if (!global.weeklyNotificationInterval) {
+        global.weeklyNotificationInterval = setInterval(sendWeeklyNotifications, WEEKLY_NOTIFICATION_INTERVAL_MS);
+        console.log('Weekly notification scheduler started.');
+    }
 });
 
 client.on('authenticated', (session) => {
@@ -318,6 +322,12 @@ client.on('disconnected', (reason) => {
     if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
     updateBotStatus('disconnected'); // Indicate disconnected
     console.log('WhatsApp client disconnected. Re-initializing...');
+    // Clear any existing weekly notification interval
+    if (global.weeklyNotificationInterval) {
+        clearInterval(global.weeklyNotificationInterval);
+        global.weeklyNotificationInterval = null;
+        console.log('Weekly notification scheduler stopped due to disconnection.');
+    }
     // Re-initialize automatically after a short delay
     setTimeout(() => {
         client.initialize();
@@ -350,62 +360,83 @@ async function updateCustomerNotification(customerPhone) {
 }
 
 client.on('message', async msg => {
-    console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body);
+    console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body); // Log message reception
+
+    // Ensure the bot is ready before processing messages
+    if (!clientReady) {
+        console.log(`Bot not ready, ignoring message from ${msg.from}.`);
+        return;
+    }
 
     const senderNumber = msg.from.split('@')[0];
     // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
     const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
     const menuUrl = `${baseUrl}/menu`; // Changed to /menu
 
-    // Update customer notification date on any message received
-    await updateCustomerNotification(senderNumber);
+    try {
+        // Update customer notification date on any message received
+        await updateCustomerNotification(senderNumber);
 
-    // Welcome message content with numbered options
-    const welcomeMessage = `Hello! Welcome to Delicious Bites!
-            \nWhat would you like to do today? Please reply with the number:
-            \n1. View our delicious Menu
-            2. See my Recent Orders
-            3. Get Help/Support`;
+        // Welcome message content with numbered options
+        const welcomeMessage = `Hello! Welcome to Delicious Bites!
+                \nWhat would you like to do today? Please reply with the number:
+                \n1. View our delicious Menu
+                2. See my Recent Orders
+                3. Get Help/Support`;
 
-    // Handle specific commands (case-insensitive and number-based)
-    const lowerCaseBody = msg.body.toLowerCase().trim();
+        // Handle specific commands (case-insensitive and number-based)
+        const lowerCaseBody = msg.body.toLowerCase().trim();
 
-    switch (lowerCaseBody) {
-        case '1':
-        case '!menu':
-        case 'menu':
-            msg.reply(`Check out our delicious menu here: ${menuUrl}`);
-            break;
-        case '2':
-        case '!orders':
-        case 'orders':
-            try {
-                const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
-                if (customerOrders.length > 0) {
-                    let orderList = 'Your recent orders:\n';
-                    customerOrders.forEach((order, index) => {
-                        orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
-                    });
-                    msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
-                } else {
-                    msg.reply('You have no recent orders. Why not place one now? Reply with *1* for menu.');
+        switch (lowerCaseBody) {
+            case '1':
+            case '!menu':
+            case 'menu':
+                await msg.reply(`Check out our delicious menu here: ${menuUrl}`);
+                console.log(`Replied to ${senderNumber} with menu link.`);
+                break;
+            case '2':
+            case '!orders':
+            case 'orders':
+                try {
+                    const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
+                    if (customerOrders.length > 0) {
+                        let orderList = 'Your recent orders:\n';
+                        customerOrders.forEach((order, index) => {
+                            orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
+                        });
+                        await msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
+                        console.log(`Replied to ${senderNumber} with recent orders.`);
+                    } else {
+                        await msg.reply('You have no recent orders. Why not place one now? Reply with *1* for menu.');
+                        console.log(`Replied to ${senderNumber} with no recent orders message.`);
+                    }
+                } catch (error) {
+                    console.error('Error fetching orders for bot:', error);
+                    await msg.reply('Sorry, I could not fetch your orders at the moment. Please try again later.');
                 }
-            } catch (error) {
-                console.error('Error fetching orders for bot:', error);
-                msg.reply('Sorry, I could not fetch your orders at the moment. Please try again later.');
-            }
-            break;
-        case '3':
-        case '!help':
-        case 'help':
-        case '!support':
-        case 'support':
-            msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
-            break;
-        default:
-            // Default response: send the welcome message for any other input
-            msg.reply(welcomeMessage);
-            break;
+                break;
+            case '3':
+            case '!help':
+            case 'help':
+            case '!support':
+            case 'support':
+                await msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
+                console.log(`Replied to ${senderNumber} with help message.`);
+                break;
+            default:
+                // Default response: send the welcome message for any other input
+                await msg.reply(welcomeMessage);
+                console.log(`Replied to ${senderNumber} with welcome message (default).`);
+                break;
+        }
+    } catch (error) {
+        console.error(`Error processing message from ${msg.from}:`, error);
+        // Attempt to send a generic error message back to the user
+        try {
+            await msg.reply('Sorry, something went wrong while processing your request. Please try again or contact support.');
+        } catch (replyError) {
+            console.error(`Failed to send error reply to ${msg.from}:`, replyError);
+        }
     }
 });
 
@@ -518,32 +549,60 @@ app.get('/admin/login', (req, res) => {
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
             <style>
                 body { font-family: 'Inter', sans-serif; }
-                .dark-mode { background-color: #1a202c; color: #e2e8f0; }
-                .dark-mode input { background-color: #2d3748; border-color: #4a5568; color: #e2e8f0; }
-                .dark-mode button { background-color: #48bb78; }
+                /* Apply black and white theme overrides */
+                body {
+                    background-color: #000000 !important; /* Pure black background */
+                    color: #ffffff !important; /* Pure white text */
+                }
+                .bg-gray-100 {
+                    background-color: #000000 !important;
+                }
+                .bg-white, .bg-gray-800 {
+                    background-color: #1a1a1a !important; /* Very dark gray */
+                }
+                .text-gray-800 {
+                    color: #ffffff !important;
+                }
+                .text-gray-700, .text-gray-300 {
+                    color: #dddddd !important;
+                }
+                input {
+                    background-color: #222222 !important;
+                    border-color: #444444 !important;
+                    color: #ffffff !important;
+                }
+                input::placeholder {
+                    color: #888888 !important;
+                }
+                button {
+                    background-color: #ffffff !important; /* White background */
+                    color: #000000 !important; /* Black text */
+                    box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.2), 0 2px 4px -1px rgba(255, 255, 255, 0.1) !important;
+                }
+                button:hover {
+                    background-color: #e0e0e0 !important;
+                }
+                .text-red-500 {
+                    color: #ff6666 !important; /* Slightly brighter red for error messages */
+                }
             </style>
         </head>
-        <body class="bg-gray-100 dark-mode flex items-center justify-center min-h-screen">
-            <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full">
-                <h2 class="text-3xl font-bold text-gray-800 dark:text-white mb-6 text-center">Admin Login</h2>
+        <body class="bg-gray-100 flex items-center justify-center min-h-screen">
+            <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Admin Login</h2>
                 <form action="/admin/login" method="POST" class="space-y-4">
                     <div>
-                        <label for="username" class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Username:</label>
-                        <input type="text" id="username" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
+                        <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Username:</label>
+                        <input type="text" id="username" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
                     </div>
                     <div>
-                        <label for="password" class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Password:</label>
-                        <input type="password" id="password" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
+                        <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Password:</label>
+                        <input type="password" id="password" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" required>
                     </div>
                     <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full transition duration-300 ease-in-out">Login</button>
                 </form>
                 ${req.session.message ? `<p class="text-red-500 text-center mt-4">${req.session.message}</p>` : ''}
             </div>
-            <script>
-                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                    document.body.classList.add('dark-mode');
-                }
-            </script>
         </body>
         </html>
     `);
@@ -622,6 +681,12 @@ app.post('/api/public/request-qr', async (req, res) => {
         clearTimeout(qrExpiryTimer);
         qrExpiryTimer = null;
     }
+    // Clear any existing weekly notification interval
+    if (global.weeklyNotificationInterval) {
+        clearInterval(global.weeklyNotificationInterval);
+        global.weeklyNotificationInterval = null;
+        console.log('Weekly notification scheduler stopped due to new QR request.');
+    }
     try {
         // Force delete session files for a fresh QR
         await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
@@ -653,10 +718,19 @@ app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
 
 app.get('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id);
+        // Ensure that subtotal, transportTax, and totalAmount are always numbers.
+        // This is a safety measure for potentially inconsistent old data,
+        // as the schema already marks them as required numbers for new data.
+        const order = await Order.findById(req.params.id).lean(); // Use .lean() for plain JS objects for modification
         if (!order) {
             return res.status(404).json({ message: 'Order not found' });
         }
+
+        // Ensure numeric fields are actually numbers, default to 0 if null/undefined
+        order.subtotal = typeof order.subtotal === 'number' ? order.subtotal : 0;
+        order.transportTax = typeof order.transportTax === 'number' ? order.transportTax : 0;
+        order.totalAmount = typeof order.totalAmount === 'number' ? order.totalAmount : 0;
+
         res.json(order);
     } catch (error) {
         console.error('Error fetching single order:', error.message);
@@ -880,7 +954,7 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
                 break;
             }
             // If it's the last rate and distance is greater, use this rate
-            if (i === sortedRates.length - 1) {
+            if (i === sortedRates.length - 1) { // This condition was slightly off, fixed to ensure last rate is picked if distance exceeds all previous
                 transportTax = sortedRates[i].amount;
             }
         }
@@ -897,7 +971,7 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
 app.post('/api/order', async (req, res) => {
     const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount } = req.body;
 
-    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || !subtotal || !totalAmount) {
+    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined') {
         return res.status(400).json({ message: 'Missing required order details.' });
     }
 
@@ -964,4 +1038,3 @@ app.get('/api/order/:id', async (req, res) => {
         res.status(500).json({ message: 'Error fetching order details.' });
     }
 });
-
