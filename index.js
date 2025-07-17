@@ -454,9 +454,8 @@ function isAuthenticated(req, res, next) {
         return next();
     }
 
-    // Check if it's an API request (heuristically by path starting with /api/)
-    // Or by checking the 'Accept' header for 'application/json'
-    if (req.path.startsWith('/api/admin/') || req.accepts('json')) {
+    // For API requests, send a 401 JSON response
+    if (req.path.startsWith('/api/admin/')) {
         console.warn(`Unauthorized API access attempt to ${req.path}. Session invalid.`);
         return res.status(401).json({ message: 'Unauthorized: Session expired or not logged in.' });
     }
