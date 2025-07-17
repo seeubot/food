@@ -91,13 +91,6 @@
             background-color: #ffffff !important; /* White background for badge */
             color: #000000 !important; /* Black text for badge */
         }
-        #locationBtn { /* Specific style for location button */
-            background-color: #333333 !important;
-            color: #ffffff !important;
-        }
-        #locationBtn:hover {
-            background-color: #444444 !important;
-        }
 
         /* Borders and Dividers */
         .border-white.border-opacity-20, .border-gray-700 {
@@ -160,23 +153,28 @@
         .success { background-color: #28a745 !important; } /* Green for success */
         .error { background-color: #dc3545 !important; } /* Red for error */
         .warning { background-color: #ffc107 !important; color: #000000 !important; } /* Yellow for warning with black text */
+        
+        /* Header scroll animation */
+        #mainHeader {
+            transition: transform 0.3s ease-in-out;
+        }
+        #mainHeader.header-hidden {
+            transform: translateY(-100%);
+        }
     </style>
 </head>
 <body class="min-h-screen">
     <!-- Header -->
-    <header class="bg-gray-800 text-white p-4 sticky top-0 z-50 shadow-md">
+    <header id="mainHeader" class="bg-gray-800 text-white p-4 sticky top-0 z-50 shadow-md">
         <div class="container mx-auto flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold">🍽️ Delicious Bites</h1>
                 <p class="text-sm opacity-80">Where every bite is a delight!</p>
             </div>
             <div class="flex items-center space-x-4">
-                <button id="cartBtn" class="relative bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-full text-white transition-all duration-300">
-                    <span class="text-lg">🛒</span>
-                    <span id="cartCount" class="cart-badge absolute -top-2 -right-2 text-xs rounded-full w-6 h-6 flex items-center justify-center">0</span>
-                </button>
-                <button id="locationBtn" class="bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-full text-white transition-all duration-300">
-                    📍 Location
+                <button id="cartBtn" class="relative bg-gray-500 hover:bg-gray-600 px-3 py-1.5 rounded-full text-white transition-all duration-300">
+                    <span class="text-base">🛒</span> <!-- Smaller cart icon -->
+                    <span id="cartCount" class="cart-badge absolute -top-1 -right-1 text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
                 </button>
             </div>
         </div>
@@ -321,9 +319,32 @@
                     </button>
                 </div>
                 <p id="locationStatus" class="text-sm text-gray-400 text-center mt-2"></p>
+                <input type="hidden" id="customerLatitude" name="customerLatitude">
+                <input type="hidden" id="customerLongitude" name="customerLongitude">
             </div>
         </div>
     </div>
+
+    <!-- Product Detail Modal -->
+    <div id="productDetailModal" class="modal fixed inset-0 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="productDetailName" class="text-xl font-bold text-white"></h2>
+                <button id="closeProductDetailModal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <img id="productDetailImage" src="" onerror="this.onerror=null;this.src='https://placehold.co/600x400/cccccc/333333?text=Food+Item';" alt="Product Image" class="w-full h-48 object-cover rounded-md mb-4">
+            <p id="productDetailDescription" class="text-gray-300 text-sm mb-3"></p>
+            <p class="text-gray-300 text-sm mb-1"><strong>Category:</strong> <span id="productDetailCategory"></span></p>
+            <p class="text-gray-300 text-sm mb-3"><strong>Availability:</strong> <span id="productDetailAvailability"></span></p>
+            <div class="flex justify-between items-center border-t border-gray-700 pt-4 mt-4">
+                <span id="productDetailPrice" class="text-2xl font-bold text-white"></span>
+                <button id="productDetailAddToCartBtn" class="btn-primary px-4 py-2 rounded-lg text-white font-semibold">
+                    Add to Cart
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         // Global variables
@@ -332,6 +353,8 @@
         let customerLocation = null;
         let shopSettings = null;
         let deliveryCost = 0;
+        let lastScrollTop = 0; // For header hide/show on scroll
+        const header = document.getElementById('mainHeader'); // Reference to the header
 
         // DOM elements
         const menuGrid = document.getElementById('menuGrid');
@@ -343,6 +366,8 @@
         const checkoutModal = document.getElementById('checkoutModal');
         const locationModal = document.getElementById('locationModal');
         const locationStatus = document.getElementById('locationStatus'); // Added location status element
+        const productDetailModal = document.getElementById('productDetailModal'); // New product detail modal
+        const productDetailAddToCartBtn = document.getElementById('productDetailAddToCartBtn'); // Add to cart button in detail modal
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
@@ -366,23 +391,43 @@
                 // Always try to get location before opening checkout if not already set
                 if (!customerLocation) {
                     showNotification('Please set your location first to calculate delivery!', 'warning');
-                    toggleModal('locationModal');
+                    toggleModal('locationModal'); // Open location modal
+                    // Do not open checkoutModal here, it will be opened after location is set
                     return;
                 }
                 toggleModal('cartModal'); // Close cart modal
-                toggleModal('checkoutModal'); // Open checkout modal
+                toggleModal('checkoutModal'); // Open checkout modal now that location is set
                 updateCheckoutSummary();
             });
             document.getElementById('closeCheckoutModal').addEventListener('click', () => toggleModal('checkoutModal'));
             
             // Location modal
-            document.getElementById('locationBtn').addEventListener('click', () => toggleModal('locationModal'));
             document.getElementById('closeLocationModal').addEventListener('click', () => toggleModal('locationModal'));
             document.getElementById('getCurrentLocation').addEventListener('click', getCurrentLocation);
             document.getElementById('setManualLocation').addEventListener('click', setManualLocation);
             
+            // Product Detail Modal
+            document.getElementById('closeProductDetailModal').addEventListener('click', () => toggleModal('productDetailModal'));
+            
             // Checkout form
             document.getElementById('checkoutForm').addEventListener('submit', handleCheckout);
+
+            // Scroll event for header
+            window.addEventListener('scroll', handleScroll);
+        }
+
+        // Handle header hide/show on scroll
+        function handleScroll() {
+            const currentScrollTop = window.scrollY || document.documentElement.scrollTop;
+
+            if (currentScrollTop > lastScrollTop && currentScrollTop > header.offsetHeight) {
+                // Scrolling down and past header height
+                header.classList.add('header-hidden');
+            } else if (currentScrollTop < lastScrollTop) {
+                // Scrolling up
+                header.classList.remove('header-hidden');
+            }
+            lastScrollTop = currentScrollTop;
         }
 
         // Load menu items
@@ -446,17 +491,17 @@
                 // Ensure item.price is a number before calling toFixed
                 const displayPrice = typeof item.price === 'number' ? item.price.toFixed(2) : '0.00';
                 return `
-                    <div class="food-card rounded-lg overflow-hidden">
+                    <div class="food-card rounded-lg overflow-hidden cursor-pointer" onclick="showProductDetails('${item._id}')">
                         <img src="${item.imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/400x300/cccccc/333333?text=Food+Item';" alt="${item.name}" class="w-full h-48 object-cover">
                         <div class="p-4">
                             <div class="flex justify-between items-start mb-2">
                                 <h3 class="text-lg font-semibold text-white">${item.name}</h3>
                                 ${item.isTrending ? '<span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full">🔥 Trending</span>' : ''}
                             </div>
-                            <p class="text-gray-300 text-sm mb-3">${item.description || 'Delicious food item'}</p>
+                            <p class="text-gray-300 text-sm mb-3">${item.description ? item.description.substring(0, 70) + '...' : 'No description available.'}</p>
                             <div class="flex justify-between items-center">
                                 <span class="text-xl font-bold text-white">₹${displayPrice}</span>
-                                <button onclick="addToCart('${item._id}')" class="btn-primary px-4 py-2 rounded-lg text-white font-medium ${!item.isAvailable ? 'opacity-50 cursor-not-allowed' : ''}" ${!item.isAvailable ? 'disabled' : ''}>
+                                <button onclick="event.stopPropagation(); addToCart('${item._id}')" class="btn-primary px-4 py-2 rounded-lg text-white font-medium ${!item.isAvailable ? 'opacity-50 cursor-not-allowed' : ''}" ${!item.isAvailable ? 'disabled' : ''}>
                                     Add to Cart
                                 </button>
                             </div>
@@ -594,8 +639,8 @@
         function getCurrentLocation() {
             locationStatus.textContent = 'Getting your location...';
             if (!navigator.geolocation) {
-                locationStatus.textContent = 'Geolocation is not supported by your browser.';
-                showNotification('Geolocation is not supported by this browser', 'error');
+                locationStatus.textContent = 'Geolocation is not supported by your browser. Please enter manually or share via WhatsApp.';
+                showNotification('Geolocation not supported. Please enter manually or share via WhatsApp.', 'error');
                 return;
             }
 
@@ -612,15 +657,22 @@
                     locationStatus.textContent = `Location found! Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
                     await calculateDeliveryCost();
                     toggleModal('locationModal'); // Close location modal after successful fetch
+                    toggleModal('checkoutModal'); // Open checkout modal now that location is set
                     showNotification('Location set successfully!', 'success');
                 },
                 (error) => {
                     console.error('Error getting location:', error);
-                    locationStatus.textContent = 'Could not get location. Please try again or enter manually.';
+                    let errorMessage = 'Could not get location. Please try again or enter manually.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMessage = 'Location access denied. Please enable location services for this site or enter manually.';
+                    } else if (error.code === error.TIMEOUT) {
+                        errorMessage = 'Location request timed out. Please try again or enter manually.';
+                    }
+                    locationStatus.textContent = errorMessage + ' Alternatively, you can share your live location via WhatsApp.';
                     customerLocation = null; // Reset location
                     deliveryCost = 0; // Reset delivery cost
                     updateCartSummary(); // Update cart summary to reflect 0 delivery cost
-                    showNotification('Failed to get current location. Please try again or enter manually.', 'error');
+                    showNotification(errorMessage, 'error');
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
@@ -645,10 +697,11 @@
             locationStatus.textContent = `Manual location set! Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
             calculateDeliveryCost();
             toggleModal('locationModal'); // Close location modal
+            toggleModal('checkoutModal'); // Open checkout modal now that location is set
             showNotification('Location set successfully!', 'success');
         }
 
-        // Calculate delivery cost (renamed from calculateDeliverycost)
+        // Calculate delivery cost
         async function calculateDeliveryCost() {
             if (!customerLocation || !shopSettings || !shopSettings.shopLocation || !shopSettings.deliveryRates) {
                 deliveryCost = 0;
@@ -757,6 +810,35 @@
                 placeOrderBtn.innerHTML = 'Place Order';
             }
         }
+
+        // Show product details in a modal
+        function showProductDetails(itemId) {
+            const item = menuItems.find(i => i._id === itemId);
+            if (!item) {
+                showNotification('Product details not found.', 'error');
+                return;
+            }
+
+            document.getElementById('productDetailName').textContent = item.name;
+            document.getElementById('productDetailImage').src = item.imageUrl;
+            document.getElementById('productDetailDescription').textContent = item.description || 'No description available.';
+            document.getElementById('productDetailCategory').textContent = item.category || 'N/A';
+            document.getElementById('productDetailAvailability').textContent = item.isAvailable ? 'Available' : 'Out of Stock';
+            document.getElementById('productDetailAvailability').className = item.isAvailable ? 'text-white font-semibold' : 'text-red-500 font-semibold';
+            document.getElementById('productDetailPrice').textContent = `₹${typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'}`;
+
+            // Set up the Add to Cart button in the detail modal
+            productDetailAddToCartBtn.onclick = () => {
+                addToCart(item._id);
+                toggleModal('productDetailModal'); // Close detail modal after adding to cart
+            };
+            productDetailAddToCartBtn.disabled = !item.isAvailable;
+            productDetailAddToCartBtn.classList.toggle('opacity-50', !item.isAvailable);
+            productDetailAddToCartBtn.classList.toggle('cursor-not-allowed', !item.isAvailable);
+
+            toggleModal('productDetailModal');
+        }
+
 
         // Toggle modal
         function toggleModal(modalId) {
