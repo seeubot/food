@@ -480,6 +480,10 @@
             try {
                 const response = await fetch('/api/admin/bot-status');
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     throw new Error('Failed to fetch bot status.');
                 }
                 const data = await response.json();
@@ -544,12 +548,17 @@
             updateBotStatusDisplay(status);
         });
 
+
         // --- Orders Management ---
         async function fetchOrders() {
             showLoading();
             try {
                 const response = await fetch('/api/admin/orders');
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to fetch orders.');
                 }
@@ -603,6 +612,10 @@
                     body: JSON.stringify({ status: newStatus })
                 });
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to update order status.');
                 }
@@ -620,6 +633,10 @@
             try {
                 const response = await fetch(`/api/admin/orders/${orderId}`);
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to fetch order details.');
                 }
@@ -671,6 +688,10 @@
             try {
                 const response = await fetch('/api/admin/menu');
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to fetch menu items.');
                 }
@@ -746,6 +767,10 @@
             try {
                 const response = await fetch(`/api/admin/menu/${productId}`);
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to fetch product for edit.');
                 }
@@ -789,6 +814,10 @@
                     });
                 }
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || `Failed to save product. Server response: ${response.status}`);
                 }
@@ -812,6 +841,10 @@
                     method: 'DELETE'
                 });
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to delete product.');
                 }
@@ -830,6 +863,10 @@
             try {
                 const response = await fetch('/api/admin/customers');
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to fetch customer data.');
                 }
@@ -888,6 +925,10 @@
             try {
                 const response = await fetch('/api/admin/settings');
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || 'Failed to fetch settings.');
                 }
@@ -957,6 +998,10 @@
                     body: JSON.stringify(settingsData)
                 });
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        return;
+                    }
                     const errorData = await response.json();
                     throw new Error(errorData.message || `Failed to save settings. Server response: ${response.status}`);
                 }
