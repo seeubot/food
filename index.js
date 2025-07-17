@@ -355,7 +355,7 @@ client.on('message', async msg => {
     const senderNumber = msg.from.split('@')[0];
     // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
     const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
-    const menuUrl = `${baseUrl}/menu`;
+    const menuUrl = `${baseUrl}/menu`; // Changed to /menu
 
     // Update customer notification date on any message received
     await updateCustomerNotification(senderNumber);
@@ -495,12 +495,10 @@ function isAuthenticated(req, res, next) {
     res.redirect('/admin/login');
 }
 
-// Root route for bot status and QR display (Public Panel)
+// Root route for bot status and QR display (Public Panel) - now serves bot_status.html
 app.get('/', async (req, res) => {
     try {
-        // Ensure the bot_status.html exists in the public directory
-        const htmlContent = await fs.readFile(path.join(__dirname, 'public', 'bot_status.html'), 'utf8');
-        res.send(htmlContent);
+        res.sendFile(path.join(__dirname, 'public', 'bot_status.html'));
     } catch (error) {
         console.error('Error serving bot_status.html:', error);
         res.status(500).send('<h1>Error loading bot status page.</h1><p>Please check server logs.</p>');
@@ -595,11 +593,10 @@ app.get('/admin/logout', (req, res) => {
     });
 });
 
-// Admin Dashboard (Protected - now serves the single-page app)
+// Admin Dashboard (Protected) - now serves admin_dashboard.html
 app.get('/admin/dashboard', isAuthenticated, async (req, res) => {
     try {
-        const dashboardHtml = await fs.readFile(path.join(__dirname, 'public', 'admin_dashboard.html'), 'utf8');
-        res.send(dashboardHtml);
+        res.sendFile(path.join(__dirname, 'public', 'admin_dashboard.html'));
     } catch (error) {
         console.error('Error serving admin_dashboard.html:', error);
         res.status(500).send('<h1>Error loading Admin Dashboard.</h1><p>Please check server logs.</p>');
@@ -820,11 +817,10 @@ app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
 });
 
 
-// Public Web Menu Panel (Now serves menu_panel.html)
+// Public Web Menu Panel - now serves menu_panel.html
 app.get('/menu', async (req, res) => {
     try {
-        const menuPanelHtml = await fs.readFile(path.join(__dirname, 'public', 'menu_panel.html'), 'utf8');
-        res.send(menuPanelHtml);
+        res.sendFile(path.join(__dirname, 'public', 'menu_panel.html'));
     } catch (error) {
         console.error('Error serving menu_panel.html:', error);
         res.status(500).send('<h1>Error loading Menu Panel.</h1><p>Please check server logs.</p>');
@@ -929,7 +925,7 @@ app.post('/api/order', async (req, res) => {
 
         // Notify Admin via WhatsApp
         if (clientReady) {
-            // Use YOUR_KOYeb_URL if set, otherwise fallback to localhost for development
+            // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
             const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
             const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
                                  `Order ID: ${newOrder._id.toString().substring(0, 6)}...\n` +
