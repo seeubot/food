@@ -27,6 +27,10 @@ const RECONNECT_DELAY_MS = 5000; // 5 seconds delay before trying to re-initiali
 const QR_EXPIRY_MS = 60000; // QR code considered expired after 60 seconds if not scanned
 const WEEKLY_NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // Check for notifications every 24 hours
 
+// NEW: Auth failure retry mechanism
+const MAX_AUTH_FAILURES = 3; // Max retries before clearing session
+let authFailureCount = 0; // Counter for consecutive auth failures
+
 // --- Express App Setup ---
 const app = express();
 const server = http.createServer(app);
@@ -282,6 +286,7 @@ client.on('ready', () => {
     if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
     console.log('WhatsApp bot is connected and operational.');
     updateBotStatus('ready');
+    authFailureCount = 0; // Reset auth failure count on successful ready
     // Start weekly notification scheduler only when client is ready
     // Check if the interval is already set to prevent multiple intervals
     if (!global.weeklyNotificationInterval) {
@@ -293,22 +298,35 @@ client.on('ready', () => {
 client.on('authenticated', (session) => {
     console.log('AUTHENTICATED', session);
     updateBotStatus('authenticated');
+    authFailureCount = 0; // Reset auth failure count on successful authentication
 });
 
 client.on('auth_failure', async msg => {
     console.error('AUTHENTICATION FAILURE', msg);
-    console.log('Authentication failed. Clearing session files and re-initializing...');
-    clientReady = false;
+    authFailureCount++;
+    console.log(`Consecutive auth failures: ${authFailureCount}`);
+
     if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
     updateBotStatus('auth_failure'); // Indicate auth failure
 
-    try {
-        await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
-        console.log('Deleted old session directory. Re-initializing client...');
-    } catch (err) {
-        console.error('Error deleting old session directory:', err);
-    } finally {
-        // Re-initialize automatically after a short delay
+    if (authFailureCount >= MAX_AUTH_FAILURES) {
+        console.log(`Max auth failures (${MAX_AUTH_FAILURES}) reached. Clearing session files and re-initializing...`);
+        clientReady = false;
+        try {
+            await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
+            console.log('Deleted old session directory.');
+            authFailureCount = 0; // Reset counter after clearing
+        } catch (err) {
+            console.error('Error deleting old session directory on max auth failures:', err);
+        } finally {
+            setTimeout(() => {
+                client.initialize();
+                updateBotStatus('reconnecting');
+            }, RECONNECT_DELAY_MS);
+        }
+    } else {
+        console.log('Attempting to re-initialize client without clearing session...');
+        clientReady = false; // Set to false while re-initializing
         setTimeout(() => {
             client.initialize();
             updateBotStatus('reconnecting');
@@ -328,6 +346,8 @@ client.on('disconnected', (reason) => {
         global.weeklyNotificationInterval = null;
         console.log('Weekly notification scheduler stopped due to disconnection.');
     }
+    // Always reset authFailureCount on disconnection, as it might be a temporary network issue
+    authFailureCount = 0;
     // Re-initialize automatically after a short delay
     setTimeout(() => {
         client.initialize();
@@ -370,7 +390,7 @@ client.on('message', async msg => {
 
     const senderNumber = msg.from.split('@')[0];
     // Direct menu URL as requested
-    const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
+    const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
 
     try {
         // Update customer notification date on any message received
@@ -678,7 +698,8 @@ app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
 app.post('/api/public/request-qr', async (req, res) => {
     console.log('API: /api/public/request-qr hit.');
     if (clientReady) {
-        return res.status(400).json({ message: 'Bot is already connected. Disconnect it first if you need a new QR for re-authentication.' });
+        // If bot is already ready, don't force a new QR unless explicitly requested to reset
+        console.warn('Bot is currently ready, but a new QR was requested. Forcing session clear.');
     }
     console.log('Public QR request received. Clearing session files and re-initializing client...');
     // Clear any existing QR expiry timer if a new request comes in
@@ -696,6 +717,7 @@ app.post('/api/public/request-qr', async (req, res) => {
         // Force delete session files for a fresh QR
         await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
         console.log('Deleted old session directory for new QR request.');
+        authFailureCount = 0; // Reset auth failure count on manual QR request
     } catch (err) {
         console.error('Error deleting old session directory during manual QR request:', err);
         // Continue even if deletion fails, client.initialize might still work
@@ -895,7 +917,7 @@ app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
             if (latestOrder) {
                 customersData.push({
                     customerName: latestOrder.customerName,
-                    customerPhone: latestOrder.customerPhone, // Corrected typo here
+                    customerPhone: latestOrder.customerPhone,
                     lastKnownLocation: latestOrder.customerLocation || null, // Can be null if order didn't have location
                     shopLocation: settings ? settings.shopLocation : null // Include shop location
                 });
