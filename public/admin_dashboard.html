@@ -191,6 +191,7 @@
             <ul class="space-y-4">
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="orders"><i class="fas fa-clipboard-list mr-3"></i>Orders</a></li>
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="menu"><i class="fas fa-utensils mr-3"></i>Menu</a></li>
+                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="customers"><i class="fas fa-users mr-3"></i>Customers</a></li>
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="settings"><i class="fas fa-cogs mr-3"></i>Settings</a></li>
                 <li><a href="/admin/logout" class="flex items-center py-3 px-4 rounded-lg text-xl hover:bg-red-700 transition duration-200 text-red-400"><i class="fas fa-sign-out-alt mr-3"></i>Logout</a></li>
             </ul>
@@ -328,6 +329,27 @@
                 </div>
             </section>
 
+            <!-- Customers Section -->
+            <section id="customers-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
+                <h2 class="text-3xl font-bold text-white mb-6">Customer Info & Location</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-gray-700 rounded-lg shadow-md">
+                        <thead>
+                            <tr class="bg-gray-600 text-gray-200 uppercase text-sm leading-normal">
+                                <th class="py-3 px-6 text-left">Customer Name</th>
+                                <th class="py-3 px-6 text-left">Phone</th>
+                                <th class="py-3 px-6 text-left">Last Location</th>
+                                <th class="py-3 px-6 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-table-body" class="text-gray-300 text-sm font-light">
+                            <!-- Customer data will be loaded here -->
+                            <tr><td colspan="4" class="py-4 text-center">Loading customers...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- Settings Section -->
             <section id="settings-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md hidden">
                 <h2 class="text-3xl font-bold text-white mb-6">Shop Settings</h2>
@@ -413,6 +435,7 @@
                 showSection(`${section}-section`);
                 if (section === 'orders') fetchOrders();
                 if (section === 'menu') fetchMenuItems();
+                if (section === 'customers') fetchCustomers(); // Call fetchCustomers
                 if (section === 'settings') fetchSettings();
             });
         });
@@ -529,7 +552,7 @@
         }
 
         // Listen for new orders via Socket.IO
-        const socket = io(); // Connects to the same host/port as the server
+        // const socket = io(); // Already initialized in main script
 
         socket.on('newOrder', (order) => {
             console.log('New order received via Socket.IO:', order);
@@ -685,6 +708,61 @@
                 hideLoading();
             }
         }
+
+        // --- Customer Management ---
+        async function fetchCustomers() {
+            showLoading();
+            try {
+                const response = await fetch('/api/admin/customers');
+                const customers = await response.json();
+                const tableBody = document.getElementById('customers-table-body');
+                tableBody.innerHTML = '';
+
+                if (customers.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-gray-500">No customer data found.</td></tr>';
+                    hideLoading();
+                    return;
+                }
+
+                customers.forEach(customer => {
+                    const locationText = customer.lastKnownLocation
+                        ? `Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`
+                        : 'N/A';
+                    const trackButton = customer.lastKnownLocation && customer.shopLocation
+                        ? `<button onclick="trackCustomer('${customer.lastKnownLocation.latitude}', '${customer.lastKnownLocation.longitude}', '${customer.shopLocation.latitude}', '${customer.shopLocation.longitude}')" class="text-blue-400 hover:text-white ml-2"><i class="fas fa-map-marker-alt"></i> Track</button>`
+                        : `<button class="text-gray-500 cursor-not-allowed ml-2" disabled><i class="fas fa-map-marker-alt"></i> Track</button>`;
+
+                    const row = `
+                        <tr class="border-b border-gray-700 hover:bg-gray-700">
+                            <td class="py-3 px-6 text-left">${customer.customerName || 'Unknown'}</td>
+                            <td class="py-3 px-6 text-left">${customer.customerPhone}</td>
+                            <td class="py-3 px-6 text-left">${locationText}</td>
+                            <td class="py-3 px-6 text-center whitespace-nowrap">
+                                <a href="tel:+${customer.customerPhone}" class="text-green-400 hover:text-white mr-2"><i class="fas fa-phone"></i> Call</a>
+                                ${trackButton}
+                            </td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                });
+            } catch (error) {
+                console.error('Error fetching customers:', error);
+                const tableBody = document.getElementById('customers-table-body');
+                tableBody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-red-500">Error loading customer data.</td></tr>';
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function callCustomer(phoneNumber) {
+            window.location.href = `tel:+${phoneNumber}`;
+        }
+
+        function trackCustomer(customerLat, customerLon, shopLat, shopLon) {
+            const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${shopLat},${shopLon}&destination=${customerLat},${customerLon}`;
+            window.open(googleMapsUrl, '_blank');
+        }
+
 
         // --- Settings Management ---
         async function fetchSettings() {
