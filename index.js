@@ -185,6 +185,21 @@ let qrCodeDataURL = null;
 let clientReady = false;
 let reconnectTimer = null; // To control re-initialization attempts
 let qrExpiryTimer = null; // To track QR code validity
+let botCurrentStatus = 'initializing'; // Global variable to hold bot status
+
+// Update bot status and emit via Socket.IO
+function updateBotStatus(status, qrData = null) {
+    botCurrentStatus = status;
+    io.emit('status', status);
+    if (qrData) {
+        qrCodeDataURL = qrData;
+        io.emit('qrCode', qrData);
+    } else if (status !== 'qr_received') { // Clear QR if not receiving a new one
+        qrCodeDataURL = null;
+        io.emit('qrCode', null);
+    }
+}
+
 
 // Ensure session directory exists
 (async () => {
@@ -218,25 +233,17 @@ const client = new Client({
 
 client.on('qr', (qr) => {
     console.log('QR RECEIVED', qr);
-    // Clear any previous QR expiry timer
     if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
     qrcode.toDataURL(qr, { small: false }, (err, url) => {
         if (err) {
             console.error('Error generating QR code data URL:', err);
-            qrCodeDataURL = null;
-            io.emit('status', 'qr_error');
+            updateBotStatus('qr_error');
         } else {
-            qrCodeDataURL = url;
-            console.log('QR code generated and will be emitted to clients.');
-            io.emit('qrCode', qrCodeDataURL);
-            io.emit('status', 'qr_received');
+            updateBotStatus('qr_received', url);
 
-            // Set a timer to expire the QR if not scanned
             qrExpiryTimer = setTimeout(() => {
-                qrCodeDataURL = null;
-                io.emit('qrCode', null); // Clear QR on frontend
-                io.emit('status', 'qr_expired');
+                updateBotStatus('qr_expired');
                 console.log('QR code expired. Please restart bot or wait for new QR.');
             }, QR_EXPIRY_MS);
         }
@@ -246,42 +253,38 @@ client.on('qr', (qr) => {
 client.on('ready', () => {
     console.log('Client is ready!');
     clientReady = true;
-    qrCodeDataURL = null; // Clear QR once ready
-    if (reconnectTimer) clearTimeout(reconnectTimer); // Clear any pending reconnect
-    if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
     console.log('WhatsApp bot is connected and operational.');
-    io.emit('status', 'ready');
+    updateBotStatus('ready');
     // Start weekly notification scheduler only when client is ready
     setInterval(sendWeeklyNotifications, WEEKLY_NOTIFICATION_INTERVAL_MS);
 });
 
 client.on('authenticated', (session) => {
     console.log('AUTHENTICATED', session);
-    if (reconnectTimer) clearTimeout(reconnectTimer); // Clear any pending reconnect
-    io.emit('status', 'authenticated');
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    updateBotStatus('authenticated');
 });
 
 client.on('auth_failure', async msg => {
     console.error('AUTHENTICATION FAILURE', msg);
     console.log('Attempting to re-authenticate. Clearing session files...');
     clientReady = false;
-    qrCodeDataURL = null;
-    if (reconnectTimer) clearTimeout(reconnectTimer); // Clear any pending reconnect
-    if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
-    io.emit('status', 'auth_failure');
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+    updateBotStatus('auth_failure');
 
     try {
-        // More aggressive session file deletion
         await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
         console.log('Deleted old session directory. Re-initializing client...');
     } catch (err) {
         console.error('Error deleting old session directory:', err);
     } finally {
-        // Re-initialize after a delay
         reconnectTimer = setTimeout(() => {
             console.log(`Attempting to re-initialize client after ${RECONNECT_DELAY_MS / 1000} seconds.`);
             client.initialize();
-            io.emit('status', 'reconnecting');
+            updateBotStatus('reconnecting');
         }, RECONNECT_DELAY_MS);
     }
 });
@@ -289,15 +292,13 @@ client.on('auth_failure', async msg => {
 client.on('disconnected', (reason) => {
     console.log('Client disconnected', reason);
     clientReady = false;
-    qrCodeDataURL = null;
-    if (reconnectTimer) clearTimeout(reconnectTimer); // Clear any pending reconnect
-    if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
-    io.emit('status', 'disconnected');
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+    updateBotStatus('disconnected');
     console.log(`Attempting to re-initialize after ${RECONNECT_DELAY_MS / 1000} seconds...`);
-    // Re-initialize after a delay
     reconnectTimer = setTimeout(() => {
         client.initialize();
-        io.emit('status', 'reconnecting');
+        updateBotStatus('reconnecting');
     }, RECONNECT_DELAY_MS);
 });
 
@@ -306,13 +307,9 @@ console.log('Initializing WhatsApp client...');
 io.on('connection', (socket) => {
     console.log('A user connected to Socket.IO');
     // Emit current status and QR code to newly connected clients
-    if (clientReady) {
-        socket.emit('status', 'ready');
-    } else if (qrCodeDataURL) {
-        socket.emit('status', 'qr_received');
+    socket.emit('status', botCurrentStatus); // Emit current status
+    if (qrCodeDataURL) {
         socket.emit('qrCode', qrCodeDataURL);
-    } else {
-        socket.emit('status', 'initializing');
     }
 });
 client.initialize();
@@ -458,6 +455,15 @@ function isAuthenticated(req, res, next) {
     if (req.session.userId && req.session.isAdmin) {
         return next();
     }
+
+    // Check if it's an API request (heuristically by path starting with /api/)
+    // Or by checking the 'Accept' header for 'application/json'
+    if (req.path.startsWith('/api/admin/') || req.accepts('json')) {
+        console.warn(`Unauthorized API access attempt to ${req.path}. Session invalid.`);
+        return res.status(401).json({ message: 'Unauthorized: Session expired or not logged in.' });
+    }
+
+    // For regular page requests, redirect to login
     res.redirect('/admin/login');
 }
 
@@ -560,6 +566,15 @@ app.get('/admin/dashboard', isAuthenticated, async (req, res) => {
     }
 });
 
+// NEW API: Get bot status for dashboard
+app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
+    res.json({
+        status: botCurrentStatus,
+        qrCodeDataURL: qrCodeDataURL // Send QR data if available
+    });
+});
+
+
 // --- API for Admin Dashboard Orders ---
 app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
     try {
@@ -567,7 +582,7 @@ app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
         res.json(orders);
     }
     catch (error) {
-        console.error('Error fetching admin orders:', error);
+        console.error('Error fetching admin orders:', error.message);
         res.status(500).json({ message: 'Error fetching orders' });
     }
 });
@@ -580,7 +595,7 @@ app.get('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
         }
         res.json(order);
     } catch (error) {
-        console.error('Error fetching single order:', error);
+        console.error('Error fetching single order:', error.message);
         res.status(500).json({ message: 'Error fetching order' });
     }
 });
