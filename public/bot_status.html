@@ -3,218 +3,267 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Bot Status Panel</title>
+    <title>WhatsApp Bot Status</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Base styles for the black and white theme */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #000000; /* Pure black background */
-            color: #ffffff; /* Pure white text */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 1rem;
-            box-sizing: border-box;
+            background-color: #000000 !important; /* Pure black background */
+            color: #ffffff !important; /* Pure white text */
         }
-        .container {
-            background-color: #1a1a1a; /* Very dark gray */
-            padding: 2rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5);
-            text-align: center;
-            max-width: 500px;
-            width: 100%;
+
+        /* General text colors to ensure visibility */
+        .text-gray-700, .text-gray-800 {
+            color: #ffffff !important; /* All main text is white */
         }
-        .status-indicator {
-            width: 1.5rem;
-            height: 1.5rem;
-            border-radius: 50%;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 0.75rem;
+        .text-gray-600 {
+            color: #cccccc !important; /* Lighter gray for secondary text */
         }
-        .status-text {
-            font-size: 1.25rem;
-            font-weight: 600;
-            display: inline-block;
-            vertical-align: middle;
+        .text-gray-500 {
+            color: #888888 !important; /* Medium gray for placeholders/disabled */
         }
-        .qr-code-img {
-            width: 12rem;
-            height: 12rem;
-            margin: 1.5rem auto;
-            border: 1px solid #444444;
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-            background-color: #ffffff; /* White background for QR */
+        .text-gray-400 {
+            color: #aaaaaa !important; /* Slightly lighter gray for icons/subtle elements */
         }
+        .text-gray-300 {
+            color: #dddddd !important; /* Very light gray */
+        }
+        .text-gray-200 {
+            color: #eeeeee !important; /* Almost white */
+        }
+
+        /* Backgrounds for main panels/cards */
+        .bg-gray-100 { /* Override default body background if still present */
+            background-color: #000000 !important;
+        }
+        .bg-white, .bg-gray-800 { /* Main content cards, modals, headers */
+            background-color: #1a1a1a !important; /* Very dark gray */
+        }
+        .bg-gray-900 { /* Modal overlay */
+            background-color: #0a0a0a !important; /* Slightly darker for deeper contrast */
+        }
+
+        /* Inputs, Textareas */
+        input, textarea {
+            background-color: #222222 !important; /* Darker background for inputs */
+            border-color: #444444 !important; /* Dark gray border */
+            color: #ffffff !important; /* White text in inputs */
+            padding: 0.75rem 1rem !important; /* More padding for touch targets */
+            border-radius: 0.375rem !important; /* Rounded corners */
+        }
+        input::placeholder, textarea::placeholder {
+            color: #888888 !important; /* Placeholder text color */
+        }
+
+        /* Buttons */
         button {
-            background-color: #666666; /* Medium gray */
-            color: #ffffff;
-            font-weight: 600;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            transition: all 0.2s ease-in-out;
-            cursor: pointer;
+            border-radius: 0.5rem !important; /* More rounded buttons */
+            padding: 0.75rem 1.5rem !important; /* Generous padding */
+            font-weight: 600 !important; /* Semi-bold text */
+            transition: all 0.2s ease-in-out !important; /* Smooth transitions */
         }
-        button:hover {
-            background-color: #888888; /* Lighter gray on hover */
+        /* Primary buttons (Add to Cart, Checkout, Place Order, Active Filter) */
+        .bg-green-500, .bg-blue-500 { /* Reusing Tailwind classes but overriding colors */
+            background-color: #ffffff !important; /* White background */
+            color: #000000 !important; /* Black text */
+            box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.2), 0 2px 4px -1px rgba(255, 255, 255, 0.1) !important;
         }
-        button:disabled {
-            background-color: #333333;
-            color: #888888;
-            cursor: not-allowed;
+        .bg-green-500:hover, .bg-blue-500:hover {
+            background-color: #e0e0e0 !important; /* Slightly darker white on hover */
         }
-        .loading-spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #ffffff;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 0.5rem;
+        /* Secondary buttons (Cancel, Close, Get Location, Inactive Filter) */
+        .bg-gray-500, .bg-gray-200 { /* Reusing Tailwind classes but overriding colors */
+            background-color: #333333 !important; /* Dark gray background */
+            color: #ffffff !important; /* White text */
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .bg-gray-500:hover, .bg-gray-200:hover {
+            background-color: #444444 !important; /* Lighter gray on hover */
+        }
+        /* Red buttons (e.g., quantity decrease) */
+        .bg-red-500 {
+            background-color: #555555 !important; /* Darker gray for subtle delete */
+            color: #ffffff !important;
+        }
+        .bg-red-500:hover {
+            background-color: #777777 !important;
+        }
+
+        /* Borders and Dividers */
+        .border-gray-200, .border-gray-700 {
+            border-color: #333333 !important; /* Consistent dark gray borders */
+        }
+
+        /* Shadows */
+        .shadow-md {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4) !important; /* Deeper shadows for depth */
+        }
+        .shadow-xl {
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.6) !important;
+        }
+
+        /* Specific text colors for status/icons */
+        .text-green-600 { color: #ffffff !important; } /* White for prices/available status */
+        .text-red-500 { color: #cccccc !important; } /* Light gray for "Out of Stock" */
+
+        /* Custom scrollbar for cart on small screens */
+        .overflow-y-auto::-webkit-scrollbar {
+            width: 8px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-track {
+            background: #222222;
+            border-radius: 10px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+            background: #555555;
+            border-radius: 10px;
+        }
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+            background: #777777;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1 class="text-3xl font-bold mb-6">WhatsApp Bot Status</h1>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full text-center">
+        <h1 class="text-3xl font-bold text-white mb-6">WhatsApp Bot Status</h1>
 
-        <div class="flex items-center justify-center mb-6">
-            <div id="bot-status-indicator" class="status-indicator bg-gray-500 animate-pulse"></div>
-            <p id="bot-status-text" class="status-text">Loading status...</p>
+        <div class="flex flex-col items-center mb-6">
+            <div id="status-indicator" class="w-8 h-8 rounded-full bg-gray-500 animate-pulse mb-3"></div>
+            <p id="status-text" class="text-lg text-gray-300">Connecting to WhatsApp...</p>
         </div>
 
-        <div id="qr-display-area" class="mt-4">
-            <p id="qr-status-message" class="text-gray-300 mb-4">Initializing bot, please wait for QR code...</p>
-            <img id="qr-code-img" src="" alt="QR Code" class="qr-code-img hidden">
-            <p id="qr-expiry-message" class="text-red-400 mt-2 text-sm hidden">QR code expired. Please generate a new one.</p>
+        <div id="qr-code-container" class="mb-6 hidden">
+            <p class="text-gray-300 mb-3">Scan this QR code with your WhatsApp app:</p>
+            <img id="qr-code-img" src="" alt="QR Code" class="w-64 h-64 mx-auto border-2 border-gray-600 rounded-md p-2 bg-white">
+            <p id="qr-expiry-message" class="text-red-500 text-sm mt-2 hidden">QR code expired. Request a new one.</p>
         </div>
 
-        <div class="mt-6">
-            <button id="generate-qr-btn">
-                <span id="button-loading-spinner" class="loading-spinner hidden"></span>
-                <span id="button-text">Generate New QR</span>
-            </button>
-        </div>
-        <p class="text-gray-400 text-sm mt-4">This panel is public. Do not share your QR code with unauthorized persons.</p>
+        <button id="request-qr-button" class="bg-blue-500 hover:bg-blue-600 text-black font-bold py-3 px-6 rounded-lg transition duration-200 mt-4">
+            Request New QR Code
+        </button>
+
+        <p class="text-gray-500 text-sm mt-6">
+            This panel shows the real-time status of your WhatsApp bot.
+            <br>Admin Dashboard: <a href="/admin/dashboard" class="text-blue-400 hover:underline">/admin/dashboard</a>
+            <br>Public Menu: <a href="/menu" class="text-blue-400 hover:underline">/menu</a>
+        </p>
     </div>
 
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
-        const socket = io(); // Connect to Socket.IO
+        const socket = io();
 
-        const botStatusIndicator = document.getElementById('bot-status-indicator');
-        const botStatusText = document.getElementById('bot-status-text');
-        const qrStatusMessage = document.getElementById('qr-status-message');
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const qrCodeContainer = document.getElementById('qr-code-container');
         const qrCodeImg = document.getElementById('qr-code-img');
         const qrExpiryMessage = document.getElementById('qr-expiry-message');
-        const generateQrBtn = document.getElementById('generate-qr-btn');
-        const buttonLoadingSpinner = document.getElementById('button-loading-spinner');
-        const buttonText = document.getElementById('button-text');
+        const requestQrButton = document.getElementById('request-qr-button');
 
-        // Function to update the UI based on bot status and QR data
-        function updateBotStatusDisplay(status, qrDataURL = null) {
-            // Update main bot status section
+        function updateStatusDisplay(status) {
+            qrExpiryMessage.classList.add('hidden'); // Hide expiry message by default
+
             switch (status) {
                 case 'initializing':
-                    botStatusIndicator.className = 'status-indicator bg-gray-500 animate-pulse';
-                    botStatusText.textContent = 'Initializing WhatsApp client...';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-gray-500 animate-pulse mb-3';
+                    statusText.textContent = 'Initializing WhatsApp client...';
+                    qrCodeContainer.classList.add('hidden');
+                    requestQrButton.disabled = true; // Disable while initializing
+                    requestQrButton.classList.add('opacity-50', 'cursor-not-allowed');
                     break;
                 case 'qr_received':
-                    botStatusIndicator.className = 'status-indicator bg-yellow-500 animate-pulse';
-                    botStatusText.textContent = 'Scan QR Code to connect!';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-yellow-500 animate-pulse mb-3';
+                    statusText.textContent = 'QR Code received. Scan with WhatsApp.';
+                    qrCodeContainer.classList.remove('hidden');
+                    requestQrButton.disabled = true; // Disable while QR is active
+                    requestQrButton.classList.add('opacity-50', 'cursor-not-allowed');
                     break;
                 case 'qr_error':
-                    botStatusIndicator.className = 'status-indicator bg-red-500';
-                    botStatusText.textContent = 'QR Code error. Check server logs.';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-red-500 mb-3';
+                    statusText.textContent = 'QR Code error. Please request a new QR.';
+                    qrCodeContainer.classList.add('hidden');
+                    requestQrButton.disabled = false; // Enable to request new QR
+                    requestQrButton.classList.remove('opacity-50', 'cursor-not-allowed');
                     break;
                 case 'qr_expired':
-                    botStatusIndicator.className = 'status-indicator bg-red-500';
-                    botStatusText.textContent = 'QR Code expired.';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-red-500 mb-3';
+                    statusText.textContent = 'QR Code expired. Please request a new QR.';
+                    qrCodeContainer.classList.add('hidden');
+                    qrExpiryMessage.classList.remove('hidden'); // Show expiry message
+                    requestQrButton.disabled = false; // Enable to request new QR
+                    requestQrButton.classList.remove('opacity-50', 'cursor-not-allowed');
                     break;
                 case 'authenticated':
-                    botStatusIndicator.className = 'status-indicator bg-blue-500';
-                    botStatusText.textContent = 'Authenticated. Waiting for ready...';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-blue-500 mb-3';
+                    statusText.textContent = 'Authenticated. Waiting for ready...';
+                    qrCodeContainer.classList.add('hidden');
+                    requestQrButton.disabled = true; // Disable while authenticated
+                    requestQrButton.classList.add('opacity-50', 'cursor-not-allowed');
                     break;
                 case 'ready':
-                    botStatusIndicator.className = 'status-indicator bg-green-500';
-                    botStatusText.textContent = 'WhatsApp Bot is Ready and Online!';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-green-500 mb-3';
+                    statusText.textContent = 'WhatsApp Bot is Ready and Online!';
+                    qrCodeContainer.classList.add('hidden');
+                    requestQrButton.disabled = true; // Disable while ready
+                    requestQrButton.classList.add('opacity-50', 'cursor-not-allowed');
                     break;
                 case 'auth_failure':
-                    botStatusIndicator.className = 'status-indicator bg-red-500';
-                    botStatusText.textContent = 'Authentication Failed! Generating new QR...';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-red-500 mb-3';
+                    statusText.textContent = 'Authentication Failed! Please request new QR.';
+                    qrCodeContainer.classList.add('hidden');
+                    requestQrButton.disabled = false; // Enable to request new QR
+                    requestQrButton.classList.remove('opacity-50', 'cursor-not-allowed');
                     break;
                 case 'disconnected':
-                    botStatusIndicator.className = 'status-indicator bg-orange-500 animate-pulse';
-                    botStatusText.textContent = 'Disconnected. Reconnecting...';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-orange-500 animate-pulse mb-3';
+                    statusText.textContent = 'Disconnected. Reconnecting...';
+                    qrCodeContainer.classList.add('hidden');
+                    requestQrButton.disabled = true; // Disable while reconnecting automatically
+                    requestQrButton.classList.add('opacity-50', 'cursor-not-allowed');
                     break;
                 case 'reconnecting':
-                    botStatusIndicator.className = 'status-indicator bg-yellow-500 animate-pulse';
-                    botStatusText.textContent = 'Reconnecting...';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-yellow-500 animate-pulse mb-3';
+                    statusText.textContent = 'Reconnecting...';
+                    qrCodeContainer.classList.add('hidden');
+                    requestQrButton.disabled = true; // Disable while reconnecting automatically
+                    requestQrButton.classList.add('opacity-50', 'cursor-not-allowed');
                     break;
                 default:
-                    botStatusIndicator.className = 'status-indicator bg-gray-500';
-                    botStatusText.textContent = `Status: ${status}`;
-            }
-
-            // Update QR Management section
-            qrCodeImg.classList.add('hidden');
-            qrExpiryMessage.classList.add('hidden');
-            generateQrBtn.disabled = false; // Enable button by default
-            buttonText.textContent = 'Generate New QR';
-            buttonLoadingSpinner.classList.add('hidden');
-
-
-            if (status === 'qr_received' && qrDataURL) {
-                qrCodeImg.src = qrDataURL;
-                qrCodeImg.classList.remove('hidden');
-                qrStatusMessage.textContent = 'Scan this QR code with your WhatsApp to connect the bot:';
-            } else if (status === 'qr_expired') {
-                qrStatusMessage.textContent = 'QR code expired. Please generate a new one.';
-                qrExpiryMessage.classList.remove('hidden');
-            } else if (status === 'ready' || status === 'authenticated') {
-                qrStatusMessage.textContent = 'Bot is connected and online. No QR needed.';
-                generateQrBtn.disabled = true; // Disable button if already connected
-            } else if (status === 'initializing' || status === 'reconnecting' || status === 'auth_failure' || status === 'disconnected') {
-                qrStatusMessage.textContent = 'Bot is attempting to connect or re-generate QR. Please wait...';
-                generateQrBtn.disabled = true; // Disable button while auto-reconnecting/initializing
-                buttonText.textContent = 'Generating QR...';
-                buttonLoadingSpinner.classList.remove('hidden');
-            } else { // Fallback for other states or errors
-                qrStatusMessage.textContent = 'No QR code available. Click "Generate New QR" if bot is offline.';
+                    statusIndicator.className = 'w-8 h-8 rounded-full bg-gray-500 mb-3';
+                    statusText.textContent = `Status: ${status}`;
+                    qrCodeContainer.classList.add('hidden');
+                    requestQrButton.disabled = true; // Default to disabled if unknown status
+                    requestQrButton.classList.add('opacity-50', 'cursor-not-allowed');
             }
         }
 
-        // Socket.IO listeners for real-time updates
+        // Listen for status updates from the server
         socket.on('status', (status) => {
-            // When status changes, we need to fetch the QR code separately if it's a 'qr_received' status
-            // The backend emits 'qrCode' specifically when a new QR is available.
-            // So, for 'status' updates, we just update the status text.
-            updateBotStatusDisplay(status, qrCodeImg.src); // Pass current QR data, will be updated by 'qrCode' event
+            console.log('Received status:', status);
+            updateStatusDisplay(status);
         });
 
-        socket.on('qrCode', (qrDataURL) => {
-            // This listener specifically handles new QR codes being pushed
-            updateBotStatusDisplay('qr_received', qrDataURL);
+        // Listen for QR code data from the server
+        socket.on('qrCode', (qrDataUrl) => {
+            if (qrDataUrl) {
+                qrCodeImg.src = qrDataUrl;
+                qrCodeContainer.classList.remove('hidden');
+                qrExpiryMessage.classList.add('hidden'); // Hide expiry message if new QR received
+                updateStatusDisplay('qr_received'); // Force status update to QR received
+            } else {
+                qrCodeContainer.classList.add('hidden');
+                qrCodeImg.src = ''; // Clear image source
+            }
         });
 
-        // Event listener for the "Generate New QR" button
-        generateQrBtn.addEventListener('click', async () => {
-            generateQrBtn.disabled = true;
-            buttonText.textContent = 'Generating QR...';
-            buttonLoadingSpinner.classList.remove('hidden');
-            qrStatusMessage.textContent = 'Requesting new QR code...';
-            qrCodeImg.classList.add('hidden');
+        // Handle requesting a new QR code
+        requestQrButton.addEventListener('click', async () => {
+            requestQrButton.disabled = true; // Disable button immediately
+            requestQrButton.classList.add('opacity-50', 'cursor-not-allowed');
+            statusText.textContent = 'Requesting new QR...';
+            statusIndicator.className = 'w-8 h-8 rounded-full bg-gray-500 animate-pulse mb-3';
+            qrCodeContainer.classList.add('hidden');
             qrExpiryMessage.classList.add('hidden');
 
             try {
@@ -223,26 +272,26 @@
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const result = await response.json();
-                if (!response.ok) {
-                    throw new Error(result.message || 'Failed to request QR.');
+                console.log('Request QR response:', result);
+                if (response.ok) {
+                    statusText.textContent = 'New QR requested. Please wait for it to appear.';
+                } else {
+                    statusText.textContent = `Error: ${result.message || 'Failed to request new QR.'}`;
+                    requestQrButton.disabled = false; // Re-enable on error
+                    requestQrButton.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
-                // UI will be updated by Socket.IO 'status' or 'qrCode' events
-                // No alert needed here, status messages will guide the user
             } catch (error) {
                 console.error('Error requesting new QR:', error);
-                qrStatusMessage.textContent = `Error: ${error.message}. Please try again.`;
-                generateQrBtn.disabled = false;
-                buttonText.textContent = 'Generate New QR';
-                buttonLoadingSpinner.classList.add('hidden');
+                statusText.textContent = 'Network error requesting new QR. Check console.';
+                requestQrButton.disabled = false; // Re-enable on network error
+                requestQrButton.classList.remove('opacity-50', 'cursor-not-allowed');
             }
         });
 
-        // Initial fetch for bot status when page loads
-        // This will trigger the display update based on current backend state
-        // We don't have a direct API to get QR data on page load for the public panel,
-        // it relies on Socket.IO 'qrCode' event or manual 'generate QR'
-        // So, initially, we just set a loading status.
-        updateBotStatusDisplay('initializing');
+        // Initial status fetch on page load
+        // This will request the current status and QR code (if available) from the server
+        // and update the display accordingly.
+        socket.emit('requestInitialStatus'); // Custom event to request initial status if needed by backend
     </script>
 </body>
 </html>
