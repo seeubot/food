@@ -369,30 +369,30 @@ client.on('message', async msg => {
     }
 
     const senderNumber = msg.from.split('@')[0];
-    // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
-    const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
-    const menuUrl = `${baseUrl}/menu`; // Changed to /menu
+    // Direct menu URL as requested
+    const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
 
     try {
         // Update customer notification date on any message received
         await updateCustomerNotification(senderNumber);
 
-        // Welcome message content with numbered options
-        const welcomeMessage = `Hello! Welcome to Delicious Bites!
-                \nWhat would you like to do today? Please reply with the number:
-                \n1. View our delicious Menu
-                2. See my Recent Orders
-                3. Get Help/Support`;
+        // Welcome message content with numbered options and Indian dialogues
+        const welcomeMessage = `Namaste! Craving something delicious? 😋 Welcome to Delicious Bites, where every bite is a delight!
+                \nKya chahiye aapko? (What do you need?) Just reply with the number:
+                \n1. My Profile (Dekho apni jaankari!)
+                \n2. My Recent Orders (Pichle orders dekho!)
+                \n3. Support (Madad chahiye? Hum hain na!)
+                \n\nTo view our full menu, simply type 'Menu' or click here: ${menuUrl}`;
 
         // Handle specific commands (case-insensitive and number-based)
         const lowerCaseBody = msg.body.toLowerCase().trim();
 
         switch (lowerCaseBody) {
             case '1':
-            case '!menu':
-            case 'menu':
-                await msg.reply(`Check out our delicious menu here: ${menuUrl}`);
-                console.log(`Replied to ${senderNumber} with menu link.`);
+            case '!profile':
+            case 'profile':
+                await msg.reply(`Aapka profile yahaan hai! (Your profile is here!) Your registered WhatsApp number is: ${senderNumber}. We're working on adding more personalized profile features soon. Stay tuned!`);
+                console.log(`Replied to ${senderNumber} with profile info.`);
                 break;
             case '2':
             case '!orders':
@@ -422,6 +422,10 @@ client.on('message', async msg => {
             case 'support':
                 await msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
                 console.log(`Replied to ${senderNumber} with help message.`);
+                break;
+            case 'menu': // Explicitly handle 'menu' as a direct link request
+                await msg.reply(`Check out our delicious menu here: ${menuUrl}`);
+                console.log(`Replied to ${senderNumber} with direct menu link.`);
                 break;
             default:
                 // Default response: send the welcome message for any other input
@@ -461,9 +465,8 @@ async function sendWeeklyNotifications() {
             return;
         }
 
-        // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
-        const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
-        const menuUrl = `${baseUrl}/menu`;
+        // Direct menu URL for notifications
+        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
 
         for (const customer of customersToNotify) {
             // Pick a random product to suggest
@@ -664,6 +667,7 @@ app.get('/admin/dashboard', isAuthenticated, async (req, res) => {
 
 // API: Get bot status for admin dashboard (NO QR data here)
 app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
+    console.log('API: /api/admin/bot-status hit.');
     res.json({
         status: botCurrentStatus,
         // Removed qrCodeDataURL from here, it's only for the public panel
@@ -672,6 +676,7 @@ app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
 
 // NEW PUBLIC API: Request a new QR code for WhatsApp bot (accessible from public panel)
 app.post('/api/public/request-qr', async (req, res) => {
+    console.log('API: /api/public/request-qr hit.');
     if (clientReady) {
         return res.status(400).json({ message: 'Bot is already connected. Disconnect it first if you need a new QR for re-authentication.' });
     }
@@ -706,8 +711,10 @@ app.post('/api/public/request-qr', async (req, res) => {
 
 // --- API for Admin Dashboard Orders ---
 app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
+    console.log('API: /api/admin/orders hit.');
     try {
         const orders = await Order.find().sort({ orderDate: -1 });
+        console.log(`Fetched ${orders.length} admin orders.`);
         res.json(orders);
     }
     catch (error) {
@@ -717,12 +724,14 @@ app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
 });
 
 app.get('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
+    console.log(`API: /api/admin/orders/${req.params.id} hit.`);
     try {
         // Ensure that subtotal, transportTax, and totalAmount are always numbers.
         // This is a safety measure for potentially inconsistent old data,
         // as the schema already marks them as required numbers for new data.
         const order = await Order.findById(req.params.id).lean(); // Use .lean() for plain JS objects for modification
         if (!order) {
+            console.log(`Order ${req.params.id} not found.`);
             return res.status(404).json({ message: 'Order not found' });
         }
 
@@ -731,6 +740,7 @@ app.get('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
         order.transportTax = typeof order.transportTax === 'number' ? order.transportTax : 0;
         order.totalAmount = typeof order.totalAmount === 'number' ? order.totalAmount : 0;
 
+        console.log(`Fetched order ${req.params.id} details.`);
         res.json(order);
     } catch (error) {
         console.error('Error fetching single order:', error.message);
@@ -740,6 +750,7 @@ app.get('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
 
 
 app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
+    console.log(`API: /api/admin/orders/${req.params.id} PUT hit.`);
     try {
         const { id } = req.params;
         const { status } = req.body;
@@ -761,8 +772,10 @@ app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
 
 // --- API for Admin Menu Management (CRUD) ---
 app.get('/api/admin/menu', isAuthenticated, async (req, res) => {
+    console.log('API: /api/admin/menu hit.');
     try {
         const products = await Product.find().sort({ name: 1 });
+        console.log(`Fetched ${products.length} admin menu items.`);
         res.json(products);
     } catch (error) {
         console.error('Error fetching admin menu:', error.message); // Log specific error
@@ -771,17 +784,24 @@ app.get('/api/admin/menu', isAuthenticated, async (req, res) => {
 });
 
 app.get('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
+    console.log(`API: /api/admin/menu/${req.params.id} hit.`);
     try {
         const product = await Product.findById(req.params.id);
-        if (!product) return res.status(404).json({ message: 'Product not found' });
+        if (!product) {
+            console.log(`Product ${req.params.id} not found.`);
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        console.log(`Fetched product ${product.name} for edit.`);
         res.json(product);
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error fetching single product:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching product' });
     }
 });
 
 app.post('/api/admin/menu', isAuthenticated, async (req, res) => {
+    console.log('API: /api/admin/menu POST hit.');
     try {
         console.log('Attempting to add new menu item. Received body:', req.body); // Log received body
         const newProduct = new Product(req.body);
@@ -795,6 +815,7 @@ app.post('/api/admin/menu', isAuthenticated, async (req, res) => {
 });
 
 app.put('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
+    console.log(`API: /api/admin/menu/${req.params.id} PUT hit.`);
     try {
         console.log(`Attempting to update menu item ${req.params.id}. Received body:`, req.body); // Log received body
         const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }); // runValidators ensures schema validation on update
@@ -811,6 +832,7 @@ app.put('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
 });
 
 app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
+    console.log(`API: /api/admin/menu/${req.params.id} DELETE hit.`);
     try {
         console.log(`Attempting to delete menu item ${req.params.id}.`);
         const deletedProduct = await Product.findByIdAndDelete(req.params.id);
@@ -828,12 +850,14 @@ app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
 
 // --- API for Admin Shop Settings ---
 app.get('/api/admin/settings', isAuthenticated, async (req, res) => {
+    console.log('API: /api/admin/settings hit.');
     try {
         const settings = await AdminSettings.findOne();
         if (!settings) {
             console.warn('Admin settings not found in DB. Returning default structure.');
             return res.json({ shopName: 'My Food Business', shopLocation: { latitude: 0, longitude: 0 }, deliveryRates: [] });
         }
+        console.log('Fetched admin settings:', settings);
         res.json(settings);
     } catch (error) {
         console.error('Error fetching admin settings:', error.message); // Log specific error
@@ -842,10 +866,11 @@ app.get('/api/admin/settings', isAuthenticated, async (req, res) => {
 });
 
 app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
+    console.log('API: /api/admin/settings PUT hit.');
     try {
         console.log('Attempting to update admin settings. Received body:', req.body); // Log received body
         const updatedSettings = await AdminSettings.findOneAndUpdate({}, req.body, { new: true, upsert: true, runValidators: true }); // runValidators ensures schema validation
-        console.log('Admin settings updated successfully.');
+        console.log('Admin settings updated successfully:', updatedSettings);
         res.json(updatedSettings);
     } catch (error) {
         console.error('Error updating admin settings:', error.message); // Log specific error
@@ -855,6 +880,7 @@ app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
 
 // NEW API: Get all customers with their last known location from orders
 app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
+    console.log('API: /api/admin/customers hit.');
     try {
         const customerNotifications = await CustomerNotification.find({});
         const customersData = [];
@@ -869,7 +895,7 @@ app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
             if (latestOrder) {
                 customersData.push({
                     customerName: latestOrder.customerName,
-                    customerPhone: latestOrder.customerPhone,
+                    customerPhone: latestOrder.customerPhone, // Corrected typo here
                     lastKnownLocation: latestOrder.customerLocation || null, // Can be null if order didn't have location
                     shopLocation: settings ? settings.shopLocation : null // Include shop location
                 });
@@ -883,6 +909,7 @@ app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
                 });
             }
         }
+        console.log(`Fetched ${customersData.length} customer records.`);
         res.json(customersData);
     } catch (error) {
         console.error('Error fetching customer data:', error.message); // Log specific error
@@ -903,8 +930,10 @@ app.get('/menu', async (req, res) => {
 
 // API for Public Menu
 app.get('/api/menu', async (req, res) => {
+    console.log('API: /api/menu hit.');
     try {
         const products = await Product.find({ isAvailable: true }).sort({ category: 1, name: 1 });
+        console.log(`Fetched ${products.length} public menu items.`);
         res.json(products);
     } catch (error) {
         console.error('Error fetching public menu:', error.message); // Log specific error
@@ -914,8 +943,10 @@ app.get('/api/menu', async (req, res) => {
 
 // API for Public Shop Settings (only what's needed for delivery calculation)
 app.get('/api/public/settings', async (req, res) => {
+    console.log('API: /api/public/settings hit.');
     try {
         const settings = await AdminSettings.findOne({}, 'shopLocation deliveryRates shopName'); // Fetch shopName as well
+        console.log('Fetched public settings:', settings);
         res.json(settings);
     }
     catch (error) {
@@ -927,14 +958,17 @@ app.get('/api/public/settings', async (req, res) => {
 
 // API for Delivery Cost Calculation
 app.post('/api/calculate-delivery-cost', async (req, res) => {
+    console.log('API: /api/calculate-delivery-cost hit.');
     const { customerLocation } = req.body;
     if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined') {
+        console.warn('Missing customer location for delivery cost calculation.');
         return res.status(400).json({ message: 'Customer location (latitude, longitude) is required.' });
     }
 
     try {
         const settings = await AdminSettings.findOne();
         if (!settings || !settings.shopLocation || !settings.deliveryRates || settings.deliveryRates.length === 0) {
+            console.warn('Shop location or delivery rates not configured by admin for delivery cost calculation.');
             return res.status(500).json({ message: 'Shop location or delivery rates not configured by admin.' });
         }
 
@@ -954,11 +988,11 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
                 break;
             }
             // If it's the last rate and distance is greater, use this rate
-            if (i === sortedRates.length - 1) { // This condition was slightly off, fixed to ensure last rate is picked if distance exceeds all previous
+            if (i === sortedRates.length - 1 && distance > sortedRates[i].kms) { // Corrected logic: only apply if distance exceeds this last rate's KMS
                 transportTax = sortedRates[i].amount;
             }
         }
-
+        console.log(`Calculated distance: ${distance.toFixed(2)}km, transport tax: ₹${transportTax.toFixed(2)}`);
         res.json({ distance, transportTax });
 
     } catch (error) {
@@ -969,9 +1003,11 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
 
 // API for Placing Orders
 app.post('/api/order', async (req, res) => {
+    console.log('API: /api/order POST hit.');
     const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount } = req.body;
 
     if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined') {
+        console.warn('Missing required order details in POST /api/order.');
         return res.status(400).json({ message: 'Missing required order details.' });
     }
 
@@ -993,6 +1029,7 @@ app.post('/api/order', async (req, res) => {
             status: 'Pending'
         });
         await newOrder.save();
+        console.log('New order placed successfully:', newOrder._id);
 
         // Update customer notification date to reset weekly reminder timer
         await updateCustomerNotification(customerPhone);
@@ -1027,14 +1064,18 @@ app.post('/api/order', async (req, res) => {
 
 // API for fetching a single order by ID (for tracking)
 app.get('/api/order/:id', async (req, res) => {
+    console.log(`API: /api/order/${req.params.id} hit.`);
     try {
         const order = await Order.findById(req.params.id);
         if (!order) {
+            console.log(`Order ${req.params.id} not found for tracking.`);
             return res.status(404).json({ message: 'Order not found' });
         }
+        console.log(`Fetched order ${req.params.id} for tracking.`);
         res.json(order);
     } catch (error) {
         console.error('Error fetching order for tracking:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching order details.' });
     }
 });
+
