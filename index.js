@@ -18,6 +18,10 @@ const ADMIN_NUMBER = process.env.ADMIN_NUMBER || '918897350151'; // Admin WhatsA
 const SESSION_SECRET = process.env.SESSION_SECRET || 'supersecretkeyforfoodbot'; // CHANGE THIS IN PRODUCTION!
 const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for whatsapp-web.js session files
 
+// Admin Credentials from Environment Variables or Default
+const DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'adminpassword';
+
 // New: Reconnection and QR expiry settings
 const RECONNECT_DELAY_MS = 5000; // 5 seconds delay before trying to re-initialize
 const QR_EXPIRY_MS = 60000; // QR code considered expired after 60 seconds if not scanned
@@ -154,18 +158,20 @@ const CustomerNotification = mongoose.model('CustomerNotification', customerNoti
 // --- Initial Data Setup ---
 async function initializeAdminAndSettings() {
     try {
-        let adminUser = await User.findOne({ username: 'admin' });
+        let adminUser = await User.findOne({ username: DEFAULT_ADMIN_USERNAME });
         if (!adminUser) {
             adminUser = new User({
-                username: 'admin',
-                password: 'adminpassword', // This will be hashed by the pre-save hook
+                username: DEFAULT_ADMIN_USERNAME,
+                password: DEFAULT_ADMIN_PASSWORD, // This will be hashed by the pre-save hook
                 isAdmin: true
             });
             await adminUser.save();
-            console.log('Default admin user created: admin/adminpassword');
+            console.log(`Default admin user created: ${DEFAULT_ADMIN_USERNAME}/${DEFAULT_ADMIN_PASSWORD}`);
             console.log('Admin user details after creation:', adminUser);
         } else {
-            console.log('Admin user already exists. Details:', adminUser);
+            console.log(`Admin user '${DEFAULT_ADMIN_USERNAME}' already exists. Details:`, adminUser);
+            // Optional: If you want to update the password if it changes in env, add logic here.
+            // For now, it only creates if not found.
         }
 
         let settings = await AdminSettings.findOne();
@@ -382,7 +388,9 @@ client.on('message', async msg => {
                 const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
                 if (customerOrders.length > 0) {
                     let orderList = 'Your recent orders:\n';
-                    customerList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
+                    customerOrders.forEach((order, index) => {
+                        orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
+                    });
                     msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
                 } else {
                     msg.reply('You have no recent orders. Why not place one now? Reply with *1* for menu.');
