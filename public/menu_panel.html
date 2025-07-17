@@ -302,6 +302,28 @@
             document.getElementById(modalId).classList.add('hidden');
         }
 
+        // Simple temporary message display (can be replaced with a full modal/toast system)
+        function showTemporaryMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg text-white z-[101] transition-all duration-300 transform translate-x-0 opacity-100`;
+            if (type === 'error') {
+                messageDiv.classList.add('bg-red-600');
+            } else if (type === 'success') {
+                messageDiv.classList.add('bg-green-600');
+            } else {
+                messageDiv.classList.add('bg-gray-700');
+            }
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+
+            setTimeout(() => {
+                messageDiv.classList.remove('opacity-100');
+                messageDiv.classList.add('opacity-0', 'translate-x-full');
+                messageDiv.addEventListener('transitionend', () => messageDiv.remove());
+            }, 3000);
+        }
+
+
         // --- Fetch Menu Items and Settings ---
         async function fetchMenuAndSettings() {
             showLoading();
@@ -315,13 +337,15 @@
                 const settings = await settingsResponse.json();
 
                 shopLocation = settings.shopLocation;
-                deliveryRates = settings.deliveryRates.sort((a, b) => a.kms - b.kms); // Ensure rates are sorted
+                // Ensure deliveryRates is an array before sorting
+                deliveryRates = Array.isArray(settings.deliveryRates) ? settings.deliveryRates.sort((a, b) => a.kms - b.kms) : [];
 
                 renderMenu(products);
                 renderCategories(products);
             } catch (error) {
                 console.error('Error fetching menu or settings:', error);
                 document.getElementById('menu-items-grid').innerHTML = '<p class="col-span-full text-center text-red-500">Failed to load menu. Please try again later.</p>';
+                showTemporaryMessage('Failed to load menu. Please try again later.', 'error');
             } finally {
                 hideLoading();
             }
@@ -331,7 +355,7 @@
             const menuGrid = document.getElementById('menu-items-grid');
             menuGrid.innerHTML = ''; // Clear previous items
 
-            if (itemsToRender.length === 0) {
+            if (!itemsToRender || itemsToRender.length === 0) {
                 document.getElementById('no-items-message').classList.remove('hidden');
                 return;
             } else {
@@ -339,6 +363,8 @@
             }
 
             itemsToRender.forEach(product => {
+                // Ensure product.price is a number before calling toFixed
+                const displayPrice = typeof product.price === 'number' ? product.price.toFixed(2) : '0.00';
                 const productCard = `
                     <div class="bg-white rounded-lg shadow-md overflow-hidden flex flex-col transform transition-transform duration-300 hover:scale-105 cursor-pointer" onclick="showProductDetails('${product._id}')">
                         <img src="${product.imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/400x300/cccccc/333333?text=Food+Item';" alt="${product.name}" class="w-full h-48 object-cover">
@@ -346,8 +372,8 @@
                             <h3 class="text-xl font-semibold text-white mb-2">${product.name}</h3>
                             <p class="text-gray-300 text-sm mb-3 flex-grow">${product.description ? product.description.substring(0, 70) + '...' : 'No description available.'}</p>
                             <div class="flex justify-between items-center mt-auto">
-                                <span class="text-2xl font-bold text-green-600">₹${product.price.toFixed(2)}</span>
-                                <button onclick="event.stopPropagation(); addToCart('${product._id}')" class="bg-blue-500 hover:bg-blue-600 text-black font-bold py-2 px-4 rounded-md transition duration-200 text-sm">
+                                <span class="text-2xl font-bold text-green-600">₹${displayPrice}</span>
+                                <button onclick="event.stopPropagation(); addToCart('${product._id}')" class="bg-blue-500 hover:bg-blue-600 text-black font-bold py-2 px-4 rounded-md transition duration-200 text-sm ${!product.isAvailable ? 'opacity-50 cursor-not-allowed' : ''}" ${!product.isAvailable ? 'disabled' : ''}>
                                     <i class="fas fa-cart-plus mr-1"></i> Add to Cart
                                 </button>
                             </div>
@@ -360,7 +386,8 @@
 
         function renderCategories(allProducts) {
             const categoriesContainer = document.querySelector('.filter-button').parentNode;
-            const uniqueCategories = [...new Set(allProducts.map(p => p.category))].filter(Boolean); // Get unique non-empty categories
+            // Filter out null/undefined categories and ensure uniqueness
+            const uniqueCategories = [...new Set(allProducts.map(p => p.category).filter(cat => cat))];
 
             // Clear existing dynamic categories, keep 'All' button
             document.querySelectorAll('.filter-button:not([data-category="All"])').forEach(btn => btn.remove());
@@ -394,15 +421,21 @@
             });
 
             // Set 'All' button as active by default
-            document.querySelector('.filter-button[data-category="All"]').classList.add('bg-green-500', 'text-black');
-            document.querySelector('.filter-button[data-category="All"]').classList.remove('bg-gray-200', 'text-white');
+            const allButton = document.querySelector('.filter-button[data-category="All"]');
+            if (allButton) {
+                allButton.classList.add('bg-green-500', 'text-black');
+                allButton.classList.remove('bg-gray-200', 'text-white');
+            }
         }
 
 
         // --- Cart Management ---
         function addToCart(productId) {
             const product = products.find(p => p._id === productId);
-            if (!product) return;
+            if (!product || !product.isAvailable) {
+                showTemporaryMessage('Item is not available or could not be found.', 'error');
+                return;
+            }
 
             const existingItem = cart.find(item => item.productId === productId);
             if (existingItem) {
@@ -416,6 +449,7 @@
                 });
             }
             updateCartDisplay();
+            showTemporaryMessage(`${product.name} added to cart!`, 'success');
         }
 
         function updateCartItemQuantity(productId, change) {
@@ -439,7 +473,8 @@
             const { subtotal, totalAmount } = calculateCartTotals();
 
             cartCountSpan.textContent = cart.reduce((sum, item) => sum + item.quantity, 0);
-            cartTotalDisplaySpan.textContent = `₹${totalAmount.toFixed(2)}`;
+            // Ensure totalAmount is a number before toFixed
+            cartTotalDisplaySpan.textContent = `₹${typeof totalAmount === 'number' ? totalAmount.toFixed(2) : '0.00'}`;
 
             cartItemsDisplayDiv.innerHTML = '';
             if (cart.length === 0) {
@@ -447,31 +482,35 @@
             } else {
                 emptyCartMessage.classList.add('hidden');
                 cart.forEach(item => {
+                    // Ensure item.price and item.quantity are numbers
+                    const itemTotalPrice = (typeof item.price === 'number' && typeof item.quantity === 'number') ? (item.price * item.quantity).toFixed(2) : '0.00';
                     const itemDiv = `
                         <div class="flex justify-between items-center py-3 border-b border-gray-700 last:border-b-0">
                             <div class="flex-grow">
                                 <p class="font-semibold text-white text-lg">${item.name}</p>
-                                <p class="text-sm text-gray-400">₹${item.price.toFixed(2)} each</p>
+                                <p class="text-sm text-gray-400">₹${typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'} each</p>
                             </div>
                             <div class="flex items-center">
                                 <button onclick="updateCartItemQuantity('${item.productId}', -1)" class="bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-lg mr-2">-</button>
                                 <span class="font-bold text-white text-xl">${item.quantity}</span>
                                 <button onclick="updateCartItemQuantity('${item.productId}', 1)" class="bg-green-500 hover:bg-green-600 text-black w-8 h-8 rounded-full flex items-center justify-center text-lg ml-2">+</button>
                             </div>
-                            <span class="font-semibold text-white ml-4 text-xl">₹${(item.price * item.quantity).toFixed(2)}</span>
+                            <span class="font-semibold text-white ml-4 text-xl">₹${itemTotalPrice}</span>
                         </div>
                     `;
                     cartItemsDisplayDiv.innerHTML += itemDiv;
                 });
             }
 
-            cartSubtotalDropdown.textContent = `₹${subtotal.toFixed(2)}`;
-            cartTaxDropdown.textContent = `₹${transportTax.toFixed(2)}`;
-            cartGrandTotalDropdown.textContent = `₹${totalAmount.toFixed(2)}`;
+            // Ensure subtotal, transportTax, totalAmount are numbers before toFixed
+            cartSubtotalDropdown.textContent = `₹${typeof subtotal === 'number' ? subtotal.toFixed(2) : '0.00'}`;
+            cartTaxDropdown.textContent = `₹${typeof transportTax === 'number' ? transportTax.toFixed(2) : '0.00'}`;
+            cartGrandTotalDropdown.textContent = `₹${typeof totalAmount === 'number' ? totalAmount.toFixed(2) : '0.00'}`;
         }
 
         // Toggle cart dropdown visibility
-        document.getElementById('cart-button').addEventListener('click', () => {
+        document.getElementById('cart-button').addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent click from bubbling to window and closing immediately
             document.getElementById('cart-dropdown').classList.toggle('hidden');
         });
 
@@ -488,7 +527,10 @@
         // --- Product Details ---
         function showProductDetails(productId) {
             const product = products.find(p => p._id === productId);
-            if (!product) return;
+            if (!product) {
+                showTemporaryMessage('Product details not found.', 'error');
+                return;
+            }
 
             document.getElementById('product-detail-name').textContent = product.name;
             document.getElementById('product-detail-image').src = product.imageUrl;
@@ -496,7 +538,8 @@
             document.getElementById('product-detail-category').textContent = product.category || 'N/A';
             document.getElementById('product-detail-availability').textContent = product.isAvailable ? 'Available' : 'Out of Stock';
             document.getElementById('product-detail-availability').className = product.isAvailable ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold';
-            document.getElementById('product-detail-price').textContent = `₹${product.price.toFixed(2)}`;
+            // Ensure product.price is a number before toFixed
+            document.getElementById('product-detail-price').textContent = `₹${typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}`;
 
             const addToCartBtn = document.getElementById('product-detail-add-to-cart');
             addToCartBtn.onclick = () => {
@@ -514,13 +557,14 @@
         // --- Checkout Process ---
         document.getElementById('checkout-button-dropdown').addEventListener('click', () => {
             if (cart.length === 0) {
-                alert('Your cart is empty. Please add items before checking out.'); // Replace with custom modal
+                showTemporaryMessage('Your cart is empty. Please add items before checking out.', 'info');
                 return;
             }
             const { subtotal, totalAmount } = calculateCartTotals();
-            checkoutSubtotalSpan.textContent = `₹${subtotal.toFixed(2)}`;
-            checkoutTransportTaxSpan.textContent = `₹${transportTax.toFixed(2)}`;
-            checkoutTotalAmountSpan.textContent = `₹${totalAmount.toFixed(2)}`;
+            // Ensure values are numbers before toFixed
+            checkoutSubtotalSpan.textContent = `₹${typeof subtotal === 'number' ? subtotal.toFixed(2) : '0.00'}`;
+            checkoutTransportTaxSpan.textContent = `₹${typeof transportTax === 'number' ? transportTax.toFixed(2) : '0.00'}`;
+            checkoutTotalAmountSpan.textContent = `₹${typeof totalAmount === 'number' ? totalAmount.toFixed(2) : '0.00'}`;
             openModal('checkout-modal');
             document.getElementById('cart-dropdown').classList.add('hidden'); // Close cart dropdown
         });
@@ -546,6 +590,7 @@
                         currentCustomerLocation = null;
                         transportTax = 0; // Reset transport tax if location fails
                         updateCartDisplay(); // Update totals
+                        showTemporaryMessage('Failed to get location. Please enter address manually.', 'error');
                     },
                     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
@@ -554,11 +599,12 @@
                 currentCustomerLocation = null;
                 transportTax = 0; // Reset transport tax if geolocation not supported
                 updateCartDisplay(); // Update totals
+                showTemporaryMessage('Geolocation is not supported by your browser.', 'error');
             }
         });
 
         async function calculateDeliveryCost(customerLoc) {
-            if (!customerLoc || !shopLocation) {
+            if (!customerLoc || typeof customerLoc.latitude === 'undefined' || typeof customerLoc.longitude === 'undefined' || !shopLocation || typeof shopLocation.latitude === 'undefined' || typeof shopLocation.longitude === 'undefined') {
                 transportTax = 0;
                 updateCartDisplay();
                 return;
@@ -572,18 +618,19 @@
                 });
                 const data = await response.json();
                 transportTax = data.transportTax;
-                document.getElementById('location-status').textContent += ` (Delivery Tax: ₹${transportTax.toFixed(2)})`;
+                document.getElementById('location-status').textContent += ` (Delivery Tax: ₹${typeof transportTax === 'number' ? transportTax.toFixed(2) : '0.00'})`;
                 updateCartDisplay(); // Update cart totals with new tax
                 // Also update checkout modal totals if it's open
                 const { subtotal, totalAmount } = calculateCartTotals();
-                checkoutSubtotalSpan.textContent = `₹${subtotal.toFixed(2)}`;
-                checkoutTransportTaxSpan.textContent = `₹${transportTax.toFixed(2)}`;
-                checkoutTotalAmountSpan.textContent = `₹${totalAmount.toFixed(2)}`;
+                checkoutSubtotalSpan.textContent = `₹${typeof subtotal === 'number' ? subtotal.toFixed(2) : '0.00'}`;
+                checkoutTransportTaxSpan.textContent = `₹${typeof transportTax === 'number' ? transportTax.toFixed(2) : '0.00'}`;
+                checkoutTotalAmountSpan.textContent = `₹${typeof totalAmount === 'number' ? totalAmount.toFixed(2) : '0.00'}`;
             } catch (error) {
                 console.error('Error calculating delivery cost:', error);
                 transportTax = 0; // Default to 0 on error
                 document.getElementById('location-status').textContent += ' (Error calculating delivery cost)';
                 updateCartDisplay();
+                showTemporaryMessage('Error calculating delivery cost. Please check your address.', 'error');
             } finally {
                 hideLoading();
             }
@@ -602,6 +649,25 @@
             const customerLongitude = formData.get('customerLongitude');
 
             const { subtotal, totalAmount } = calculateCartTotals();
+
+            // Basic validation before sending
+            if (cart.length === 0) {
+                showTemporaryMessage('Your cart is empty. Please add items.', 'error');
+                hideLoading();
+                return;
+            }
+            if (!customerName || !customerPhone || !deliveryAddress) {
+                showTemporaryMessage('Please fill in all required customer details.', 'error');
+                hideLoading();
+                return;
+            }
+            // Basic phone number format check (more robust validation can be added)
+            if (!/^\d{10,15}$/.test(customerPhone)) {
+                showTemporaryMessage('Please enter a valid WhatsApp number (10-15 digits).', 'error');
+                hideLoading();
+                return;
+            }
+
 
             const orderData = {
                 items: cart.map(item => ({
@@ -639,13 +705,14 @@
                 cart = []; // Clear cart after successful order
                 transportTax = 0; // Reset transport tax
                 updateCartDisplay();
+                showTemporaryMessage('Order placed successfully!', 'success');
 
                 // Show order tracking modal
                 viewOrderTracking(result.orderId);
 
             } catch (error) {
                 console.error('Error placing order:', error);
-                alert(`Error placing order: ${error.message}`); // Replace with custom modal
+                showTemporaryMessage(`Error placing order: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }
@@ -656,25 +723,33 @@
             showLoading();
             try {
                 const response = await fetch(`/api/order/${orderId}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch order for tracking.');
+                }
                 const order = await response.json();
                 const trackingContent = document.getElementById('order-tracking-content');
+
+                // Ensure numeric values are safe before toFixed
+                const orderTotalAmount = typeof order.totalAmount === 'number' ? order.totalAmount.toFixed(2) : '0.00';
+
                 trackingContent.innerHTML = `
                     <p><strong>Order ID:</strong> ${order._id}</p>
-                    <p><strong>Status:</strong> <span class="font-bold text-green-600">${order.status}</span></p>
-                    <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
-                    <p><strong>Order Date:</strong> ${new Date(order.orderDate).toLocaleString()}</p>
+                    <p><strong>Status:</strong> <span class="font-bold text-green-600">${order.status || 'N/A'}</span></p>
+                    <p><strong>Total Amount:</strong> ₹${orderTotalAmount}</p>
+                    <p><strong>Order Date:</strong> ${order.orderDate ? new Date(order.orderDate).toLocaleString() : 'N/A'}</p>
                     <h4 class="font-bold mt-4 mb-2">Items:</h4>
                     <ul class="list-disc list-inside space-y-1">
-                        ${order.items.map(item => `
-                            <li>${item.name} (x${item.quantity}) - ₹${(item.price * item.quantity).toFixed(2)}</li>
-                        `).join('')}
+                        ${order.items && order.items.length > 0 ? order.items.map(item => `
+                            <li>${item.name || 'Unknown Item'} (x${item.quantity || 0}) - ₹${(typeof item.price === 'number' && typeof item.quantity === 'number') ? (item.price * item.quantity).toFixed(2) : '0.00'}</li>
+                        `).join('') : '<li>No items found.</li>'}
                     </ul>
                     <p class="mt-4 text-sm text-gray-500">You can track your order status here. For more details, please contact us via WhatsApp using the number you provided.</p>
                 `;
                 openModal('order-tracking-modal');
             } catch (error) {
                 console.error('Error fetching order for tracking:', error);
-                alert('Failed to fetch order status. Please try again or contact support.'); // Replace with custom modal
+                showTemporaryMessage(`Failed to fetch order status. Please try again or contact support. Details: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }
