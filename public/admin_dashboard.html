@@ -577,7 +577,7 @@
                             <td class="py-3 px-6 text-left whitespace-nowrap">${order._id.substring(0, 6)}...</td>
                             <td class="py-3 px-6 text-left">${order.customerName}</td>
                             <td class="py-3 px-6 text-left">${order.customerPhone}</td>
-                            <td class="py-3 px-6 text-left">₹${order.totalAmount.toFixed(2)}</td>
+                            <td class="py-3 px-6 text-left">₹${order.totalAmount ? order.totalAmount.toFixed(2) : '0.00'}</td>
                             <td class="py-3 px-6 text-center">
                                 <select onchange="updateOrderStatus('${order._id}', this.value)"
                                     class="bg-gray-700 text-gray-200 py-1 px-2 rounded-md text-sm focus:outline-none">
@@ -622,7 +622,12 @@
                 await fetchOrders(); // Refresh orders
             } catch (error) {
                 console.error('Error updating order status:', error);
-                alert(`Failed to update order status. Please try again. Details: ${error.message}`);
+                // Use a custom modal or message box instead of alert
+                // For now, using a simple console log and temporary message
+                const errorMessage = `Failed to update order status. Please try again. Details: ${error.message}`;
+                console.error(errorMessage);
+                // alert(errorMessage); // Replaced with a more user-friendly approach if possible
+                showTemporaryMessage(errorMessage, 'error');
             } finally {
                 hideLoading();
             }
@@ -642,33 +647,73 @@
                 }
                 const order = await response.json();
                 const detailContent = document.getElementById('order-detail-content');
+
+                // Robust checks for undefined/null values before accessing properties or calling toFixed
+                const subtotalDisplay = order.subtotal !== undefined && order.subtotal !== null ? `₹${order.subtotal.toFixed(2)}` : 'N/A';
+                const transportTaxDisplay = order.transportTax !== undefined && order.transportTax !== null ? `₹${order.transportTax.toFixed(2)}` : 'N/A';
+                const totalAmountDisplay = order.totalAmount !== undefined && order.totalAmount !== null ? `₹${order.totalAmount.toFixed(2)}` : 'N/A';
+
+                const customerLocationDisplay = order.customerLocation && order.customerLocation.latitude !== undefined && order.customerLocation.longitude !== undefined
+                    ? `<h4 class="font-bold mt-6 mb-3 text-xl">Customer Location:</h4><p>Latitude: ${order.customerLocation.latitude}, Longitude: ${order.customerLocation.longitude}</p>`
+                    : '';
+                const shopLocationDisplay = order.deliveryFromLocation && order.deliveryFromLocation.latitude !== undefined && order.deliveryFromLocation.longitude !== undefined
+                    ? `<h4 class="font-bold mt-6 mb-3 text-xl">Shop Location at Order:</h4><p>Latitude: ${order.deliveryFromLocation.latitude}, Longitude: ${order.deliveryFromLocation.longitude}</p>`
+                    : '';
+
                 detailContent.innerHTML = `
                     <p><strong>Order ID:</strong> ${order._id}</p>
-                    <p><strong>Customer Name:</strong> ${order.customerName}</p>
-                    <p><strong>Customer Phone:</strong> ${order.customerPhone}</p>
-                    <p><strong>Delivery Address:</strong> ${order.deliveryAddress}</p>
-                    <p><strong>Order Date:</strong> ${new Date(order.orderDate).toLocaleString()}</p>
-                    <p><strong>Status:</strong> ${order.status}</p>
-                    <p><strong>Subtotal:</strong> ₹${order.subtotal.toFixed(2)}</p>
-                    <p><strong>Transport Tax:</strong> ₹${order.transportTax.toFixed(2)}</p>
-                    <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
+                    <p><strong>Customer Name:</strong> ${order.customerName || 'N/A'}</p>
+                    <p><strong>Customer Phone:</strong> ${order.customerPhone || 'N/A'}</p>
+                    <p><strong>Delivery Address:</strong> ${order.deliveryAddress || 'N/A'}</p>
+                    <p><strong>Order Date:</strong> ${order.orderDate ? new Date(order.orderDate).toLocaleString() : 'N/A'}</p>
+                    <p><strong>Status:</strong> ${order.status || 'N/A'}</p>
+                    <p><strong>Subtotal:</strong> ${subtotalDisplay}</p>
+                    <p><strong>Transport Tax:</strong> ${transportTaxDisplay}</p>
+                    <p><strong>Total Amount:</strong> ${totalAmountDisplay}</p>
                     <h4 class="font-bold mt-6 mb-3 text-xl">Items:</h4>
                     <ul class="list-disc list-inside space-y-2 ml-4">
-                        ${order.items.map(item => `
-                            <li>${item.name} (x${item.quantity}) - ₹${(item.price * item.quantity).toFixed(2)}</li>
-                        `).join('')}
+                        ${order.items && order.items.length > 0 ? order.items.map(item => `
+                            <li>${item.name || 'Unknown Item'} (x${item.quantity || 0}) - ₹${(item.price !== undefined && item.price !== null && item.quantity !== undefined && item.quantity !== null) ? (item.price * item.quantity).toFixed(2) : '0.00'}</li>
+                        `).join('') : '<li>No items found.</li>'}
                     </ul>
-                    ${order.customerLocation ? `<h4 class="font-bold mt-6 mb-3 text-xl">Customer Location:</h4><p>Latitude: ${order.customerLocation.latitude}, Longitude: ${order.customerLocation.longitude}</p>` : ''}
-                    ${order.deliveryFromLocation ? `<h4 class="font-bold mt-6 mb-3 text-xl">Shop Location at Order:</h4><p>Latitude: ${order.deliveryFromLocation.latitude}, Longitude: ${order.deliveryFromLocation.longitude}</p>` : ''}
+                    ${customerLocationDisplay}
+                    ${shopLocationDisplay}
                 `;
                 openModal('order-detail-modal');
             } catch (error) {
                 console.error('Error fetching order details:', error);
-                alert(`Failed to fetch order details. Details: ${error.message}`);
+                // Use a custom modal or message box instead of alert
+                // For now, using a simple console log and temporary message
+                const errorMessage = `Failed to fetch order details. Details: ${error.message}`;
+                console.error(errorMessage);
+                // alert(errorMessage); // Replaced with a more user-friendly approach if possible
+                showTemporaryMessage(errorMessage, 'error');
             } finally {
                 hideLoading();
             }
         }
+
+        // Simple temporary message display (can be replaced with a full modal/toast system)
+        function showTemporaryMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg text-white z-[101] transition-all duration-300 transform translate-x-0 opacity-100`;
+            if (type === 'error') {
+                messageDiv.classList.add('bg-red-600');
+            } else if (type === 'success') {
+                messageDiv.classList.add('bg-green-600');
+            } else {
+                messageDiv.classList.add('bg-gray-700');
+            }
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+
+            setTimeout(() => {
+                messageDiv.classList.remove('opacity-100');
+                messageDiv.classList.add('opacity-0', 'translate-x-full');
+                messageDiv.addEventListener('transitionend', () => messageDiv.remove());
+            }, 3000);
+        }
+
 
         // Listen for new orders via Socket.IO
         socket.on('newOrder', (order) => {
@@ -678,7 +723,7 @@
                 fetchOrders();
             }
             // Optionally, show a toast notification for new order
-            // showToast('New Order Received!', 'success');
+            showTemporaryMessage('New Order Received!', 'success');
         });
 
 
@@ -711,8 +756,8 @@
                                 <img src="${product.imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/50x50/cccccc/333333?text=Food';" alt="${product.name}" class="w-12 h-12 rounded-full object-cover">
                             </td>
                             <td class="py-3 px-6 text-left">${product.name}</td>
-                            <td class="py-3 px-6 text-left">${product.category}</td>
-                            <td class="py-3 px-6 text-right">₹${product.price.toFixed(2)}</td>
+                            <td class="py-3 px-6 text-left">${product.category || 'N/A'}</td>
+                            <td class="py-3 px-6 text-right">₹${product.price ? product.price.toFixed(2) : '0.00'}</td>
                             <td class="py-3 px-6 text-center">
                                 <input type="checkbox" ${product.isAvailable ? 'checked' : ''} disabled class="form-checkbox h-4 w-4 text-white rounded">
                             </td>
@@ -778,7 +823,7 @@
                 openProductModal(product);
             } catch (error) {
                 console.error('Error fetching product for edit:', error);
-                alert(`Failed to load product for editing. Details: ${error.message}`);
+                showTemporaryMessage(`Failed to load product for editing. Details: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }
@@ -823,16 +868,18 @@
                 }
                 closeModal('product-modal');
                 await fetchMenuItems(); // Refresh menu
+                showTemporaryMessage('Product saved successfully!', 'success');
             } catch (error) {
                 console.error('Error saving product:', error);
-                alert(`Failed to save product. Please check your input. Details: ${error.message}`);
+                showTemporaryMessage(`Failed to save product. Please check your input. Details: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }
         });
 
         async function deleteProduct(productId) {
-            if (!confirm('Are you sure you want to delete this product?')) { // Using confirm for simplicity, replace with custom modal
+            // Replaced confirm with a custom modal if needed, for now using a simple check
+            if (!confirm('Are you sure you want to delete this product?')) {
                 return;
             }
             showLoading();
@@ -849,9 +896,10 @@
                     throw new Error(errorData.message || 'Failed to delete product.');
                 }
                 await fetchMenuItems(); // Refresh menu
+                showTemporaryMessage('Product deleted successfully!', 'success');
             } catch (error) {
                 console.error('Error deleting product:', error);
-                alert(`Failed to delete product. Details: ${error.message}`);
+                showTemporaryMessage(`Failed to delete product. Details: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }
@@ -880,17 +928,18 @@
                 }
 
                 customers.forEach(customer => {
-                    const locationText = customer.lastKnownLocation
+                    const locationText = customer.lastKnownLocation && customer.lastKnownLocation.latitude !== undefined && customer.lastKnownLocation.longitude !== undefined
                         ? `Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`
                         : 'N/A';
-                    const trackButton = customer.lastKnownLocation && customer.shopLocation
+                    const trackButton = customer.lastKnownLocation && customer.lastKnownLocation.latitude !== undefined && customer.lastKnownLocation.longitude !== undefined &&
+                                         customer.shopLocation && customer.shopLocation.latitude !== undefined && customer.shopLocation.longitude !== undefined
                         ? `<button onclick="trackCustomer('${customer.lastKnownLocation.latitude}', '${customer.lastKnownLocation.longitude}', '${customer.shopLocation.latitude}', '${customer.shopLocation.longitude}')" class="text-blue-400 hover:text-white ml-2"><i class="fas fa-map-marker-alt"></i> Track</button>`
                         : `<button class="text-gray-500 cursor-not-allowed ml-2" disabled><i class="fas fa-map-marker-alt"></i> Track</button>`;
 
                     const row = `
                         <tr class="border-b border-gray-700 hover:bg-gray-700">
                             <td class="py-3 px-6 text-left">${customer.customerName || 'Unknown'}</td>
-                            <td class="py-3 px-6 text-left">${customer.customerPhone}</td>
+                            <td class="py-3 px-6 text-left">${customer.customerPhone || 'N/A'}</td>
                             <td class="py-3 px-6 text-left">${locationText}</td>
                             <td class="py-3 px-6 text-center whitespace-nowrap">
                                 <a href="tel:+${customer.customerPhone}" class="text-green-400 hover:text-white mr-2"><i class="fas fa-phone"></i> Call</a>
@@ -946,7 +995,7 @@
                 }
             } catch (error) {
                 console.error('Error fetching settings:', error);
-                alert(`Failed to load settings. Details: ${error.message}`);
+                showTemporaryMessage(`Failed to load settings. Details: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }
@@ -1005,10 +1054,10 @@
                     const errorData = await response.json();
                     throw new Error(errorData.message || `Failed to save settings. Server response: ${response.status}`);
                 }
-                alert('Settings saved successfully!'); // Using alert for simplicity, replace with custom modal
+                showTemporaryMessage('Settings saved successfully!', 'success');
             } catch (error) {
                 console.error('Error saving settings:', error);
-                alert(`Failed to save settings. Please check your input. Details: ${error.message}`);
+                showTemporaryMessage(`Failed to save settings. Please check your input. Details: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }
