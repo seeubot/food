@@ -189,6 +189,7 @@
         </div>
         <nav class="flex-grow">
             <ul class="space-y-4">
+                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="bot-status"><i class="fab fa-whatsapp mr-3"></i>Bot Status</a></li>
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="orders"><i class="fas fa-clipboard-list mr-3"></i>Orders</a></li>
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="menu"><i class="fas fa-utensils mr-3"></i>Menu</a></li>
                 <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="customers"><i class="fas fa-users mr-3"></i>Customers</a></li>
@@ -219,22 +220,28 @@
             </div>
 
             <!-- Bot Status Section -->
-            <section id="bot-status-section" class="bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+            <section id="bot-status-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
                 <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status</h2>
                 <div class="flex items-center space-x-4">
                     <div id="bot-status-indicator" class="w-4 h-4 rounded-full bg-gray-500 animate-pulse"></div>
                     <p id="bot-status-text" class="text-lg text-gray-300">Initializing...</p>
                 </div>
-                <div id="qr-code-container" class="mt-4 text-center hidden">
+            </section>
+
+            <!-- QR Code Management Section -->
+            <section id="qr-management-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
+                <h2 class="text-3xl font-bold text-white mb-4">QR Code Management</h2>
+                <div id="qr-code-container" class="mt-4 text-center">
                     <p class="text-gray-300 mb-2">Scan this QR code with your WhatsApp to connect the bot:</p>
                     <img id="qr-code-img" src="" alt="QR Code" class="w-48 h-48 mx-auto border border-gray-700 rounded-md p-2 bg-white">
                     <p id="qr-expiry-message" class="text-red-400 mt-2 text-sm hidden">QR code expired. Please refresh the page or restart the bot if needed.</p>
+                    <p id="qr-no-qr-message" class="text-gray-500 mt-2 text-sm hidden">No QR code available. Bot is either connected or initializing.</p>
                 </div>
             </section>
 
 
             <!-- Orders Section -->
-            <section id="orders-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+            <section id="orders-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
                 <h2 class="text-3xl font-bold text-white mb-6">Recent Orders</h2>
                 <div class="overflow-x-auto">
                     <table class="min-w-full bg-gray-700 rounded-lg shadow-md">
@@ -453,15 +460,15 @@
                 if (section === 'menu') fetchMenuItems();
                 if (section === 'customers') fetchCustomers();
                 if (section === 'settings') fetchSettings();
+                if (section === 'bot-status') fetchBotStatus(); // Fetch bot status when navigating to its section
             });
         });
 
         // Initial section display: Bot Status and Orders
-        // Note: Bot status is always visible, orders is the default data section
-        // You might want to remove one of these if you prefer only one active section at a time.
-        // For now, bot status is a fixed panel, and orders is the default content.
+        // Show bot status by default, and orders as the initial data section
         document.getElementById('bot-status-section').classList.remove('hidden');
         showSection('orders-section');
+        fetchBotStatus(); // Initial fetch for bot status on page load
 
 
         // --- Modals ---
@@ -478,29 +485,55 @@
 
         const botStatusIndicator = document.getElementById('bot-status-indicator');
         const botStatusText = document.getElementById('bot-status-text');
-        const qrCodeContainer = document.getElementById('qr-code-container');
-        const qrCodeImg = document.getElementById('qr-code-img');
-        const qrExpiryMessage = document.getElementById('qr-expiry-message');
+        const qrCodeContainer = document.getElementById('qr-code-container'); // Moved to qr-management-section
+        const qrCodeImg = document.getElementById('qr-code-img'); // Moved to qr-management-section
+        const qrExpiryMessage = document.getElementById('qr-expiry-message'); // Moved to qr-management-section
+        const qrNoQrMessage = document.getElementById('qr-no-qr-message'); // Moved to qr-management-section
 
-        socket.on('status', (status) => {
-            console.log('Bot Status:', status);
+
+        async function fetchBotStatus() {
+            try {
+                const response = await fetch('/api/admin/bot-status');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch bot status.');
+                }
+                const data = await response.json();
+                updateBotStatusDisplay(data.status, data.qrCodeDataURL);
+            } catch (error) {
+                console.error('Error fetching bot status:', error);
+                updateBotStatusDisplay('error', null);
+            }
+        }
+
+        function updateBotStatusDisplay(status, qrDataURL = null) {
             qrCodeContainer.classList.add('hidden');
             qrCodeImg.src = '';
             qrExpiryMessage.classList.add('hidden');
+            qrNoQrMessage.classList.add('hidden');
 
             switch (status) {
                 case 'initializing':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 animate-pulse';
                     botStatusText.textContent = 'Initializing WhatsApp client...';
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'Bot is initializing. QR may appear shortly.';
                     break;
                 case 'qr_received':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
                     botStatusText.textContent = 'Scan QR Code to connect!';
-                    qrCodeContainer.classList.remove('hidden');
+                    if (qrDataURL) {
+                        qrCodeContainer.classList.remove('hidden');
+                        qrCodeImg.src = qrDataURL;
+                    } else {
+                        qrNoQrMessage.classList.remove('hidden');
+                        qrNoQrMessage.textContent = 'QR code expected but not received. Check server logs.';
+                    }
                     break;
                 case 'qr_error':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
                     botStatusText.textContent = 'QR Code error. Check server logs.';
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'An error occurred generating the QR code.';
                     break;
                 case 'qr_expired':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
@@ -510,38 +543,67 @@
                 case 'authenticated':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500';
                     botStatusText.textContent = 'Authenticated. Waiting for ready...';
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'Bot is authenticated. Almost ready!';
                     break;
                 case 'ready':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-green-500';
                     botStatusText.textContent = 'WhatsApp Bot is Ready and Online!';
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'Bot is connected. No QR needed.';
                     break;
                 case 'auth_failure':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
                     botStatusText.textContent = 'Authentication Failed! Restarting...';
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'Authentication failed. Bot is attempting to reconnect.';
                     break;
                 case 'disconnected':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 animate-pulse';
                     botStatusText.textContent = 'Disconnected. Reconnecting...';
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'Bot disconnected. Attempting to reconnect.';
                     break;
                 case 'reconnecting':
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
                     botStatusText.textContent = 'Reconnecting...';
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'Bot is in the process of reconnecting.';
+                    break;
+                case 'error': // General error state
+                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
+                    botStatusText.textContent = 'Error fetching bot status.';
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'Could not retrieve bot status from server.';
                     break;
                 default:
                     botStatusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
                     botStatusText.textContent = `Status: ${status}`;
+                    qrNoQrMessage.classList.remove('hidden');
+                    qrNoQrMessage.textContent = 'Unknown bot status.';
             }
+
+            // If the QR management section is active, update its display
+            if (!document.getElementById('qr-management-section').classList.contains('hidden')) {
+                if (status === 'qr_received' && qrDataURL) {
+                    qrCodeContainer.classList.remove('hidden');
+                    qrNoQrMessage.classList.add('hidden');
+                } else {
+                    qrCodeContainer.classList.add('hidden');
+                    qrNoQrMessage.classList.remove('hidden');
+                }
+            }
+        }
+
+        socket.on('status', (status) => {
+            // This socket listener updates the bot status in real-time
+            // The fetchBotStatus() is for initial load.
+            updateBotStatusDisplay(status, qrCodeImg.src); // Pass current QR image src if it exists
         });
 
         socket.on('qrCode', (qrDataURL) => {
-            if (qrDataURL) {
-                qrCodeImg.src = qrDataURL;
-                qrCodeContainer.classList.remove('hidden');
-                qrExpiryMessage.classList.add('hidden');
-            } else {
-                qrCodeContainer.classList.add('hidden');
-                qrCodeImg.src = '';
-            }
+            // This socket listener receives new QR codes
+            updateBotStatusDisplay('qr_received', qrDataURL);
         });
 
 
