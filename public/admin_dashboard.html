@@ -383,11 +383,11 @@
                         </div>
                     </div>
                     <div>
-                        <h3 class="text-xl font-bold text-gray-200 mb-3">Delivery Rates (KMs vs. Amount):</h3>
+                        <h3 class="text-xl font-bold text-gray-200 mb-3">Delivery Rates (KMs Range vs. Amount):</h3>
                         <div id="delivery-rates-container" class="space-y-4">
                             <!-- Delivery rates will be loaded here -->
                         </div>
-                        <button type="button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg mt-5 transition duration-200" onclick="addDeliveryRateField()">Add Rate</button>
+                        <button type="button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg mt-5 transition duration-200" onclick="addDeliveryRateField()">Add Rate Range</button>
                     </div>
                     <div class="flex justify-end mt-8">
                         <button type="submit" class="bg-green-500 hover:bg-green-600 text-black py-3 px-6 rounded-lg transition duration-200">Save Settings</button>
@@ -989,7 +989,7 @@
                 const ratesContainer = document.getElementById('delivery-rates-container');
                 ratesContainer.innerHTML = ''; // Clear existing rates
                 if (settings.deliveryRates && settings.deliveryRates.length > 0) {
-                    settings.deliveryRates.forEach(rate => addDeliveryRateField(rate.kms, rate.amount));
+                    settings.deliveryRates.forEach(rate => addDeliveryRateField(rate.minKms, rate.maxKms, rate.amount));
                 } else {
                     addDeliveryRateField(); // Add one empty field if none exist
                 }
@@ -1001,13 +1001,16 @@
             }
         }
 
-        function addDeliveryRateField(kms = '', amount = '') {
+        function addDeliveryRateField(minKms = '', maxKms = '', amount = '') {
             const ratesContainer = document.getElementById('delivery-rates-container');
             const div = document.createElement('div');
             div.className = 'flex flex-col sm:flex-row gap-4 items-center'; /* Increased gap */
             div.innerHTML = `
-                <input type="number" placeholder="KMs" value="${kms}" class="w-full sm:w-1/2" required>
-                <input type="number" placeholder="Amount" value="${amount}" step="0.01" class="w-full sm:w-1/2" required>
+                <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input type="number" placeholder="Min KMs" value="${minKms}" class="w-full" required step="0.01">
+                    <input type="number" placeholder="Max KMs" value="${maxKms}" class="w-full" required step="0.01">
+                </div>
+                <input type="number" placeholder="Amount (₹)" value="${amount}" step="0.01" class="w-full sm:w-1/3 flex-shrink-0" required>
                 <button type="button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex-shrink-0 w-full sm:w-auto" onclick="this.parentNode.remove()">Remove</button>
             `;
             ratesContainer.appendChild(div);
@@ -1026,13 +1029,16 @@
                 deliveryRates: []
             };
 
-            const rateInputs = document.querySelectorAll('#delivery-rates-container > div');
-            rateInputs.forEach(div => {
-                const kmsInput = div.querySelector('input[placeholder="KMs"]');
-                const amountInput = div.querySelector('input[placeholder="Amount"]');
-                if (kmsInput && amountInput && kmsInput.value && amountInput.value) {
+            const rateDivs = document.querySelectorAll('#delivery-rates-container > div');
+            rateDivs.forEach(div => {
+                const minKmsInput = div.querySelector('input[placeholder="Min KMs"]');
+                const maxKmsInput = div.querySelector('input[placeholder="Max KMs"]');
+                const amountInput = div.querySelector('input[placeholder="Amount (₹)"]');
+
+                if (minKmsInput && maxKmsInput && amountInput && minKmsInput.value && maxKmsInput.value && amountInput.value) {
                     settingsData.deliveryRates.push({
-                        kms: parseFloat(kmsInput.value),
+                        minKms: parseFloat(minKmsInput.value),
+                        maxKms: parseFloat(maxKmsInput.value),
                         amount: parseFloat(amountInput.value)
                     });
                 }
