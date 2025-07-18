@@ -1,8 +1,7 @@
 # Use a Node.js base image
 FROM node:18-slim
 
-# Install Chromium and other necessary dependencies for Puppeteer
-# These packages are crucial for whatsapp-web.js to run headless Chrome
+# Install Chromium and other necessary dependencies for Puppeteer / whatsapp-web.js
 RUN apt-get update && apt-get install -y \
     chromium \
     libnss3 \
@@ -23,18 +22,6 @@ RUN apt-get update && apt-get install -y \
     libxss1 \
     libxtst6 \
     libappindicator1 \
-    libnss3 \
-    libxrandr2 \
-    libxcomposite1 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libgdk-pixbuf2.0-0 \
-    libgtk-3-0 \
-    libgbm-dev \
-    libasound2 \
-    libnss3 \
-    libxss1 \
-    libxtst6 \
     fonts-liberation \
     xdg-utils \
     --no-install-recommends \
@@ -43,18 +30,17 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if you have one)
+# Copy only package.json and package-lock.json to install dependencies early
 COPY package*.json ./
 
-# Install dependencies
+# Install app dependencies
 RUN npm install
 
-# Copy the rest of your application code
+# Copy the rest of the application code
 COPY . .
 
-# Expose the port your app runs on
+# Expose the application port
 EXPOSE 8080
 
-# Command to run the application
+# Run the application
 CMD ["npm", "start"]
-
