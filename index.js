@@ -111,7 +111,7 @@ const productSchema = new mongoose.Schema({
     price: { type: Number, required: true, min: 0 },
     imageUrl: { type: String, default: 'https://placehold.co/300x200/cccccc/333333?text=Food+Item' },
     category: { type: String, default: 'Main Course' },
-    isAvailable: { type: Boolean, default: true },
+    isAvailable: { type: Boolean, default: false }, // Default to false, admin sets true
     isTrending: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
