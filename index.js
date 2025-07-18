@@ -1,4 +1,7 @@
-const { Client, AuthStrategy } = require('whatsapp-web.js'); // Re-confirmed: AuthStrategy is a named export
+const wwjs = require('whatsapp-web.js'); // Import the entire module
+const Client = wwjs.Client; // Access Client from the module
+const AuthStrategy = wwjs.AuthStrategy; // Access AuthStrategy from the module
+
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
@@ -168,8 +171,8 @@ const whatsappSessionSchema = new mongoose.Schema({
 });
 const WhatsappSession = mongoose.model('WhatsappSession', whatsappSessionSchema);
 
-// Custom Auth Strategy for MongoDB - Defined immediately after AuthStrategy import
-class MongoDBAuthStrategy extends AuthStrategy { // Using AuthStrategy directly as named export
+// Custom Auth Strategy for MongoDB - Defined immediately after AuthStrategy is accessed
+class MongoDBAuthStrategy extends AuthStrategy { // Using AuthStrategy directly
     constructor(collection) {
         super();
         this.collection = collection; // Mongoose model for WhatsappSession
