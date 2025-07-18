@@ -1,4 +1,3 @@
-// index.js
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const express = require('express');
@@ -145,7 +144,8 @@ const adminSettingsSchema = new mongoose.Schema({
         longitude: { type: Number, default: 0 }
     },
     deliveryRates: [{
-        kms: { type: Number, required: true, min: 0 },
+        minKms: { type: Number, required: true, min: 0 }, // Changed from kms
+        maxKms: { type: Number, required: true, min: 0 }, // New field for range
         amount: { type: Number, required: true, min: 0 }
     }]
 });
@@ -179,13 +179,14 @@ async function initializeAdminAndSettings() {
                 shopName: 'Delicious Bites',
                 shopLocation: { latitude: 17.4375, longitude: 78.4482 }, // Example: Hyderabad coordinates
                 deliveryRates: [
-                    { kms: 5, amount: 30 },
-                    { kms: 10, amount: 60 },
-                    { kms: 20, amount: 100 }
+                    { minKms: 0, maxKms: 2, amount: 20 },
+                    { minKms: 2.01, maxKms: 5, amount: 40 },
+                    { minKms: 5.01, maxKms: 10, amount: 70 },
+                    { minKms: 10.01, maxKms: 20, amount: 120 }
                 ]
             });
             await settings.save();
-            console.log('Default admin settings created.');
+            console.log('Default admin settings created with ranged delivery rates.');
         }
 
         // Start the Express server ONLY after admin and settings are initialized
@@ -1002,18 +1003,30 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
         );
 
         let transportTax = 0;
-        // Find the appropriate tax rate based on distance
-        const sortedRates = settings.deliveryRates.sort((a, b) => a.kms - b.kms);
-        for (let i = 0; i < sortedRates.length; i++) {
-            if (distance <= sortedRates[i].kms) {
-                transportTax = sortedRates[i].amount;
+        // Sort rates by minKms to ensure correct range matching
+        const sortedRates = settings.deliveryRates.sort((a, b) => a.minKms - b.minKms);
+
+        let foundRate = false;
+        for (const rate of sortedRates) {
+            // Check if distance falls within the current range [minKms, maxKms]
+            if (distance >= rate.minKms && distance <= rate.maxKms) {
+                transportTax = rate.amount;
+                foundRate = true;
                 break;
             }
-            // If it's the last rate and distance is greater, use this rate
-            if (i === sortedRates.length - 1 && distance > sortedRates[i].kms) { // Corrected logic: only apply if distance exceeds this last rate's KMS
-                transportTax = sortedRates[i].amount;
-            }
         }
+
+        // If no specific range is found and distance is greater than the max of all ranges,
+        // you might want to apply the highest rate or a default "beyond range" rate.
+        // For now, if no range matches, transportTax remains 0 (or a default value).
+        // You could add a fallback here if needed, e.g., for distances beyond the defined ranges.
+        if (!foundRate && sortedRates.length > 0 && distance > sortedRates[sortedRates.length - 1].maxKms) {
+            // If distance is beyond the max of the last defined range, apply the last rate's amount
+            transportTax = sortedRates[sortedRates.length - 1].amount;
+            console.log(`Distance ${distance.toFixed(2)}km is beyond defined ranges. Applying last rate.`);
+        }
+
+
         console.log(`Calculated distance: ${distance.toFixed(2)}km, transport tax: ₹${transportTax.toFixed(2)}`);
         res.json({ distance, transportTax });
 
