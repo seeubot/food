@@ -226,7 +226,30 @@
             color: #ffffff;
             font-size: 2.5rem;
         }
-        
+
+        /* Styles for the live location marker and accuracy circle */
+        .live-marker-anim {
+            animation: livepulse 1.25s infinite;
+            border-radius:50%;
+            box-shadow:0 0 0 0 #1e88e5cc; /* Blue pulse */
+        }
+        @keyframes livepulse {
+            0% {box-shadow:0 0 0 0 #1e88e5cc;}
+            70% {box-shadow:0 0 0 18px transparent;}
+            100% {box-shadow:0 0 0 0 transparent;}
+        }
+        /* FAB button for recentering */
+        .fab {
+            position:absolute; bottom:24px; right:26px; /* Position within modal */
+            width:56px; height:56px;
+            border-radius:50%; border:none; color:#fff; background:#1976d2; z-index:1102;
+            display:flex; align-items:center; justify-content:center; font-size:2em;
+            box-shadow:0 2px 14px #0003; cursor:pointer; transition: background .14s;
+        }
+        .fab:active { background:#0d47a1; }
+        @media (max-width:600px){
+            .fab { width:44px; height:44px; font-size:1.14em;}
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -392,6 +415,19 @@
                     Save Location
                 </button>
             </div>
+            <!-- FAB for recentering to live location -->
+            <button id="center-btn" class="fab" title="Go to live location" aria-label="Go to live location">
+                <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="13" cy="13" r="11" stroke="#fff" stroke-width="2"/>
+                    <circle cx="13" cy="13" r="5" fill="#1976d2" stroke="#fff" stroke-width="3"/>
+                    <g stroke="#1976d2" stroke-width="2">
+                        <line x1="13" x2="13" y1="0" y2="5"/>
+                        <line x1="13" x2="13" y1="21" y2="26"/>
+                        <line x1="0" x2="5" y1="13" y2="13"/>
+                        <line x1="21" x2="26" y1="13" y2="13"/>
+                    </g>
+                </svg>
+            </button>
         </div>
     </div>
 
@@ -432,6 +468,7 @@
         let deliveryCost = 0;
         let lastScrollTop = 0; // For header hide/show on scroll
         let geolocationWatcherId = null; // To store the ID returned by watchPosition
+        let lastKnownLiveCoords = null; // Stores the last known coordinates from watchPosition
         const header = document.getElementById('mainHeader'); // Reference to the header
 
         // DOM elements
@@ -449,10 +486,13 @@
         const productDetailAddToCartBtn = document.getElementById('productDetailAddToCartBtn'); // Add to cart button in detail modal
         const placeOrderBtn = document.getElementById('placeOrderBtn'); // Reference to place order button
         const mapLoadingOverlay = document.getElementById('map-loading-overlay'); // Map loading overlay
+        const centerBtn = document.getElementById('center-btn'); // FAB for recentering
 
         // Map variables
         let map = null;
-        let deliveryMarker = null;
+        let deliveryMarker = null; // Marker for the selected delivery location
+        let liveMarker = null;     // Marker for the real-time live location
+        let userCircle = null;     // Circle for accuracy of live location
         let geocoderControl = null; // To store the geocoder control instance
 
         // Initialize app
@@ -498,11 +538,27 @@
                     map.remove();
                     map = null;
                     deliveryMarker = null;
+                    liveMarker = null;
+                    userCircle = null;
                     geocoderControl = null;
                 }
             });
             document.getElementById('mapGetCurrentLocation').addEventListener('click', getCurrentLocationForMap);
             document.getElementById('saveDeliveryLocationBtn').addEventListener('click', saveDeliveryLocation);
+
+            // FAB for recentering to live location
+            centerBtn.addEventListener('click', () => {
+                if (lastKnownLiveCoords) {
+                    map.setView([lastKnownLiveCoords.latitude, lastKnownLiveCoords.longitude], map.getZoom(), { animate:true });
+                    if (liveMarker && liveMarker._icon) { // Check if _icon exists before adding class
+                        liveMarker._icon.classList.add("live-marker-anim");
+                        liveMarker.openPopup();
+                        setTimeout(()=>liveMarker._icon.classList.remove("live-marker-anim"), 1200);
+                    }
+                } else {
+                    showNotification('Live location not yet available. Please enable GPS and try again.', 'warning');
+                }
+            });
             
             // Product Detail Modal
             document.getElementById('closeProductDetailModal').addEventListener('click', () => toggleModal('productDetailModal'));
@@ -733,17 +789,47 @@
             document.getElementById('checkoutTotal').textContent = `₹${(subtotal + deliveryCost).toFixed(2)}`;
         }
 
+        // Custom animated blue live marker icon
+        function liveSVGIcon() {
+            return L.divIcon({
+                className:"live-marker-anim",
+                iconSize:[40,40], iconAnchor:[20,20],
+                html:`<svg width="40" height="40" viewBox="0 0 40 40">
+                    <circle cx="20" cy="20" r="16" fill="#1976d2" opacity="0.10"/>
+                    <circle cx="20" cy="20" r="12" fill="#1976d2" opacity="0.22"/>
+                    <circle cx="20" cy="20" r="8" fill="#1976d2" stroke="#fff" stroke-width="2"/>
+                </svg>`
+            });
+        }
+
+        // Custom colourful pin icon (white house)
+        const pinIcon = L.divIcon({
+            className:"",
+            iconSize:[38,38], iconAnchor:[19,38],
+            html: `<svg viewBox="0 0 24 24" width="38" height="38" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#FFFFFF"/>
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="url(#paint0_linear)"/>
+                <defs>
+                    <linearGradient id="paint0_linear" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#FFFFFF"/>
+                        <stop offset="1" stop-color="#CCCCCC"/>
+                    </linearGradient>
+                </defs>
+            </svg>`
+        });
+
+
         // Initialize Leaflet Map in the popup modal
         function initMap() {
+            mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
             if (map) {
                 map.remove(); // Remove existing map if any
             }
 
-            // Custom dark tile layer from CartoDB
-            const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-                subdomains: 'abcd',
-                maxZoom: 19
+            // Esri World Imagery (Satellite) tile layer
+            const esriSatelliteTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+                attribution:'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community', 
+                maxZoom:19 
             });
 
             // Set initial map center and zoom based on customerLocation or a default
@@ -753,30 +839,18 @@
             map = L.map('map', {
                 center: initialCenter,
                 zoom: initialZoom,
-                layers: [darkTiles],
-                zoomControl: false // Disable default zoom control
+                layers: [esriSatelliteTiles], // Use satellite tiles
+                zoomControl: false, // Hide default zoom control
+                attributionControl: true // Keep attribution
             });
 
-            // Add a custom zoom control to match theme
-            L.control.zoom({
-                position: 'topright'
-            }).addTo(map);
-
-            // Custom delivery marker icon
-            const deliveryIcon = L.divIcon({
-                className: 'custom-delivery-marker',
-                html: '<i class="fas fa-map-marker-alt"></i>', // Font Awesome icon
-                iconSize: [40, 40], // Size of the icon
-                iconAnchor: [20, 40] // Point of the icon which will correspond to marker's location
-            });
-
-            // Add a draggable marker
+            // Add a draggable delivery marker
             deliveryMarker = L.marker(initialCenter, { // Place marker at initial center
-                icon: deliveryIcon,
+                icon: pinIcon, // Use the new pin icon
                 draggable: true
             }).addTo(map);
 
-            // Update customerLocation when marker is dragged
+            // Update customerLocation when delivery marker is dragged
             deliveryMarker.on('dragend', function(e) {
                 const latLng = deliveryMarker.getLatLng();
                 customerLocation = {
@@ -787,7 +861,7 @@
                 // No need to calculate delivery cost here, it will be done on Save Location
             });
 
-            // Initialize Geocoder control
+            // Initialize Geocoder control for search
             geocoderControl = L.Control.geocoder({
                 defaultMarkGeocodedLocation: false, // We'll manage the marker manually
                 placeholder: 'Search for delivery location...',
@@ -798,20 +872,19 @@
                 })
             }).addTo(map);
 
-            // Listen for geocoding results
+            // Listen for geocoding results and move the delivery marker
             geocoderControl.on('markgeocode', function(e) {
                 const latLng = e.geocode.center;
                 map.setView(latLng, 16); // Zoom to the result
-                deliveryMarker.setLatLng(latLng); // Move marker to the result
+                deliveryMarker.setLatLng(latLng); // Move delivery marker to the result
                 customerLocation = {
                     latitude: latLng.lat,
                     longitude: latLng.lng
                 };
                 mapLocationStatus.textContent = `Selected: ${e.geocode.name}`;
-                // No need to calculate delivery cost here, it will be done on Save Location
             });
 
-            // Attempt to get current location on map init
+            // Attempt to get current live location on map init
             getCurrentLocationForMap();
         }
 
@@ -834,19 +907,32 @@
                 (position) => {
                     mapLoadingOverlay.classList.add('hidden'); // Hide spinner on first successful location
                     const latLng = [position.coords.latitude, position.coords.longitude];
+                    lastKnownLiveCoords = { latitude: position.coords.latitude, longitude: position.coords.longitude }; // Store last known live coords
+
+                    // Update live marker
+                    if (liveMarker) {
+                        liveMarker.setLatLng(latLng);
+                    } else {
+                        liveMarker = L.marker(latLng, {icon:liveSVGIcon()}).addTo(map);
+                    }
+                    liveMarker.bindPopup(`You're here!<br>Accuracy: ±${Math.round(position.coords.accuracy)}m`).openPopup();
+
+                    // Update accuracy circle
+                    if (userCircle) {
+                        userCircle.setLatLng(latLng).setRadius(position.coords.accuracy);
+                    } else {
+                        userCircle = L.circle(latLng, {
+                            radius:position.coords.accuracy, color:'#1976d2', fillColor:'#90caf9', fillOpacity:0.12, opacity:0.19
+                        }).addTo(map);
+                    }
                     
-                    // Only update map view if the accuracy is good enough (e.g., < 100m)
+                    // Only update map view if the accuracy is good enough (< 100m)
                     // and if the map is not currently being dragged by the user
                     if (position.coords.accuracy < 100 && !map.dragging.enabled()) {
                         map.setView(latLng, 16); // Set map view to current location
                     }
-                    deliveryMarker.setLatLng(latLng); // Move marker to current location
-                    customerLocation = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude
-                    };
-                    mapLocationStatus.textContent = `Your current location: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)} (Accuracy: ${position.coords.accuracy.toFixed(0)}m)`;
-                    // showNotification('Current location updating on map!', 'success'); // Too frequent notification
+                    
+                    mapLocationStatus.textContent = `Your current location: Lat: ${lastKnownLiveCoords.latitude.toFixed(4)}, Lon: ${lastKnownLiveCoords.longitude.toFixed(4)} (Accuracy: ${position.coords.accuracy.toFixed(0)}m)`;
                 },
                 (error) => {
                     console.error('Error getting location:', error);
@@ -857,7 +943,7 @@
                         errorMessage = 'Location request timed out. Please try again or search manually.';
                     }
                     mapLocationStatus.textContent = errorMessage;
-                    customerLocation = null; // Reset location
+                    // customerLocation = null; // Do not reset customerLocation here, it's for delivery point
                     showNotification(errorMessage, 'error');
                     mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
                     clearGeolocationWatcher(); // Stop watching on error
@@ -1036,6 +1122,8 @@
                     map.remove();
                     map = null;
                     deliveryMarker = null;
+                    liveMarker = null;
+                    userCircle = null;
                     geocoderControl = null;
                 }
                 clearGeolocationWatcher(); // Ensure watcher is stopped on checkout completion
@@ -1116,6 +1204,8 @@
                         map.remove();
                         map = null;
                         deliveryMarker = null;
+                        liveMarker = null;
+                        userCircle = null;
                         geocoderControl = null;
                     }
                 }
