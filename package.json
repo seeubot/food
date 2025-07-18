@@ -1,34 +1,35 @@
 {
-  "name": "whatsapp-food-bot",
+  "name": "food-delivery-bot",
   "version": "1.0.0",
-  "description": "An e-commerce food business bot with web panels.",
+  "description": "A WhatsApp bot for food ordering and delivery management.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "keywords": [
-    "whatsapp",
-    "bot",
-    "koyeb",
+    "whatsapp-bot",
+    "food-delivery",
     "nodejs",
-    "ecommerce",
-    "food",
-    "mongodb"
+    "express",
+    "mongodb",
+    "whatsapp-web.js"
   ],
-  "author": "Your Name",
+  "author": "Your Name/Organization",
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "connect-mongo": "^5.1.0",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "mongoose": "^8.4.4",
+    "mongoose": "^8.4.3",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
-    "whatsapp-web.js": "^1.23.0"
+    "whatsapp-web.js": "^1.23.0",
+    "whatsapp-web.js-mongo": "^1.1.0"  // New dependency for MongoDB session store
   },
-  "engines": {
-    "node": ">=18.0.0"
+  "devDependencies": {
+    "nodemon": "^3.1.3"
   }
 }
 
