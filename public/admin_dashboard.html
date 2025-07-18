@@ -3,1048 +3,864 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>Admin Dashboard - Delicious Bites</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* Base styles for the black and white theme */
+        body { font-family: 'Inter', sans-serif; }
+        /* Apply black and white theme overrides */
         body {
-            font-family: 'Inter', sans-serif;
             background-color: #000000 !important; /* Pure black background */
             color: #ffffff !important; /* Pure white text */
         }
-
-        /* General text colors to ensure visibility */
-        .text-gray-700, .text-gray-800 {
-            color: #ffffff !important; /* All main text is white */
-        }
-        .text-gray-600 {
-            color: #cccccc !important; /* Lighter gray for secondary text */
-        }
-        .text-gray-500 {
-            color: #888888 !important; /* Medium gray for placeholders/disabled */
-        }
-        .text-gray-400 {
-            color: #aaaaaa !important; /* Slightly lighter gray for icons/subtle elements */
-        }
-        .text-gray-300 {
-            color: #dddddd !important; /* Very light gray */
-        }
-        .text-gray-200 {
-            color: #eeeeee !important; /* Almost white */
-        }
-
-        /* Backgrounds for main panels/cards */
-        .bg-gray-100 { /* Override default body background if still present */
+        .bg-gray-100 {
             background-color: #000000 !important;
         }
-        .bg-white, .bg-gray-800 { /* Main content cards, modals, headers */
+        .bg-white, .bg-gray-800 {
             background-color: #1a1a1a !important; /* Very dark gray */
         }
-        .bg-gray-900 { /* Sidebar, modal overlay */
-            background-color: #0a0a0a !important; /* Slightly darker for deeper contrast */
+        .text-gray-800 {
+            color: #ffffff !important;
         }
-
-        /* Inputs, Textareas, Selects */
+        .text-gray-700, .text-gray-300 {
+            color: #dddddd !important;
+        }
         input, textarea, select {
-            background-color: #222222 !important; /* Darker background for inputs */
-            border-color: #444444 !important; /* Dark gray border */
-            color: #ffffff !important; /* White text in inputs */
-            padding: 0.75rem 1rem !important; /* More padding for touch targets */
-            border-radius: 0.375rem !important; /* Rounded corners */
+            background-color: #222222 !important;
+            border-color: #444444 !important;
+            color: #ffffff !important;
         }
         input::placeholder, textarea::placeholder {
-            color: #888888 !important; /* Placeholder text color */
+            color: #888888 !important;
         }
-        select {
-            appearance: none; /* Remove default select arrow */
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='white'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'%3E%3C/path%3E%3C/svg%3E") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 0.75rem center !important;
-            background-size: 1.5em 1.5em !important;
-        }
-
-
-        /* Buttons */
         button {
-            border-radius: 0.5rem !important; /* More rounded buttons */
-            padding: 0.75rem 1.5rem !important; /* Generous padding */
-            font-weight: 600 !important; /* Semi-bold text */
-            transition: all 0.2s ease-in-out !important; /* Smooth transitions */
-        }
-        /* Primary buttons (Save, Add) */
-        .bg-green-500 {
             background-color: #ffffff !important; /* White background */
             color: #000000 !important; /* Black text */
             box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.2), 0 2px 4px -1px rgba(255, 255, 255, 0.1) !important;
         }
-        .bg-green-500:hover {
-            background-color: #e0e0e0 !important; /* Slightly darker white on hover */
+        button:hover {
+            background-color: #e0e0e0 !important;
         }
-        /* Secondary buttons (Cancel, Close, Neutral actions) */
-        .bg-gray-500 {
-            background-color: #333333 !important; /* Dark gray background */
-            color: #ffffff !important; /* White text */
+        .text-red-500 {
+            color: #ff6666 !important; /* Slightly brighter red for error messages */
         }
-        .bg-gray-500:hover {
-            background-color: #444444 !important; /* Lighter gray on hover */
+        .text-green-500 {
+            color: #66ff66 !important; /* Slightly brighter green for success */
         }
-        /* Blue buttons (e.g., Add Rate, Get Location) */
-        .bg-blue-500 {
-            background-color: #666666 !important; /* Medium gray */
-            color: #ffffff !important;
+        .text-yellow-500 {
+            color: #ffff66 !important; /* Slightly brighter yellow for warnings */
         }
-        .bg-blue-500:hover {
-            background-color: #888888 !important; /* Lighter gray on hover */
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        /* Action icons (Edit, Delete, View) - using specific text colors for visibility */
-        .text-blue-500, .text-blue-400 { color: #aaaaaa !important; } /* Light gray for icons */
-        .text-yellow-500, .text-yellow-400 { color: #aaaaaa !important; }
-        .text-red-500, .text-red-400 { color: #aaaaaa !important; }
-
-
-        /* Borders and Dividers */
-        .border-gray-200, .border-gray-700 {
-            border-color: #333333 !important; /* Consistent dark gray borders */
+        .alert-red {
+            background-color: #440000;
+            color: #ff6666;
+            border: 1px solid #ff6666;
         }
-
-        /* Shadows */
-        .shadow-md {
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4) !important; /* Deeper shadows for depth */
+        .alert-yellow {
+            background-color: #444400;
+            color: #ffff66;
+            border: 1px solid #ffff66;
         }
-        .shadow-lg {
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5) !important;
+        .alert-green {
+            background-color: #004400;
+            color: #66ff66;
+            border: 1px solid #66ff66;
         }
-        .shadow-xl {
-            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.6) !important;
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
         }
-
-        /* Specific table styles */
-        table {
-            background-color: #1a1a1a !important; /* Table background matches card */
-            border-collapse: separate; /* Allows for rounded corners on table */
-            border-spacing: 0;
-            border-radius: 0.5rem; /* Rounded corners for table */
-            overflow: hidden; /* Ensures content stays within rounded corners */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        table thead tr {
-            background-color: #0a0a0a !important; /* Table header background */
-            color: #ffffff !important; /* Table header text */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+            justify-content: center;
+            align-items: center;
         }
-        table th, table td {
-            padding: 1rem 1.5rem !important; /* More padding for table cells */
-            border-bottom: 1px solid #333333 !important; /* Darker row dividers */
+        .modal-content {
+            background-color: #1a1a1a;
+            margin: auto;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 5px 15px rgba(255,255,255,0.1);
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+            color: #ffffff;
         }
-        table tbody tr:last-child td {
-            border-bottom: none !important; /* No border on last row */
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.75rem;
+            font-weight: bold;
+            cursor: pointer;
         }
-        table tbody tr:nth-child(odd) {
-            background-color: #1a1a1a !important; /* Alternating row background */
-        }
-        table tbody tr:nth-child(even) {
-            background-color: #222222 !important; /* Alternating row background */
-        }
-        table tbody tr:hover {
-            background-color: #333333 !important; /* Darker hover effect */
-        }
-
-        /* Status indicators for consistency */
-        .text-green-600 { color: #ffffff !important; } /* White for 'Available' text */
-        .text-blue-600 { color: #cccccc !important; } /* Light gray for 'Trending' checkbox */
-        .form-checkbox {
-            background-color: #333333 !important;
-            border-color: #555555 !important;
-        }
-        .form-checkbox:checked {
-            background-color: #ffffff !important; /* White checkmark */
-            border-color: #ffffff !important;
-        }
-
-        /* Custom scrollbar for tables on small screens */
-        .overflow-x-auto::-webkit-scrollbar {
-            height: 8px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-track {
-            background: #222222;
-            border-radius: 10px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-thumb {
-            background: #555555;
-            border-radius: 10px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-            background: #777777;
+        .close-button:hover,
+        .close-button:focus {
+            color: #ffffff;
+            text-decoration: none;
+            cursor: pointer;
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col lg:flex-row">
-    <!-- Sidebar / Mobile Navbar -->
-    <aside id="sidebar" class="bg-gray-900 text-white w-full lg:w-64 p-4 lg:p-6 flex flex-col shadow-lg lg:shadow-none transition-all duration-300 ease-in-out transform -translate-x-full lg:translate-x-0 fixed lg:static inset-y-0 z-50">
-        <div class="flex items-center justify-between lg:justify-center mb-8">
-            <h1 class="text-3xl font-bold">Admin Panel</h1>
-            <button id="close-sidebar" class="lg:hidden text-white text-3xl focus:outline-none">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <nav class="flex-grow">
-            <ul class="space-y-4">
-                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="whatsapp-bot"><i class="fab fa-whatsapp mr-3"></i>WhatsApp Bot</a></li>
-                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="orders"><i class="fas fa-clipboard-list mr-3"></i>Orders</a></li>
-                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="menu"><i class="fas fa-utensils mr-3"></i>Menu</a></li>
-                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="customers"><i class="fas fa-users mr-3"></i>Customers</a></li>
-                <li><a href="#" class="nav-link flex items-center py-3 px-4 rounded-lg text-xl hover:bg-gray-800 transition duration-200" data-section="settings"><i class="fas fa-cogs mr-3"></i>Settings</a></li>
-                <li><a href="/admin/logout" class="flex items-center py-3 px-4 rounded-lg text-xl hover:bg-red-700 transition duration-200 text-red-400"><i class="fas fa-sign-out-alt mr-3"></i>Logout</a></li>
-            </ul>
-        </nav>
-    </aside>
-
-    <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col overflow-hidden">
-        <!-- Top Bar for Mobile -->
-        <header class="bg-gray-800 shadow-md lg:hidden p-4 flex items-center justify-between">
-            <button id="open-sidebar" class="text-white text-3xl focus:outline-none">
-                <i class="fas fa-bars"></i>
-            </button>
-            <h1 class="text-2xl font-bold text-white">Admin Dashboard</h1>
-            <a href="/admin/logout" class="text-red-400 text-2xl"><i class="fas fa-sign-out-alt"></i></a>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto p-4">
+        <header class="flex justify-between items-center py-4 border-b border-gray-700">
+            <h1 class="text-4xl font-bold text-green-400">Admin Dashboard</h1>
+            <nav>
+                <a href="/admin/logout" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Logout</a>
+            </nav>
         </header>
 
-        <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-            <!-- Loading Indicator -->
-            <div id="loading-indicator" class="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-[100] hidden">
-                <div class="flex flex-col items-center">
-                    <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
-                    <p class="mt-4 text-white text-lg">Loading...</p>
+        <main class="mt-8">
+            <h2 class="text-3xl font-bold text-gray-200 mb-6">WhatsApp Bot Status</h2>
+            <div id="bot-status-alert" class="alert hidden">
+                <span id="alert-message"></span>
+                <button id="request-qr-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ml-4 hidden">Request New QR</button>
+            </div>
+            <p class="text-gray-400 mb-6">Current Status: <span id="bot-status" class="font-semibold">Loading...</span></p>
+
+            <!-- Tabs for navigation -->
+            <div class="flex border-b border-gray-700 mb-6">
+                <button class="tab-button px-4 py-2 text-lg font-medium focus:outline-none" data-tab="orders">Orders</button>
+                <button class="tab-button px-4 py-2 text-lg font-medium focus:outline-none" data-tab="menu">Menu</button>
+                <button class="tab-button px-4 py-2 text-lg font-medium focus:outline-none" data-tab="settings">Settings</button>
+                <button class="tab-button px-4 py-2 text-lg font-medium focus:outline-none" data-tab="customers">Customers</button>
+            </div>
+
+            <!-- Orders Tab Content -->
+            <div id="orders-tab" class="tab-content">
+                <h2 class="text-3xl font-bold text-gray-200 mb-6">Recent Orders</h2>
+                <div id="orders-list" class="bg-gray-800 rounded-lg shadow-lg p-4">
+                    <p class="text-gray-400 text-center">Loading orders...</p>
                 </div>
             </div>
 
-            <!-- WhatsApp Bot Status Section -->
-            <section id="whatsapp-bot-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
-                <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status</h2>
-                <div class="flex items-center space-x-4 mb-6">
-                    <div id="bot-status-indicator" class="w-4 h-4 rounded-full bg-gray-500 animate-pulse"></div>
-                    <p id="bot-status-text" class="text-lg text-gray-300">Loading status...</p>
+            <!-- Menu Tab Content -->
+            <div id="menu-tab" class="tab-content hidden">
+                <h2 class="text-3xl font-bold text-gray-200 mb-6">Menu Management</h2>
+                <button id="add-menu-item-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg mb-4 transition duration-300">Add New Menu Item</button>
+                <div id="menu-items-list" class="bg-gray-800 rounded-lg shadow-lg p-4">
+                    <p class="text-gray-400 text-center">Loading menu items...</p>
                 </div>
-                <div class="mt-4 text-center">
-                    <p class="text-gray-300">For QR code generation and connection, please visit the <a href="/" target="_blank" class="text-blue-400 hover:underline">public bot status panel</a>.</p>
-                </div>
-            </section>
+            </div>
 
-
-            <!-- Orders Section -->
-            <section id="orders-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
-                <h2 class="text-3xl font-bold text-white mb-6">Recent Orders</h2>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full bg-gray-700 rounded-lg shadow-md">
-                        <thead>
-                            <tr class="bg-gray-600 text-gray-200 uppercase text-sm leading-normal">
-                                <th class="py-3 px-6 text-left">Order ID</th>
-                                <th class="py-3 px-6 text-left">Customer</th>
-                                <th class="py-3 px-6 text-left">Phone</th>
-                                <th class="py-3 px-6 text-left">Total</th>
-                                <th class="py-3 px-6 text-center">Status</th>
-                                <th class="py-3 px-6 text-center">Date</th>
-                                <th class="py-3 px-6 text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="orders-table-body" class="text-gray-300 text-sm font-light">
-                            <!-- Orders will be loaded here by JavaScript -->
-                            <tr><td colspan="7" class="py-4 text-center text-gray-500">No orders found.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <!-- Order Detail Modal -->
-                <div id="order-detail-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-50 hidden">
-                    <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-11/12 md:w-2/3 lg:w-1/2 max-h-[90vh] overflow-y-auto">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-2xl font-bold text-white">Order Details</h3>
-                            <button class="text-gray-400 hover:text-white text-3xl focus:outline-none" onclick="closeModal('order-detail-modal')">&times;</button>
-                        </div>
-                        <div id="order-detail-content" class="text-gray-300 space-y-4 text-lg">
-                            <!-- Order details will be loaded here -->
-                        </div>
-                        <div class="mt-8 flex justify-end">
-                            <button class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200" onclick="closeModal('order-detail-modal')">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Menu Management Section -->
-            <section id="menu-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
-                <h2 class="text-3xl font-bold text-white mb-6">Menu Management</h2>
-                <button class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg mb-6 transition duration-200" onclick="openProductModal()">Add New Product</button>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full bg-gray-700 rounded-lg shadow-md">
-                        <thead>
-                            <tr class="bg-gray-600 text-gray-200 uppercase text-sm leading-normal">
-                                <th class="py-3 px-6 text-left">Image</th>
-                                <th class="py-3 px-6 text-left">Name</th>
-                                <th class="py-3 px-6 text-left">Category</th>
-                                <th class="py-3 px-6 text-right">Price</th>
-                                <th class="py-3 px-6 text-center">Available</th>
-                                <th class="py-3 px-6 text-center">Trending</th>
-                                <th class="py-3 px-6 text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="menu-table-body" class="text-gray-300 text-sm font-light">
-                            <!-- Menu items will be loaded here by JavaScript -->
-                            <tr><td colspan="7" class="py-4 text-center">Loading menu items...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Product Add/Edit Modal -->
-                <div id="product-modal" class="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-50 hidden">
-                    <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-11/12 md:w-2/3 lg:w-1/2 max-h-[90vh] overflow-y-auto">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 id="product-modal-title" class="text-2xl font-bold text-white">Add Product</h3>
-                            <button class="text-gray-400 hover:text-white text-3xl focus:outline-none" onclick="closeModal('product-modal')">&times;</button>
-                        </div>
-                        <form id="product-form" class="space-y-5">
-                            <input type="hidden" id="product-id">
-                            <div>
-                                <label for="product-name" class="block text-gray-300 text-base font-bold mb-2">Name:</label>
-                                <input type="text" id="product-name" name="name" class="w-full" required>
-                            </div>
-                            <div>
-                                <label for="product-description" class="block text-gray-300 text-base font-bold mb-2">Description:</label>
-                                <textarea id="product-description" name="description" rows="3" class="w-full"></textarea>
-                            </div>
-                            <div>
-                                <label for="product-price" class="block text-gray-300 text-base font-bold mb-2">Price:</label>
-                                <input type="number" id="product-price" name="price" step="0.01" class="w-full" required>
-                            </div>
-                            <div>
-                                <label for="product-imageUrl" class="block text-gray-300 text-base font-bold mb-2">Image URL:</label>
-                                <input type="text" id="product-imageUrl" name="imageUrl" class="w-full">
-                            </div>
-                            <div>
-                                <label for="product-category" class="block text-gray-300 text-base font-bold mb-2">Category:</label>
-                                <input type="text" id="product-category" name="category" class="w-full">
-                            </div>
-                            <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-6">
-                                <label class="flex items-center text-gray-300 text-base">
-                                    <input type="checkbox" id="product-isAvailable" name="isAvailable" class="form-checkbox h-6 w-6 text-white rounded-md border-gray-500 bg-gray-700">
-                                    <span class="ml-3">Available</span>
-                                </label>
-                                <label class="flex items-center text-gray-300 text-base">
-                                    <input type="checkbox" id="product-isTrending" name="isTrending" class="form-checkbox h-6 w-6 text-white rounded-md border-gray-500 bg-gray-700">
-                                    <span class="ml-3">Trending</span>
-                                </label>
-                            </div>
-                            <div class="flex justify-end space-x-4 mt-8">
-                                <button type="button" class="bg-gray-500 hover:bg-gray-600 text-white py-3 px-6 rounded-lg transition duration-200" onclick="closeModal('product-modal')">Cancel</button>
-                                <button type="submit" class="bg-green-500 hover:bg-green-600 text-black py-3 px-6 rounded-lg transition duration-200">Save Product</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Customers Section -->
-            <section id="customers-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md mb-8 hidden">
-                <h2 class="text-3xl font-bold text-white mb-6">Customer Info & Location</h2>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full bg-gray-700 rounded-lg shadow-md">
-                        <thead>
-                            <tr class="bg-gray-600 text-gray-200 uppercase text-sm leading-normal">
-                                <th class="py-3 px-6 text-left">Customer Name</th>
-                                <th class="py-3 px-6 text-left">Phone</th>
-                                <th class="py-3 px-6 text-left">Last Location</th>
-                                <th class="py-3 px-6 text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="customers-table-body" class="text-gray-300 text-sm font-light">
-                            <!-- Customer data will be loaded here -->
-                            <tr><td colspan="4" class="py-4 text-center">Loading customers...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- Settings Section -->
-            <section id="settings-section" class="dashboard-section bg-gray-800 p-6 rounded-lg shadow-md hidden">
-                <h2 class="text-3xl font-bold text-white mb-6">Shop Settings</h2>
-                <form id="settings-form" class="space-y-5">
+            <!-- Settings Tab Content -->
+            <div id="settings-tab" class="tab-content hidden">
+                <h2 class="text-3xl font-bold text-gray-200 mb-6">Shop Settings</h2>
+                <form id="settings-form" class="bg-gray-800 rounded-lg shadow-lg p-6 space-y-4">
                     <div>
-                        <label for="shop-name" class="block text-gray-300 text-base font-bold mb-2">Shop Name:</label>
-                        <input type="text" id="shop-name" name="shopName" class="w-full" required>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label for="shop-latitude" class="block text-gray-300 text-base font-bold mb-2">Shop Latitude:</label>
-                            <input type="number" id="shop-latitude" name="shopLocation.latitude" step="0.000001" class="w-full" required>
-                        </div>
-                        <div>
-                            <label for="shop-longitude" class="block text-gray-300 text-base font-bold mb-2">Shop Longitude:</label>
-                            <input type="number" id="shop-longitude" name="shopLocation.longitude" step="0.000001" class="w-full" required>
-                        </div>
+                        <label for="shop-name" class="block text-gray-300 text-sm font-bold mb-2">Shop Name:</label>
+                        <input type="text" id="shop-name" name="shopName" class="shadow border rounded w-full py-2 px-3 text-gray-300 leading-tight focus:outline-none focus:shadow-outline" required>
                     </div>
                     <div>
-                        <h3 class="text-xl font-bold text-gray-200 mb-3">Delivery Rates (KMs Range vs. Amount):</h3>
-                        <div id="delivery-rates-container" class="space-y-4">
-                            <!-- Delivery rates will be loaded here -->
+                        <label class="block text-gray-300 text-sm font-bold mb-2">Shop Location (Latitude, Longitude):</label>
+                        <input type="number" step="any" id="shop-latitude" name="shopLocation.latitude" class="shadow border rounded w-full py-2 px-3 text-gray-300 leading-tight focus:outline-none focus:shadow-outline mb-2" placeholder="Latitude" required>
+                        <input type="number" step="any" id="shop-longitude" name="shopLocation.longitude" class="shadow border rounded w-full py-2 px-3 text-gray-300 leading-tight focus:outline-none focus:shadow-outline" placeholder="Longitude" required>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-200 mb-2">Delivery Rates (KMs, Amount)</h3>
+                        <div id="delivery-rates-container" class="space-y-2">
+                            <!-- Delivery rates will be dynamically added here -->
                         </div>
-                        <button type="button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg mt-5 transition duration-200" onclick="addDeliveryRateField()">Add Rate Range</button>
+                        <button type="button" id="add-delivery-rate-btn" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Add Rate</button>
                     </div>
-                    <div class="flex justify-end mt-8">
-                        <button type="submit" class="bg-green-500 hover:bg-green-600 text-black py-3 px-6 rounded-lg transition duration-200">Save Settings</button>
-                    </div>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Save Settings</button>
+                    <p id="settings-message" class="mt-2 text-sm"></p>
                 </form>
-            </section>
+            </div>
+
+            <!-- Customers Tab Content -->
+            <div id="customers-tab" class="tab-content hidden">
+                <h2 class="text-3xl font-bold text-gray-200 mb-6">Customer Locations</h2>
+                <div id="customers-list" class="bg-gray-800 rounded-lg shadow-lg p-4">
+                    <p class="text-gray-400 text-center">Loading customer data...</p>
+                </div>
+            </div>
         </main>
     </div>
 
-    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <!-- Modals (Order Details, Menu Item Form) -->
+
+    <!-- Order Details Modal -->
+    <div id="order-details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-2xl font-bold text-gray-200 mb-4">Order Details</h2>
+            <div id="order-details-content" class="text-gray-300">
+                <!-- Details will be loaded here -->
+            </div>
+            <div class="mt-4">
+                <label for="order-status-select" class="block text-gray-300 text-sm font-bold mb-2">Update Status:</label>
+                <select id="order-status-select" class="shadow border rounded w-full py-2 px-3 text-gray-300 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="Pending">Pending</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Preparing">Preparing</option>
+                    <option value="Out for Delivery">Out for Delivery</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
+                <button id="update-order-status-btn" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Update Status</button>
+                <p id="order-update-message" class="mt-2 text-sm"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Item Form Modal -->
+    <div id="menu-item-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="menu-item-modal-title" class="text-2xl font-bold text-gray-200 mb-4">Add New Menu Item</h2>
+            <form id="menu-item-form" class="space-y-4">
+                <input type="hidden" id="menu-item-id">
+                <div>
+                    <label for="item-name" class="block text-gray-300 text-sm font-bold mb-2">Name:</label>
+                    <input type="text" id="item-name" name="name" class="shadow border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+                <div>
+                    <label for="item-description" class="block text-gray-300 text-sm font-bold mb-2">Description:</label>
+                    <textarea id="item-description" name="description" class="shadow border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+                </div>
+                <div>
+                    <label for="item-price" class="block text-gray-300 text-sm font-bold mb-2">Price:</label>
+                    <input type="number" step="0.01" id="item-price" name="price" class="shadow border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline" required min="0">
+                </div>
+                <div>
+                    <label for="item-image-url" class="block text-gray-300 text-sm font-bold mb-2">Image URL:</label>
+                    <input type="url" id="item-image-url" name="imageUrl" class="shadow border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline" placeholder="https://example.com/image.jpg">
+                </div>
+                <div>
+                    <label for="item-category" class="block text-gray-300 text-sm font-bold mb-2">Category:</label>
+                    <input type="text" id="item-category" name="category" class="shadow border rounded w-full py-2 px-3 leading-tight focus:outline-none focus:shadow-outline" value="Main Course">
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="item-is-available" name="isAvailable" class="mr-2 leading-tight">
+                    <label for="item-is-available" class="text-gray-300 text-sm">Available</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="item-is-trending" name="isTrending" class="mr-2 leading-tight">
+                    <label for="item-is-trending" class="text-gray-300 text-sm">Trending</label>
+                </div>
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Save Item</button>
+                <p id="menu-item-message" class="mt-2 text-sm"></p>
+            </form>
+        </div>
+    </div>
+
+
     <script>
-        const loadingIndicator = document.getElementById('loading-indicator');
+        const socket = io();
+        const botStatusSpan = document.getElementById('bot-status');
+        const botStatusAlert = document.getElementById('bot-status-alert');
+        const alertMessage = document.getElementById('alert-message');
+        const requestQrBtn = document.getElementById('request-qr-btn');
 
-        function showLoading() { loadingIndicator.classList.remove('hidden'); }
-        function hideLoading() { loadingIndicator.classList.add('hidden'); }
+        const ordersTabBtn = document.querySelector('[data-tab="orders"]');
+        const menuTabBtn = document.querySelector('[data-tab="menu"]');
+        const settingsTabBtn = document.querySelector('[data-tab="settings"]');
+        const customersTabBtn = document.querySelector('[data-tab="customers"]');
 
-        // Sidebar functionality for mobile
-        const sidebar = document.getElementById('sidebar');
-        const openSidebarBtn = document.getElementById('open-sidebar');
-        const closeSidebarBtn = document.getElementById('close-sidebar');
+        const ordersTabContent = document.getElementById('orders-tab');
+        const menuTabContent = document.getElementById('menu-tab');
+        const settingsTabContent = document.getElementById('settings-tab');
+        const customersTabContent = document.getElementById('customers-tab');
 
-        openSidebarBtn.addEventListener('click', () => {
-            sidebar.classList.remove('-translate-x-full');
-        });
+        const ordersList = document.getElementById('orders-list');
+        const menuItemsList = document.getElementById('menu-items-list');
+        const addMenuItemBtn = document.getElementById('add-menu-item-btn');
+        const settingsForm = document.getElementById('settings-form');
+        const deliveryRatesContainer = document.getElementById('delivery-rates-container');
+        const addDeliveryRateBtn = document.getElementById('add-delivery-rate-btn');
+        const settingsMessage = document.getElementById('settings-message');
+        const customersList = document.getElementById('customers-list');
 
-        closeSidebarBtn.addEventListener('click', () => {
-            sidebar.classList.add('-translate-x-full');
-        });
+        const orderDetailsModal = document.getElementById('order-details-modal');
+        const closeOrderDetailsModalBtn = orderDetailsModal.querySelector('.close-button');
+        const orderDetailsContent = document.getElementById('order-details-content');
+        const orderStatusSelect = document.getElementById('order-status-select');
+        const updateOrderStatusBtn = document.getElementById('update-order-status-btn');
+        const orderUpdateMessage = document.getElementById('order-update-message');
+        let currentOrderId = null;
 
-        // Close sidebar when a nav link is clicked on mobile
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', () => {
-                if (window.innerWidth < 1024) { // Check if on mobile/tablet
-                    sidebar.classList.add('-translate-x-full');
-                }
+        const menuItemModal = document.getElementById('menu-item-modal');
+        const closeMenuItemModalBtn = menuItemModal.querySelector('.close-button');
+        const menuItemModalTitle = document.getElementById('menu-item-modal-title');
+        const menuItemForm = document.getElementById('menu-item-form');
+        const menuItemIdInput = document.getElementById('menu-item-id');
+        const itemNameInput = document.getElementById('item-name');
+        const itemDescriptionInput = document.getElementById('item-description');
+        const itemPriceInput = document.getElementById('item-price');
+        const itemImageUrlInput = document.getElementById('item-image-url');
+        const itemCategoryInput = document.getElementById('item-category');
+        const itemIsAvailableInput = document.getElementById('item-is-available');
+        const itemIsTrendingInput = document.getElementById('item-is-trending');
+        const menuItemMessage = document.getElementById('menu-item-message');
+
+        let currentActiveTab = 'orders'; // Default active tab
+
+        // --- Tab Switching Logic ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
             });
-        });
-
-        // Section switching
-        const sections = document.querySelectorAll('.dashboard-section');
-        const navLinks = document.querySelectorAll('.nav-link');
-
-        function showSection(sectionId) {
-            sections.forEach(section => {
-                section.classList.add('hidden');
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('bg-gray-700', 'text-white');
+                button.classList.add('text-gray-400', 'hover:text-gray-200');
             });
-            document.getElementById(sectionId).classList.remove('hidden');
 
-            navLinks.forEach(link => {
-                link.classList.remove('bg-gray-800'); /* Active link background */
-            });
-            document.querySelector(`.nav-link[data-section="${sectionId.replace('-section', '')}"]`).classList.add('bg-gray-800'); /* Active link background */
+            document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('bg-gray-700', 'text-white');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.remove('text-gray-400', 'hover:text-gray-200');
+            currentActiveTab = tabName;
+
+            // Fetch data for the active tab
+            if (tabName === 'orders') fetchOrders();
+            else if (tabName === 'menu') fetchMenuItems();
+            else if (tabName === 'settings') fetchSettings();
+            else if (tabName === 'customers') fetchCustomers();
         }
 
-        navLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const section = e.target.dataset.section;
-                showSection(`${section}-section`);
-                // Trigger data fetch for the newly shown section
-                if (section === 'orders') fetchOrders();
-                if (section === 'menu') fetchMenuItems();
-                if (section === 'customers') fetchCustomers();
-                if (section === 'settings') fetchSettings();
-                if (section === 'whatsapp-bot') fetchBotStatus(); // Fetch bot status when navigating to its section
-            });
-        });
+        ordersTabBtn.addEventListener('click', () => switchTab('orders'));
+        menuTabBtn.addEventListener('click', () => switchTab('menu'));
+        settingsTabBtn.addEventListener('click', () => switchTab('settings'));
+        customersTabBtn.addEventListener('click', () => switchTab('customers'));
 
-        // Initial section display: WhatsApp Bot (default)
-        showSection('whatsapp-bot-section');
-        fetchBotStatus(); // Initial fetch for bot status on page load
+        // Initialize with the default tab
+        switchTab(currentActiveTab);
 
 
-        // --- Modals ---
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.remove('hidden');
-        }
+        // --- WhatsApp Bot Status ---
+        socket.on('status', (status) => {
+            botStatusSpan.textContent = status;
+            botStatusAlert.classList.remove('alert-red', 'alert-yellow', 'alert-green', 'hidden');
+            requestQrBtn.classList.add('hidden'); // Hide by default
 
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.add('hidden');
-        }
+            let message = '';
+            let alertClass = '';
 
-        // --- WhatsApp Bot Status Display (Admin Dashboard) ---
-        const socket = io(); // Connect to Socket.IO
-
-        const botStatusIndicator = document.getElementById('bot-status-indicator');
-        const botStatusText = document.getElementById('bot-status-text');
-
-        async function fetchBotStatus() {
-            try {
-                const response = await fetch('/api/admin/bot-status');
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
-                        return;
-                    }
-                    throw new Error('Failed to fetch bot status.');
-                }
-                const data = await response.json();
-                updateBotStatusDisplay(data.status); // No QR data expected here
-            } catch (error) {
-                console.error('Error fetching bot status for admin dashboard:', error);
-                updateBotStatusDisplay('error'); // Set a general error status
-            }
-        }
-
-        function updateBotStatusDisplay(status) {
-            // Update main bot status section
             switch (status) {
-                case 'initializing':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 animate-pulse';
-                    botStatusText.textContent = 'Initializing WhatsApp client...';
-                    break;
-                case 'qr_received':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
-                    botStatusText.textContent = 'QR Code received. Scan on public panel.';
-                    break;
-                case 'qr_error':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
-                    botStatusText.textContent = 'QR Code error. Check server logs.';
-                    break;
-                case 'qr_expired':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
-                    botStatusText.textContent = 'QR Code expired. Generate new on public panel.';
+                case 'ready':
+                    message = 'WhatsApp bot is connected and ready!';
+                    alertClass = 'alert-green';
                     break;
                 case 'authenticated':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500';
-                    botStatusText.textContent = 'Authenticated. Waiting for ready...';
+                    message = 'WhatsApp bot authenticated. Waiting for ready state...';
+                    alertClass = 'alert-yellow';
                     break;
-                case 'ready':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-green-500';
-                    botStatusText.textContent = 'WhatsApp Bot is Ready and Online!';
+                case 'qr_received':
+                    message = 'QR Code received. Scan it with your WhatsApp app.';
+                    alertClass = 'alert-yellow';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
+                    break;
+                case 'qr_expired':
+                    message = 'QR Code expired. Please request a new one.';
+                    alertClass = 'alert-red';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
                     break;
                 case 'auth_failure':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
-                    botStatusText.textContent = 'Authentication Failed! Please check public panel.';
+                    message = 'Authentication failed. Please request a new QR code and re-scan.';
+                    alertClass = 'alert-red';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
                     break;
                 case 'disconnected':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 animate-pulse';
-                    botStatusText.textContent = 'Disconnected. Reconnecting...';
+                    message = 'WhatsApp bot disconnected. Attempting to reconnect or waiting for new QR.';
+                    alertClass = 'alert-red';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
+                    break;
+                case 'initializing':
+                    message = 'WhatsApp bot is initializing...';
+                    alertClass = 'alert-yellow';
                     break;
                 case 'reconnecting':
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 animate-pulse';
-                    botStatusText.textContent = 'Reconnecting...';
+                    message = 'WhatsApp bot is reconnecting...';
+                    alertClass = 'alert-yellow';
                     break;
-                case 'error': // General error state from frontend fetch
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-red-500';
-                    botStatusText.textContent = 'Error fetching bot status.';
+                case 'qr_error':
+                    message = 'Error generating QR code. Check server logs.';
+                    alertClass = 'alert-red';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
                     break;
                 default:
-                    botStatusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
-                    botStatusText.textContent = `Status: ${status}`;
+                    message = `Unknown status: ${status}`;
+                    alertClass = 'alert-yellow';
             }
-        }
 
-        // Socket.IO listener for real-time status updates
-        socket.on('status', (status) => {
-            updateBotStatusDisplay(status);
+            alertMessage.textContent = message;
+            botStatusAlert.classList.add(alertClass);
+            botStatusAlert.classList.remove('hidden');
         });
 
+        requestQrBtn.addEventListener('click', async () => {
+            requestQrBtn.disabled = true;
+            alertMessage.textContent = 'Requesting new QR...';
+            botStatusAlert.classList.remove('alert-red', 'alert-yellow', 'alert-green');
+            botStatusAlert.classList.add('alert-yellow');
 
-        // --- Orders Management ---
+            try {
+                const response = await fetch('/api/public/request-qr', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alertMessage.textContent = result.message;
+                    // Status update will come via socket.io
+                } else {
+                    alertMessage.textContent = `Error: ${result.message || 'Failed to request new QR.'}`;
+                    botStatusAlert.classList.remove('alert-yellow');
+                    botStatusAlert.classList.add('alert-red');
+                }
+            } catch (error) {
+                alertMessage.textContent = `Network error requesting QR: ${error.message}`;
+                botStatusAlert.classList.remove('alert-yellow');
+                botStatusAlert.classList.add('alert-red');
+            } finally {
+                requestQrBtn.disabled = false;
+            }
+        });
+
+        // --- Orders Tab Functions ---
         async function fetchOrders() {
-            showLoading();
+            ordersList.innerHTML = '<p class="text-gray-400 text-center">Loading orders...</p>';
             try {
                 const response = await fetch('/api/admin/orders');
                 if (!response.ok) {
                     if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        window.location.href = '/admin/login'; // Redirect to login if unauthorized
                         return;
                     }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch orders.');
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const orders = await response.json();
-                const tableBody = document.getElementById('orders-table-body');
-                tableBody.innerHTML = ''; // Clear previous orders
-
-                if (orders.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-gray-500">No orders found.</td></tr>';
-                    return;
-                }
-
-                orders.forEach(order => {
-                    const row = `
-                        <tr class="border-b border-gray-700 hover:bg-gray-700">
-                            <td class="py-3 px-6 text-left whitespace-nowrap">${order._id.substring(0, 6)}...</td>
-                            <td class="py-3 px-6 text-left">${order.customerName}</td>
-                            <td class="py-3 px-6 text-left">${order.customerPhone}</td>
-                            <td class="py-3 px-6 text-left">₹${order.totalAmount ? order.totalAmount.toFixed(2) : '0.00'}</td>
-                            <td class="py-3 px-6 text-center">
-                                <select onchange="updateOrderStatus('${order._id}', this.value)"
-                                    class="bg-gray-700 text-gray-200 py-1 px-2 rounded-md text-sm focus:outline-none">
-                                    ${['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'].map(status => `
-                                        <option value="${status}" ${order.status === status ? 'selected' : ''}>${status}</option>
-                                    `).join('')}
-                                </select>
-                            </td>
-                            <td class="py-3 px-6 text-center">${new Date(order.orderDate).toLocaleDateString()}</td>
-                            <td class="py-3 px-6 text-center">
-                                <button onclick="viewOrderDetails('${order._id}')" class="text-blue-400 hover:text-white mr-2"><i class="fas fa-eye"></i></button>
-                            </td>
-                        </tr>
-                    `;
-                    tableBody.innerHTML += row;
-                });
+                displayOrders(orders);
             } catch (error) {
                 console.error('Error fetching orders:', error);
-                const tableBody = document.getElementById('orders-table-body');
-                tableBody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-red-500">Error loading orders: ${error.message}</td></tr>`;
-            } finally {
-                hideLoading();
+                ordersList.innerHTML = `<p class="text-red-500 text-center">Failed to load orders: ${error.message}</p>`;
             }
         }
 
-        async function updateOrderStatus(orderId, newStatus) {
-            showLoading();
+        function displayOrders(orders) {
+            ordersList.innerHTML = '';
+            if (orders.length === 0) {
+                ordersList.innerHTML = '<p class="text-gray-400 text-center">No orders found.</p>';
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.className = 'min-w-full bg-gray-700 rounded-lg overflow-hidden';
+            table.innerHTML = `
+                <thead>
+                    <tr class="bg-gray-600 text-left">
+                        <th class="py-2 px-4">Order ID</th>
+                        <th class="py-2 px-4">Customer</th>
+                        <th class="py-2 px-4">Phone</th>
+                        <th class="py-2 px-4">Total</th>
+                        <th class="py-2 px-4">Payment</th>
+                        <th class="py-2 px-4">Status</th>
+                        <th class="py-2 px-4">Date</th>
+                        <th class="py-2 px-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-table-body"></tbody>
+            `;
+            ordersList.appendChild(table);
+            const tbody = document.getElementById('orders-table-body');
+
+            orders.forEach(order => {
+                const row = tbody.insertRow();
+                row.className = 'border-b border-gray-600 hover:bg-gray-700';
+                row.innerHTML = `
+                    <td class="py-2 px-4">${order._id.substring(0, 8)}...</td>
+                    <td class="py-2 px-4">${order.customerName}</td>
+                    <td class="py-2 px-4">${order.customerPhone}</td>
+                    <td class="py-2 px-4">₹${order.totalAmount.toFixed(2)}</td>
+                    <td class="py-2 px-4">${order.paymentMethod || 'N/A'}</td>
+                    <td class="py-2 px-4">
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold
+                            ${order.status === 'Pending' ? 'bg-yellow-500 text-yellow-900' : ''}
+                            ${order.status === 'Confirmed' ? 'bg-blue-500 text-blue-900' : ''}
+                            ${order.status === 'Preparing' ? 'bg-purple-500 text-purple-900' : ''}
+                            ${order.status === 'Out for Delivery' ? 'bg-indigo-500 text-indigo-900' : ''}
+                            ${order.status === 'Delivered' ? 'bg-green-500 text-green-900' : ''}
+                            ${order.status === 'Cancelled' ? 'bg-red-500 text-red-900' : ''}
+                        ">${order.status}</span>
+                    </td>
+                    <td class="py-2 px-4">${new Date(order.orderDate).toLocaleString()}</td>
+                    <td class="py-2 px-4">
+                        <button data-id="${order._id}" class="view-order-btn bg-blue-500 hover:bg-blue-600 text-white text-sm py-1 px-3 rounded-md">View</button>
+                    </td>
+                `;
+            });
+
+            ordersList.querySelectorAll('.view-order-btn').forEach(button => {
+                button.addEventListener('click', (e) => openOrderDetailsModal(e.target.dataset.id));
+            });
+        }
+
+        async function openOrderDetailsModal(orderId) {
+            currentOrderId = orderId;
+            orderDetailsContent.innerHTML = '<p class="text-gray-400">Loading order details...</p>';
+            orderDetailsModal.style.display = 'flex';
+            orderUpdateMessage.textContent = ''; // Clear previous messages
+
             try {
-                const response = await fetch(`/api/admin/orders/${orderId}`, {
+                const response = await fetch(`/api/admin/orders/${orderId}`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const order = await response.json();
+
+                orderDetailsContent.innerHTML = `
+                    <p><strong>Order ID:</strong> ${order._id}</p>
+                    <p><strong>Customer Name:</strong> ${order.customerName}</p>
+                    <p><strong>Phone:</strong> ${order.customerPhone}</p>
+                    <p><strong>Delivery Address:</strong> ${order.deliveryAddress}</p>
+                    <p><strong>Customer Location:</strong> ${order.customerLocation ? `Lat: ${order.customerLocation.latitude}, Lon: ${order.customerLocation.longitude}` : 'N/A'}</p>
+                    <p><strong>Payment Method:</strong> ${order.paymentMethod || 'COD'}</p>
+                    <p><strong>Subtotal:</strong> ₹${order.subtotal.toFixed(2)}</p>
+                    <p><strong>Transport Tax:</strong> ₹${order.transportTax.toFixed(2)}</p>
+                    <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
+                    <p><strong>Order Date:</strong> ${new Date(order.orderDate).toLocaleString()}</p>
+                    <h4 class="text-xl font-bold mt-4 mb-2">Items:</h4>
+                    <ul class="list-disc pl-5">
+                        ${order.items.map(item => `<li>${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)</li>`).join('')}
+                    </ul>
+                `;
+                orderStatusSelect.value = order.status; // Set current status in dropdown
+            } catch (error) {
+                console.error('Error fetching order details:', error);
+                orderDetailsContent.innerHTML = `<p class="text-red-500">Failed to load order details: ${error.message}</p>`;
+            }
+        }
+
+        closeOrderDetailsModalBtn.addEventListener('click', () => {
+            orderDetailsModal.style.display = 'none';
+            currentOrderId = null;
+        });
+
+        updateOrderStatusBtn.addEventListener('click', async () => {
+            if (!currentOrderId) return;
+
+            const newStatus = orderStatusSelect.value;
+            updateOrderStatusBtn.disabled = true;
+            orderUpdateMessage.textContent = 'Updating status...';
+            orderUpdateMessage.className = 'mt-2 text-sm text-yellow-500';
+
+            try {
+                const response = await fetch(`/api/admin/orders/${currentOrderId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: newStatus })
                 });
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
-                        return;
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to update order status.');
+
+                const result = await response.json();
+                if (response.ok) {
+                    orderUpdateMessage.textContent = `Status updated to ${result.status}!`;
+                    orderUpdateMessage.className = 'mt-2 text-sm text-green-500';
+                    fetchOrders(); // Refresh orders list
+                } else {
+                    orderUpdateMessage.textContent = `Error updating status: ${result.message || response.statusText}`;
+                    orderUpdateMessage.className = 'mt-2 text-sm text-red-500';
                 }
-                await fetchOrders(); // Refresh orders
             } catch (error) {
                 console.error('Error updating order status:', error);
-                // Use a custom modal or message box instead of alert
-                // For now, using a simple console log and temporary message
-                const errorMessage = `Failed to update order status. Please try again. Details: ${error.message}`;
-                console.error(errorMessage);
-                // alert(errorMessage); // Replaced with a more user-friendly approach if possible
-                showTemporaryMessage(errorMessage, 'error');
+                orderUpdateMessage.textContent = `Network error: ${error.message}`;
+                orderUpdateMessage.className = 'mt-2 text-sm text-red-500';
             } finally {
-                hideLoading();
+                updateOrderStatusBtn.disabled = false;
             }
-        }
-
-        async function viewOrderDetails(orderId) {
-            showLoading();
-            try {
-                const response = await fetch(`/api/admin/orders/${orderId}`);
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
-                        return;
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch order details.');
-                }
-                const order = await response.json();
-                const detailContent = document.getElementById('order-detail-content');
-
-                // Robust checks for undefined/null values before accessing properties or calling toFixed
-                const subtotalDisplay = order.subtotal !== undefined && order.subtotal !== null ? `₹${order.subtotal.toFixed(2)}` : 'N/A';
-                const transportTaxDisplay = order.transportTax !== undefined && order.transportTax !== null ? `₹${order.transportTax.toFixed(2)}` : 'N/A';
-                const totalAmountDisplay = order.totalAmount !== undefined && order.totalAmount !== null ? `₹${order.totalAmount.toFixed(2)}` : 'N/A';
-
-                const customerLocationDisplay = order.customerLocation && order.customerLocation.latitude !== undefined && order.customerLocation.longitude !== undefined
-                    ? `<h4 class="font-bold mt-6 mb-3 text-xl">Customer Location:</h4><p>Latitude: ${order.customerLocation.latitude}, Longitude: ${order.customerLocation.longitude}</p>`
-                    : '';
-                const shopLocationDisplay = order.deliveryFromLocation && order.deliveryFromLocation.latitude !== undefined && order.deliveryFromLocation.longitude !== undefined
-                    ? `<h4 class="font-bold mt-6 mb-3 text-xl">Shop Location at Order:</h4><p>Latitude: ${order.deliveryFromLocation.latitude}, Longitude: ${order.deliveryFromLocation.longitude}</p>`
-                    : '';
-
-                detailContent.innerHTML = `
-                    <p><strong>Order ID:</strong> ${order._id}</p>
-                    <p><strong>Customer Name:</strong> ${order.customerName || 'N/A'}</p>
-                    <p><strong>Customer Phone:</strong> ${order.customerPhone || 'N/A'}</p>
-                    <p><strong>Delivery Address:</strong> ${order.deliveryAddress || 'N/A'}</p>
-                    <p><strong>Order Date:</strong> ${order.orderDate ? new Date(order.orderDate).toLocaleString() : 'N/A'}</p>
-                    <p><strong>Status:</strong> ${order.status || 'N/A'}</p>
-                    <p><strong>Subtotal:</strong> ${subtotalDisplay}</p>
-                    <p><strong>Transport Tax:</strong> ${transportTaxDisplay}</p>
-                    <p><strong>Total Amount:</strong> ${totalAmountDisplay}</p>
-                    <h4 class="font-bold mt-6 mb-3 text-xl">Items:</h4>
-                    <ul class="list-disc list-inside space-y-2 ml-4">
-                        ${order.items && order.items.length > 0 ? order.items.map(item => `
-                            <li>${item.name || 'Unknown Item'} (x${item.quantity || 0}) - ₹${(item.price !== undefined && item.price !== null && item.quantity !== undefined && item.quantity !== null) ? (item.price * item.quantity).toFixed(2) : '0.00'}</li>
-                        `).join('') : '<li>No items found.</li>'}
-                    </ul>
-                    ${customerLocationDisplay}
-                    ${shopLocationDisplay}
-                `;
-                openModal('order-detail-modal');
-            } catch (error) {
-                console.error('Error fetching order details:', error);
-                // Use a custom modal or message box instead of alert
-                // For now, using a simple console log and temporary message
-                const errorMessage = `Failed to fetch order details. Details: ${error.message}`;
-                console.error(errorMessage);
-                // alert(errorMessage); // Replaced with a more user-friendly approach if possible
-                showTemporaryMessage(errorMessage, 'error');
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // Simple temporary message display (can be replaced with a full modal/toast system)
-        function showTemporaryMessage(message, type = 'info') {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg text-white z-[101] transition-all duration-300 transform translate-x-0 opacity-100`;
-            if (type === 'error') {
-                messageDiv.classList.add('bg-red-600');
-            } else if (type === 'success') {
-                messageDiv.classList.add('bg-green-600');
-            } else {
-                messageDiv.classList.add('bg-gray-700');
-            }
-            messageDiv.textContent = message;
-            document.body.appendChild(messageDiv);
-
-            setTimeout(() => {
-                messageDiv.classList.remove('opacity-100');
-                messageDiv.classList.add('opacity-0', 'translate-x-full');
-                messageDiv.addEventListener('transitionend', () => messageDiv.remove());
-            }, 3000);
-        }
-
-
-        // Listen for new orders via Socket.IO
-        socket.on('newOrder', (order) => {
-            console.log('New order received via Socket.IO:', order);
-            // Only refresh if the orders section is currently visible
-            if (!document.getElementById('orders-section').classList.contains('hidden')) {
-                fetchOrders();
-            }
-            // Optionally, show a toast notification for new order
-            showTemporaryMessage('New Order Received!', 'success');
         });
 
-
-        // --- Menu Management ---
+        // --- Menu Tab Functions ---
         async function fetchMenuItems() {
-            showLoading();
+            menuItemsList.innerHTML = '<p class="text-gray-400 text-center">Loading menu items...</p>';
             try {
                 const response = await fetch('/api/admin/menu');
                 if (!response.ok) {
                     if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        window.location.href = '/admin/login';
                         return;
                     }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch menu items.');
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                const products = await response.json();
-                const tableBody = document.getElementById('menu-table-body');
-                tableBody.innerHTML = '';
-
-                if (products.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-gray-500">No menu items found.</td></tr>';
-                    return;
-                }
-
-                products.forEach(product => {
-                    const row = `
-                        <tr class="border-b border-gray-700 hover:bg-gray-700">
-                            <td class="py-3 px-6 text-left">
-                                <img src="${product.imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/50x50/cccccc/333333?text=Food';" alt="${product.name}" class="w-12 h-12 rounded-full object-cover">
-                            </td>
-                            <td class="py-3 px-6 text-left">${product.name}</td>
-                            <td class="py-3 px-6 text-left">${product.category || 'N/A'}</td>
-                            <td class="py-3 px-6 text-right">₹${product.price ? product.price.toFixed(2) : '0.00'}</td>
-                            <td class="py-3 px-6 text-center">
-                                <input type="checkbox" ${product.isAvailable ? 'checked' : ''} disabled class="form-checkbox h-4 w-4 text-white rounded">
-                            </td>
-                            <td class="py-3 px-6 text-center">
-                                <input type="checkbox" ${product.isTrending ? 'checked' : ''} disabled class="form-checkbox h-4 w-4 text-white rounded">
-                            </td>
-                            <td class="py-3 px-6 text-center">
-                                <button onclick="editProduct('${product._id}')" class="text-yellow-400 hover:text-white mr-2"><i class="fas fa-edit"></i></button>
-                                <button onclick="deleteProduct('${product._id}')" class="text-red-400 hover:text-white"><i class="fas fa-trash-alt"></i></button>
-                            </td>
-                        </tr>
-                    `;
-                    tableBody.innerHTML += row;
-                });
+                const items = await response.json();
+                displayMenuItems(items);
             } catch (error) {
                 console.error('Error fetching menu items:', error);
-                const tableBody = document.getElementById('menu-table-body');
-                tableBody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-red-500">Error loading menu items: ${error.message}</td></tr>`;
-            } finally {
-                hideLoading();
+                menuItemsList.innerHTML = `<p class="text-red-500 text-center">Failed to load menu items: ${error.message}</p>`;
             }
         }
 
-        function openProductModal(product = null) {
-            const modal = document.getElementById('product-modal');
-            const form = document.getElementById('product-form');
-            const title = document.getElementById('product-modal-title');
-
-            form.reset(); // Clear form fields
-            document.getElementById('product-id').value = ''; // Clear ID
-
-            if (product) {
-                title.textContent = 'Edit Product';
-                document.getElementById('product-id').value = product._id;
-                document.getElementById('product-name').value = product.name;
-                document.getElementById('product-description').value = product.description || '';
-                document.getElementById('product-price').value = product.price;
-                document.getElementById('product-imageUrl').value = product.imageUrl || '';
-                document.getElementById('product-category').value = product.category || '';
-                document.getElementById('product-isAvailable').checked = product.isAvailable;
-                document.getElementById('product-isTrending').checked = product.isTrending;
-            } else {
-                title.textContent = 'Add New Product';
-                document.getElementById('product-isAvailable').checked = true; // Default new product to available
-                document.getElementById('product-isTrending').checked = false;
+        function displayMenuItems(items) {
+            menuItemsList.innerHTML = '';
+            if (items.length === 0) {
+                menuItemsList.innerHTML = '<p class="text-gray-400 text-center">No menu items added yet.</p>';
+                return;
             }
-            openModal('product-modal');
+
+            const table = document.createElement('table');
+            table.className = 'min-w-full bg-gray-700 rounded-lg overflow-hidden';
+            table.innerHTML = `
+                <thead>
+                    <tr class="bg-gray-600 text-left">
+                        <th class="py-2 px-4">Name</th>
+                        <th class="py-2 px-4">Price</th>
+                        <th class="py-2 px-4">Category</th>
+                        <th class="py-2 px-4">Available</th>
+                        <th class="py-2 px-4">Trending</th>
+                        <th class="py-2 px-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="menu-items-table-body"></tbody>
+            `;
+            menuItemsList.appendChild(table);
+            const tbody = document.getElementById('menu-items-table-body');
+
+            items.forEach(item => {
+                const row = tbody.insertRow();
+                row.className = 'border-b border-gray-600 hover:bg-gray-700';
+                row.innerHTML = `
+                    <td class="py-2 px-4">${item.name}</td>
+                    <td class="py-2 px-4">₹${item.price.toFixed(2)}</td>
+                    <td class="py-2 px-4">${item.category}</td>
+                    <td class="py-2 px-4">${item.isAvailable ? 'Yes' : 'No'}</td>
+                    <td class="py-2 px-4">${item.isTrending ? 'Yes' : 'No'}</td>
+                    <td class="py-2 px-4">
+                        <button data-id="${item._id}" class="edit-menu-item-btn bg-yellow-500 hover:bg-yellow-600 text-white text-sm py-1 px-3 rounded-md mr-2">Edit</button>
+                        <button data-id="${item._id}" class="delete-menu-item-btn bg-red-500 hover:bg-red-600 text-white text-sm py-1 px-3 rounded-md">Delete</button>
+                    </td>
+                `;
+            });
+
+            menuItemsList.querySelectorAll('.edit-menu-item-btn').forEach(button => {
+                button.addEventListener('click', (e) => openMenuItemModalForEdit(e.target.dataset.id));
+            });
+            menuItemsList.querySelectorAll('.delete-menu-item-btn').forEach(button => {
+                button.addEventListener('click', (e) => deleteMenuItem(e.target.dataset.id));
+            });
         }
 
-        async function editProduct(productId) {
-            showLoading();
+        addMenuItemBtn.addEventListener('click', () => {
+            menuItemModalTitle.textContent = 'Add New Menu Item';
+            menuItemForm.reset(); // Clear form for new entry
+            menuItemIdInput.value = ''; // Ensure ID is empty for new item
+            menuItemModal.style.display = 'flex';
+            menuItemMessage.textContent = '';
+        });
+
+        closeMenuItemModalBtn.addEventListener('click', () => {
+            menuItemModal.style.display = 'none';
+        });
+
+        async function openMenuItemModalForEdit(itemId) {
+            menuItemModalTitle.textContent = 'Edit Menu Item';
+            menuItemForm.reset();
+            menuItemMessage.textContent = 'Loading item details...';
+            menuItemMessage.className = 'mt-2 text-sm text-yellow-500';
+            menuItemModal.style.display = 'flex';
+
             try {
-                const response = await fetch(`/api/admin/menu/${productId}`);
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
-                        return;
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch product for edit.');
-                }
-                const product = await response.json();
-                openProductModal(product);
+                const response = await fetch(`/api/admin/menu/${itemId}`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const item = await response.json();
+
+                menuItemIdInput.value = item._id;
+                itemNameInput.value = item.name;
+                itemDescriptionInput.value = item.description;
+                itemPriceInput.value = item.price;
+                itemImageUrlInput.value = item.imageUrl;
+                itemCategoryInput.value = item.category;
+                itemIsAvailableInput.checked = item.isAvailable;
+                itemIsTrendingInput.checked = item.isTrending;
+
+                menuItemMessage.textContent = '';
             } catch (error) {
-                console.error('Error fetching product for edit:', error);
-                showTemporaryMessage(`Failed to load product for editing. Details: ${error.message}`, 'error');
-            } finally {
-                hideLoading();
+                console.error('Error fetching menu item for edit:', error);
+                menuItemMessage.textContent = `Failed to load item for edit: ${error.message}`;
+                menuItemMessage.className = 'mt-2 text-sm text-red-500';
             }
         }
 
-        document.getElementById('product-form').addEventListener('submit', async (e) => {
+        menuItemForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            showLoading();
-            const productId = document.getElementById('product-id').value;
-            const formData = new FormData(e.target);
-            const productData = Object.fromEntries(formData.entries());
 
-            // Convert checkboxes to boolean
-            productData.isAvailable = productData.isAvailable === 'on';
-            productData.isTrending = productData.isTrending === 'on';
-            productData.price = parseFloat(productData.price);
+            const itemId = menuItemIdInput.value;
+            const method = itemId ? 'PUT' : 'POST';
+            const url = itemId ? `/api/admin/menu/${itemId}` : '/api/admin/menu';
 
-            console.log('Sending product data:', productData); // Frontend log of data being sent
+            const formData = {
+                name: itemNameInput.value,
+                description: itemDescriptionInput.value,
+                price: parseFloat(itemPriceInput.value),
+                imageUrl: itemImageUrlInput.value,
+                category: itemCategoryInput.value,
+                isAvailable: itemIsAvailableInput.checked,
+                isTrending: itemIsTrendingInput.checked
+            };
+
+            menuItemMessage.textContent = 'Saving item...';
+            menuItemMessage.className = 'mt-2 text-sm text-yellow-500';
+            menuItemForm.querySelector('button[type="submit"]').disabled = true;
 
             try {
-                let response;
-                if (productId) {
-                    response = await fetch(`/api/admin/menu/${productId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(productData)
-                    });
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    menuItemMessage.textContent = `Item saved successfully!`;
+                    menuItemMessage.className = 'mt-2 text-sm text-green-500';
+                    fetchMenuItems(); // Refresh list
+                    setTimeout(() => menuItemModal.style.display = 'none', 1500);
                 } else {
-                    response = await fetch('/api/admin/menu', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(productData)
-                    });
+                    menuItemMessage.textContent = `Error saving item: ${result.message || response.statusText}`;
+                    menuItemMessage.className = 'mt-2 text-sm text-red-500';
                 }
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
-                        return;
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || `Failed to save product. Server response: ${response.status}`);
-                }
-                closeModal('product-modal');
-                await fetchMenuItems(); // Refresh menu
-                showTemporaryMessage('Product saved successfully!', 'success');
             } catch (error) {
-                console.error('Error saving product:', error);
-                showTemporaryMessage(`Failed to save product. Please check your input. Details: ${error.message}`, 'error');
+                console.error('Error saving menu item:', error);
+                menuItemMessage.textContent = `Network error: ${error.message}`;
+                menuItemMessage.className = 'mt-2 text-sm text-red-500';
             } finally {
-                hideLoading();
+                menuItemForm.querySelector('button[type="submit"]').disabled = false;
             }
         });
 
-        async function deleteProduct(productId) {
-            // Replaced confirm with a custom modal if needed, for now using a simple check
-            if (!confirm('Are you sure you want to delete this product?')) {
+        async function deleteMenuItem(itemId) {
+            if (!confirm('Are you sure you want to delete this menu item?')) { // Consider a custom modal instead of alert
                 return;
             }
-            showLoading();
+
             try {
-                const response = await fetch(`/api/admin/menu/${productId}`, {
+                const response = await fetch(`/api/admin/menu/${itemId}`, {
                     method: 'DELETE'
                 });
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
-                        return;
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to delete product.');
+
+                if (response.ok) {
+                    alert('Menu item deleted successfully!'); // Consider a custom modal
+                    fetchMenuItems(); // Refresh list
+                } else {
+                    const result = await response.json();
+                    alert(`Error deleting item: ${result.message || response.statusText}`); // Consider a custom modal
                 }
-                await fetchMenuItems(); // Refresh menu
-                showTemporaryMessage('Product deleted successfully!', 'success');
             } catch (error) {
-                console.error('Error deleting product:', error);
-                showTemporaryMessage(`Failed to delete product. Details: ${error.message}`, 'error');
-            } finally {
-                hideLoading();
+                console.error('Error deleting menu item:', error);
+                alert(`Network error deleting item: ${error.message}`); // Consider a custom modal
             }
         }
 
-        // --- Customer Management ---
-        async function fetchCustomers() {
-            showLoading();
-            try {
-                const response = await fetch('/api/admin/customers');
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
-                        return;
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch customer data.');
-                }
-                const customers = await response.json();
-                const tableBody = document.getElementById('customers-table-body');
-                tableBody.innerHTML = '';
-
-                if (customers.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-gray-500">No customer data found.</td></tr>';
-                    return;
-                }
-
-                customers.forEach(customer => {
-                    const locationText = customer.lastKnownLocation && customer.lastKnownLocation.latitude !== undefined && customer.lastKnownLocation.longitude !== undefined
-                        ? `Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`
-                        : 'N/A';
-                    const trackButton = customer.lastKnownLocation && customer.lastKnownLocation.latitude !== undefined && customer.lastKnownLocation.longitude !== undefined &&
-                                         customer.shopLocation && customer.shopLocation.latitude !== undefined && customer.shopLocation.longitude !== undefined
-                        ? `<button onclick="trackCustomer('${customer.lastKnownLocation.latitude}', '${customer.lastKnownLocation.longitude}', '${customer.shopLocation.latitude}', '${customer.shopLocation.longitude}')" class="text-blue-400 hover:text-white ml-2"><i class="fas fa-map-marker-alt"></i> Track</button>`
-                        : `<button class="text-gray-500 cursor-not-allowed ml-2" disabled><i class="fas fa-map-marker-alt"></i> Track</button>`;
-
-                    const row = `
-                        <tr class="border-b border-gray-700 hover:bg-gray-700">
-                            <td class="py-3 px-6 text-left">${customer.customerName || 'Unknown'}</td>
-                            <td class="py-3 px-6 text-left">${customer.customerPhone || 'N/A'}</td>
-                            <td class="py-3 px-6 text-left">${locationText}</td>
-                            <td class="py-3 px-6 text-center whitespace-nowrap">
-                                <a href="tel:+${customer.customerPhone}" class="text-green-400 hover:text-white mr-2"><i class="fas fa-phone"></i> Call</a>
-                                ${trackButton}
-                            </td>
-                        </tr>
-                    `;
-                    tableBody.innerHTML += row;
-                });
-            } catch (error) {
-                console.error('Error fetching customers:', error);
-                const tableBody = document.getElementById('customers-table-body');
-                tableBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-red-500">Error loading customer data: ${error.message}</td></tr>`;
-            } finally {
-                hideLoading();
-            }
-        }
-
-        function callCustomer(phoneNumber) {
-            window.location.href = `tel:+${phoneNumber}`;
-        }
-
-        function trackCustomer(customerLat, customerLon, shopLat, shopLon) {
-            const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${shopLat},${shopLon}&destination=${customerLat},${customerLon}`;
-            window.open(googleMapsUrl, '_blank');
-        }
-
-
-        // --- Settings Management ---
+        // --- Settings Tab Functions ---
         async function fetchSettings() {
-            showLoading();
+            settingsMessage.textContent = 'Loading settings...';
+            settingsMessage.className = 'mt-2 text-sm text-yellow-500';
             try {
                 const response = await fetch('/api/admin/settings');
                 if (!response.ok) {
                     if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
+                        window.location.href = '/admin/login';
                         return;
                     }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch settings.');
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const settings = await response.json();
                 document.getElementById('shop-name').value = settings.shopName || '';
-                document.getElementById('shop-latitude').value = settings.shopLocation?.latitude || 0;
-                document.getElementById('shop-longitude').value = settings.shopLocation?.longitude || 0;
-
-                const ratesContainer = document.getElementById('delivery-rates-container');
-                ratesContainer.innerHTML = ''; // Clear existing rates
-                if (settings.deliveryRates && settings.deliveryRates.length > 0) {
-                    settings.deliveryRates.forEach(rate => addDeliveryRateField(rate.minKms, rate.maxKms, rate.amount));
-                } else {
-                    addDeliveryRateField(); // Add one empty field if none exist
-                }
+                document.getElementById('shop-latitude').value = settings.shopLocation ? settings.shopLocation.latitude : 0;
+                document.getElementById('shop-longitude').value = settings.shopLocation ? settings.shopLocation.longitude : 0;
+                displayDeliveryRates(settings.deliveryRates || []);
+                settingsMessage.textContent = '';
             } catch (error) {
                 console.error('Error fetching settings:', error);
-                showTemporaryMessage(`Failed to load settings. Details: ${error.message}`, 'error');
-            } finally {
-                hideLoading();
+                settingsMessage.textContent = `Failed to load settings: ${error.message}`;
+                settingsMessage.className = 'mt-2 text-sm text-red-500';
             }
         }
 
-        function addDeliveryRateField(minKms = '', maxKms = '', amount = '') {
-            const ratesContainer = document.getElementById('delivery-rates-container');
-            const div = document.createElement('div');
-            div.className = 'flex flex-col sm:flex-row gap-4 items-center'; /* Increased gap */
-            div.innerHTML = `
-                <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input type="number" placeholder="Min KMs" value="${minKms}" class="w-full" required step="0.01">
-                    <input type="number" placeholder="Max KMs" value="${maxKms}" class="w-full" required step="0.01">
-                </div>
-                <input type="number" placeholder="Amount (₹)" value="${amount}" step="0.01" class="w-full sm:w-1/3 flex-shrink-0" required>
-                <button type="button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200 flex-shrink-0 w-full sm:w-auto" onclick="this.parentNode.remove()">Remove</button>
-            `;
-            ratesContainer.appendChild(div);
+        function displayDeliveryRates(rates) {
+            deliveryRatesContainer.innerHTML = '';
+            rates.forEach((rate, index) => {
+                const rateDiv = document.createElement('div');
+                rateDiv.className = 'flex space-x-2 items-center';
+                rateDiv.innerHTML = `
+                    <input type="number" step="any" class="delivery-kms shadow border rounded py-2 px-3 w-1/2" placeholder="KMs" value="${rate.kms}" required>
+                    <input type="number" step="0.01" class="delivery-amount shadow border rounded py-2 px-3 w-1/2" placeholder="Amount" value="${rate.amount}" required>
+                    <button type="button" class="remove-delivery-rate-btn bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-md text-sm">Remove</button>
+                `;
+                deliveryRatesContainer.appendChild(rateDiv);
+            });
+            addRemoveRateListeners();
         }
 
-        document.getElementById('settings-form').addEventListener('submit', async (e) => {
+        function addRemoveRateListeners() {
+            deliveryRatesContainer.querySelectorAll('.remove-delivery-rate-btn').forEach(button => {
+                button.onclick = (e) => e.target.closest('.flex').remove();
+            });
+        }
+
+        addDeliveryRateBtn.addEventListener('click', () => {
+            const rateDiv = document.createElement('div');
+            rateDiv.className = 'flex space-x-2 items-center';
+            rateDiv.innerHTML = `
+                <input type="number" step="any" class="delivery-kms shadow border rounded py-2 px-3 w-1/2" placeholder="KMs" required>
+                <input type="number" step="0.01" class="delivery-amount shadow border rounded py-2 px-3 w-1/2" placeholder="Amount" required>
+                <button type="button" class="remove-delivery-rate-btn bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-md text-sm">Remove</button>
+            `;
+            deliveryRatesContainer.appendChild(rateDiv);
+            addRemoveRateListeners();
+        });
+
+        settingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            showLoading();
-            const formData = new FormData(e.target);
-            const settingsData = {
-                shopName: formData.get('shopName'),
-                shopLocation: {
-                    latitude: parseFloat(formData.get('shopLocation.latitude')),
-                    longitude: parseFloat(formData.get('shopLocation.longitude'))
-                },
-                deliveryRates: []
-            };
 
-            const rateDivs = document.querySelectorAll('#delivery-rates-container > div');
-            rateDivs.forEach(div => {
-                const minKmsInput = div.querySelector('input[placeholder="Min KMs"]');
-                const maxKmsInput = div.querySelector('input[placeholder="Max KMs"]');
-                const amountInput = div.querySelector('input[placeholder="Amount (₹)"]');
+            const shopName = document.getElementById('shop-name').value;
+            const shopLatitude = parseFloat(document.getElementById('shop-latitude').value);
+            const shopLongitude = parseFloat(document.getElementById('shop-longitude').value);
 
-                if (minKmsInput && maxKmsInput && amountInput && minKmsInput.value && maxKmsInput.value && amountInput.value) {
-                    settingsData.deliveryRates.push({
-                        minKms: parseFloat(minKmsInput.value),
-                        maxKms: parseFloat(maxKmsInput.value),
-                        amount: parseFloat(amountInput.value)
-                    });
+            const deliveryRates = [];
+            deliveryRatesContainer.querySelectorAll('.flex').forEach(rateDiv => {
+                const kms = parseFloat(rateDiv.querySelector('.delivery-kms').value);
+                const amount = parseFloat(rateDiv.querySelector('.delivery-amount').value);
+                if (!isNaN(kms) && !isNaN(amount)) {
+                    deliveryRates.push({ kms, amount });
                 }
             });
 
-            console.log('Sending settings data:', settingsData); // Frontend log of data being sent
+            const settingsData = {
+                shopName,
+                shopLocation: { latitude: shopLatitude, longitude: shopLongitude },
+                deliveryRates
+            };
+
+            settingsMessage.textContent = 'Saving settings...';
+            settingsMessage.className = 'mt-2 text-sm text-yellow-500';
+            settingsForm.querySelector('button[type="submit"]').disabled = true;
 
             try {
                 const response = await fetch('/api/admin/settings', {
@@ -1052,25 +868,138 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(settingsData)
                 });
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login on unauthorized
-                        return;
-                    }
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || `Failed to save settings. Server response: ${response.status}`);
+
+                const result = await response.json();
+                if (response.ok) {
+                    settingsMessage.textContent = 'Settings saved successfully!';
+                    settingsMessage.className = 'mt-2 text-sm text-green-500';
+                } else {
+                    settingsMessage.textContent = `Error saving settings: ${result.message || response.statusText}`;
+                    settingsMessage.className = 'mt-2 text-sm text-red-500';
                 }
-                showTemporaryMessage('Settings saved successfully!', 'success');
             } catch (error) {
                 console.error('Error saving settings:', error);
-                showTemporaryMessage(`Failed to save settings. Please check your input. Details: ${error.message}`, 'error');
+                settingsMessage.textContent = `Network error: ${error.message}`;
+                settingsMessage.className = 'mt-2 text-sm text-red-500';
             } finally {
-                hideLoading();
+                settingsForm.querySelector('button[type="submit"]').disabled = false;
             }
         });
 
-        // Initial fetch for orders when page loads
-        fetchOrders();
+        // --- Customer Tab Functions ---
+        async function fetchCustomers() {
+            customersList.innerHTML = '<p class="text-gray-400 text-center">Loading customer data...</p>';
+            try {
+                const response = await fetch('/api/admin/customers');
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin/login';
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const customers = await response.json();
+                displayCustomers(customers);
+            } catch (error) {
+                console.error('Error fetching customers:', error);
+                customersList.innerHTML = `<p class="text-red-500 text-center">Failed to load customer data: ${error.message}</p>`;
+            }
+        }
+
+        function displayCustomers(customers) {
+            customersList.innerHTML = '';
+            if (customers.length === 0) {
+                customersList.innerHTML = '<p class="text-gray-400 text-center">No customer data found.</p>';
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.className = 'min-w-full bg-gray-700 rounded-lg overflow-hidden';
+            table.innerHTML = `
+                <thead>
+                    <tr class="bg-gray-600 text-left">
+                        <th class="py-2 px-4">Customer Name</th>
+                        <th class="py-2 px-4">Phone</th>
+                        <th class="py-2 px-4">Last Known Location</th>
+                        <th class="py-2 px-4">Distance from Shop (km)</th>
+                    </tr>
+                </thead>
+                <tbody id="customers-table-body"></tbody>
+            `;
+            customersList.appendChild(table);
+            const tbody = document.getElementById('customers-table-body');
+
+            customers.forEach(customer => {
+                const row = tbody.insertRow();
+                row.className = 'border-b border-gray-600 hover:bg-gray-700';
+
+                let locationText = 'N/A';
+                let distanceFromShop = 'N/A';
+
+                if (customer.lastKnownLocation && customer.lastKnownLocation.latitude && customer.lastKnownLocation.longitude) {
+                    locationText = `Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`;
+                    if (customer.shopLocation && customer.shopLocation.latitude && customer.shopLocation.longitude) {
+                        const dist = haversineDistance(
+                            customer.shopLocation.latitude,
+                            customer.shopLocation.longitude,
+                            customer.lastKnownLocation.latitude,
+                            customer.lastKnownLocation.longitude
+                        );
+                        distanceFromShop = dist.toFixed(2);
+                    }
+                }
+
+                row.innerHTML = `
+                    <td class="py-2 px-4">${customer.customerName || 'N/A'}</td>
+                    <td class="py-2 px-4">${customer.customerPhone}</td>
+                    <td class="py-2 px-4">${locationText}</td>
+                    <td class="py-2 px-4">${distanceFromShop}</td>
+                `;
+            });
+        }
+
+        // Haversine distance function (duplicated from menu_panel for self-containment)
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of Earth in kilometers
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Distance in km
+        }
+
+        // Initial fetch for the default tab
+        switchTab(currentActiveTab);
+
+        // Periodically fetch bot status to keep the dashboard updated
+        setInterval(() => {
+            fetch('/api/admin/bot-status')
+                .then(response => {
+                    if (response.status === 401) {
+                        // If session expired, redirect to login
+                        window.location.href = '/admin/login';
+                        return Promise.reject('Unauthorized');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Status update is handled by the socket.io listener now
+                    // This fetch is primarily for initial load or if socket.io fails
+                    // The socket.io 'status' event will trigger the display logic
+                })
+                .catch(error => {
+                    console.error('Error fetching bot status:', error);
+                    // Handle network errors or server issues
+                    botStatusSpan.textContent = 'Error: Could not connect to server.';
+                    alertMessage.textContent = 'Could not connect to bot server. Please check server logs.';
+                    botStatusAlert.classList.remove('alert-yellow', 'alert-green');
+                    botStatusAlert.classList.add('alert-red');
+                    requestQrBtn.classList.remove('hidden');
+                });
+        }, 5000); // Poll every 5 seconds
     </script>
 </body>
 </html>
