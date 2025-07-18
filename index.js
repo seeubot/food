@@ -285,7 +285,7 @@ async function loadAndInitializeClient() {
         }
     });
 
-    // Attach event listeners
+    // Attach ALL WhatsApp client event listeners *here*, after client is initialized
     client.on('qr', (qr) => {
         console.log('QR RECEIVED', qr);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
@@ -357,7 +357,8 @@ async function loadAndInitializeClient() {
                 console.error('Error deleting old session data from MongoDB on max auth failures:', err);
             } finally {
                 setTimeout(() => {
-                    client.initialize();
+                    if (client) client.destroy().then(() => loadAndInitializeClient()).catch(err => console.error("Error destroying client:", err));
+                    else loadAndInitializeClient(); // Fallback if client is somehow null
                     updateBotStatus('reconnecting');
                 }, RECONNECT_DELAY_MS);
             }
@@ -365,7 +366,8 @@ async function loadAndInitializeClient() {
             console.log('Attempting to re-initialize client without clearing session...');
             clientReady = false; // Set to false while re-initializing
             setTimeout(() => {
-                client.initialize();
+                if (client) client.destroy().then(() => loadAndInitializeClient()).catch(err => console.error("Error destroying client:", err));
+                else loadAndInitializeClient(); // Fallback if client is somehow null
                 updateBotStatus('reconnecting');
             }, RECONNECT_DELAY_MS);
         }
@@ -387,9 +389,96 @@ async function loadAndInitializeClient() {
         authFailureCount = 0;
         // Re-initialize automatically after a short delay
         setTimeout(() => {
-            client.initialize();
+            if (client) client.destroy().then(() => loadAndInitializeClient()).catch(err => console.error("Error destroying client:", err));
+            else loadAndInitializeClient(); // Fallback if client is somehow null
             updateBotStatus('reconnecting');
         }, RECONNECT_DELAY_MS);
+    });
+
+    // MOVED: The client.on('message') listener is now here
+    client.on('message', async msg => {
+        console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body); // Log message reception
+
+        // Ensure the bot is ready before processing messages
+        if (!clientReady) {
+            console.log(`Bot not ready, ignoring message from ${msg.from}.`);
+            return;
+        }
+
+        const senderNumber = msg.from.split('@')[0];
+        // Direct menu URL as requested
+        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
+
+        try {
+            // Update customer notification date on any message received
+            await updateCustomerNotification(senderNumber);
+
+            // Welcome message content with numbered options and Indian dialogues
+            const welcomeMessage = `Namaste! Craving something delicious? 😋 Welcome to Delicious Bites, where every bite is a delight!
+                    \nKya chahiye aapko? (What do you need?) Just reply with the number:
+                    \n1. My Profile (Dekho apni jaankari!)
+                    \n2. My Recent Orders (Pichle orders dekho!)
+                    \n3. Support (Madad chahiye? Hum hain na!)
+                    \n\nTo view our full menu, simply type 'Menu' or click here: ${menuUrl}`;
+
+            // Handle specific commands (case-insensitive and number-based)
+            const lowerCaseBody = msg.body.toLowerCase().trim();
+
+            switch (lowerCaseBody) {
+                case '1':
+                case '!profile':
+                case 'profile':
+                    await msg.reply(`Aapka profile yahaan hai! (Your profile is here!) Your registered WhatsApp number is: ${senderNumber}. We're working on adding more personalized profile features soon. Stay tuned!`);
+                    console.log(`Replied to ${senderNumber} with profile info.`);
+                    break;
+                case '2':
+                case '!orders':
+                case 'orders':
+                    try {
+                        const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
+                        if (customerOrders.length > 0) {
+                            let orderList = 'Your recent orders:\n';
+                            customerOrders.forEach((order, index) => {
+                                orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
+                            });
+                            await msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
+                            console.log(`Replied to ${senderNumber} with recent orders.`);
+                        } else {
+                            await msg.reply('You have no recent orders. Why not place one now? Reply with *1* for menu.');
+                            console.log(`Replied to ${senderNumber} with no recent orders message.`);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching orders for bot:', error);
+                        await msg.reply('Sorry, I could not fetch your orders at the moment. Please try again later.');
+                    }
+                    break;
+                case '3':
+                case '!help':
+                case 'help':
+                case '!support':
+                case 'support':
+                    await msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
+                    console.log(`Replied to ${senderNumber} with help message.`);
+                    break;
+                case 'menu': // Explicitly handle 'menu' as a direct link request
+                    await msg.reply(`Check out our delicious menu here: ${menuUrl}`);
+                    console.log(`Replied to ${senderNumber} with direct menu link.`);
+                    break;
+                default:
+                    // Default response: send the welcome message for any other input
+                    await msg.reply(welcomeMessage);
+                    console.log(`Replied to ${senderNumber} with welcome message (default).`);
+                    break;
+            }
+        } catch (error) {
+            console.error(`Error processing message from ${msg.from}:`, error);
+            // Attempt to send a generic error message back to the user
+            try {
+                await msg.reply('Sorry, something went wrong while processing your request. Please try again or contact support.');
+            } catch (replyError) {
+                console.error(`Failed to send error reply to ${msg.from}:`, replyError);
+            }
+        }
     });
 
     // Finally, initialize the client
@@ -420,91 +509,6 @@ async function updateCustomerNotification(customerPhone) {
         console.error(`Error updating customer notification for ${customerPhone}:`, error);
     }
 }
-
-client.on('message', async msg => { // This listener needs to be attached to the 'client' object
-    console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body); // Log message reception
-
-    // Ensure the bot is ready before processing messages
-    if (!clientReady) {
-        console.log(`Bot not ready, ignoring message from ${msg.from}.`);
-        return;
-    }
-
-    const senderNumber = msg.from.split('@')[0];
-    // Direct menu URL as requested
-    const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
-
-    try {
-        // Update customer notification date on any message received
-        await updateCustomerNotification(senderNumber);
-
-        // Welcome message content with numbered options and Indian dialogues
-        const welcomeMessage = `Namaste! Craving something delicious? 😋 Welcome to Delicious Bites, where every bite is a delight!
-                \nKya chahiye aapko? (What do you need?) Just reply with the number:
-                \n1. My Profile (Dekho apni jaankari!)
-                \n2. My Recent Orders (Pichle orders dekho!)
-                \n3. Support (Madad chahiye? Hum hain na!)
-                \n\nTo view our full menu, simply type 'Menu' or click here: ${menuUrl}`;
-
-        // Handle specific commands (case-insensitive and number-based)
-        const lowerCaseBody = msg.body.toLowerCase().trim();
-
-        switch (lowerCaseBody) {
-            case '1':
-            case '!profile':
-            case 'profile':
-                await msg.reply(`Aapka profile yahaan hai! (Your profile is here!) Your registered WhatsApp number is: ${senderNumber}. We're working on adding more personalized profile features soon. Stay tuned!`);
-                console.log(`Replied to ${senderNumber} with profile info.`);
-                break;
-            case '2':
-            case '!orders':
-            case 'orders':
-                try {
-                    const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
-                    if (customerOrders.length > 0) {
-                        let orderList = 'Your recent orders:\n';
-                        customerOrders.forEach((order, index) => {
-                            orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
-                        });
-                        await msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
-                        console.log(`Replied to ${senderNumber} with recent orders.`);
-                    } else {
-                        await msg.reply('You have no recent orders. Why not place one now? Reply with *1* for menu.');
-                        console.log(`Replied to ${senderNumber} with no recent orders message.`);
-                    }
-                } catch (error) {
-                    console.error('Error fetching orders for bot:', error);
-                    await msg.reply('Sorry, I could not fetch your orders at the moment. Please try again later.');
-                }
-                break;
-            case '3':
-            case '!help':
-            case 'help':
-            case '!support':
-            case 'support':
-                await msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
-                console.log(`Replied to ${senderNumber} with help message.`);
-                break;
-            case 'menu': // Explicitly handle 'menu' as a direct link request
-                await msg.reply(`Check out our delicious menu here: ${menuUrl}`);
-                console.log(`Replied to ${senderNumber} with direct menu link.`);
-                break;
-            default:
-                // Default response: send the welcome message for any other input
-                await msg.reply(welcomeMessage);
-                console.log(`Replied to ${senderNumber} with welcome message (default).`);
-                break;
-        }
-    } catch (error) {
-        console.error(`Error processing message from ${msg.from}:`, error);
-        // Attempt to send a generic error message back to the user
-        try {
-            await msg.reply('Sorry, something went wrong while processing your request. Please try again or contact support.');
-        } catch (replyError) {
-            console.error(`Failed to send error reply to ${msg.from}:`, replyError);
-        }
-    }
-});
 
 // NEW: Function to send weekly notifications to users
 async function sendWeeklyNotifications() {
@@ -538,10 +542,14 @@ async function sendWeeklyNotifications() {
 
             try {
                 // Send message to customer
-                await client.sendMessage(customer.customerPhone + '@c.us', message);
-                // Update last notified date for this customer
-                await CustomerNotification.findByIdAndUpdate(customer._id, { lastNotifiedDate: new Date() });
-                console.log(`Sent weekly notification to ${customer.customerPhone}`);
+                if (clientReady && client) { // Ensure client is ready and not null before sending
+                    await client.sendMessage(customer.customerPhone + '@c.us', message);
+                    // Update last notified date for this customer
+                    await CustomerNotification.findByIdAndUpdate(customer._id, { lastNotifiedDate: new Date() });
+                    console.log(`Sent weekly notification to ${customer.customerPhone}`);
+                } else {
+                    console.warn(`Client not ready or null, skipping weekly notification to ${customer.customerPhone}`);
+                }
             } catch (msgError) {
                 console.error(`Error sending weekly notification to ${customer.customerPhone}:`, msgError);
             }
@@ -767,13 +775,19 @@ app.post('/api/public/request-qr', async (req, res) => {
         // Set status to initializing and clear current QR data immediately
         updateBotStatus('initializing'); // This will clear qrCodeDataURL and emit
         // Re-initialize the client (this will trigger a new QR)
-        client.destroy().then(() => { // Destroy existing client instance
-            loadAndInitializeClient(); // Re-create and initialize a new client
+        if (client) {
+            client.destroy().then(() => { // Destroy existing client instance
+                loadAndInitializeClient(); // Re-create and initialize a new client
+                res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
+            }).catch(err => {
+                console.error('Error destroying client before re-initialization:', err);
+                res.status(500).json({ message: 'Error re-initializing client for new QR.' });
+            });
+        } else {
+            // If client was never initialized, just load and initialize
+            loadAndInitializeClient();
             res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
-        }).catch(err => {
-            console.error('Error destroying client before re-initialization:', err);
-            res.status(500).json({ message: 'Error re-initializing client for new QR.' });
-        });
+        }
     }
 });
 
@@ -831,10 +845,10 @@ app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
         }
         console.log(`Order ${id} updated successfully to status: ${order.status}`);
         // Optional: Notify customer via WhatsApp about status update
-        if (clientReady) { // Only send if client is ready
+        if (clientReady && client) { // Only send if client is ready and not null
             client.sendMessage(order.customerPhone + '@c.us', `Your order #${order._id.toString().substring(0,6)} has been updated to: ${order.status}`);
         } else {
-            console.warn(`WhatsApp client not ready, cannot notify customer ${order.customerPhone} about order status update.`);
+            console.warn(`WhatsApp client not ready or null, cannot notify customer ${order.customerPhone} about order status update.`);
         }
         res.json(order);
     } catch (error) {
@@ -1108,7 +1122,7 @@ app.post('/api/order', async (req, res) => {
         await updateCustomerNotification(customerPhone);
 
         // Notify Admin via WhatsApp
-        if (clientReady) {
+        if (clientReady && client) { // Ensure client is ready and not null before sending
             // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
             const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
             const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
@@ -1122,7 +1136,7 @@ app.post('/api/order', async (req, res) => {
                 .then(() => console.log('Admin notified via WhatsApp for new order'))
                 .catch(err => console.error('Error sending WhatsApp notification to admin:', err));
         } else {
-            console.warn('WhatsApp client not ready, cannot send admin notification.');
+            console.warn('WhatsApp client not ready or null, cannot send admin notification.');
         }
 
         // Notify Admin Dashboard via Socket.IO
