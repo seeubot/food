@@ -1,10 +1,10 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, AuthStrategy } = require('whatsapp-web.js'); // Import AuthStrategy
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const fs = require('fs').promises;
+// const fs = require('fs').promises; // No longer needed for session management
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 8080;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER || '918897350151'; // Admin WhatsApp number for notifications (without +)
 const SESSION_SECRET = process.env.SESSION_SECRET || 'supersecretkeyforfoodbot'; // CHANGE THIS IN PRODUCTION!
-const SESSION_DIR_PATH = './.wwebjs_auth'; // Directory for whatsapp-web.js session files
+// const SESSION_DIR_PATH = './.wwebjs_auth'; // No longer needed for session management
 
 // Admin Credentials from Environment Variables or Default
 const DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
@@ -161,6 +161,13 @@ const customerNotificationSchema = new mongoose.Schema({
 });
 const CustomerNotification = mongoose.model('CustomerNotification', customerNotificationSchema);
 
+// NEW: WhatsApp Session Schema for MongoDB persistence
+const whatsappSessionSchema = new mongoose.Schema({
+    sessionId: { type: String, required: true, unique: true },
+    data: { type: Object, required: true } // Store the entire session object
+});
+const WhatsappSession = mongoose.model('WhatsappSession', whatsappSessionSchema);
+
 
 // --- Initial Data Setup ---
 async function initializeAdminAndSettings() {
@@ -234,21 +241,63 @@ function updateBotStatus(status, qrData = null) {
     }
 }
 
-
-// Ensure session directory exists
-(async () => {
-    try {
-        await fs.mkdir(SESSION_DIR_PATH, { recursive: true });
-        console.log('Session directory ensured:', SESSION_DIR_PATH);
-    } catch (err) {
-        console.error('Error ensuring session directory:', err);
+// Custom Auth Strategy for MongoDB
+class MongoDBAuthStrategy extends AuthStrategy {
+    constructor(collection) {
+        super();
+        this.collection = collection; // Mongoose model for WhatsappSession
+        this.session = {}; // In-memory session data
+        this.sessionId = 'wwebjs_session'; // A fixed ID for the single session document
     }
-})();
+
+    async setup() {
+        // No specific setup needed beyond constructor
+        console.log('MongoDBAuthStrategy setup complete.');
+    }
+
+    async get() {
+        try {
+            const sessionDoc = await this.collection.findOne({ sessionId: this.sessionId });
+            if (sessionDoc && sessionDoc.data) {
+                this.session = sessionDoc.data;
+                console.log('WhatsApp session loaded from MongoDB.');
+                return this.session;
+            }
+            console.log('No WhatsApp session found in MongoDB.');
+            return {};
+        } catch (error) {
+            console.error('Error loading WhatsApp session from MongoDB:', error);
+            return {};
+        }
+    }
+
+    async set(session) {
+        try {
+            this.session = session;
+            await this.collection.findOneAndUpdate(
+                { sessionId: this.sessionId },
+                { $set: { data: session } },
+                { upsert: true, new: true }
+            );
+            console.log('WhatsApp session saved to MongoDB.');
+        } catch (error) {
+            console.error('Error saving WhatsApp session to MongoDB:', error);
+        }
+    }
+
+    async destroy() {
+        try {
+            await this.collection.deleteOne({ sessionId: this.sessionId });
+            this.session = {};
+            console.log('WhatsApp session destroyed in MongoDB.');
+        } catch (error) {
+            console.error('Error destroying WhatsApp session in MongoDB:', error);
+        }
+    }
+}
 
 const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: SESSION_DIR_PATH
-    }),
+    authStrategy: new MongoDBAuthStrategy(WhatsappSession), // Use the new MongoDBAuthStrategy
     puppeteer: {
         headless: true,
         args: [
@@ -314,14 +363,14 @@ client.on('auth_failure', async msg => {
     updateBotStatus('auth_failure'); // Indicate auth failure
 
     if (authFailureCount >= MAX_AUTH_FAILURES) {
-        console.log(`Max auth failures (${MAX_AUTH_FAILURES}) reached. Clearing session files and re-initializing...`);
+        console.log(`Max auth failures (${MAX_AUTH_FAILURES}) reached. Logging out and re-initializing...`);
         clientReady = false;
         try {
-            await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
-            console.log('Deleted old session directory.');
+            await client.logout(); // This will trigger the destroy method of MongoDBAuthStrategy
+            console.log('WhatsApp client logged out and session cleared from MongoDB.');
             authFailureCount = 0; // Reset counter after clearing
         } catch (err) {
-            console.error('Error deleting old session directory on max auth failures:', err);
+            console.error('Error during client logout on max auth failures:', err);
         } finally {
             setTimeout(() => {
                 client.initialize();
@@ -707,7 +756,7 @@ app.post('/api/public/request-qr', async (req, res) => {
         // If bot is already ready, don't force a new QR unless explicitly requested to reset
         console.warn('Bot is currently ready, but a new QR was requested. Forcing session clear.');
     }
-    console.log('Public QR request received. Clearing session files and re-initializing client...');
+    console.log('Public QR request received. Logging out client and re-initializing...');
     // Clear any existing QR expiry timer if a new request comes in
     if (qrExpiryTimer) {
         clearTimeout(qrExpiryTimer);
@@ -720,13 +769,12 @@ app.post('/api/public/request-qr', async (req, res) => {
         console.log('Weekly notification scheduler stopped due to new QR request.');
     }
     try {
-        // Force delete session files for a fresh QR
-        await fs.rm(SESSION_DIR_PATH, { recursive: true, force: true });
-        console.log('Deleted old session directory for new QR request.');
+        await client.logout(); // This will trigger the destroy method of MongoDBAuthStrategy
+        console.log('WhatsApp client logged out and session cleared from MongoDB for new QR request.');
         authFailureCount = 0; // Reset auth failure count on manual QR request
     } catch (err) {
-        console.error('Error deleting old session directory during manual QR request:', err);
-        // Continue even if deletion fails, client.initialize might still work
+        console.error('Error during client logout during manual QR request:', err);
+        // Continue even if logout fails, client.initialize might still work
     } finally {
         // Set status to initializing and clear current QR data immediately
         updateBotStatus('initializing'); // This will clear qrCodeDataURL and emit
