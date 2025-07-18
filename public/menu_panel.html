@@ -431,10 +431,11 @@
                 // Dynamically load Leaflet JS only when modal opens
                 if (!leafletLoaded) {
                     loadLeafletScripts().then(() => {
-                        console.log('Leaflet scripts loaded. Preparing map initialization...');
+                        console.log('Leaflet scripts loaded. Preparing map initialization with requestAnimationFrame...');
                         // Use requestAnimationFrame twice for robust layout calculation
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
+                                console.log('Calling initMap after two requestAnimationFrames.');
                                 initMap();
                             });
                         });
@@ -443,10 +444,11 @@
                         showNotification('Failed to load map components. Please check your internet connection.', 'error');
                     });
                 } else {
-                    console.log('Leaflet scripts already loaded. Preparing map initialization...');
+                    console.log('Leaflet scripts already loaded. Preparing map initialization with requestAnimationFrame...');
                     // Use requestAnimationFrame twice for robust layout calculation
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
+                            console.log('Calling initMap after two requestAnimationFrames (scripts already loaded).');
                             initMap();
                         });
                     });
@@ -747,10 +749,13 @@
             console.log('initMap: Attempting to initialize map...');
             errorBanner.classList.add("hidden"); // Hide any previous error
 
-            // Log dimensions before map creation
+            // Explicitly set map div dimensions before L.map()
+            mapDiv.style.width = '100%';
+            mapDiv.style.height = '300px'; // Ensure it has a height
             console.log(`Map div dimensions before L.map(): Width=${mapDiv.offsetWidth}, Height=${mapDiv.offsetHeight}`);
+
             if (mapDiv.offsetWidth === 0 || mapDiv.offsetHeight === 0) {
-                showMapError("Map container has zero dimensions. Cannot load map. Please try reopening the modal.");
+                showMapError("Map container has zero dimensions. Please try reopening the modal or refreshing the page. This might be an environment limitation.");
                 console.error("Critical: Map div has zero dimensions. This is why the map is not loading.");
                 return;
             }
@@ -801,7 +806,7 @@
                 });
 
             } catch (e) {
-                showMapError("Map failed to load. Please check your internet connection and try again.");
+                showMapError("Map failed to load. Please check your your internet connection and try again.");
                 mapInitialized = false;
                 console.error("Error during map initialization:", e);
             }
@@ -848,14 +853,18 @@
                 },
                 function(err) {
                     let msg = "Failed to get current location.";
-                    if (err.code === 1) msg = "Permission denied. Please allow location access for this site in your browser settings.";
-                    else if (err.code === 2) msg = "Location unavailable. Check your device's GPS settings.";
-                    else if (err.code === 3) msg = "Location request timed out. Try again or drag the pin manually.";
+                    if (err.code === 1) {
+                        msg = "Permission denied. Please allow location access for this site in your browser settings.";
+                    } else if (err.code === 2) {
+                        msg = "Location unavailable. Check your device's GPS settings.";
+                    } else if (err.code === 3) {
+                        msg = "Location request timed out. Try again or drag the pin manually.";
+                    }
                     showMapError(msg);
                     locationStatus.textContent = msg; // Update status for user
                     console.error('Geolocation error:', err);
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // Request high accuracy, 10s timeout, no cached position
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 } // Increased timeout to 20 seconds
             );
         }
 
