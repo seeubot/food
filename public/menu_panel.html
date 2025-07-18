@@ -469,6 +469,7 @@
         let lastScrollTop = 0; // For header hide/show on scroll
         let geolocationWatcherId = null; // To store the ID returned by watchPosition
         let lastKnownLiveCoords = null; // Stores the last known coordinates from watchPosition
+        let mapInitialized = false; // Flag to track if the map has been initialized
         const header = document.getElementById('mainHeader'); // Reference to the header
 
         // DOM elements
@@ -523,36 +524,22 @@
             // Delivery Location Map Modal
             document.getElementById('openLocationMapBtn').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
-                // IMPORTANT: Call invalidateSize after the modal is visible
-                // A small timeout ensures the modal is fully rendered before map tries to size itself
+                // Give the modal a moment to become visible before initializing the map
                 setTimeout(() => {
                     initMap(); 
-                    if (map) map.whenReady(() => { // Use whenReady for more reliable sizing
-                        map.invalidateSize();
-                        console.log('Map invalidateSize called via whenReady after modal visible.');
-                    });
-                }, 300); // Increased timeout for better reliability 
+                }, 300); 
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
-                // Destroy map instance and clear watcher when modal is closed
-                clearGeolocationWatcher();
-                if (map) {
-                    map.remove();
-                    map = null;
-                    deliveryMarker = null;
-                    liveMarker = null;
-                    userCircle = null;
-                    geocoderControl = null;
-                    console.log('Map instance destroyed.');
-                }
+                // Clean up map and geolocation watcher when modal is closed
+                cleanupMapAndGeolocation();
             });
             document.getElementById('mapGetCurrentLocation').addEventListener('click', getCurrentLocationForMap);
             document.getElementById('saveDeliveryLocationBtn').addEventListener('click', saveDeliveryLocation);
 
             // FAB for recentering to live location
             centerBtn.addEventListener('click', () => {
-                if (lastKnownLiveCoords) {
+                if (lastKnownLiveCoords && map) { // Ensure map exists before trying to set view
                     map.setView([lastKnownLiveCoords.latitude, lastKnownLiveCoords.longitude], map.getZoom(), { animate:true });
                     if (liveMarker && liveMarker._icon) { // Check if _icon exists before adding class
                         liveMarker._icon.classList.add("live-marker-anim");
@@ -826,13 +813,13 @@
 
         // Initialize Leaflet Map in the popup modal
         function initMap() {
-            console.log('initMap: Function started.');
-            mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
-            if (map) {
-                map.remove(); // Remove existing map if any
-                console.log('Existing map instance removed.');
+            if (mapInitialized) {
+                console.log('initMap: Map already initialized, skipping.');
+                return;
             }
-
+            console.log('initMap: Function started - initializing new map instance.');
+            mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
+            
             // Esri World Imagery (Satellite) tile layer
             const esriSatelliteTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
                 attribution:'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community', 
@@ -850,60 +837,66 @@
                 zoomControl: false, // Hide default zoom control
                 attributionControl: true // Keep attribution
             });
-            console.log('Map initialized with center:', initialCenter, 'zoom:', initialZoom);
+            mapInitialized = true; // Set flag to true
+            console.log('Map L.map() called with center:', initialCenter, 'zoom:', initialZoom);
 
-            // Add a draggable delivery marker
-            deliveryMarker = L.marker(initialCenter, { // Place marker at initial center
-                icon: pinIcon, // Use the new pin icon
-                draggable: true
-            }).addTo(map);
-            console.log('Delivery marker added.');
+            // Important: Invalidate size after map is added to a visible container
+            map.whenReady(() => {
+                map.invalidateSize();
+                console.log('Map invalidateSize called via whenReady.');
+                // Add a draggable delivery marker AFTER map is ready and sized
+                deliveryMarker = L.marker(initialCenter, { // Place marker at initial center
+                    icon: pinIcon, // Use the new pin icon
+                    draggable: true
+                }).addTo(map);
+                console.log('Delivery marker added after map ready.');
 
-            // Update customerLocation when delivery marker is dragged
-            deliveryMarker.on('dragend', function(e) {
-                const latLng = deliveryMarker.getLatLng();
-                customerLocation = {
-                    latitude: latLng.lat,
-                    longitude: latLng.lng
-                };
-                mapLocationStatus.textContent = `Pinned: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
-                console.log('Delivery marker dragged to:', customerLocation);
+                // Update customerLocation when delivery marker is dragged
+                deliveryMarker.on('dragend', function(e) {
+                    const latLng = deliveryMarker.getLatLng();
+                    customerLocation = {
+                        latitude: latLng.lat,
+                        longitude: latLng.lng
+                    };
+                    mapLocationStatus.textContent = `Pinned: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+                    console.log('Delivery marker dragged to:', customerLocation);
+                });
+
+                // Initialize Geocoder control for search AFTER map is ready
+                geocoderControl = L.Control.geocoder({
+                    defaultMarkGeocodedLocation: false, // We'll manage the marker manually
+                    placeholder: 'Search for delivery location...',
+                    collapsed: false, // Keep search bar open
+                    position: 'topleft',
+                    geocoder: L.Control.Geocoder.nominatim({
+                        serviceUrl: 'https://nominatim.openstreetmap.org/search/'
+                    })
+                }).addTo(map);
+                console.log('Geocoder control added after map ready.');
+
+                // Listen for geocoding results and move the delivery marker
+                geocoderControl.on('markgeocode', function(e) {
+                    const latLng = e.geocode.center;
+                    map.setView(latLng, 16); // Zoom to the result
+                    deliveryMarker.setLatLng(latLng); // Move delivery marker to the result
+                    customerLocation = {
+                        latitude: latLng.lat,
+                        longitude: latLng.lng
+                    };
+                    mapLocationStatus.textContent = `Selected: ${e.geocode.name}`;
+                    console.log('Location selected via search:', customerLocation);
+                });
+
+                // Now attempt to get current live location
+                getCurrentLocationForMap();
             });
-
-            // Initialize Geocoder control for search
-            geocoderControl = L.Control.geocoder({
-                defaultMarkGeocodedLocation: false, // We'll manage the marker manually
-                placeholder: 'Search for delivery location...',
-                collapsed: false, // Keep search bar open
-                position: 'topleft',
-                geocoder: L.Control.Geocoder.nominatim({
-                    serviceUrl: 'https://nominatim.openstreetmap.org/search/'
-                })
-            }).addTo(map);
-            console.log('Geocoder control added.');
-
-            // Listen for geocoding results and move the delivery marker
-            geocoderControl.on('markgeocode', function(e) {
-                const latLng = e.geocode.center;
-                map.setView(latLng, 16); // Zoom to the result
-                deliveryMarker.setLatLng(latLng); // Move delivery marker to the result
-                customerLocation = {
-                    latitude: latLng.lat,
-                    longitude: latLng.lng
-                };
-                mapLocationStatus.textContent = `Selected: ${e.geocode.name}`;
-                console.log('Location selected via search:', customerLocation);
-            });
-
-            // Attempt to get current live location on map init
-            getCurrentLocationForMap();
         }
 
-        // Get current location for map initialization and marker placement (using watchPosition)
+        // Get current location for map initialization and marker placement (using getCurrentPosition then watchPosition)
         function getCurrentLocationForMap() {
             mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
-            mapLocationStatus.textContent = 'Attempting to get your GPS location (real-time updates)...';
-            console.log('getCurrentLocationForMap: Attempting to get live location.');
+            mapLocationStatus.textContent = 'Attempting to get your initial GPS location...';
+            console.log('getCurrentLocationForMap: Starting initial GPS fetch.');
             // Clear any existing watcher first
             clearGeolocationWatcher();
 
@@ -915,52 +908,93 @@
                 return;
             }
 
-            // Start watching position
-            geolocationWatcherId = navigator.geolocation.watchPosition(
+            // First, try to get a one-time current position
+            navigator.geolocation.getCurrentPosition(
                 (position) => {
                     mapLoadingOverlay.classList.add('hidden'); // Hide spinner on first successful location
                     const latLng = [position.coords.latitude, position.coords.longitude];
                     lastKnownLiveCoords = { latitude: position.coords.latitude, longitude: position.coords.longitude }; // Store last known live coords
 
-                    // Update live marker
-                    if (liveMarker) {
-                        liveMarker.setLatLng(latLng);
-                    } else {
-                        liveMarker = L.marker(latLng, {icon:liveSVGIcon()}).addTo(map);
-                        console.log('Live marker added.');
-                    }
-                    liveMarker.bindPopup(`You're here!<br>Accuracy: ±${Math.round(position.coords.accuracy)}m`).openPopup();
-
-                    // Update accuracy circle
-                    if (userCircle) {
-                        userCircle.setLatLng(latLng).setRadius(position.coords.accuracy);
-                    } else {
-                        userCircle = L.circle(latLng, {
-                            radius:position.coords.accuracy, color:'#1976d2', fillColor:'#90caf9', fillOpacity:0.12, opacity:0.19
-                        }).addTo(map);
-                        console.log('Accuracy circle added.');
-                    }
-                    
-                    // Only update map view if the accuracy is good enough (< 100m)
-                    // and if the map is not currently being dragged by the user
-                    if (position.coords.accuracy < 100 && !map.dragging.enabled()) {
-                        map.setView(latLng, 16); // Set map view to current location
-                        console.log('Map view updated to live location (good accuracy).');
-                    }
-                    
+                    map.setView(latLng, 16); // Set map view to current location
+                    deliveryMarker.setLatLng(latLng); // Move delivery marker to current location
+                    customerLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
                     mapLocationStatus.textContent = `Your current location: Lat: ${lastKnownLiveCoords.latitude.toFixed(4)}, Lon: ${lastKnownLiveCoords.longitude.toFixed(4)} (Accuracy: ${position.coords.accuracy.toFixed(0)}m)`;
-                    // showNotification('Current location updating on map!', 'success'); // Too frequent notification
+                    console.log('Initial GPS location obtained:', lastKnownLiveCoords);
+
+                    // Initialize live marker and circle
+                    if (liveMarker) map.removeLayer(liveMarker);
+                    if (userCircle) map.removeLayer(userCircle);
+                    liveMarker = L.marker(latLng, {icon:liveSVGIcon()}).addTo(map);
+                    userCircle = L.circle(latLng, {
+                        radius:position.coords.accuracy, color:'#1976d2', fillColor:'#90caf9', fillOpacity:0.12, opacity:0.19
+                    }).addTo(map);
+                    liveMarker.bindPopup(`You're here!<br>Accuracy: ±${Math.round(position.coords.accuracy)}m`).openPopup();
+                    
+                    // Now start watching for continuous updates
+                    startGeolocationWatcher();
                 },
                 (error) => {
-                    console.error('Error getting location:', error);
-                    let errorMessage = 'Could not get current location. Please search for a location or drag the marker.';
+                    console.error('Error getting initial location:', error);
+                    let errorMessage = 'Could not get initial location. Please search for a location or drag the marker.';
                     if (error.code === error.PERMISSION_DENIED) {
                         errorMessage = 'Geolocation permission denied. Please enable location services for this site or search manually.';
                     } else if (error.code === error.TIMEOUT) {
                         errorMessage = 'Geolocation request timed out. Please try again or search manually.';
                     }
                     mapLocationStatus.textContent = errorMessage;
-                    // customerLocation = null; // Do not reset customerLocation here, it's for delivery point
+                    showNotification(errorMessage, 'error');
+                    mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
+                    // Even if initial fails, try to start watcher for later updates
+                    startGeolocationWatcher(); 
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        // Function to start the geolocation watcher for continuous updates
+        function startGeolocationWatcher() {
+            console.log('startGeolocationWatcher: Starting continuous GPS watcher.');
+            geolocationWatcherId = navigator.geolocation.watchPosition(
+                (position) => {
+                    mapLoadingOverlay.classList.add('hidden'); // Ensure spinner is hidden
+                    const latLng = [position.coords.latitude, position.coords.longitude];
+                    lastKnownLiveCoords = { latitude: position.coords.latitude, longitude: position.coords.longitude }; // Update last known live coords
+
+                    // Update live marker position
+                    if (liveMarker) {
+                        liveMarker.setLatLng(latLng);
+                    } else { // In case watchPosition starts before initial marker is set
+                        liveMarker = L.marker(latLng, {icon:liveSVGIcon()}).addTo(map);
+                    }
+                    liveMarker.bindPopup(`You're here!<br>Accuracy: ±${Math.round(position.coords.accuracy)}m`).openPopup();
+
+                    // Update accuracy circle position and radius
+                    if (userCircle) {
+                        userCircle.setLatLng(latLng).setRadius(position.coords.accuracy);
+                    } else { // In case watchPosition starts before initial circle is set
+                        userCircle = L.circle(latLng, {
+                            radius:position.coords.accuracy, color:'#1976d2', fillColor:'#90caf9', fillOpacity:0.12, opacity:0.19
+                        }).addTo(map);
+                    }
+                    
+                    // Only update map view if the accuracy is good enough (< 100m)
+                    // and if the map is not currently being dragged by the user
+                    if (position.coords.accuracy < 100 && !map.dragging.enabled()) {
+                        map.setView(latLng, 16); // Set map view to current location
+                    }
+                    
+                    mapLocationStatus.textContent = `Your current location: Lat: ${lastKnownLiveCoords.latitude.toFixed(4)}, Lon: ${lastKnownLiveCoords.longitude.toFixed(4)} (Accuracy: ${position.coords.accuracy.toFixed(0)}m)`;
+                },
+                (error) => {
+                    console.error('Error in watchPosition:', error);
+                    let errorMessage = 'Lost real-time location. Please check GPS or search manually.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMessage = 'Geolocation permission denied. Cannot track live location.';
+                    }
+                    mapLocationStatus.textContent = errorMessage;
                     showNotification(errorMessage, 'error');
                     mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
                     clearGeolocationWatcher(); // Stop watching on error
@@ -975,6 +1009,21 @@
                 navigator.geolocation.clearWatch(geolocationWatcherId);
                 geolocationWatcherId = null;
                 console.log('Geolocation watcher stopped.');
+            }
+        }
+
+        // Combined cleanup function for map and geolocation
+        function cleanupMapAndGeolocation() {
+            clearGeolocationWatcher();
+            if (map) {
+                map.remove();
+                map = null;
+                deliveryMarker = null;
+                liveMarker = null;
+                userCircle = null;
+                geocoderControl = null;
+                mapInitialized = false; // Reset flag
+                console.log('Map and geolocation resources cleaned up.');
             }
         }
 
@@ -1020,7 +1069,7 @@
             await calculateDeliveryCost(); // Calculate delivery cost after saving location
             showNotification('Delivery location saved!', 'success');
             toggleModal('deliveryLocationModal'); // Close map modal
-            // Map will be destroyed on close of this modal
+            // Cleanup happens via closeDeliveryLocationModal listener
         }
 
         // Calculate delivery cost
@@ -1144,15 +1193,7 @@
                 placeOrderBtn.disabled = false;
                 placeOrderBtn.innerHTML = 'Place Order';
                 // Ensure map is destroyed if it was open
-                if (map) {
-                    map.remove();
-                    map = null;
-                    deliveryMarker = null;
-                    liveMarker = null;
-                    userCircle = null;
-                    geocoderControl = null;
-                }
-                clearGeolocationWatcher(); // Ensure watcher is stopped on checkout completion
+                cleanupMapAndGeolocation(); // Call cleanup here too
             }
         }
 
@@ -1227,16 +1268,7 @@
                 toggleModal(modalId);
                 // If deliveryLocationModal is closed, destroy map
                 if (modalId === 'deliveryLocationModal') {
-                    clearGeolocationWatcher(); // Ensure watcher is stopped
-                    if (map) {
-                        map.remove();
-                        map = null;
-                        deliveryMarker = null;
-                        liveMarker = null;
-                        userCircle = null;
-                        geocoderControl = null;
-                        console.log('Map instance destroyed by outside click.');
-                    }
+                    cleanupMapAndGeolocation();
                 }
             }
         });
