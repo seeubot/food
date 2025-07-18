@@ -8,11 +8,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Leaflet CSS -->
+    <!-- Leaflet CSS - This stays in head because it's just CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
      integrity="sha256-p4NxAoJBhIIN+hmNHrzxH+GnBFwDChDLEFNyJsTddoCA="
      crossorigin=""/>
-    <!-- Leaflet Control Geocoder CSS (still useful for search, though not in provided script's core) -->
+    <!-- Leaflet Control Geocoder CSS - Keep for styling, but JS is removed for now -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <style>
         /* Base styles for the black and white theme */
@@ -430,13 +430,6 @@
     </div>
 
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjGwZZ1Xz0GbnSe75Lp9js+9dxFVQ="
-     crossorigin=""></script>
-    <!-- Leaflet Control Geocoder JS (Optional, if you want search functionality back) -->
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-
     <script>
         // Global variables
         let menuItems = [];
@@ -473,6 +466,7 @@
         let map = null;
         let userMarker = null; // Corresponds to deliveryMarker in previous versions
         let mapInitialized = false; // Flag to track if the map has been initialized
+        let leafletLoaded = false; // New flag to track Leaflet script loading
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
@@ -503,11 +497,19 @@
             document.getElementById('openLocationMapBtn').addEventListener('click', () => {
                 errorBanner.classList.add('hidden'); // Hide any previous error message
                 toggleModal('deliveryLocationModal');
-                // Give the modal a moment to become visible before initializing the map
-                // This setTimeout is crucial for Leaflet to correctly calculate dimensions
-                setTimeout(() => {
-                    initMap(); 
-                }, 100); 
+                // Dynamically load Leaflet JS only when modal opens
+                if (!leafletLoaded) {
+                    loadLeafletScripts().then(() => {
+                        console.log('Leaflet scripts loaded. Initializing map...');
+                        initMap();
+                    }).catch(error => {
+                        console.error('Failed to load Leaflet scripts:', error);
+                        showMapError('Failed to load map components. Please check your internet connection.');
+                    });
+                } else {
+                    console.log('Leaflet scripts already loaded. Initializing map...');
+                    initMap(); // Just initialize if scripts are already there
+                }
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
@@ -526,6 +528,28 @@
 
             // Scroll event for header
             window.addEventListener('scroll', handleScroll);
+        }
+
+        // Dynamically load Leaflet JavaScript
+        function loadLeafletScripts() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+                script.integrity = "sha256-20nQCchB9co0qIjGwZZ1Xz0GbnSe75Lp9js+9dxFVQ=";
+                script.crossOrigin = "";
+                script.onload = () => {
+                    leafletLoaded = true;
+                    // Optionally load geocoder if needed, after main Leaflet is loaded
+                    // const geocoderScript = document.createElement('script');
+                    // geocoderScript.src = "https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js";
+                    // geocoderScript.onload = resolve;
+                    // geocoderScript.onerror = reject;
+                    // document.head.appendChild(geocoderScript);
+                    resolve(); // Resolve immediately if no geocoder or if geocoder is not critical for basic map
+                };
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
         }
 
         // Handle header hide/show on scroll
@@ -747,18 +771,23 @@
             document.getElementById('checkoutTotal').textContent = `₹${(subtotal + deliveryCost).toFixed(2)}`;
         }
 
-        // --- Map Functions (Adapted from provided script) ---
+        // --- Map Functions (Adapted from provided script and new strategy) ---
 
         // Helper to show map-specific error messages
         function showMapError(msg) {
             errorBanner.classList.remove("hidden");
             errorBanner.textContent = msg;
-            locationStatus.textContent = "Map not initialized or error occurred.";
+            locationStatus.textContent = "Map or Geolocation Error.";
             console.error("Map Error:", msg);
         }
 
         // Initialize the Leaflet Map
         function initMap() {
+            if (!L) {
+                showMapError("Leaflet library not loaded. Cannot initialize map.");
+                return;
+            }
+
             if (mapInitialized && map) {
                 console.log('initMap: Map already initialized, invalidating size and returning.');
                 map.invalidateSize(); // Ensure it redraws if modal size changed
@@ -996,7 +1025,7 @@
             e.preventDefault();
             
             // Basic validation for location
-            if (!customerLocation || !customerLocation.latitude || !customerLocation.longitude) {
+            if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined') {
                 showNotification('Please select your delivery location on the map.', 'warning');
                 return;
             }
