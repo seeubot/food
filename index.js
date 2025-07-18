@@ -1093,6 +1093,9 @@ app.post('/api/order', async (req, res) => {
     console.log('API: /api/order POST hit.');
     const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount } = req.body;
 
+    // Log the incoming request body for debugging
+    console.log('Incoming order request body:', JSON.stringify(req.body, null, 2));
+
     if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined') {
         console.warn('Missing required order details in POST /api/order.');
         return res.status(400).json({ message: 'Missing required order details.' });
@@ -1144,7 +1147,7 @@ app.post('/api/order', async (req, res) => {
 
         res.status(201).json({ message: 'Order placed successfully!', order: newOrder, orderId: newOrder._id }); // Return orderId for tracking
     } catch (error) {
-        console.error('Error placing order:', error.message); // Log specific error
+        console.error('Error placing order:', error); // Log the full error object
         res.status(500).json({ message: 'Error placing order.' });
     }
 });
