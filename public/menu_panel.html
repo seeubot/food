@@ -336,18 +336,15 @@
                     <textarea id="deliveryAddress" required rows="3" class="w-full px-3 py-2" placeholder="Enter your complete delivery address"></textarea>
                 </div>
 
-                <!-- Map Integration for Location Selection -->
-                <div class="space-y-3">
-                    <label class="block text-white text-sm font-medium mb-2">Select Delivery Location</label>
-                    <div id="map" class="h-64 w-full rounded-lg"></div>
-                    <button type="button" id="getCurrentLocation" class="btn-primary w-full py-3 rounded-lg font-semibold">
-                        📍 Use Current Location
-                    </button>
-                    <p id="locationStatus" class="text-sm text-gray-400 text-center mt-2"></p>
-                    <!-- Hidden inputs to store selected coordinates -->
-                    <input type="hidden" id="customerLatitude" name="customerLatitude">
-                    <input type="hidden" id="customerLongitude" name="customerLongitude">
-                </div>
+                <!-- Button to open Location Selection Map -->
+                <button type="button" id="openLocationMapBtn" class="btn-primary w-full py-3 rounded-lg font-semibold">
+                    📍 Select Delivery Location
+                </button>
+                <p id="selectedLocationDisplay" class="text-sm text-gray-400 text-center mt-2"></p>
+                
+                <!-- Hidden inputs to store selected coordinates -->
+                <input type="hidden" id="customerLatitude" name="customerLatitude">
+                <input type="hidden" id="customerLongitude" name="customerLongitude">
                 
                 <div class="bg-gray-700 p-3 rounded-lg">
                     <div class="flex justify-between text-white mb-1">
@@ -368,6 +365,29 @@
                     Place Order
                 </button>
             </form>
+        </div>
+    </div>
+
+    <!-- Delivery Location Map Modal (New Popup) -->
+    <div id="deliveryLocationModal" class="modal fixed inset-0 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-11/12 mx-4 max-h-[90vh] overflow-y-auto shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-white">Select Delivery Location</h2>
+                <button id="closeDeliveryLocationModal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div id="map" class="h-64 w-full rounded-lg mb-4"></div>
+            
+            <p id="mapLocationStatus" class="text-sm text-gray-400 text-center mb-4">Drag the marker or search for your location.</p>
+
+            <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                <button type="button" id="mapGetCurrentLocation" class="btn-primary w-full sm:w-1/2 py-3 rounded-lg font-semibold">
+                    📍 Use My Current Location
+                </button>
+                <button type="button" id="saveDeliveryLocationBtn" class="bg-gray-500 hover:bg-gray-600 w-full sm:w-1/2 text-white py-3 rounded-lg font-semibold">
+                    Save Location
+                </button>
+            </div>
         </div>
     </div>
 
@@ -417,8 +437,10 @@
         const cartCount = document.getElementById('cartCount');
         const cartModal = document.getElementById('cartModal');
         const checkoutModal = document.getElementById('checkoutModal');
-        const locationStatus = document.getElementById('locationStatus'); // Added location status element
-        const productDetailModal = document.getElementById('productDetailModal'); // New product detail modal
+        const deliveryLocationModal = document.getElementById('deliveryLocationModal'); // New map modal
+        const mapLocationStatus = document.getElementById('mapLocationStatus'); // Status inside map modal
+        const selectedLocationDisplay = document.getElementById('selectedLocationDisplay'); // Display in checkout modal
+        const productDetailModal = document.getElementById('productDetailModal'); // Product detail modal
         const productDetailAddToCartBtn = document.getElementById('productDetailAddToCartBtn'); // Add to cart button in detail modal
         const placeOrderBtn = document.getElementById('placeOrderBtn'); // Reference to place order button
 
@@ -448,11 +470,17 @@
                 }
                 toggleModal('cartModal'); // Close cart modal
                 toggleModal('checkoutModal'); // Open checkout modal
-                initMap(); // Initialize map when checkout modal opens
                 updateCheckoutSummary();
             });
-            document.getElementById('closeCheckoutModal').addEventListener('click', () => {
-                toggleModal('checkoutModal');
+            document.getElementById('closeCheckoutModal').addEventListener('click', () => toggleModal('checkoutModal'));
+            
+            // Delivery Location Map Modal
+            document.getElementById('openLocationMapBtn').addEventListener('click', () => {
+                toggleModal('deliveryLocationModal');
+                initMap(); // Initialize map when map modal opens
+            });
+            document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
+                toggleModal('deliveryLocationModal');
                 // Destroy map instance when modal is closed to prevent issues
                 if (map) {
                     map.remove();
@@ -461,9 +489,8 @@
                     geocoderControl = null;
                 }
             });
-            
-            // Location selection within checkout modal
-            document.getElementById('getCurrentLocation').addEventListener('click', getCurrentLocation);
+            document.getElementById('mapGetCurrentLocation').addEventListener('click', getCurrentLocationForMap);
+            document.getElementById('saveDeliveryLocationBtn').addEventListener('click', saveDeliveryLocation);
             
             // Product Detail Modal
             document.getElementById('closeProductDetailModal').addEventListener('click', () => toggleModal('productDetailModal'));
@@ -694,7 +721,7 @@
             document.getElementById('checkoutTotal').textContent = `₹${(subtotal + deliveryCost).toFixed(2)}`;
         }
 
-        // Initialize Leaflet Map
+        // Initialize Leaflet Map in the popup modal
         function initMap() {
             if (map) {
                 map.remove(); // Remove existing map if any
@@ -740,10 +767,8 @@
                     latitude: latLng.lat,
                     longitude: latLng.lng
                 };
-                document.getElementById('customerLatitude').value = latLng.lat;
-                document.getElementById('customerLongitude').value = latLng.lng;
-                locationStatus.textContent = `Pinned: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
-                calculateDeliveryCost(); // Recalculate delivery cost on marker drag
+                mapLocationStatus.textContent = `Pinned: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+                // No need to calculate delivery cost here, it will be done on Save Location
             });
 
             // Initialize Geocoder control
@@ -766,36 +791,25 @@
                     latitude: latLng.lat,
                     longitude: latLng.lng
                 };
-                document.getElementById('customerLatitude').value = latLng.lat;
-                document.getElementById('customerLongitude').value = latLng.lng;
-                locationStatus.textContent = `Selected: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
-                calculateDeliveryCost(); // Recalculate delivery cost on search select
+                mapLocationStatus.textContent = `Selected: ${e.geocode.name}`;
+                // No need to calculate delivery cost here, it will be done on Save Location
             });
 
-            // Set initial location if available, otherwise prompt for current location
-            if (customerLocation) {
-                map.setView([customerLocation.latitude, customerLocation.longitude], 16);
-                deliveryMarker.setLatLng([customerLocation.latitude, customerLocation.longitude]);
-                document.getElementById('customerLatitude').value = customerLocation.latitude;
-                document.getElementById('customerLongitude').value = customerLocation.longitude;
-                locationStatus.textContent = `Current: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
-                calculateDeliveryCost();
-            } else {
-                getCurrentLocation(); // Attempt to get current location on map init
-            }
+            // Attempt to get current location on map init
+            getCurrentLocationForMap();
         }
 
-        // Get current location (used to initialize map view and marker)
-        function getCurrentLocation() {
-            locationStatus.textContent = 'Getting your current GPS location...';
+        // Get current location for map initialization and marker placement
+        function getCurrentLocationForMap() {
+            mapLocationStatus.textContent = 'Getting your current GPS location...';
             if (!navigator.geolocation) {
-                locationStatus.textContent = 'Geolocation is not supported by your browser. Please search for a location or drag the marker.';
+                mapLocationStatus.textContent = 'Geolocation is not supported by your browser. Please search for a location or drag the marker.';
                 showNotification('Geolocation not supported. Please search for a location or drag the marker.', 'error');
                 return;
             }
 
             navigator.geolocation.getCurrentPosition(
-                async (position) => {
+                (position) => {
                     const latLng = [position.coords.latitude, position.coords.longitude];
                     map.setView(latLng, 16); // Set map view to current location
                     deliveryMarker.setLatLng(latLng); // Move marker to current location
@@ -803,10 +817,7 @@
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude
                     };
-                    document.getElementById('customerLatitude').value = customerLocation.latitude;
-                    document.getElementById('customerLongitude').value = customerLocation.longitude;
-                    locationStatus.textContent = `Your current location: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
-                    await calculateDeliveryCost();
+                    mapLocationStatus.textContent = `Your current location: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
                     showNotification('Current location set on map!', 'success');
                 },
                 (error) => {
@@ -817,38 +828,60 @@
                     } else if (error.code === error.TIMEOUT) {
                         errorMessage = 'Location request timed out. Please try again or search manually.';
                     }
-                    locationStatus.textContent = errorMessage;
+                    mapLocationStatus.textContent = errorMessage;
                     customerLocation = null; // Reset location
-                    deliveryCost = 0; // Reset delivery cost
-                    updateCartSummary(); // Update cart summary to reflect 0 delivery cost
                     showNotification(errorMessage, 'error');
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
-        // Calculate delivery cost
-        async function calculateDeliveryCost() {
-            // Use the current marker position for calculation
-            const currentMarkerLatLng = deliveryMarker ? deliveryMarker.getLatLng() : null;
-            if (!currentMarkerLatLng) {
-                deliveryCost = 0;
-                updateCartSummary();
-                updateCheckoutSummary();
-                locationStatus.textContent = 'Please select a delivery location on the map.';
+        // Save the delivery location from the map
+        async function saveDeliveryLocation() {
+            if (!deliveryMarker || !deliveryMarker.getLatLng()) {
+                showNotification('Please select a delivery location on the map by dragging the marker or searching.', 'warning');
                 return;
             }
 
-            const customerLocForCalc = {
-                latitude: currentMarkerLatLng.lat,
-                longitude: currentMarkerLatLng.lng
+            const latLng = deliveryMarker.getLatLng();
+            customerLocation = {
+                latitude: latLng.lat,
+                longitude: latLng.lng
             };
 
-            if (!shopSettings || !shopSettings.shopLocation || !shopSettings.deliveryRates) {
+            // Update hidden inputs in checkout form
+            document.getElementById('customerLatitude').value = customerLocation.latitude;
+            document.getElementById('customerLongitude').value = customerLocation.longitude;
+
+            // Attempt to reverse geocode the address for the textarea
+            if (geocoderControl && geocoderControl.options.geocoder) {
+                geocoderControl.options.geocoder.reverse(latLng, map.options.crs.scale(map.getZoom()), function(results) {
+                    if (results.length > 0) {
+                        document.getElementById('deliveryAddress').value = results[0].name;
+                        selectedLocationDisplay.textContent = `Delivery location: ${results[0].name}`;
+                    } else {
+                        document.getElementById('deliveryAddress').value = `Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+                        selectedLocationDisplay.textContent = `Delivery location: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+                    }
+                });
+            } else {
+                document.getElementById('deliveryAddress').value = `Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+                selectedLocationDisplay.textContent = `Delivery location: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+            }
+            
+            await calculateDeliveryCost(); // Calculate delivery cost after saving location
+            showNotification('Delivery location saved!', 'success');
+            toggleModal('deliveryLocationModal'); // Close map modal
+            // Map will be destroyed on close of this modal
+        }
+
+        // Calculate delivery cost
+        async function calculateDeliveryCost() {
+            if (!customerLocation || !shopSettings || !shopSettings.shopLocation || !shopSettings.deliveryRates) {
                 deliveryCost = 0;
                 updateCartSummary();
                 updateCheckoutSummary(); // Also update checkout summary if it's open
-                locationStatus.textContent = 'Shop settings or delivery rates not configured. Delivery cost is 0.';
+                selectedLocationDisplay.textContent = 'Shop settings or delivery rates not configured. Delivery cost is 0.';
                 return;
             }
 
@@ -858,7 +891,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ customerLocation: customerLocForCalc })
+                    body: JSON.stringify({ customerLocation })
                 });
 
                 if (!response.ok) {
@@ -870,13 +903,13 @@
                 deliveryCost = data.transportTax;
                 updateCartSummary();
                 updateCheckoutSummary();
-                locationStatus.textContent = `Delivery location set. Delivery: ₹${deliveryCost.toFixed(2)}`;
+                selectedLocationDisplay.textContent += ` (Delivery: ₹${deliveryCost.toFixed(2)})`;
             } catch (error) {
                 console.error('Error calculating delivery cost:', error);
                 deliveryCost = 0; // Default to 0 on error
                 updateCartSummary();
                 updateCheckoutSummary();
-                locationStatus.textContent = 'Error calculating delivery cost. Please try again.';
+                selectedLocationDisplay.textContent = 'Error calculating delivery cost. Please try again.';
                 showNotification('Failed to calculate delivery cost. Please try again.', 'error');
             }
         }
@@ -885,27 +918,20 @@
         async function handleCheckout(e) {
             e.preventDefault();
             
-            placeOrderBtn.disabled = true;
-            placeOrderBtn.innerHTML = '<div class="loading-spinner"></div> Placing Order...';
-
-            // Ensure customerLocation is set from the map marker
-            if (!deliveryMarker || !deliveryMarker.getLatLng()) {
+            // Basic validation for location
+            if (!customerLocation || !customerLocation.latitude || !customerLocation.longitude) {
                 showNotification('Please select your delivery location on the map.', 'warning');
-                placeOrderBtn.disabled = false;
-                placeOrderBtn.innerHTML = 'Place Order';
                 return;
             }
-            customerLocation = deliveryMarker.getLatLng();
+
+            placeOrderBtn.disabled = true;
+            placeOrderBtn.innerHTML = '<div class="loading-spinner"></div> Placing Order...';
 
             try {
                 const customerName = document.getElementById('customerName').value;
                 const customerPhone = document.getElementById('customerPhone').value;
                 const deliveryAddress = document.getElementById('deliveryAddress').value;
                 
-                // Use coordinates from the map marker
-                const customerLatitude = customerLocation.lat;
-                const customerLongitude = customerLocation.lng;
-
                 const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 const totalAmount = subtotal + deliveryCost;
 
@@ -920,8 +946,8 @@
                     customerPhone,
                     deliveryAddress,
                     customerLocation: {
-                        latitude: parseFloat(customerLatitude),
-                        longitude: parseFloat(customerLongitude)
+                        latitude: customerLocation.latitude,
+                        longitude: customerLocation.longitude
                     },
                     subtotal,
                     transportTax: deliveryCost,
@@ -950,11 +976,12 @@
                 
                 showNotification('Order placed successfully! 🎉', 'success');
                 
-                // Reset form
+                // Reset form and location data
                 document.getElementById('checkoutForm').reset();
-                locationStatus.textContent = ''; // Clear location status after order
+                selectedLocationDisplay.textContent = ''; // Clear display
                 customerLocation = null; // Reset global customer location
                 deliveryCost = 0; // Reset delivery cost
+                updateCartSummary(); // Reset cart summary display
 
             } catch (error) {
                 console.error('Error placing order:', error);
@@ -962,7 +989,7 @@
             } finally {
                 placeOrderBtn.disabled = false;
                 placeOrderBtn.innerHTML = 'Place Order';
-                // Destroy map instance after order is placed
+                // Ensure map is destroyed if it was open
                 if (map) {
                     map.remove();
                     map = null;
@@ -1034,8 +1061,8 @@
             if (e.target.classList.contains('modal')) {
                 const modalId = e.target.id;
                 toggleModal(modalId);
-                // If checkout modal is closed, destroy map
-                if (modalId === 'checkoutModal' && map) {
+                // If deliveryLocationModal is closed, destroy map
+                if (modalId === 'deliveryLocationModal' && map) {
                     map.remove();
                     map = null;
                     deliveryMarker = null;
