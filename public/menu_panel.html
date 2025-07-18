@@ -8,6 +8,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzxH+GnBFwDChDLEFNyJsTddoCA="
+     crossorigin=""/>
+    <!-- Leaflet Control Geocoder CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <style>
         /* Base styles for the black and white theme */
         body {
@@ -172,16 +178,72 @@
             margin-bottom: 1rem;
             background-color: #333; /* Dark background for map while loading */
         }
+        /* Custom Leaflet Control Geocoder styles to match theme */
+        .leaflet-control-geocoder {
+            box-shadow: none !important;
+            border-radius: 0.5rem !important;
+            overflow: hidden;
+            background-color: #222222 !important;
+            border: 1px solid #444444 !important;
+        }
+        .leaflet-control-geocoder input {
+            background-color: #222222 !important;
+            color: #ffffff !important;
+            border: none !important;
+            padding: 0.75rem 1rem !important;
+            width: calc(100% - 2rem); /* Adjust width for padding */
+        }
+        .leaflet-control-geocoder .geocoder-control-suggestions {
+            background-color: #222222 !important;
+            border-top: 1px solid #444444 !important;
+            color: #ffffff !important;
+        }
+        .leaflet-control-geocoder .geocoder-control-suggestions li {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            color: #ffffff !important;
+        }
+        .leaflet-control-geocoder .geocoder-control-suggestions li:hover {
+            background-color: #333333 !important;
+        }
+        .leaflet-control-geocoder a {
+            color: #ffffff !important; /* Ensure icons/links are visible */
+        }
 
-        /* Specific style for the "Use My Current Location" button */
-        #getLoc {
-            background-color: #ffffff !important; /* White background */
-            color: #000000 !important; /* Black text */
-            box-shadow: 0 2px 4px rgba(255, 255, 255, 0.2); /* Subtle white shadow */
+        /* Custom marker icon styling */
+        .leaflet-marker-icon.custom-delivery-marker {
+            background-color: transparent; /* Remove default background */
+            border: none; /* Remove default border */
+            font-size: 2.5rem; /* Large icon */
+            color: #ffffff; /* White color */
+            text-shadow: 0 0 5px rgba(0,0,0,0.5); /* Subtle shadow */
+            transform: translate(-50%, -100%); /* Adjust origin to bottom center */
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        #getLoc:hover {
-            background-color: #e0e0e0 !important; /* Slightly darker white on hover */
+        .leaflet-marker-icon.custom-delivery-marker i {
+            color: #ffffff;
+            font-size: 2.5rem;
         }
+
+        /* Live location marker */
+        .leaflet-marker-icon.live-location-marker {
+            background-color: transparent;
+            border: none;
+            font-size: 1.8rem; /* Slightly smaller than delivery marker */
+            color: #4285F4; /* Google Blue */
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+            transform: translate(-50%, -50%); /* Centered */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .leaflet-marker-icon.live-location-marker i {
+            color: #4285F4;
+            font-size: 1.8rem;
+        }
+        
     </style>
 </head>
 <body class="min-h-screen">
@@ -291,15 +353,17 @@
                     <textarea id="deliveryAddress" required rows="3" class="w-full px-3 py-2" placeholder="Enter your complete delivery address"></textarea>
                 </div>
 
-                <!-- Button to open Location Selection Map -->
-                <button type="button" id="openLocationMapBtn" class="btn-primary w-full py-3 rounded-lg font-semibold">
-                    📍 Select Delivery Location
-                </button>
-                <p id="selectedLocationDisplay" class="text-sm text-gray-400 text-center mt-2"></p>
-                
-                <!-- Hidden inputs to store selected coordinates -->
-                <input type="hidden" id="customerLatitude" name="customerLatitude">
-                <input type="hidden" id="customerLongitude" name="customerLongitude">
+                <!-- Button to open Location Selection Modal -->
+                <div class="space-y-3">
+                    <label class="block text-white text-sm font-medium mb-2">Delivery Location</label>
+                    <button type="button" id="openLocationSelectionBtn" class="btn-primary w-full py-3 rounded-lg font-semibold">
+                        📍 Select Location on Map
+                    </button>
+                    <p id="selectedLocationDisplay" class="text-sm text-gray-400 text-center mt-2">No location selected.</p>
+                    <!-- Hidden inputs to store selected coordinates -->
+                    <input type="hidden" id="customerLatitude" name="customerLatitude">
+                    <input type="hidden" id="customerLongitude" name="customerLongitude">
+                </div>
                 
                 <div class="bg-gray-700 p-3 rounded-lg">
                     <div class="flex justify-between text-white mb-1">
@@ -323,25 +387,25 @@
         </div>
     </div>
 
-    <!-- Delivery Location Map Modal -->
-    <div id="deliveryLocationModal" class="modal fixed inset-0 hidden items-center justify-center z-50 modal-bg">
-        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-2 shadow-lg">
-            <div class="flex justify-between items-center mb-3">
+    <!-- Location Selection Modal (New) -->
+    <div id="locationSelectionModal" class="modal fixed inset-0 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto shadow-xl">
+            <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-white">Select Delivery Location</h2>
-                <button id="closeDeliveryLocationModal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                <button id="closeLocationSelectionModal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
             </div>
-            <div id="errorBanner" class="hidden bg-red-700 text-white p-4 mb-2 rounded text-center"></div>
             
-            <!-- Map Container -->
-            <div id="map" class="mb-3"></div>
-
-            <p id="locationStatus" class="text-sm text-gray-300 text-center mb-2"></p>
-            <div class="flex flex-col sm:flex-row gap-2 mb-1">
-                <!-- "Use My Current Location" button with white background -->
-                <button id="getLoc" class="bg-white text-black px-4 py-2 rounded font-semibold flex-1 flex items-center justify-center">📍 Use My Current Location</button>
-                <button id="saveLoc" class="bg-gray-600 text-white px-4 py-2 rounded font-semibold flex-1">Save Location</button>
+            <div id="map" class="h-80 w-full rounded-lg mb-4"></div>
+            
+            <div class="space-y-3">
+                <button type="button" id="startLiveLocation" class="btn-primary w-full py-3 rounded-lg font-semibold">
+                    <i class="fas fa-location-arrow mr-2"></i> Use Live Location
+                </button>
+                <p id="mapLocationStatus" class="text-sm text-gray-400 text-center mt-2">Drag marker to pin location or search above.</p>
+                <button type="button" id="setDeliveryLocationBtn" class="bg-green-500 hover:bg-green-600 text-black w-full py-3 rounded-lg font-semibold">
+                    <i class="fas fa-check-circle mr-2"></i> Confirm Delivery Location
+                </button>
             </div>
-            <div class="text-gray-400 text-xs text-center mt-2" id="coordsDisp">No pin placed</div>
         </div>
     </div>
 
@@ -366,15 +430,18 @@
     </div>
 
 
-    <script>
-        // IMPORTANT: Replace 'YOUR_GOOGLE_MAPS_API_KEY' with your actual Google Maps API Key
-        // Ensure the API key has "Maps JavaScript API" and "Geolocation API" enabled.
-        const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY'; 
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjGwZZ1Xz0GbnSe75Lp9js+9dxFVQ="
+     crossorigin=""></script>
+    <!-- Leaflet Control Geocoder JS -->
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
+    <script>
         // Global variables
         let menuItems = [];
         let cart = [];
-        let customerLocation = null; // Stores {latitude, longitude, address} of the selected delivery point
+        let customerLocation = null; // Stores {latitude, longitude} of the selected delivery point
         let shopSettings = null;
         let deliveryCost = 0;
         let lastScrollTop = 0; // For header hide/show on scroll
@@ -388,25 +455,18 @@
         const cartCount = document.getElementById('cartCount');
         const cartModal = document.getElementById('cartModal');
         const checkoutModal = document.getElementById('checkoutModal');
-        const deliveryLocationModal = document.getElementById('deliveryLocationModal'); // Location modal
-        const selectedLocationDisplay = document.getElementById('selectedLocationDisplay'); // Display in checkout modal
-        const productDetailModal = document.getElementById('productDetailModal'); // Product detail modal
+        const selectedLocationDisplay = document.getElementById('selectedLocationDisplay'); // Display selected location in checkout
+        const productDetailModal = document.getElementById('productDetailModal'); // New product detail modal
         const productDetailAddToCartBtn = document.getElementById('productDetailAddToCartBtn'); // Add to cart button in detail modal
         const placeOrderBtn = document.getElementById('placeOrderBtn'); // Reference to place order button
 
-        // Map related DOM elements
-        const errorBanner = document.getElementById('errorBanner');
-        const locationStatus = document.getElementById('locationStatus');
-        const coordsDisp = document.getElementById('coordsDisp');
-        const getLocBtn = document.getElementById('getLoc');
-        const saveLocBtn = document.getElementById('saveLoc');
-        const mapDiv = document.getElementById('map'); // Reference to the map container
-
-        // Google Maps variables
+        // Map variables
         let map = null;
-        let userMarker = null;
-        let geocoder = null; // Google Maps Geocoder service
-        let googleMapsLoaded = false; // Flag to track Google Maps script loading
+        let deliveryMarker = null; // Marker for the pinned delivery location
+        let liveLocationMarker = null; // Marker for the user's live GPS location
+        let liveLocationWatchId = null; // ID for watchPosition to clear it later
+        let geocoderControl = null; // To store the geocoder control instance
+        const mapLocationStatus = document.getElementById('mapLocationStatus'); // Status text within map modal
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
@@ -429,37 +489,30 @@
                 }
                 toggleModal('cartModal'); // Close cart modal
                 toggleModal('checkoutModal'); // Open checkout modal
-                updateCheckoutSummary();
+                updateCheckoutSummary(); // Update summary based on current cart/delivery cost
             });
             document.getElementById('closeCheckoutModal').addEventListener('click', () => toggleModal('checkoutModal'));
             
-            // Delivery Location Map Modal
-            document.getElementById('openLocationMapBtn').addEventListener('click', () => {
-                errorBanner.classList.add('hidden'); // Hide any previous error message
-                toggleModal('deliveryLocationModal');
-                // Dynamically load Google Maps JS only when modal opens
-                if (!googleMapsLoaded) {
-                    loadGoogleMapsScript().then(() => {
-                        console.log('Google Maps scripts loaded. Initializing map...');
-                        initMap();
-                    }).catch(error => {
-                        console.error('Failed to load Google Maps scripts:', error);
-                        showNotification('Failed to load map components. Please check your internet connection and API key.', 'error');
-                        showMapError('Failed to load map. Check console for details.');
-                    });
-                } else {
-                    console.log('Google Maps scripts already loaded. Re-initializing map...');
-                    initMap(); // Re-initialize map if already loaded
+            // Location Selection Modal
+            document.getElementById('openLocationSelectionBtn').addEventListener('click', () => {
+                toggleModal('locationSelectionModal');
+                initMap(); // Initialize map when location modal opens
+            });
+            document.getElementById('closeLocationSelectionModal').addEventListener('click', () => {
+                toggleModal('locationSelectionModal');
+                stopLiveLocationTracking(); // Stop live tracking when modal closes
+                // Destroy map instance when modal is closed to prevent issues
+                if (map) {
+                    map.remove();
+                    map = null;
+                    deliveryMarker = null;
+                    liveLocationMarker = null;
+                    geocoderControl = null;
                 }
             });
-            document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
-                toggleModal('deliveryLocationModal');
-                cleanupMap(); // Clean up map resources
-            });
 
-            // Map button listeners
-            getLocBtn.addEventListener('click', getGeolocationAndSetMap);
-            saveLocBtn.addEventListener('click', saveDeliveryLocation);
+            document.getElementById('startLiveLocation').addEventListener('click', getCurrentLiveLocation);
+            document.getElementById('setDeliveryLocationBtn').addEventListener('click', setDeliveryLocationFromMap);
             
             // Product Detail Modal
             document.getElementById('closeProductDetailModal').addEventListener('click', () => toggleModal('productDetailModal'));
@@ -469,36 +522,6 @@
 
             // Scroll event for header
             window.addEventListener('scroll', handleScroll);
-        }
-
-        // Dynamically load Google Maps JavaScript API
-        function loadGoogleMapsScript() {
-            return new Promise((resolve, reject) => {
-                // Check if google.maps object already exists
-                if (typeof google !== 'undefined' && google.maps) {
-                    googleMapsLoaded = true;
-                    console.log("Google Maps API already loaded.");
-                    resolve();
-                    return;
-                }
-
-                const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMapCallback`;
-                script.async = true;
-                script.defer = true;
-                script.onerror = (e) => {
-                    console.error("Failed to load Google Maps script:", e);
-                    reject(new Error("Failed to load Google Maps script."));
-                };
-                document.head.appendChild(script);
-
-                // Global callback function required by Google Maps API
-                window.initMapCallback = () => {
-                    googleMapsLoaded = true;
-                    console.log("Google Maps API loaded successfully via callback.");
-                    resolve();
-                };
-            });
         }
 
         // Handle header hide/show on scroll
@@ -718,221 +741,232 @@
             document.getElementById('checkoutSubtotal').textContent = `₹${subtotal.toFixed(2)}`;
             document.getElementById('checkoutDelivery').textContent = `₹${deliveryCost.toFixed(2)}`;
             document.getElementById('checkoutTotal').textContent = `₹${(subtotal + deliveryCost).toFixed(2)}`;
-        }
 
-        // --- Google Maps Functions ---
-
-        // Helper to show map-specific error messages
-        function showMapError(msg) {
-            errorBanner.classList.remove("hidden");
-            errorBanner.textContent = msg;
-            locationStatus.textContent = "Map or Geolocation Error.";
-            console.error("Map Error:", msg);
-        }
-
-        // Initialize the Google Map
-        function initMap() {
-            // Ensure google.maps object is available
-            if (typeof google === 'undefined' || !google.maps) {
-                showMapError("Google Maps API not loaded. Cannot initialize map.");
-                return;
-            }
-
-            // If map already exists, destroy it for a clean re-initialization
-            if (map) {
-                console.log('initMap: Map already initialized. Destroying existing instance.');
-                // Google Maps doesn't have a direct 'destroy' method like Leaflet.
-                // We just null out the map object and let garbage collection handle it.
-                // Re-creating it in the same div will overwrite the old one.
-                map = null; 
-                userMarker = null;
-                mapDiv.innerHTML = ''; // Clear the div content
-            }
-
-            console.log('initMap: Attempting to initialize Google Map...');
-            errorBanner.classList.add("hidden"); // Hide any previous error
-
-            // Default location (India)
-            const defaultLat = 22.5937;
-            const defaultLng = 78.9629;
-            let initialLatLng = { lat: defaultLat, lng: defaultLng };
-            let initialZoom = 5; // Country level zoom
-
-            // If a location was previously selected, use it as the initial center
-            if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
-                initialLatLng = { lat: customerLocation.latitude, lng: customerLocation.longitude };
-                initialZoom = 16; // Zoom in to street level
-            }
-
-            map = new google.maps.Map(mapDiv, {
-                center: initialLatLng,
-                zoom: initialZoom,
-                mapTypeId: 'hybrid', // Hybrid view (satellite with roads)
-                fullscreenControl: false,
-                mapTypeControl: false,
-                streetViewControl: false,
-                zoomControl: true,
-                scaleControl: true,
-                gestureHandling: 'greedy' // Allow single-finger pan on mobile
-            });
-            console.log('Google Map instance created.');
-
-            geocoder = new google.maps.Geocoder();
-
-            // Place initial marker
-            userMarker = new google.maps.Marker({
-                position: initialLatLng,
-                map: map,
-                draggable: true,
-                title: "Your Delivery Location"
-            });
-            console.log('Initial marker placed.');
-
-            // Event listener for marker drag end
-            userMarker.addListener('dragend', () => {
-                const newPosition = userMarker.getPosition();
-                updateLocationAndAddress(newPosition.lat(), newPosition.lng());
-                console.log('Marker dragged to:', newPosition.lat(), newPosition.lng());
-            });
-
-            // Event listener for map clicks
-            map.addListener('click', (e) => {
-                updateLocationAndAddress(e.latLng.lat(), e.latLng.lng());
-                console.log('Map clicked at:', e.latLng.lat(), e.latLng.lng());
-            });
-
-            // Try to get current geolocation if no previous location was set
-            if (!customerLocation) {
-                getGeolocationAndSetMap();
+            // Update display in checkout modal if location is already set
+            if (customerLocation) {
+                selectedLocationDisplay.textContent = `Selected: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
             } else {
-                // If a previous location was set, update display with its address
-                updateLocationAndAddress(customerLocation.latitude, customerLocation.longitude);
+                selectedLocationDisplay.textContent = 'No location selected.';
             }
         }
 
-        // Updates customerLocation and performs reverse geocoding
-        function updateLocationAndAddress(lat, lng) {
-            const latLng = { lat: lat, lng: lng };
-            userMarker.setPosition(latLng); // Move marker to new position
-            map.setCenter(latLng); // Center map on marker
-
-            customerLocation = { latitude: lat, longitude: lng }; // Temporarily save coords
-
-            coordsDisp.textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lng.toFixed(6)}`;
-            locationStatus.textContent = "Getting address...";
-
-            geocoder.geocode({ 'location': latLng }, (results, status) => {
-                if (status === 'OK') {
-                    if (results[0]) {
-                        customerLocation.address = results[0].formatted_address;
-                        locationStatus.textContent = `Address: ${customerLocation.address}`;
-                        console.log('Reverse geocoded address:', customerLocation.address);
-                    } else {
-                        customerLocation.address = `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`;
-                        locationStatus.textContent = "No address found for this location.";
-                        console.warn('No address results found for reverse geocoding.');
-                    }
-                } else {
-                    customerLocation.address = `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`;
-                    locationStatus.textContent = `Geocoder failed: ${status}. Coordinates saved.`;
-                    console.error('Geocoder failed due to: ' + status);
-                }
-            });
-        }
-
-        // Gets current geolocation and sets the map view/marker
-        function getGeolocationAndSetMap() {
-            errorBanner.classList.add("hidden");
-            if (!navigator.geolocation) {
-                showMapError("Geolocation not supported by your browser. Please manually select a location on the map.");
-                return;
-            }
-            locationStatus.textContent = "Locating your position...";
-            console.log('Attempting to get current geolocation...');
-
-            navigator.geolocation.getCurrentPosition(
-                function(pos) {
-                    let lat = pos.coords.latitude;
-                    let lng = pos.coords.longitude;
-                    updateLocationAndAddress(lat, lng);
-                    map.setZoom(18); // Zoom in to high accuracy
-                    locationStatus.textContent = "Location found! (You may adjust pin)";
-                    console.log('Geolocation successful:', { lat, lng });
-                },
-                function(err) {
-                    let msg = "Failed to get current location.";
-                    if (err.code === err.PERMISSION_DENIED) {
-                        msg = "Permission denied. Please allow location access for this site in your browser settings.";
-                    } else if (err.code === err.TIMEOUT) {
-                        msg = "Location request timed out. Try again or drag the pin manually.";
-                    } else {
-                        msg = "Unable to determine your location. Please manually select a location on the map.";
-                    }
-                    showMapError(msg);
-                    locationStatus.textContent = msg;
-                    console.error('Geolocation error:', err);
-                },
-                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-            );
-        }
-
-        // Cleanup map resources when modal closes
-        function cleanupMap() {
-            // For Google Maps, setting map to null and clearing div is often sufficient.
-            // The API object itself remains loaded.
+        // Initialize Leaflet Map in the location selection modal
+        function initMap() {
             if (map) {
-                map = null;
-                userMarker = null;
-                mapDiv.innerHTML = ''; // Clear the map div
-                console.log('Google Map instance cleared.');
+                map.remove(); // Remove existing map if any
             }
-            errorBanner.classList.add("hidden"); // Hide error banner
-            locationStatus.textContent = ""; // Clear status
-            coordsDisp.textContent = "No pin placed"; // Reset coordinates display
+
+            // Custom dark tile layer from CartoDB
+            const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            });
+
+            map = L.map('map', {
+                center: [20.5937, 78.9629], // Default center (e.g., India)
+                zoom: 5,
+                layers: [darkTiles],
+                zoomControl: false // Disable default zoom control
+            });
+
+            // Invalidate map size to ensure it renders correctly within the modal
+            map.invalidateSize();
+
+            // Add a custom zoom control to match theme
+            L.control.zoom({
+                position: 'topright'
+            }).addTo(map);
+
+            // Custom delivery marker icon
+            const deliveryIcon = L.divIcon({
+                className: 'custom-delivery-marker',
+                html: '<i class="fas fa-map-marker-alt"></i>', // Font Awesome icon
+                iconSize: [40, 40], // Size of the icon
+                iconAnchor: [20, 40] // Point of the icon which will correspond to marker's location
+            });
+
+            // Add a draggable marker for delivery location
+            // If customerLocation is already set, use it, otherwise use map center
+            const initialMarkerLatLng = customerLocation ? [customerLocation.latitude, customerLocation.longitude] : map.getCenter();
+            deliveryMarker = L.marker(initialMarkerLatLng, {
+                icon: deliveryIcon,
+                draggable: true
+            }).addTo(map);
+
+            // Update customerLocation when delivery marker is dragged
+            deliveryMarker.on('dragend', function(e) {
+                const latLng = deliveryMarker.getLatLng();
+                customerLocation = {
+                    latitude: latLng.lat,
+                    longitude: latLng.lng
+                };
+                mapLocationStatus.textContent = `Pinned: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+            });
+
+            // Initialize Geocoder control
+            geocoderControl = L.Control.geocoder({
+                defaultMarkGeocodedLocation: false, // We'll manage the marker manually
+                placeholder: 'Search for delivery location...',
+                collapsed: false, // Keep search bar open
+                position: 'topleft',
+                geocoder: L.Control.Geocoder.nominatim({
+                    serviceUrl: 'https://nominatim.openstreetmap.org/search/'
+                })
+            }).addTo(map);
+
+            // Listen for geocoding results
+            geocoderControl.on('markgeocode', function(e) {
+                const latLng = e.geocode.center;
+                map.setView(latLng, 16); // Zoom to the result
+                deliveryMarker.setLatLng(latLng); // Move delivery marker to the result
+                customerLocation = {
+                    latitude: latLng.lat,
+                    longitude: latLng.lng
+                };
+                mapLocationStatus.textContent = `Selected: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+            });
+
+            // If customerLocation was already set (e.g., from a previous session), center map on it
+            if (customerLocation) {
+                map.setView([customerLocation.latitude, customerLocation.longitude], 16);
+                mapLocationStatus.textContent = `Previously selected: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
+            } else {
+                // If no location set, try to get current GPS location to initialize map
+                getCurrentLiveLocation(true); // Call with true to only get once, not watch
+            }
         }
 
-        // Save the delivery location from the map
-        async function saveDeliveryLocation() {
-            if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined' || !customerLocation.address) {
-                locationStatus.textContent = "Please select a location on the map or use your current location.";
-                showNotification('Please select a delivery location on the map by dragging the marker or clicking.', 'warning');
+        // Get current live location (continuous tracking)
+        function getCurrentLiveLocation(once = false) {
+            mapLocationStatus.textContent = 'Getting your current GPS location...';
+            if (!navigator.geolocation) {
+                mapLocationStatus.textContent = 'Geolocation is not supported by your browser. Please search for a location or drag the marker.';
+                showNotification('Geolocation not supported. Please search for a location or drag the marker.', 'error');
                 return;
             }
 
-            console.log('Saving delivery location:', customerLocation);
+            // Stop any existing live tracking first
+            stopLiveLocationTracking();
 
-            // Update hidden inputs in checkout form
+            const liveIcon = L.divIcon({
+                className: 'live-location-marker',
+                html: '<i class="fas fa-dot-circle"></i>', // Blue dot icon for live location
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+
+            const successCallback = (position) => {
+                const latLng = [position.coords.latitude, position.coords.longitude];
+                
+                if (!liveLocationMarker) {
+                    liveLocationMarker = L.marker(latLng, { icon: liveIcon }).addTo(map);
+                } else {
+                    liveLocationMarker.setLatLng(latLng);
+                }
+
+                // Move both map view and delivery marker to live location if it's the first time or 'Use Live Location' button is clicked
+                if (once || !customerLocation) { // Only center/move delivery marker if it's the initial call or no location is set yet
+                    map.setView(latLng, 16);
+                    deliveryMarker.setLatLng(latLng);
+                    customerLocation = { latitude: latLng[0], longitude: latLng[1] };
+                }
+
+                mapLocationStatus.textContent = `Live: Lat: ${latLng[0].toFixed(4)}, Lon: ${latLng[1].toFixed(4)}`;
+                showNotification('Live location updated!', 'success');
+            };
+
+            const errorCallback = (error) => {
+                console.error('Error getting live location:', error);
+                let errorMessage = 'Could not get current location. Please search for a location or drag the marker.';
+                if (error.code === error.PERMISSION_DENIED) {
+                    errorMessage = 'Location access denied. Please enable location services for this site or search manually.';
+                } else if (error.code === error.TIMEOUT) {
+                    errorMessage = 'Location request timed out. Please try again or search manually.';
+                }
+                mapLocationStatus.textContent = errorMessage;
+                showNotification(errorMessage, 'error');
+                stopLiveLocationTracking(); // Stop tracking on error
+            };
+
+            if (once) {
+                navigator.geolocation.getCurrentPosition(successCallback, errorCallback, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+            } else {
+                liveLocationWatchId = navigator.geolocation.watchPosition(successCallback, errorCallback, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                mapLocationStatus.textContent = 'Tracking live location... Drag the red marker to set delivery point.';
+                showNotification('Started live location tracking.', 'info');
+            }
+        }
+
+        // Stop live location tracking
+        function stopLiveLocationTracking() {
+            if (liveLocationWatchId !== null) {
+                navigator.geolocation.clearWatch(liveLocationWatchId);
+                liveLocationWatchId = null;
+                if (liveLocationMarker) {
+                    map.removeLayer(liveLocationMarker);
+                    liveLocationMarker = null;
+                }
+                console.log('Stopped live location tracking.');
+            }
+        }
+
+        // Set delivery location from the map (triggered by "Confirm" button)
+        async function setDeliveryLocationFromMap() {
+            if (!deliveryMarker || !deliveryMarker.getLatLng()) {
+                showNotification('Please pin a delivery location on the map by dragging the marker or searching.', 'warning');
+                return;
+            }
+
+            const latLng = deliveryMarker.getLatLng();
+            customerLocation = {
+                latitude: latLng.lat,
+                longitude: latLng.lng
+            };
+
             document.getElementById('customerLatitude').value = customerLocation.latitude;
             document.getElementById('customerLongitude').value = customerLocation.longitude;
-            document.getElementById('deliveryAddress').value = customerLocation.address; // Populate address textarea
+            selectedLocationDisplay.textContent = `Selected: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
 
-            selectedLocationDisplay.textContent = `Delivery location: ${customerLocation.address}`;
-            
-            await calculateDeliveryCost(); // Calculate delivery cost after saving location
-            showNotification('Delivery location saved!', 'success');
-            toggleModal('deliveryLocationModal'); // Close map modal
-            cleanupMap(); // Ensure map is cleaned up after saving
+            stopLiveLocationTracking(); // Stop live tracking once location is confirmed
+            toggleModal('locationSelectionModal'); // Close location modal
+            await calculateDeliveryCost(); // Calculate delivery cost immediately
+            updateCheckoutSummary(); // Update checkout summary to reflect new cost
+            showNotification('Delivery location confirmed!', 'success');
         }
+
 
         // Calculate delivery cost
         async function calculateDeliveryCost() {
-            if (!customerLocation || !shopSettings || !shopSettings.shopLocation || !shopSettings.deliveryRates) {
+            // Use the globally stored customerLocation for calculation
+            if (!customerLocation) {
+                deliveryCost = 0;
+                updateCartSummary();
+                updateCheckoutSummary();
+                mapLocationStatus.textContent = 'Please select a delivery location on the map.';
+                return;
+            }
+
+            const customerLocForCalc = {
+                latitude: customerLocation.latitude,
+                longitude: customerLocation.longitude
+            };
+
+            if (!shopSettings || !shopSettings.shopLocation || !shopSettings.deliveryRates) {
                 deliveryCost = 0;
                 updateCartSummary();
                 updateCheckoutSummary(); // Also update checkout summary if it's open
-                selectedLocationDisplay.textContent = 'Shop settings or delivery rates not configured. Delivery cost is 0.';
-                console.warn('Cannot calculate delivery cost: Missing customerLocation, shopSettings, or deliveryRates.');
+                mapLocationStatus.textContent = 'Shop settings or delivery rates not configured. Delivery cost is 0.';
                 return;
             }
 
             try {
-                console.log('Calculating delivery cost for customerLocation:', customerLocation);
                 const response = await fetch('/api/calculate-delivery-cost', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ customerLocation })
+                    body: JSON.stringify({ customerLocation: customerLocForCalc })
                 });
 
                 if (!response.ok) {
@@ -944,21 +978,13 @@
                 deliveryCost = data.transportTax;
                 updateCartSummary();
                 updateCheckoutSummary();
-                // Update selectedLocationDisplay without overwriting previous text
-                const currentText = selectedLocationDisplay.textContent;
-                if (!currentText.includes('Delivery:')) { // Avoid adding it multiple times
-                    selectedLocationDisplay.textContent += ` (Delivery: ₹${deliveryCost.toFixed(2)})`;
-                } else { // Update existing delivery cost
-                    selectedLocationDisplay.textContent = currentText.replace(/\(Delivery: ₹[\d.]+\)/, `(Delivery: ₹${deliveryCost.toFixed(2)})`);
-                }
-                
-                console.log(`Delivery cost calculated: ₹${deliveryCost.toFixed(2)}`);
+                mapLocationStatus.textContent = `Delivery location set. Delivery: ₹${deliveryCost.toFixed(2)}`;
             } catch (error) {
                 console.error('Error calculating delivery cost:', error);
                 deliveryCost = 0; // Default to 0 on error
                 updateCartSummary();
                 updateCheckoutSummary();
-                selectedLocationDisplay.textContent = 'Error calculating delivery cost. Please try again.';
+                mapLocationStatus.textContent = 'Error calculating delivery cost. Please try again.';
                 showNotification('Failed to calculate delivery cost. Please try again.', 'error');
             }
         }
@@ -967,31 +993,28 @@
         async function handleCheckout(e) {
             e.preventDefault();
             
-            // Basic validation for location
-            if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined' || !customerLocation.address) {
-                showNotification('Please select your delivery location on the map.', 'warning');
+            if (!customerLocation) {
+                showNotification('Please select your delivery location on the map first!', 'warning');
+                document.getElementById('openLocationSelectionBtn').click(); // Open location modal
                 return;
             }
 
             placeOrderBtn.disabled = true;
             placeOrderBtn.innerHTML = '<div class="loading-spinner"></div> Placing Order...';
-            console.log('Attempting to place order...');
 
             try {
                 const customerName = document.getElementById('customerName').value;
                 const customerPhone = document.getElementById('customerPhone').value;
                 const deliveryAddress = document.getElementById('deliveryAddress').value;
                 
+                // Use coordinates from the globally stored customerLocation
+                const customerLatitude = customerLocation.latitude;
+                const customerLongitude = customerLocation.longitude;
+
                 const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 const totalAmount = subtotal + deliveryCost;
 
-                // Generate a unique orderId using crypto.randomUUID()
-                const uniqueOrderId = crypto.randomUUID();
-                console.log('Generated uniqueOrderId:', uniqueOrderId);
-
                 const orderData = {
-                    _id: uniqueOrderId, // Add _id, often used as primary key in MongoDB
-                    orderId: uniqueOrderId, // Also add orderId, as the index is on it
                     items: cart.map(item => ({
                         productId: item._id,
                         name: item.name,
@@ -1002,14 +1025,13 @@
                     customerPhone,
                     deliveryAddress,
                     customerLocation: {
-                        latitude: customerLocation.latitude,
-                        longitude: customerLocation.longitude
+                        latitude: parseFloat(customerLatitude),
+                        longitude: parseFloat(customerLongitude)
                     },
                     subtotal,
                     transportTax: deliveryCost,
                     totalAmount
                 };
-                console.log('Order data being sent (JSON.stringify):', JSON.stringify(orderData)); // Log the exact JSON payload
 
                 const response = await fetch('/api/order', {
                     method: 'POST',
@@ -1025,7 +1047,6 @@
                 }
 
                 const result = await response.json();
-                console.log('Order placed successfully, response:', result);
                 
                 // Clear cart and close modals
                 cart = [];
@@ -1034,12 +1055,11 @@
                 
                 showNotification('Order placed successfully! 🎉', 'success');
                 
-                // Reset form and location data
+                // Reset form
                 document.getElementById('checkoutForm').reset();
-                selectedLocationDisplay.textContent = ''; // Clear display
+                selectedLocationDisplay.textContent = 'No location selected.'; // Clear display
                 customerLocation = null; // Reset global customer location
                 deliveryCost = 0; // Reset delivery cost
-                updateCartSummary(); // Reset cart summary display
 
             } catch (error) {
                 console.error('Error placing order:', error);
@@ -1047,8 +1067,6 @@
             } finally {
                 placeOrderBtn.disabled = false;
                 placeOrderBtn.innerHTML = 'Place Order';
-                // Ensure map is destroyed if it was open
-                cleanupMap(); // Call cleanup here too
             }
         }
 
@@ -1081,18 +1099,11 @@
         }
 
 
-        // Toggle modal - ensures flex is added before hidden is removed
+        // Toggle modal
         function toggleModal(modalId) {
             const modal = document.getElementById(modalId);
-            if (modal.classList.contains('hidden')) {
-                modal.classList.add('flex'); // Add flex first
-                modal.classList.remove('hidden');
-                console.log(`${modalId} opened.`);
-            } else {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex'); // Remove flex after hidden
-                console.log(`${modalId} closed.`);
-            }
+            modal.classList.toggle('hidden');
+            modal.classList.toggle('flex');
         }
 
         // Show notification
@@ -1105,6 +1116,8 @@
                 notification.classList.add('bg-green-600');
             } else if (type === 'warning') {
                 notification.classList.add('bg-yellow-500', 'text-black'); // Warning with black text
+            } else if (type === 'info') {
+                notification.classList.add('bg-blue-500'); // Info with blue background
             }
             notification.textContent = message;
             document.body.appendChild(notification);
@@ -1121,9 +1134,16 @@
             if (e.target.classList.contains('modal')) {
                 const modalId = e.target.id;
                 toggleModal(modalId);
-                // If deliveryLocationModal is closed, destroy map
-                if (modalId === 'deliveryLocationModal') {
-                    cleanupMap();
+                // If location selection modal is closed, stop live tracking and destroy map
+                if (modalId === 'locationSelectionModal') {
+                    stopLiveLocationTracking();
+                    if (map) {
+                        map.remove();
+                        map = null;
+                        deliveryMarker = null;
+                        liveLocationMarker = null;
+                        geocoderControl = null;
+                    }
                 }
             }
         });
