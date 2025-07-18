@@ -527,9 +527,11 @@
                 // A small timeout ensures the modal is fully rendered before map tries to size itself
                 setTimeout(() => {
                     initMap(); 
-                    if (map) map.invalidateSize(); // Force map to redraw
-                    console.log('Map invalidateSize called after modal visible.');
-                }, 250); // Increased timeout for better reliability 
+                    if (map) map.whenReady(() => { // Use whenReady for more reliable sizing
+                        map.invalidateSize();
+                        console.log('Map invalidateSize called via whenReady after modal visible.');
+                    });
+                }, 300); // Increased timeout for better reliability 
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
