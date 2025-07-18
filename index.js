@@ -110,6 +110,8 @@ const Product = mongoose.model('Product', productSchema);
 
 // Order Schema
 const orderSchema = new mongoose.Schema({
+    // --- IMPORTANT FIX: Added orderId field with unique constraint ---
+    orderId: { type: String, required: true, unique: true }, 
     items: [{
         productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
         name: String,
@@ -423,7 +425,9 @@ client.on('message', async msg => {
                     if (customerOrders.length > 0) {
                         let orderList = 'Your recent orders:\n';
                         customerOrders.forEach((order, index) => {
-                            orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
+                            // Use orderId if available, fallback to _id
+                            const displayOrderId = order.orderId ? order.orderId.substring(0, 6) : order._id.toString().substring(0, 6);
+                            orderList += `${index + 1}. Order ID: ${displayOrderId}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
                         });
                         await msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
                         console.log(`Replied to ${senderNumber} with recent orders.`);
@@ -1039,10 +1043,12 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
 // API for Placing Orders
 app.post('/api/order', async (req, res) => {
     console.log('API: /api/order POST hit.');
-    const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount } = req.body;
+    // Destructure orderId from req.body as well
+    const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount, orderId } = req.body;
 
-    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined') {
-        console.warn('Missing required order details in POST /api/order.');
+    // --- IMPORTANT FIX: Validate orderId presence ---
+    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined' || !orderId) { 
+        console.warn('Missing required order details (including orderId) in POST /api/order.');
         return res.status(400).json({ message: 'Missing required order details.' });
     }
 
@@ -1052,6 +1058,7 @@ app.post('/api/order', async (req, res) => {
         const deliveryFromLocation = settings ? settings.shopLocation : { latitude: 0, longitude: 0 }; // Default if not found
 
         const newOrder = new Order({
+            orderId: orderId, // --- IMPORTANT FIX: Use the orderId from req.body ---
             items,
             customerName,
             customerPhone,
@@ -1064,7 +1071,7 @@ app.post('/api/order', async (req, res) => {
             status: 'Pending'
         });
         await newOrder.save();
-        console.log('New order placed successfully:', newOrder._id);
+        console.log('New order placed successfully:', newOrder.orderId); // Log the new orderId
 
         // Update customer notification date to reset weekly reminder timer
         await updateCustomerNotification(customerPhone);
@@ -1074,7 +1081,7 @@ app.post('/api/order', async (req, res) => {
             // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
             const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
             const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
-                                 `Order ID: ${newOrder._id.toString().substring(0, 6)}...\n` +
+                                 `Order ID: ${newOrder.orderId}\n` + // Use newOrder.orderId
                                  `Customer: ${newOrder.customerName}\n` +
                                  `Phone: ${newOrder.customerPhone}\n` +
                                  `Total: ₹${newOrder.totalAmount.toFixed(2)}\n` +
@@ -1090,9 +1097,14 @@ app.post('/api/order', async (req, res) => {
         // Notify Admin Dashboard via Socket.IO
         io.emit('newOrder', newOrder);
 
-        res.status(201).json({ message: 'Order placed successfully!', order: newOrder, orderId: newOrder._id }); // Return orderId for tracking
+        res.status(201).json({ message: 'Order placed successfully!', order: newOrder, orderId: newOrder.orderId }); // Return orderId for tracking
     } catch (error) {
         console.error('Error placing order:', error.message); // Log specific error
+        // --- IMPORTANT FIX: Handle duplicate key error specifically ---
+        if (error.code === 11000 && error.keyPattern && error.keyPattern.orderId) {
+            console.error('Duplicate orderId detected:', error.keyValue.orderId);
+            return res.status(409).json({ message: 'Duplicate order ID. Please try again.', details: error.message });
+        }
         res.status(500).json({ message: 'Error placing order.' });
     }
 });
@@ -1101,7 +1113,8 @@ app.post('/api/order', async (req, res) => {
 app.get('/api/order/:id', async (req, res) => {
     console.log(`API: /api/order/${req.params.id} hit.`);
     try {
-        const order = await Order.findById(req.params.id);
+        // Find by _id (Mongoose's default primary key)
+        const order = await Order.findById(req.params.id); 
         if (!order) {
             console.log(`Order ${req.params.id} not found for tracking.`);
             return res.status(404).json({ message: 'Order not found' });
