@@ -1,4 +1,4 @@
-const { Client, AuthStrategy } = require('whatsapp-web.js'); // Import AuthStrategy
+const { Client } = require('whatsapp-web.js'); // Corrected: AuthStrategy is a property of Client
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
@@ -242,7 +242,7 @@ function updateBotStatus(status, qrData = null) {
 }
 
 // Custom Auth Strategy for MongoDB
-class MongoDBAuthStrategy extends AuthStrategy {
+class MongoDBAuthStrategy extends Client.AuthStrategy { // Corrected: Use Client.AuthStrategy
     constructor(collection) {
         super();
         this.collection = collection; // Mongoose model for WhatsappSession
