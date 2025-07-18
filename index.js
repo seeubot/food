@@ -1,25 +1,24 @@
-const wwjs = require('whatsapp-web.js'); // Import the entire module
-const Client = wwjs.Client; // Access Client from the module
-const AuthStrategy = wwjs.AuthStrategy; // Access AuthStrategy from the module
-
+// index.js
+const { Client } = require('whatsapp-web.js');
+const { MongoStore } = require('whatsapp-web.js-mongo'); // Import MongoStore
+const { MultiDeviceAuthStrategy } = require('whatsapp-web.js'); // Use MultiDeviceAuthStrategy
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-// const fs = require('fs').promises; // No longer needed for session management
+// const fs = require('fs').promises; // No longer needed for local session files
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
-const fetch = require('node-fetch'); // Import node-fetch for HTTP requests
+const MongoSessionStore = require('connect-mongo'); // Renamed to avoid conflict with whatsapp-web.js-mongo's MongoStore
 
 // --- Configuration ---
 const PORT = process.env.PORT || 8080;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER || '918897350151'; // Admin WhatsApp number for notifications (without +)
 const SESSION_SECRET = process.env.SESSION_SECRET || 'supersecretkeyforfoodbot'; // CHANGE THIS IN PRODUCTION!
-// const SESSION_DIR_PATH = './.wwebjs_auth'; // No longer needed for session management
+// const SESSION_DIR_PATH = './.wwebjs_auth'; // No longer needed for local session files
 
 // Admin Credentials from Environment Variables or Default
 const DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
@@ -48,14 +47,14 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session Middleware
+// Session Middleware (for Express admin panel)
 app.use(session({
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
+    store: MongoSessionStore.create({ // Use MongoSessionStore for Express sessions
         mongoUrl: MONGODB_URI,
-        collectionName: 'sessions',
+        collectionName: 'sessions', // Collection for Express sessions
         ttl: 14 * 24 * 60 * 60
     }),
     cookie: {
@@ -68,13 +67,19 @@ app.use(session({
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- MongoDB Connection ---
+let mongoDbConnected = false; // Flag to track MongoDB connection status
 mongoose.connect(MONGODB_URI)
     .then(() => {
         console.log('MongoDB connected successfully');
+        mongoDbConnected = true;
         // Initialize admin and settings ONLY after DB connection is established
         initializeAdminAndSettings();
     })
-    .catch(err => console.error('MongoDB connection error:', err));
+    .catch(err => {
+        console.error('MongoDB connection error:', err);
+        // Exit process if initial setup fails critically
+        process.exit(1);
+    });
 
 // --- Mongoose Schemas ---
 
@@ -114,8 +119,6 @@ const Product = mongoose.model('Product', productSchema);
 
 // Order Schema
 const orderSchema = new mongoose.Schema({
-    // --- IMPORTANT FIX: Added orderId field with unique constraint ---
-    orderId: { type: String, required: true, unique: true }, 
     items: [{
         productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
         name: String,
@@ -150,8 +153,7 @@ const adminSettingsSchema = new mongoose.Schema({
         longitude: { type: Number, default: 0 }
     },
     deliveryRates: [{
-        minKms: { type: Number, required: true, min: 0 }, // Changed from kms
-        maxKms: { type: Number, required: true, min: 0 }, // New field for range
+        kms: { type: Number, required: true, min: 0 },
         amount: { type: Number, required: true, min: 0 }
     }]
 });
@@ -163,68 +165,6 @@ const customerNotificationSchema = new mongoose.Schema({
     lastNotifiedDate: { type: Date, default: Date.now }
 });
 const CustomerNotification = mongoose.model('CustomerNotification', customerNotificationSchema);
-
-// NEW: WhatsApp Session Schema for MongoDB persistence
-const whatsappSessionSchema = new mongoose.Schema({
-    sessionId: { type: String, required: true, unique: true },
-    data: { type: Object, required: true } // Store the entire session object
-});
-const WhatsappSession = mongoose.model('WhatsappSession', whatsappSessionSchema);
-
-// Custom Auth Strategy for MongoDB - Defined immediately after AuthStrategy is accessed
-class MongoDBAuthStrategy extends AuthStrategy { // Using AuthStrategy directly
-    constructor(collection) {
-        super();
-        this.collection = collection; // Mongoose model for WhatsappSession
-        this.session = {}; // In-memory session data
-        this.sessionId = 'wwebjs_session'; // A fixed ID for the single session document
-    }
-
-    async setup() {
-        // No specific setup needed beyond constructor
-        console.log('MongoDBAuthStrategy setup complete.');
-    }
-
-    async get() {
-        try {
-            const sessionDoc = await this.collection.findOne({ sessionId: this.sessionId });
-            if (sessionDoc && sessionDoc.data) {
-                this.session = sessionDoc.data;
-                console.log('WhatsApp session loaded from MongoDB.');
-                return this.session;
-            }
-            console.log('No WhatsApp session found in MongoDB.');
-            return {};
-        } catch (error) {
-            console.error('Error loading WhatsApp session from MongoDB:', error);
-            return {};
-        }
-    }
-
-    async set(session) {
-        try {
-            this.session = session;
-            await this.collection.findOneAndUpdate(
-                { sessionId: this.sessionId },
-                { $set: { data: session } },
-                { upsert: true, new: true }
-            );
-            console.log('WhatsApp session saved to MongoDB.');
-        } catch (error) {
-            console.error('Error saving WhatsApp session to MongoDB:', error);
-        }
-    }
-
-    async destroy() {
-        try {
-            await this.collection.deleteOne({ sessionId: this.sessionId });
-            this.session = {};
-            console.log('WhatsApp session destroyed in MongoDB.');
-        } catch (error) {
-            console.error('Error destroying WhatsApp session in MongoDB:', error);
-        }
-    }
-}
 
 
 // --- Initial Data Setup ---
@@ -247,14 +187,13 @@ async function initializeAdminAndSettings() {
                 shopName: 'Delicious Bites',
                 shopLocation: { latitude: 17.4375, longitude: 78.4482 }, // Example: Hyderabad coordinates
                 deliveryRates: [
-                    { minKms: 0, maxKms: 2, amount: 20 },
-                    { minKms: 2.01, maxKms: 5, amount: 40 },
-                    { minKms: 5.01, maxKms: 10, amount: 70 },
-                    { minKms: 10.01, maxKms: 20, amount: 120 }
+                    { kms: 5, amount: 30 },
+                    { kms: 10, amount: 60 },
+                    { kms: 20, amount: 100 }
                 ]
             });
             await settings.save();
-            console.log('Default admin settings created with ranged delivery rates.');
+            console.log('Default admin settings created.');
         }
 
         // Start the Express server ONLY after admin and settings are initialized
@@ -267,7 +206,12 @@ async function initializeAdminAndSettings() {
         });
 
         // Initial client initialization on server startup
-        client.initialize();
+        // Ensure MongoDB is connected before initializing WhatsApp client with MongoStore
+        if (mongoDbConnected) {
+            client.initialize();
+        } else {
+            console.error('MongoDB not connected. WhatsApp client initialization deferred.');
+        }
 
     } catch (error) {
         console.error('Error initializing admin and settings:', error);
@@ -299,9 +243,12 @@ function updateBotStatus(status, qrData = null) {
     }
 }
 
-
+// WhatsApp client instance using MongoStore
 const client = new Client({
-    authStrategy: new MongoDBAuthStrategy(WhatsappSession), // Use the new MongoDBAuthStrategy
+    authStrategy: new MultiDeviceAuthStrategy({
+        // Pass the mongoose connection object to MongoStore
+        store: new MongoStore({ mongoose: mongoose })
+    }),
     puppeteer: {
         headless: true,
         args: [
@@ -367,14 +314,16 @@ client.on('auth_failure', async msg => {
     updateBotStatus('auth_failure'); // Indicate auth failure
 
     if (authFailureCount >= MAX_AUTH_FAILURES) {
-        console.log(`Max auth failures (${MAX_AUTH_FAILURES}) reached. Logging out and re-initializing...`);
+        console.log(`Max auth failures (${MAX_AUTH_FAILURES}) reached. Clearing session from DB and re-initializing...`);
         clientReady = false;
         try {
-            await client.logout(); // This will trigger the destroy method of MongoDBAuthStrategy
-            console.log('WhatsApp client logged out and session cleared from MongoDB.');
+            // Clear session data from MongoDB
+            const sessionCollection = mongoose.connection.collection('wwebjs_auth_sessions'); // Default collection name for whatsapp-web.js-mongo
+            await sessionCollection.deleteMany({}); // Delete all session documents
+            console.log('Deleted old session data from MongoDB.');
             authFailureCount = 0; // Reset counter after clearing
         } catch (err) {
-            console.error('Error during client logout on max auth failures:', err);
+            console.error('Error deleting old session data from MongoDB on max auth failures:', err);
         } finally {
             setTimeout(() => {
                 client.initialize();
@@ -479,9 +428,7 @@ client.on('message', async msg => {
                     if (customerOrders.length > 0) {
                         let orderList = 'Your recent orders:\n';
                         customerOrders.forEach((order, index) => {
-                            // Use orderId if available, fallback to _id
-                            const displayOrderId = order.orderId ? order.orderId.substring(0, 6) : order._id.toString().substring(0, 6);
-                            orderList += `${index + 1}. Order ID: ${displayOrderId}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
+                            orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
                         });
                         await msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
                         console.log(`Replied to ${senderNumber} with recent orders.`);
@@ -760,7 +707,7 @@ app.post('/api/public/request-qr', async (req, res) => {
         // If bot is already ready, don't force a new QR unless explicitly requested to reset
         console.warn('Bot is currently ready, but a new QR was requested. Forcing session clear.');
     }
-    console.log('Public QR request received. Logging out client and re-initializing...');
+    console.log('Public QR request received. Clearing session from DB and re-initializing client...');
     // Clear any existing QR expiry timer if a new request comes in
     if (qrExpiryTimer) {
         clearTimeout(qrExpiryTimer);
@@ -773,12 +720,14 @@ app.post('/api/public/request-qr', async (req, res) => {
         console.log('Weekly notification scheduler stopped due to new QR request.');
     }
     try {
-        await client.logout(); // This will trigger the destroy method of MongoDBAuthStrategy
-        console.log('WhatsApp client logged out and session cleared from MongoDB.');
+        // Clear session data from MongoDB
+        const sessionCollection = mongoose.connection.collection('wwebjs_auth_sessions'); // Default collection name for whatsapp-web.js-mongo
+        await sessionCollection.deleteMany({}); // Delete all session documents
+        console.log('Deleted old session data from MongoDB for new QR request.');
         authFailureCount = 0; // Reset auth failure count on manual QR request
     } catch (err) {
-        console.error('Error during client logout during manual QR request:', err);
-        // Continue even if logout fails, client.initialize might still work
+        console.error('Error deleting old session data from MongoDB during manual QR request:', err);
+        // Continue even if deletion fails, client.initialize might still work
     } finally {
         // Set status to initializing and clear current QR data immediately
         updateBotStatus('initializing'); // This will clear qrCodeDataURL and emit
@@ -1060,30 +1009,18 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
         );
 
         let transportTax = 0;
-        // Sort rates by minKms to ensure correct range matching
-        const sortedRates = settings.deliveryRates.sort((a, b) => a.minKms - b.minKms);
-
-        let foundRate = false;
-        for (const rate of sortedRates) {
-            // Check if distance falls within the current range [minKms, maxKms]
-            if (distance >= rate.minKms && distance <= rate.maxKms) {
-                transportTax = rate.amount;
-                foundRate = true;
+        // Find the appropriate tax rate based on distance
+        const sortedRates = settings.deliveryRates.sort((a, b) => a.kms - b.kms);
+        for (let i = 0; i < sortedRates.length; i++) {
+            if (distance <= sortedRates[i].kms) {
+                transportTax = sortedRates[i].amount;
                 break;
             }
+            // If it's the last rate and distance is greater, use this rate
+            if (i === sortedRates.length - 1 && distance > sortedRates[i].kms) { // Corrected logic: only apply if distance exceeds this last rate's KMS
+                transportTax = sortedRates[i].amount;
+            }
         }
-
-        // If no specific range is found and distance is greater than the max of all ranges,
-        // you might want to apply the highest rate or a default "beyond range" rate.
-        // For now, if no range matches, transportTax remains 0 (or a default value).
-        // You could add a fallback here if needed, e.g., for distances beyond the defined ranges.
-        if (!foundRate && sortedRates.length > 0 && distance > sortedRates[sortedRates.length - 1].maxKms) {
-            // If distance is beyond the max of the last defined range, apply the last rate's amount
-            transportTax = sortedRates[sortedRates.length - 1].amount;
-            console.log(`Distance ${distance.toFixed(2)}km is beyond defined ranges. Applying last rate.`);
-        }
-
-
         console.log(`Calculated distance: ${distance.toFixed(2)}km, transport tax: ₹${transportTax.toFixed(2)}`);
         res.json({ distance, transportTax });
 
@@ -1096,12 +1033,10 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
 // API for Placing Orders
 app.post('/api/order', async (req, res) => {
     console.log('API: /api/order POST hit.');
-    // Destructure orderId from req.body as well
-    const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount, orderId } = req.body;
+    const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount } = req.body;
 
-    // --- IMPORTANT FIX: Validate orderId presence ---
-    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined' || !orderId) { 
-        console.warn('Missing required order details (including orderId) in POST /api/order.');
+    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined') {
+        console.warn('Missing required order details in POST /api/order.');
         return res.status(400).json({ message: 'Missing required order details.' });
     }
 
@@ -1111,7 +1046,6 @@ app.post('/api/order', async (req, res) => {
         const deliveryFromLocation = settings ? settings.shopLocation : { latitude: 0, longitude: 0 }; // Default if not found
 
         const newOrder = new Order({
-            orderId: orderId, // --- IMPORTANT FIX: Use the orderId from req.body ---
             items,
             customerName,
             customerPhone,
@@ -1124,7 +1058,7 @@ app.post('/api/order', async (req, res) => {
             status: 'Pending'
         });
         await newOrder.save();
-        console.log('New order placed successfully:', newOrder.orderId); // Log the new orderId
+        console.log('New order placed successfully:', newOrder._id);
 
         // Update customer notification date to reset weekly reminder timer
         await updateCustomerNotification(customerPhone);
@@ -1134,7 +1068,7 @@ app.post('/api/order', async (req, res) => {
             // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
             const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
             const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
-                                 `Order ID: ${newOrder.orderId}\n` + // Use newOrder.orderId
+                                 `Order ID: ${newOrder._id.toString().substring(0, 6)}...\n` +
                                  `Customer: ${newOrder.customerName}\n` +
                                  `Phone: ${newOrder.customerPhone}\n` +
                                  `Total: ₹${newOrder.totalAmount.toFixed(2)}\n` +
@@ -1150,14 +1084,9 @@ app.post('/api/order', async (req, res) => {
         // Notify Admin Dashboard via Socket.IO
         io.emit('newOrder', newOrder);
 
-        res.status(201).json({ message: 'Order placed successfully!', order: newOrder, orderId: newOrder.orderId }); // Return orderId for tracking
+        res.status(201).json({ message: 'Order placed successfully!', order: newOrder, orderId: newOrder._id }); // Return orderId for tracking
     } catch (error) {
         console.error('Error placing order:', error.message); // Log specific error
-        // --- IMPORTANT FIX: Handle duplicate key error specifically ---
-        if (error.code === 11000 && error.keyPattern && error.keyPattern.orderId) {
-            console.error('Duplicate orderId detected:', error.keyValue.orderId);
-            return res.status(409).json({ message: 'Duplicate order ID. Please try again.', details: error.message });
-        }
         res.status(500).json({ message: 'Error placing order.' });
     }
 });
@@ -1166,8 +1095,7 @@ app.post('/api/order', async (req, res) => {
 app.get('/api/order/:id', async (req, res) => {
     console.log(`API: /api/order/${req.params.id} hit.`);
     try {
-        // Find by _id (Mongoose's default primary key)
-        const order = await Order.findById(req.params.id); 
+        const order = await Order.findById(req.params.id);
         if (!order) {
             console.log(`Order ${req.params.id} not found for tracking.`);
             return res.status(404).json({ message: 'Order not found' });
@@ -1177,89 +1105,6 @@ app.get('/api/order/:id', async (req, res) => {
     } catch (error) {
         console.error('Error fetching order for tracking:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching order details.' });
-    }
-});
-
-// --- NEW GEOCoding API Endpoints (using Nominatim) ---
-
-// API to geocode an address (address to coordinates)
-app.post('/api/geocode-address', async (req, res) => {
-    console.log('API: /api/geocode-address hit.');
-    const { address } = req.body;
-
-    if (!address) {
-        console.warn('Missing address for geocoding.');
-        return res.status(400).json({ message: 'Address is required for geocoding.' });
-    }
-
-    try {
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
-        console.log('Calling Nominatim Geocoding API:', nominatimUrl);
-        const response = await fetch(nominatimUrl, {
-            headers: { 'User-Agent': 'DeliciousBitesApp/1.0 (your-email@example.com)' } // Required by Nominatim
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Nominatim geocoding failed: ${response.status} - ${errorText}`);
-            return res.status(response.status).json({ message: `Geocoding service error: ${response.statusText}` });
-        }
-
-        const data = await response.json();
-
-        if (data && data.length > 0) {
-            const result = data[0];
-            console.log('Geocoding successful:', { lat: result.lat, lon: result.lon, display_name: result.display_name });
-            res.json({
-                latitude: parseFloat(result.lat),
-                longitude: parseFloat(result.lon),
-                formattedAddress: result.display_name
-            });
-        } else {
-            console.warn(`No geocoding results found for address: "${address}"`);
-            res.status(404).json({ message: 'Address not found or could not be geocoded.' });
-        }
-    } catch (error) {
-        console.error('Error in /api/geocode-address:', error.message);
-        res.status(500).json({ message: 'Internal server error during geocoding.' });
-    }
-});
-
-// API to reverse geocode coordinates (coordinates to address)
-app.post('/api/reverse-geocode', async (req, res) => {
-    console.log('API: /api/reverse-geocode hit.');
-    const { latitude, longitude } = req.body;
-
-    if (typeof latitude === 'undefined' || typeof longitude === 'undefined') {
-        console.warn('Missing latitude or longitude for reverse geocoding.');
-        return res.status(400).json({ message: 'Latitude and longitude are required for reverse geocoding.' });
-    }
-
-    try {
-        const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
-        console.log('Calling Nominatim Reverse Geocoding API:', nominatimUrl);
-        const response = await fetch(nominatimUrl, {
-            headers: { 'User-Agent': 'DeliciousBitesApp/1.0 (your-email@example.com)' } // Required by Nominatim
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Nominatim reverse geocoding failed: ${response.status} - ${errorText}`);
-            return res.status(response.status).json({ message: `Reverse geocoding service error: ${response.statusText}` });
-        }
-
-        const data = await response.json();
-
-        if (data && data.display_name) {
-            console.log('Reverse geocoding successful:', data.display_name);
-            res.json({ address: data.display_name });
-        } else {
-            console.warn(`No reverse geocoding results found for coordinates: ${latitude}, ${longitude}`);
-            res.status(404).json({ message: 'Address not found for these coordinates.' });
-        }
-    } catch (error) {
-        console.error('Error in /api/reverse-geocode:', error.message);
-        res.status(500).json({ message: 'Internal server error during reverse geocoding.' });
     }
 });
 
