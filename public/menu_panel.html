@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
      integrity="sha256-p4NxAoJBhIIN+hmNHrzxH+GnBFwDChDLEFNyJsTddoCA="
      crossorigin=""/>
-    <!-- Leaflet Control Geocoder CSS - Keep for styling if you re-add geocoder JS later -->
+    <!-- Leaflet Control Geocoder CSS - This also stays in head for styling -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
     <style>
         /* Base styles for the black and white theme */
@@ -432,12 +432,13 @@
                 if (!leafletLoaded) {
                     loadLeafletScripts().then(() => {
                         console.log('Leaflet scripts loaded. Preparing map initialization with requestAnimationFrame...');
-                        // Use requestAnimationFrame twice for robust layout calculation
+                        // Use requestAnimationFrame for robust layout calculation
                         requestAnimationFrame(() => {
-                            requestAnimationFrame(() => {
-                                console.log('Calling initMap after two requestAnimationFrames.');
+                            // A second requestAnimationFrame or a setTimeout(0) can sometimes help for complex layouts
+                            setTimeout(() => {
+                                console.log('Calling initMap after requestAnimationFrame and setTimeout(0).');
                                 initMap();
-                            });
+                            }, 0); // Use 0ms timeout to put it at the end of the event queue
                         });
                     }).catch(error => {
                         console.error('Failed to load Leaflet scripts:', error);
@@ -445,12 +446,13 @@
                     });
                 } else {
                     console.log('Leaflet scripts already loaded. Preparing map initialization with requestAnimationFrame...');
-                    // Use requestAnimationFrame twice for robust layout calculation
+                    // Use requestAnimationFrame for robust layout calculation
                     requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            console.log('Calling initMap after two requestAnimationFrames (scripts already loaded).');
+                        // A second requestAnimationFrame or a setTimeout(0) can sometimes help for complex layouts
+                        setTimeout(() => {
+                            console.log('Calling initMap after requestAnimationFrame and setTimeout(0) (scripts already loaded).');
                             initMap();
-                        });
+                        }, 0); // Use 0ms timeout to put it at the end of the event queue
                     });
                 }
             });
@@ -473,30 +475,60 @@
             window.addEventListener('scroll', handleScroll);
         }
 
-        // Dynamically load Leaflet JavaScript
+        // Dynamically load Leaflet JavaScript and Geocoder
         function loadLeafletScripts() {
             return new Promise((resolve, reject) => {
                 // Check if L (Leaflet global object) already exists, meaning script is loaded
                 if (typeof L !== 'undefined' && L.map) {
                     leafletLoaded = true;
-                    resolve();
+                    console.log("Leaflet.js already loaded.");
+                    // Check if Geocoder is also loaded, if not, load it
+                    if (typeof L.Control.Geocoder === 'undefined') {
+                        const geocoderScript = document.createElement('script');
+                        geocoderScript.src = "https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js";
+                        geocoderScript.onload = () => {
+                            console.log("Leaflet-Control-Geocoder.js loaded successfully.");
+                            resolve();
+                        };
+                        geocoderScript.onerror = () => {
+                            console.error("Failed to load Leaflet-Control-Geocoder.js. Search functionality might be limited.");
+                            resolve(); // Still resolve even if geocoder fails, main map should work
+                        };
+                        document.head.appendChild(geocoderScript);
+                    } else {
+                        console.log("Leaflet-Control-Geocoder.js already loaded.");
+                        resolve();
+                    }
                     return;
                 }
 
-                const script = document.createElement('script');
-                script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-                script.integrity = "sha256-20nQCchB9co0qIjGwZZ1Xz0GbnSe75Lp9js+9dxFVQ=";
-                script.crossOrigin = "";
-                script.onload = () => {
+                // Load Leaflet.js first
+                const leafletScript = document.createElement('script');
+                leafletScript.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+                leafletScript.integrity = "sha256-20nQCchB9co0qIjGwZZ1Xz0GbnSe75Lp9js+9dxFVQ=";
+                leafletScript.crossOrigin = "";
+                leafletScript.onload = () => {
                     leafletLoaded = true;
                     console.log("Leaflet.js loaded successfully.");
-                    resolve(); 
+
+                    // Then load Leaflet-Control-Geocoder.js
+                    const geocoderScript = document.createElement('script');
+                    geocoderScript.src = "https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js";
+                    geocoderScript.onload = () => {
+                        console.log("Leaflet-Control-Geocoder.js loaded successfully.");
+                        resolve();
+                    };
+                    geocoderScript.onerror = (e) => {
+                        console.error("Failed to load Leaflet-Control-Geocoder.js:", e);
+                        resolve(); // Still resolve even if geocoder fails, main map should work
+                    };
+                    document.head.appendChild(geocoderScript);
                 };
-                script.onerror = (e) => {
+                leafletScript.onerror = (e) => {
                     console.error("Failed to load Leaflet.js:", e);
                     reject(new Error("Failed to load Leaflet.js"));
                 };
-                document.head.appendChild(script);
+                document.head.appendChild(leafletScript);
             });
         }
 
@@ -719,7 +751,7 @@
             document.getElementById('checkoutTotal').textContent = `₹${(subtotal + deliveryCost).toFixed(2)}`;
         }
 
-        // --- Map Functions (New Design & Implementation) ---
+        // --- Map Functions ---
 
         // Helper to show map-specific error messages
         function showMapError(msg) {
@@ -853,12 +885,12 @@
                 },
                 function(err) {
                     let msg = "Failed to get current location.";
-                    if (err.code === 1) {
+                    if (err.code === err.PERMISSION_DENIED) { // Using err.PERMISSION_DENIED
                         msg = "Permission denied. Please allow location access for this site in your browser settings.";
-                    } else if (err.code === 2) {
-                        msg = "Location unavailable. Check your device's GPS settings.";
-                    } else if (err.code === 3) {
+                    } else if (err.code === err.TIMEOUT) { // Using err.TIMEOUT
                         msg = "Location request timed out. Try again or drag the pin manually.";
+                    } else {
+                        msg = "Unable to determine your location. Drag the pin.";
                     }
                     showMapError(msg);
                     locationStatus.textContent = msg; // Update status for user
@@ -897,7 +929,6 @@
             document.getElementById('customerLongitude').value = customerLocation.longitude;
 
             // Attempt to reverse geocode the address for the textarea (using Leaflet Control Geocoder if available)
-            // Note: L.Control.Geocoder.js is linked in the head, so this should work if you want search functionality.
             if (typeof L.Control.Geocoder !== 'undefined' && map && customerLocation) {
                 const geocoder = L.Control.Geocoder.nominatim({ serviceUrl: 'https://nominatim.openstreetmap.org/search/' });
                 geocoder.reverse(L.latLng(customerLocation.latitude, customerLocation.longitude), map.options.crs.scale(map.getZoom()), function(results) {
