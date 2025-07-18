@@ -1,6 +1,6 @@
 // index.js
 const { Client } = require('whatsapp-web.js');
-const { MongoStore } = require('whatsapp-web.js-mongo'); // Import MongoStore
+const { MongoStore } = require('wwebjs-mongo'); // CORRECTED: Import MongoStore from 'wwebjs-mongo'
 const { MultiDeviceAuthStrategy } = require('whatsapp-web.js'); // Use MultiDeviceAuthStrategy
 const qrcode = require('qrcode');
 const express = require('express');
@@ -11,7 +11,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
-const MongoSessionStore = require('connect-mongo'); // Renamed to avoid conflict with whatsapp-web.js-mongo's MongoStore
+const MongoSessionStore = require('connect-mongo'); // Renamed to avoid conflict with wwebjs-mongo's MongoStore
 
 // --- Configuration ---
 const PORT = process.env.PORT || 8080;
@@ -318,7 +318,7 @@ client.on('auth_failure', async msg => {
         clientReady = false;
         try {
             // Clear session data from MongoDB
-            const sessionCollection = mongoose.connection.collection('wwebjs_auth_sessions'); // Default collection name for whatsapp-web.js-mongo
+            const sessionCollection = mongoose.connection.collection('wwebjs_auth_sessions'); // Default collection name for wwebjs-mongo
             await sessionCollection.deleteMany({}); // Delete all session documents
             console.log('Deleted old session data from MongoDB.');
             authFailureCount = 0; // Reset counter after clearing
@@ -721,7 +721,7 @@ app.post('/api/public/request-qr', async (req, res) => {
     }
     try {
         // Clear session data from MongoDB
-        const sessionCollection = mongoose.connection.collection('wwebjs_auth_sessions'); // Default collection name for whatsapp-web.js-mongo
+        const sessionCollection = mongoose.connection.collection('wwebjs_auth_sessions'); // Default collection name for wwebjs-mongo
         await sessionCollection.deleteMany({}); // Delete all session documents
         console.log('Deleted old session data from MongoDB for new QR request.');
         authFailureCount = 0; // Reset auth failure count on manual QR request
