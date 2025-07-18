@@ -9,6 +9,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
+const fetch = require('node-fetch'); // Import node-fetch for HTTP requests
 
 // --- Configuration ---
 const PORT = process.env.PORT || 8080;
@@ -393,7 +394,7 @@ client.on('message', async msg => {
 
     const senderNumber = msg.from.split('@')[0];
     // Direct menu URL as requested
-    const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
+    const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
 
     try {
         // Update customer notification date on any message received
@@ -491,7 +492,7 @@ async function sendWeeklyNotifications() {
         }
 
         // Direct menu URL for notifications
-        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
+        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
 
         for (const customer of customersToNotify) {
             // Pick a random product to suggest
@@ -1124,6 +1125,89 @@ app.get('/api/order/:id', async (req, res) => {
     } catch (error) {
         console.error('Error fetching order for tracking:', error.message); // Log specific error
         res.status(500).json({ message: 'Error fetching order details.' });
+    }
+});
+
+// --- NEW GEOCoding API Endpoints (using Nominatim) ---
+
+// API to geocode an address (address to coordinates)
+app.post('/api/geocode-address', async (req, res) => {
+    console.log('API: /api/geocode-address hit.');
+    const { address } = req.body;
+
+    if (!address) {
+        console.warn('Missing address for geocoding.');
+        return res.status(400).json({ message: 'Address is required for geocoding.' });
+    }
+
+    try {
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
+        console.log('Calling Nominatim Geocoding API:', nominatimUrl);
+        const response = await fetch(nominatimUrl, {
+            headers: { 'User-Agent': 'DeliciousBitesApp/1.0 (your-email@example.com)' } // Required by Nominatim
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Nominatim geocoding failed: ${response.status} - ${errorText}`);
+            return res.status(response.status).json({ message: `Geocoding service error: ${response.statusText}` });
+        }
+
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+            const result = data[0];
+            console.log('Geocoding successful:', { lat: result.lat, lon: result.lon, display_name: result.display_name });
+            res.json({
+                latitude: parseFloat(result.lat),
+                longitude: parseFloat(result.lon),
+                formattedAddress: result.display_name
+            });
+        } else {
+            console.warn(`No geocoding results found for address: "${address}"`);
+            res.status(404).json({ message: 'Address not found or could not be geocoded.' });
+        }
+    } catch (error) {
+        console.error('Error in /api/geocode-address:', error.message);
+        res.status(500).json({ message: 'Internal server error during geocoding.' });
+    }
+});
+
+// API to reverse geocode coordinates (coordinates to address)
+app.post('/api/reverse-geocode', async (req, res) => {
+    console.log('API: /api/reverse-geocode hit.');
+    const { latitude, longitude } = req.body;
+
+    if (typeof latitude === 'undefined' || typeof longitude === 'undefined') {
+        console.warn('Missing latitude or longitude for reverse geocoding.');
+        return res.status(400).json({ message: 'Latitude and longitude are required for reverse geocoding.' });
+    }
+
+    try {
+        const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
+        console.log('Calling Nominatim Reverse Geocoding API:', nominatimUrl);
+        const response = await fetch(nominatimUrl, {
+            headers: { 'User-Agent': 'DeliciousBitesApp/1.0 (your-email@example.com)' } // Required by Nominatim
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Nominatim reverse geocoding failed: ${response.status} - ${errorText}`);
+            return res.status(response.status).json({ message: `Reverse geocoding service error: ${response.statusText}` });
+        }
+
+        const data = await response.json();
+
+        if (data && data.display_name) {
+            console.log('Reverse geocoding successful:', data.display_name);
+            res.json({ address: data.display_name });
+        } else {
+            console.warn(`No reverse geocoding results found for coordinates: ${latitude}, ${longitude}`);
+            res.status(404).json({ message: 'Address not found for these coordinates.' });
+        }
+    } catch (error) {
+        console.error('Error in /api/reverse-geocode:', error.message);
+        res.status(500).json({ message: 'Internal server error during reverse geocoding.' });
     }
 });
 
