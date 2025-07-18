@@ -1,4 +1,4 @@
-const { Client, AuthStrategy } = require('whatsapp-web.js'); // Corrected: AuthStrategy is a named export
+const { Client, AuthStrategy } = require('whatsapp-web.js'); // Re-confirmed: AuthStrategy is a named export
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
@@ -168,6 +168,61 @@ const whatsappSessionSchema = new mongoose.Schema({
 });
 const WhatsappSession = mongoose.model('WhatsappSession', whatsappSessionSchema);
 
+// Custom Auth Strategy for MongoDB - Defined immediately after AuthStrategy import
+class MongoDBAuthStrategy extends AuthStrategy { // Using AuthStrategy directly as named export
+    constructor(collection) {
+        super();
+        this.collection = collection; // Mongoose model for WhatsappSession
+        this.session = {}; // In-memory session data
+        this.sessionId = 'wwebjs_session'; // A fixed ID for the single session document
+    }
+
+    async setup() {
+        // No specific setup needed beyond constructor
+        console.log('MongoDBAuthStrategy setup complete.');
+    }
+
+    async get() {
+        try {
+            const sessionDoc = await this.collection.findOne({ sessionId: this.sessionId });
+            if (sessionDoc && sessionDoc.data) {
+                this.session = sessionDoc.data;
+                console.log('WhatsApp session loaded from MongoDB.');
+                return this.session;
+            }
+            console.log('No WhatsApp session found in MongoDB.');
+            return {};
+        } catch (error) {
+            console.error('Error loading WhatsApp session from MongoDB:', error);
+            return {};
+        }
+    }
+
+    async set(session) {
+        try {
+            this.session = session;
+            await this.collection.findOneAndUpdate(
+                { sessionId: this.sessionId },
+                { $set: { data: session } },
+                { upsert: true, new: true }
+            );
+            console.log('WhatsApp session saved to MongoDB.');
+        } catch (error) {
+            console.error('Error saving WhatsApp session to MongoDB:', error);
+        }
+    }
+
+    async destroy() {
+        try {
+            await this.collection.deleteOne({ sessionId: this.sessionId });
+            this.session = {};
+            console.log('WhatsApp session destroyed in MongoDB.');
+        } catch (error) {
+            console.error('Error destroying WhatsApp session in MongoDB:', error);
+        }
+    }
+}
+
 
 // --- Initial Data Setup ---
 async function initializeAdminAndSettings() {
@@ -241,60 +296,6 @@ function updateBotStatus(status, qrData = null) {
     }
 }
 
-// Custom Auth Strategy for MongoDB
-class MongoDBAuthStrategy extends AuthStrategy { // Corrected: Use AuthStrategy directly
-    constructor(collection) {
-        super();
-        this.collection = collection; // Mongoose model for WhatsappSession
-        this.session = {}; // In-memory session data
-        this.sessionId = 'wwebjs_session'; // A fixed ID for the single session document
-    }
-
-    async setup() {
-        // No specific setup needed beyond constructor
-        console.log('MongoDBAuthStrategy setup complete.');
-    }
-
-    async get() {
-        try {
-            const sessionDoc = await this.collection.findOne({ sessionId: this.sessionId });
-            if (sessionDoc && sessionDoc.data) {
-                this.session = sessionDoc.data;
-                console.log('WhatsApp session loaded from MongoDB.');
-                return this.session;
-            }
-            console.log('No WhatsApp session found in MongoDB.');
-            return {};
-        } catch (error) {
-            console.error('Error loading WhatsApp session from MongoDB:', error);
-            return {};
-        }
-    }
-
-    async set(session) {
-        try {
-            this.session = session;
-            await this.collection.findOneAndUpdate(
-                { sessionId: this.sessionId },
-                { $set: { data: session } },
-                { upsert: true, new: true }
-            );
-            console.log('WhatsApp session saved to MongoDB.');
-        } catch (error) {
-            console.error('Error saving WhatsApp session to MongoDB:', error);
-        }
-    }
-
-    async destroy() {
-        try {
-            await this.collection.deleteOne({ sessionId: this.sessionId });
-            this.session = {};
-            console.log('WhatsApp session destroyed in MongoDB.');
-        } catch (error) {
-            console.error('Error destroying WhatsApp session in MongoDB:', error);
-        }
-    }
-}
 
 const client = new Client({
     authStrategy: new MongoDBAuthStrategy(WhatsappSession), // Use the new MongoDBAuthStrategy
@@ -770,7 +771,7 @@ app.post('/api/public/request-qr', async (req, res) => {
     }
     try {
         await client.logout(); // This will trigger the destroy method of MongoDBAuthStrategy
-        console.log('WhatsApp client logged out and session cleared from MongoDB for new QR request.');
+        console.log('WhatsApp client logged out and session cleared from MongoDB.');
         authFailureCount = 0; // Reset auth failure count on manual QR request
     } catch (err) {
         console.error('Error during client logout during manual QR request:', err);
