@@ -376,7 +376,11 @@
                 <button id="closeDeliveryLocationModal" class="text-gray-400 hover:text-white text-2xl">&times;</button>
             </div>
             
-            <div id="map" class="h-64 w-full rounded-lg mb-4"></div>
+            <div id="map" class="h-64 w-full rounded-lg mb-4 relative">
+                <div id="map-loading-overlay" class="absolute inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-10 hidden">
+                    <div class="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-white"></div>
+                </div>
+            </div>
             
             <p id="mapLocationStatus" class="text-sm text-gray-400 text-center mb-4">Drag the marker or search for your location.</p>
 
@@ -444,6 +448,7 @@
         const productDetailModal = document.getElementById('productDetailModal'); // Product detail modal
         const productDetailAddToCartBtn = document.getElementById('productDetailAddToCartBtn'); // Add to cart button in detail modal
         const placeOrderBtn = document.getElementById('placeOrderBtn'); // Reference to place order button
+        const mapLoadingOverlay = document.getElementById('map-loading-overlay'); // Map loading overlay
 
         // Map variables
         let map = null;
@@ -482,7 +487,7 @@
                 // A small timeout ensures the modal is fully rendered before map tries to size itself
                 setTimeout(() => {
                     initMap(); 
-                    if (map) map.invalidateSize();
+                    if (map) map.invalidateSize(); // Force map to redraw
                 }, 100); 
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
@@ -741,9 +746,13 @@
                 maxZoom: 19
             });
 
+            // Set initial map center and zoom based on customerLocation or a default
+            const initialCenter = customerLocation ? [customerLocation.latitude, customerLocation.longitude] : [20.5937, 78.9629]; // Default: India
+            const initialZoom = customerLocation ? 16 : 5; // Zoom in if location is known
+
             map = L.map('map', {
-                center: [20.5937, 78.9629], // Default center (e.g., India)
-                zoom: 5,
+                center: initialCenter,
+                zoom: initialZoom,
                 layers: [darkTiles],
                 zoomControl: false // Disable default zoom control
             });
@@ -762,7 +771,7 @@
             });
 
             // Add a draggable marker
-            deliveryMarker = L.marker(map.getCenter(), {
+            deliveryMarker = L.marker(initialCenter, { // Place marker at initial center
                 icon: deliveryIcon,
                 draggable: true
             }).addTo(map);
@@ -808,6 +817,7 @@
 
         // Get current location for map initialization and marker placement (using watchPosition)
         function getCurrentLocationForMap() {
+            mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
             mapLocationStatus.textContent = 'Getting your current GPS location (real-time updates)...';
             // Clear any existing watcher first
             clearGeolocationWatcher();
@@ -815,13 +825,16 @@
             if (!navigator.geolocation) {
                 mapLocationStatus.textContent = 'Geolocation is not supported by your browser. Please search for a location or drag the marker.';
                 showNotification('Geolocation not supported. Please search for a location or drag the marker.', 'error');
+                mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
                 return;
             }
 
             // Start watching position
             geolocationWatcherId = navigator.geolocation.watchPosition(
                 (position) => {
+                    mapLoadingOverlay.classList.add('hidden'); // Hide spinner on first successful location
                     const latLng = [position.coords.latitude, position.coords.longitude];
+                    
                     // Only update map view if the accuracy is good enough (e.g., < 100m)
                     // and if the map is not currently being dragged by the user
                     if (position.coords.accuracy < 100 && !map.dragging.enabled()) {
@@ -833,7 +846,7 @@
                         longitude: position.coords.longitude
                     };
                     mapLocationStatus.textContent = `Your current location: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)} (Accuracy: ${position.coords.accuracy.toFixed(0)}m)`;
-                    showNotification('Current location updating on map!', 'success');
+                    // showNotification('Current location updating on map!', 'success'); // Too frequent notification
                 },
                 (error) => {
                     console.error('Error getting location:', error);
@@ -846,6 +859,7 @@
                     mapLocationStatus.textContent = errorMessage;
                     customerLocation = null; // Reset location
                     showNotification(errorMessage, 'error');
+                    mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
                     clearGeolocationWatcher(); // Stop watching on error
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -1060,8 +1074,13 @@
         // Toggle modal
         function toggleModal(modalId) {
             const modal = document.getElementById(modalId);
-            modal.classList.toggle('hidden');
-            modal.classList.toggle('flex');
+            if (modal.classList.contains('hidden')) {
+                modal.classList.add('flex'); // Add flex first
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex'); // Remove flex after hidden
+            }
         }
 
         // Show notification
