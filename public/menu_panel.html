@@ -332,8 +332,8 @@
             <p id="locationStatus" class="text-sm text-gray-300 text-center mb-2"></p>
             <div class="flex flex-col sm:flex-row gap-2 mb-1">
                 <!-- "Use My Current Location" button with white background -->
-                <button id="getLoc" class="bg-white text-black px-4 py-2 rounded font-semibold flex-1 flex items-center justify-center">📍 Use My Current Location</button>
-                <button id="saveLoc" class="bg-gray-600 text-white px-4 py-2 rounded font-semibold flex-1">Save Location</button>
+                <button type="button" id="getLoc" class="bg-white text-black px-4 py-2 rounded font-semibold flex-1 flex items-center justify-center">📍 Use My Current Location</button>
+                <button type="button" id="saveLoc" class="bg-gray-600 text-white px-4 py-2 rounded font-semibold flex-1">Save Location</button>
             </div>
             <div class="text-gray-400 text-xs text-center mt-2" id="coordsDisp">No location selected</div>
         </div>
@@ -364,7 +364,7 @@
         // Global variables
         let menuItems = [];
         let cart = [];
-        let customerLocation = null; // Stores {latitude, longitude} of the selected delivery point
+        let customerLocation = null; // Stores {latitude, longitude, address} of the selected delivery point
         let shopSettings = null;
         let deliveryCost = 0;
         let lastScrollTop = 0; // For header hide/show on scroll
@@ -514,7 +514,7 @@
             if (filteredItems.length === 0) {
                 console.log('renderMenu: No items to render or filteredItems is empty.');
                 menuGrid.innerHTML = ''; // Ensure grid is empty
-                emptyState.classList.remove('hidden');
+                emptyState.classList.add('hidden'); // Ensure emptyState is hidden if items are found
                 return;
             }
 
@@ -668,7 +668,7 @@
             document.getElementById('checkoutTotal').textContent = `₹${(subtotal + deliveryCost).toFixed(2)}`;
         }
 
-        // --- Location Functions (Non-Visual Map) ---
+        // --- Location Functions (Backend Geocoding) ---
 
         // Helper to show location-specific error messages
         function showLocationError(msg) {
@@ -679,7 +679,7 @@
         }
 
         // Gets current geolocation and sets the location data
-        function getGeolocationAndSetLocation() {
+        async function getGeolocationAndSetLocation() {
             errorBanner.classList.add("hidden");
             if (!navigator.geolocation) {
                 showLocationError("Geolocation not supported by your browser. Please enter your address manually.");
@@ -696,13 +696,24 @@
                     locationStatus.textContent = "Location found! Getting address...";
 
                     try {
-                        const address = await reverseGeocode(lat, lng);
+                        const response = await fetch('/api/reverse-geocode', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ latitude: lat, longitude: lng })
+                        });
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.message || 'Failed to reverse geocode.');
+                        }
+                        const data = await response.json();
+                        const address = data.address || `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`;
+                        
                         customerLocation = { latitude: lat, longitude: lng, address: address };
                         manualAddressInput.value = address; // Populate manual input
                         locationStatus.textContent = "Location and address retrieved!";
                         showNotification('Current location found and address populated.', 'success');
                     } catch (error) {
-                        console.error("Reverse geocoding failed:", error);
+                        console.error("Reverse geocoding failed (via backend):", error);
                         customerLocation = { latitude: lat, longitude: lng, address: `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}` };
                         manualAddressInput.value = `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`;
                         showLocationError("Could not get a readable address for your location. Coordinates saved.");
@@ -725,25 +736,7 @@
             );
         }
 
-        // Reverse Geocoding function using Nominatim API
-        async function reverseGeocode(lat, lon) {
-            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-            try {
-                const response = await fetch(url, {
-                    headers: { 'User-Agent': 'DeliciousBitesApp/1.0 (your-email@example.com)' } // Good practice to include User-Agent
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                return data.display_name || `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
-            } catch (error) {
-                console.error("Error during reverse geocoding:", error);
-                throw error; // Re-throw to be caught by calling function
-            }
-        }
-
-        // Save the delivery location
+        // Save the delivery location (either from GPS or manual input geocoding)
         async function saveDeliveryLocation() {
             const addressFromInput = manualAddressInput.value.trim();
 
@@ -760,21 +753,23 @@
                 // If manual input is provided, attempt to forward geocode it
                 locationStatus.textContent = "Searching for address...";
                 try {
-                    const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressFromInput)}&limit=1`;
-                    const response = await fetch(geocodeUrl, {
-                        headers: { 'User-Agent': 'DeliciousBitesApp/1.0 (your-email@example.com)' }
+                    const response = await fetch('/api/geocode-address', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ address: addressFromInput })
                     });
+
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || 'Failed to geocode address.');
                     }
                     const data = await response.json();
 
-                    if (data && data.length > 0) {
-                        const result = data[0];
+                    if (data && data.latitude !== undefined && data.longitude !== undefined) {
                         customerLocation = {
-                            latitude: parseFloat(result.lat),
-                            longitude: parseFloat(result.lon),
-                            address: result.display_name
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                            address: data.formattedAddress || addressFromInput // Use formatted address if available, else original
                         };
                         document.getElementById('deliveryAddress').value = customerLocation.address;
                         document.getElementById('customerLatitude').value = customerLocation.latitude;
@@ -784,12 +779,12 @@
                         await calculateDeliveryCost();
                         toggleModal('deliveryLocationModal');
                     } else {
-                        showLocationError("Could not find coordinates for the entered address. Please try a different address or use your current location.");
+                        showLocationError("Could not find coordinates for the entered address. Please try a more specific address or use your current location.");
                         locationStatus.textContent = "Address not found.";
                     }
                 } catch (error) {
-                    console.error("Error during forward geocoding:", error);
-                    showLocationError("Failed to process address. Please check your internet connection or try again.");
+                    console.error("Error during forward geocoding (via backend):", error);
+                    showLocationError(`Failed to process address: ${error.message}. Please check your internet connection or try again.`);
                 }
             } else {
                 showLocationError("Please use your current location or enter an address manually.");
@@ -852,7 +847,7 @@
             e.preventDefault();
             
             // Basic validation for location
-            if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined') {
+            if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined' || !customerLocation.address) {
                 showNotification('Please select your delivery location.', 'warning');
                 return;
             }
@@ -869,7 +864,12 @@
                 const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 const totalAmount = subtotal + deliveryCost;
 
+                // Generate a unique orderId using crypto.randomUUID()
+                const uniqueOrderId = crypto.randomUUID();
+                console.log('Generated uniqueOrderId:', uniqueOrderId);
+
                 const orderData = {
+                    orderId: uniqueOrderId, // Explicitly add orderId
                     items: cart.map(item => ({
                         productId: item._id,
                         name: item.name,
@@ -887,7 +887,7 @@
                     transportTax: deliveryCost,
                     totalAmount
                 };
-                console.log('Order data being sent:', orderData);
+                console.log('Order data being sent (JSON.stringify):', JSON.stringify(orderData)); // Log the exact JSON payload
 
                 const response = await fetch('/api/order', {
                     method: 'POST',
