@@ -1,7 +1,5 @@
 // index.js
-const { Client } = require('whatsapp-web.js');
-const { MongoStore } = require('wwebjs-mongo');
-const { MultiDeviceAuthStrategy } = require('whatsapp-web.js'); // This import is correct for 1.19.5
+const { Client, LocalAuth } = require('whatsapp-web.js'); // Using LocalAuth or no explicit strategy
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
@@ -164,6 +162,13 @@ const customerNotificationSchema = new mongoose.Schema({
 });
 const CustomerNotification = mongoose.model('CustomerNotification', customerNotificationSchema);
 
+// NEW: WhatsApp Session Schema for manual storage
+const whatsappSessionSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true }, // Usually 'session' or a specific client ID
+    sessionData: { type: Object, required: true } // The actual session object from whatsapp-web.js
+});
+const WhatsappSession = mongoose.model('WhatsappSession', whatsappSessionSchema);
+
 
 // --- Initial Data Setup ---
 async function initializeAdminAndSettings() {
@@ -204,9 +209,9 @@ async function initializeAdminAndSettings() {
         });
 
         // Initial client initialization on server startup
-        // Ensure MongoDB is connected before initializing WhatsApp client with MongoStore
+        // Ensure MongoDB is connected before initializing WhatsApp client
         if (mongoDbConnected) {
-            client.initialize();
+            loadAndInitializeClient(); // Call the new function to load session and initialize
         } else {
             console.error('MongoDB not connected. WhatsApp client initialization deferred.');
         }
@@ -241,123 +246,156 @@ function updateBotStatus(status, qrData = null) {
     }
 }
 
-// WhatsApp client instance using MongoStore
-const client = new Client({
-    authStrategy: new MultiDeviceAuthStrategy({
-        // Pass the mongoose connection object to MongoStore
-        store: new MongoStore({ mongoose: mongoose })
-    }),
-    puppeteer: {
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-video-decode',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-            '--single-process'
-        ]
-    }
-});
+let client = null; // Declare client here, will be initialized dynamically
 
-client.on('qr', (qr) => {
-    console.log('QR RECEIVED', qr);
-    if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-
-    qrcode.toDataURL(qr, { small: false }, (err, url) => {
-        if (err) {
-            console.error('Error generating QR code data URL:', err);
-            updateBotStatus('qr_error');
+async function loadAndInitializeClient() {
+    let sessionData;
+    try {
+        const storedSession = await WhatsappSession.findOne({ id: 'whatsapp-session' });
+        if (storedSession && storedSession.sessionData) {
+            sessionData = storedSession.sessionData;
+            console.log('Found existing WhatsApp session in MongoDB. Attempting to restore...');
         } else {
-            updateBotStatus('qr_received', url);
+            console.log('No existing WhatsApp session found in MongoDB. Starting fresh.');
+        }
+    } catch (error) {
+        console.error('Error loading session from MongoDB:', error);
+        console.log('Proceeding without stored session.');
+    }
 
-            qrExpiryTimer = setTimeout(() => {
-                updateBotStatus('qr_expired');
-                console.log('QR code expired. Please request a new QR.');
-            }, QR_EXPIRY_MS);
+    // Initialize the client with or without session data
+    // Using LocalAuth to ensure session is managed by whatsapp-web.js
+    client = new Client({
+        authStrategy: new LocalAuth({
+            clientId: 'whatsapp-session' // Use a fixed client ID for consistent session storage
+        }),
+        puppeteer: {
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-video-decode',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu',
+                '--single-process'
+            ]
         }
     });
-});
 
-client.on('ready', () => {
-    console.log('Client is ready!');
-    clientReady = true;
-    if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-    console.log('WhatsApp bot is connected and operational.');
-    updateBotStatus('ready');
-    authFailureCount = 0; // Reset auth failure count on successful ready
-    // Start weekly notification scheduler only when client is ready
-    // Check if the interval is already set to prevent multiple intervals
-    if (!global.weeklyNotificationInterval) {
-        global.weeklyNotificationInterval = setInterval(sendWeeklyNotifications, WEEKLY_NOTIFICATION_INTERVAL_MS);
-        console.log('Weekly notification scheduler started.');
-    }
-});
+    // Attach event listeners
+    client.on('qr', (qr) => {
+        console.log('QR RECEIVED', qr);
+        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
-client.on('authenticated', (session) => {
-    console.log('AUTHENTICATED', session);
-    updateBotStatus('authenticated');
-    authFailureCount = 0; // Reset auth failure count on successful authentication
-});
+        qrcode.toDataURL(qr, { small: false }, (err, url) => {
+            if (err) {
+                console.error('Error generating QR code data URL:', err);
+                updateBotStatus('qr_error');
+            } else {
+                updateBotStatus('qr_received', url);
 
-client.on('auth_failure', async msg => {
-    console.error('AUTHENTICATION FAILURE', msg);
-    authFailureCount++;
-    console.log(`Consecutive auth failures: ${authFailureCount}`);
+                qrExpiryTimer = setTimeout(() => {
+                    updateBotStatus('qr_expired');
+                    console.log('QR code expired. Please request a new QR.');
+                }, QR_EXPIRY_MS);
+            }
+        });
+    });
 
-    if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-    updateBotStatus('auth_failure'); // Indicate auth failure
+    client.on('ready', () => {
+        console.log('Client is ready!');
+        clientReady = true;
+        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+        console.log('WhatsApp bot is connected and operational.');
+        updateBotStatus('ready');
+        authFailureCount = 0; // Reset auth failure count on successful ready
+        // Start weekly notification scheduler only when client is ready
+        if (!global.weeklyNotificationInterval) {
+            global.weeklyNotificationInterval = setInterval(sendWeeklyNotifications, WEEKLY_NOTIFICATION_INTERVAL_MS);
+            console.log('Weekly notification scheduler started.');
+        }
+    });
 
-    if (authFailureCount >= MAX_AUTH_FAILURES) {
-        console.log(`Max auth failures (${MAX_AUTH_FAILURES}) reached. Clearing session from DB and re-initializing...`);
-        clientReady = false;
+    client.on('authenticated', async (session) => {
+        console.log('AUTHENTICATED', session);
+        updateBotStatus('authenticated');
+        authFailureCount = 0; // Reset auth failure count on successful authentication
+
+        // Manually save the session to MongoDB
         try {
-            // Clear session data from MongoDB
-            const sessionCollection = mongoose.connection.collection('wwebjs_auth_sessions'); // Default collection name for wwebjs-mongo
-            await sessionCollection.deleteMany({}); // Delete all session documents
-            console.log('Deleted old session data from MongoDB.');
-            authFailureCount = 0; // Reset counter after clearing
-        } catch (err) {
-            console.error('Error deleting old session data from MongoDB on max auth failures:', err);
-        } finally {
+            await WhatsappSession.findOneAndUpdate(
+                { id: 'whatsapp-session' },
+                { sessionData: session },
+                { upsert: true, new: true }
+            );
+            console.log('WhatsApp session saved to MongoDB successfully.');
+        } catch (error) {
+            console.error('Error saving WhatsApp session to MongoDB:', error);
+        }
+    });
+
+    client.on('auth_failure', async msg => {
+        console.error('AUTHENTICATION FAILURE', msg);
+        authFailureCount++;
+        console.log(`Consecutive auth failures: ${authFailureCount}`);
+
+        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+        updateBotStatus('auth_failure'); // Indicate auth failure
+
+        if (authFailureCount >= MAX_AUTH_FAILURES) {
+            console.log(`Max auth failures (${MAX_AUTH_FAILURES}) reached. Clearing session from DB and re-initializing...`);
+            clientReady = false;
+            try {
+                // Clear session data from MongoDB
+                await WhatsappSession.deleteOne({ id: 'whatsapp-session' });
+                console.log('Deleted old WhatsApp session data from MongoDB.');
+                authFailureCount = 0; // Reset counter after clearing
+            } catch (err) {
+                console.error('Error deleting old session data from MongoDB on max auth failures:', err);
+            } finally {
+                setTimeout(() => {
+                    client.initialize();
+                    updateBotStatus('reconnecting');
+                }, RECONNECT_DELAY_MS);
+            }
+        } else {
+            console.log('Attempting to re-initialize client without clearing session...');
+            clientReady = false; // Set to false while re-initializing
             setTimeout(() => {
                 client.initialize();
                 updateBotStatus('reconnecting');
             }, RECONNECT_DELAY_MS);
         }
-    } else {
-        console.log('Attempting to re-initialize client without clearing session...');
-        clientReady = false; // Set to false while re-initializing
+    });
+
+    client.on('disconnected', async (reason) => {
+        console.log('Client disconnected', reason);
+        clientReady = false;
+        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+        updateBotStatus('disconnected'); // Indicate disconnected
+        console.log('WhatsApp client disconnected. Re-initializing...');
+        // Clear any existing weekly notification interval
+        if (global.weeklyNotificationInterval) {
+            clearInterval(global.weeklyNotificationInterval);
+            global.weeklyNotificationInterval = null;
+            console.log('Weekly notification scheduler stopped due to disconnection.');
+        }
+        // Always reset authFailureCount on disconnection, as it might be a temporary network issue
+        authFailureCount = 0;
+        // Re-initialize automatically after a short delay
         setTimeout(() => {
             client.initialize();
             updateBotStatus('reconnecting');
         }, RECONNECT_DELAY_MS);
-    }
-});
+    });
 
-client.on('disconnected', (reason) => {
-    console.log('Client disconnected', reason);
-    clientReady = false;
-    if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-    updateBotStatus('disconnected'); // Indicate disconnected
-    console.log('WhatsApp client disconnected. Re-initializing...');
-    // Clear any existing weekly notification interval
-    if (global.weeklyNotificationInterval) {
-        clearInterval(global.weeklyNotificationInterval);
-        global.weeklyNotificationInterval = null;
-        console.log('Weekly notification scheduler stopped due to disconnection.');
-    }
-    // Always reset authFailureCount on disconnection, as it might be a temporary network issue
-    authFailureCount = 0;
-    // Re-initialize automatically after a short delay
-    setTimeout(() => {
-        client.initialize();
-        updateBotStatus('reconnecting');
-    }, RECONNECT_DELAY_MS);
-});
+    // Finally, initialize the client
+    client.initialize();
+}
+
 
 // Initial Socket.IO connection handling
 io.on('connection', (socket) => {
@@ -383,7 +421,7 @@ async function updateCustomerNotification(customerPhone) {
     }
 }
 
-client.on('message', async msg => {
+client.on('message', async msg => { // This listener needs to be attached to the 'client' object
     console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body); // Log message reception
 
     // Ensure the bot is ready before processing messages
@@ -719,9 +757,8 @@ app.post('/api/public/request-qr', async (req, res) => {
     }
     try {
         // Clear session data from MongoDB
-        const sessionCollection = mongoose.connection.collection('wwebjs_auth_sessions'); // Default collection name for wwebjs-mongo
-        await sessionCollection.deleteMany({}); // Delete all session documents
-        console.log('Deleted old session data from MongoDB for new QR request.');
+        await WhatsappSession.deleteOne({ id: 'whatsapp-session' }); // Delete the manually stored session
+        console.log('Deleted old WhatsApp session data from MongoDB.');
         authFailureCount = 0; // Reset auth failure count on manual QR request
     } catch (err) {
         console.error('Error deleting old session data from MongoDB during manual QR request:', err);
@@ -729,9 +766,14 @@ app.post('/api/public/request-qr', async (req, res) => {
     } finally {
         // Set status to initializing and clear current QR data immediately
         updateBotStatus('initializing'); // This will clear qrCodeDataURL and emit
-        // Initialize the client; this will trigger 'qr' or 'ready' event
-        client.initialize();
-        res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
+        // Re-initialize the client (this will trigger a new QR)
+        client.destroy().then(() => { // Destroy existing client instance
+            loadAndInitializeClient(); // Re-create and initialize a new client
+            res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
+        }).catch(err => {
+            console.error('Error destroying client before re-initialization:', err);
+            res.status(500).json({ message: 'Error re-initializing client for new QR.' });
+        });
     }
 });
 
@@ -789,7 +831,11 @@ app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
         }
         console.log(`Order ${id} updated successfully to status: ${order.status}`);
         // Optional: Notify customer via WhatsApp about status update
-        // client.sendMessage(order.customerPhone + '@c.us', `Your order #${order._id.toString().substring(0,6)} has been updated to: ${order.status}`);
+        if (clientReady) { // Only send if client is ready
+            client.sendMessage(order.customerPhone + '@c.us', `Your order #${order._id.toString().substring(0,6)} has been updated to: ${order.status}`);
+        } else {
+            console.warn(`WhatsApp client not ready, cannot notify customer ${order.customerPhone} about order status update.`);
+        }
         res.json(order);
     } catch (error) {
         console.error('Error updating order status:', error.message); // Log specific error
