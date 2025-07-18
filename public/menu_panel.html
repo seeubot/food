@@ -760,12 +760,12 @@
         // Initialize the Leaflet Map
         function initMap() {
             if (mapInitialized && map) {
-                console.log('Map already initialized, invalidating size and returning.');
+                console.log('initMap: Map already initialized, invalidating size and returning.');
                 map.invalidateSize(); // Ensure it redraws if modal size changed
                 return;
             }
 
-            console.log('Attempting to initialize map...');
+            console.log('initMap: Attempting to initialize map...');
             errorBanner.classList.add("hidden"); // Hide any previous error
 
             // Log dimensions before map creation
@@ -776,6 +776,9 @@
             }
 
             try {
+                // Ensure the map container is empty before initializing
+                mapDiv.innerHTML = ''; 
+
                 map = L.map('map', {
                     zoomControl: false,
                     attributionControl: false
@@ -794,7 +797,13 @@
                 map.whenReady(() => {
                     map.invalidateSize();
                     console.log('Map invalidateSize called after whenReady.');
-                    // Also hide default Leaflet controls if they appear
+                    // Additional small timeout for robustness
+                    setTimeout(() => {
+                        map.invalidateSize();
+                        console.log('Map invalidateSize called again after small timeout for robustness.');
+                    }, 50);
+
+                    // Hide default Leaflet controls if they appear
                     setTimeout(() => {
                         let el;
                         if (el = document.querySelector('.leaflet-control-zoom')) el.style.display = "none";
