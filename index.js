@@ -1,24 +1,22 @@
 // index.js
 const { Client } = require('whatsapp-web.js');
-const { MongoStore } = require('wwebjs-mongo'); // CORRECTED: Import MongoStore from 'wwebjs-mongo'
-const { MultiDeviceAuthStrategy } = require('whatsapp-web.js'); // Use MultiDeviceAuthStrategy
+const { MongoStore } = require('wwebjs-mongo');
+const { MultiDeviceAuthStrategy } = require('whatsapp-web.js'); // This import is correct for 1.19.5
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-// const fs = require('fs').promises; // No longer needed for local session files
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
-const MongoSessionStore = require('connect-mongo'); // Renamed to avoid conflict with wwebjs-mongo's MongoStore
+const MongoSessionStore = require('connect-mongo');
 
 // --- Configuration ---
 const PORT = process.env.PORT || 8080;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
 const ADMIN_NUMBER = process.env.ADMIN_NUMBER || '918897350151'; // Admin WhatsApp number for notifications (without +)
 const SESSION_SECRET = process.env.SESSION_SECRET || 'supersecretkeyforfoodbot'; // CHANGE THIS IN PRODUCTION!
-// const SESSION_DIR_PATH = './.wwebjs_auth'; // No longer needed for local session files
 
 // Admin Credentials from Environment Variables or Default
 const DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
@@ -1100,7 +1098,7 @@ app.get('/api/order/:id', async (req, res) => {
             console.log(`Order ${req.params.id} not found for tracking.`);
             return res.status(404).json({ message: 'Order not found' });
         }
-        console.log(`Fetched order ${req.params.id} for tracking.`);
+        console.log(`Fetched order ${order._id} for tracking.`);
         res.json(order);
     } catch (error) {
         console.error('Error fetching order for tracking:', error.message); // Log specific error
