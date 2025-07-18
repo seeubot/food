@@ -403,6 +403,9 @@
                 <div id="map-loading-overlay" class="absolute inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-10 hidden">
                     <div class="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-white"></div>
                 </div>
+                <div id="map-error-message" class="absolute inset-0 bg-red-900 bg-opacity-80 flex items-center justify-center z-20 hidden text-white text-lg font-bold p-4 text-center rounded-lg">
+                    Map failed to load or Geolocation unavailable. Please ensure location services are enabled and try again.
+                </div>
             </div>
             
             <p id="mapLocationStatus" class="text-sm text-gray-400 text-center mb-4">Drag the marker or search for your location.</p>
@@ -487,6 +490,7 @@
         const productDetailAddToCartBtn = document.getElementById('productDetailAddToCartBtn'); // Add to cart button in detail modal
         const placeOrderBtn = document.getElementById('placeOrderBtn'); // Reference to place order button
         const mapLoadingOverlay = document.getElementById('map-loading-overlay'); // Map loading overlay
+        const mapErrorMessage = document.getElementById('map-error-message'); // Map error message
         const centerBtn = document.getElementById('center-btn'); // FAB for recentering
 
         // Map variables
@@ -523,11 +527,12 @@
             
             // Delivery Location Map Modal
             document.getElementById('openLocationMapBtn').addEventListener('click', () => {
+                mapErrorMessage.classList.add('hidden'); // Hide any previous error message
                 toggleModal('deliveryLocationModal');
                 // Give the modal a moment to become visible before initializing the map
                 setTimeout(() => {
-                    initMap(); 
-                }, 300); 
+                    _initializeLeafletMapCore(); // Call the new core initialization function
+                }, 100); // Short delay to allow modal to render
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
@@ -811,89 +816,109 @@
         });
 
 
-        // Initialize Leaflet Map in the popup modal
-        function initMap() {
+        // Core map initialization function
+        function _initializeLeafletMapCore() {
             if (mapInitialized) {
-                console.log('initMap: Map already initialized, skipping.');
+                console.log('_initializeLeafletMapCore: Map already initialized, skipping. Re-invalidating size.');
+                if (map) map.invalidateSize(); // In case modal was resized
+                getCurrentLocationForMap(); // Still try to get location
                 return;
             }
-            console.log('initMap: Function started - initializing new map instance.');
+            console.log('_initializeLeafletMapCore: Starting map initialization process.');
             mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
-            
+            mapErrorMessage.classList.add('hidden'); // Hide any previous error message
+
+            // Ensure any previous map instance is completely removed before creating a new one
+            if (map) {
+                map.remove();
+                map = null;
+                deliveryMarker = null;
+                liveMarker = null;
+                userCircle = null;
+                geocoderControl = null;
+                mapInitialized = false;
+                console.log('Previous map instance removed for fresh initialization.');
+            }
+
             // Esri World Imagery (Satellite) tile layer
             const esriSatelliteTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
                 attribution:'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community', 
                 maxZoom:19 
             });
 
-            // Set initial map center and zoom based on customerLocation or a default
             const initialCenter = customerLocation ? [customerLocation.latitude, customerLocation.longitude] : [20.5937, 78.9629]; // Default: India
             const initialZoom = customerLocation ? 16 : 5; // Zoom in if location is known
 
-            map = L.map('map', {
-                center: initialCenter,
-                zoom: initialZoom,
-                layers: [esriSatelliteTiles], // Use satellite tiles
-                zoomControl: false, // Hide default zoom control
-                attributionControl: true // Keep attribution
-            });
-            mapInitialized = true; // Set flag to true
-            console.log('Map L.map() called with center:', initialCenter, 'zoom:', initialZoom);
+            try {
+                map = L.map('map', {
+                    center: initialCenter,
+                    zoom: initialZoom,
+                    layers: [esriSatelliteTiles],
+                    zoomControl: false,
+                    attributionControl: true
+                });
+                mapInitialized = true; // Set flag only if map creation succeeds
+                console.log('L.map() called successfully. Map object:', map);
 
-            // Important: Invalidate size after map is added to a visible container
-            map.whenReady(() => {
-                map.invalidateSize();
-                console.log('Map invalidateSize called via whenReady.');
-                // Add a draggable delivery marker AFTER map is ready and sized
-                deliveryMarker = L.marker(initialCenter, { // Place marker at initial center
-                    icon: pinIcon, // Use the new pin icon
-                    draggable: true
-                }).addTo(map);
-                console.log('Delivery marker added after map ready.');
+                map.whenReady(() => {
+                    map.invalidateSize();
+                    console.log('Map invalidateSize called via whenReady. Map should now be visible.');
 
-                // Update customerLocation when delivery marker is dragged
-                deliveryMarker.on('dragend', function(e) {
-                    const latLng = deliveryMarker.getLatLng();
-                    customerLocation = {
-                        latitude: latLng.lat,
-                        longitude: latLng.lng
-                    };
-                    mapLocationStatus.textContent = `Pinned: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
-                    console.log('Delivery marker dragged to:', customerLocation);
+                    // Add a draggable delivery marker
+                    deliveryMarker = L.marker(initialCenter, {
+                        icon: pinIcon,
+                        draggable: true
+                    }).addTo(map);
+                    console.log('Delivery marker added.');
+
+                    deliveryMarker.on('dragend', function(e) {
+                        const latLng = deliveryMarker.getLatLng();
+                        customerLocation = { latitude: latLng.lat, longitude: latLng.lng };
+                        mapLocationStatus.textContent = `Pinned: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+                        console.log('Delivery marker dragged to:', customerLocation);
+                    });
+
+                    // Initialize Geocoder control
+                    geocoderControl = L.Control.geocoder({
+                        defaultMarkGeocodedLocation: false,
+                        placeholder: 'Search for delivery location...',
+                        collapsed: false,
+                        position: 'topleft',
+                        geocoder: L.Control.Geocoder.nominatim({ serviceUrl: 'https://nominatim.openstreetmap.org/search/' })
+                    }).addTo(map);
+                    console.log('Geocoder control added.');
+
+                    geocoderControl.on('markgeocode', function(e) {
+                        const latLng = e.geocode.center;
+                        map.setView(latLng, 16);
+                        deliveryMarker.setLatLng(latLng);
+                        customerLocation = { latitude: latLng.lat, longitude: latLng.lng };
+                        mapLocationStatus.textContent = `Selected: ${e.geocode.name}`;
+                        console.log('Location selected via search:', customerLocation);
+                    });
+
+                    // Attempt to get current live location
+                    getCurrentLocationForMap();
                 });
 
-                // Initialize Geocoder control for search AFTER map is ready
-                geocoderControl = L.Control.geocoder({
-                    defaultMarkGeocodedLocation: false, // We'll manage the marker manually
-                    placeholder: 'Search for delivery location...',
-                    collapsed: false, // Keep search bar open
-                    position: 'topleft',
-                    geocoder: L.Control.Geocoder.nominatim({
-                        serviceUrl: 'https://nominatim.openstreetmap.org/search/'
-                    })
-                }).addTo(map);
-                console.log('Geocoder control added after map ready.');
-
-                // Listen for geocoding results and move the delivery marker
-                geocoderControl.on('markgeocode', function(e) {
-                    const latLng = e.geocode.center;
-                    map.setView(latLng, 16); // Zoom to the result
-                    deliveryMarker.setLatLng(latLng); // Move delivery marker to the result
-                    customerLocation = {
-                        latitude: latLng.lat,
-                        longitude: latLng.lng
-                    };
-                    mapLocationStatus.textContent = `Selected: ${e.geocode.name}`;
-                    console.log('Location selected via search:', customerLocation);
-                });
-
-                // Now attempt to get current live location
-                getCurrentLocationForMap();
-            });
+            } catch (e) {
+                console.error('Error initializing Leaflet map:', e);
+                mapLoadingOverlay.classList.add('hidden');
+                mapErrorMessage.classList.remove('hidden'); // Show error message
+                mapInitialized = false; // Ensure flag is false if initialization fails
+                showNotification('Map failed to load. Please try again.', 'error');
+            }
         }
 
         // Get current location for map initialization and marker placement (using getCurrentPosition then watchPosition)
         function getCurrentLocationForMap() {
+            if (!mapInitialized || !map) {
+                console.warn('getCurrentLocationForMap: Map not initialized, cannot get location.');
+                mapLoadingOverlay.classList.add('hidden');
+                mapErrorMessage.classList.remove('hidden');
+                mapLocationStatus.textContent = 'Map not initialized. Cannot get location.';
+                return;
+            }
             mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
             mapLocationStatus.textContent = 'Attempting to get your initial GPS location...';
             console.log('getCurrentLocationForMap: Starting initial GPS fetch.');
@@ -904,6 +929,7 @@
                 mapLocationStatus.textContent = 'Geolocation is not supported by your browser. Please search for a location or drag the marker.';
                 showNotification('Geolocation not supported. Please search for a location or drag the marker.', 'error');
                 mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
+                mapErrorMessage.classList.remove('hidden'); // Show error message
                 console.warn('Geolocation not supported.');
                 return;
             }
@@ -912,6 +938,7 @@
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     mapLoadingOverlay.classList.add('hidden'); // Hide spinner on first successful location
+                    mapErrorMessage.classList.add('hidden'); // Hide error message on success
                     const latLng = [position.coords.latitude, position.coords.longitude];
                     lastKnownLiveCoords = { latitude: position.coords.latitude, longitude: position.coords.longitude }; // Store last known live coords
 
@@ -947,6 +974,7 @@
                     mapLocationStatus.textContent = errorMessage;
                     showNotification(errorMessage, 'error');
                     mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
+                    mapErrorMessage.classList.remove('hidden'); // Show error message
                     // Even if initial fails, try to start watcher for later updates
                     startGeolocationWatcher(); 
                 },
@@ -960,6 +988,7 @@
             geolocationWatcherId = navigator.geolocation.watchPosition(
                 (position) => {
                     mapLoadingOverlay.classList.add('hidden'); // Ensure spinner is hidden
+                    mapErrorMessage.classList.add('hidden'); // Hide error message on success
                     const latLng = [position.coords.latitude, position.coords.longitude];
                     lastKnownLiveCoords = { latitude: position.coords.latitude, longitude: position.coords.longitude }; // Update last known live coords
 
@@ -997,6 +1026,7 @@
                     mapLocationStatus.textContent = errorMessage;
                     showNotification(errorMessage, 'error');
                     mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
+                    mapErrorMessage.classList.remove('hidden'); // Show error message
                     clearGeolocationWatcher(); // Stop watching on error
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -1025,6 +1055,7 @@
                 mapInitialized = false; // Reset flag
                 console.log('Map and geolocation resources cleaned up.');
             }
+            mapErrorMessage.classList.add('hidden'); // Ensure error message is hidden on cleanup
         }
 
         // Save the delivery location from the map
