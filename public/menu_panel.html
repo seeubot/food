@@ -427,6 +427,7 @@
         let shopSettings = null;
         let deliveryCost = 0;
         let lastScrollTop = 0; // For header hide/show on scroll
+        let geolocationWatcherId = null; // To store the ID returned by watchPosition
         const header = document.getElementById('mainHeader'); // Reference to the header
 
         // DOM elements
@@ -477,11 +478,17 @@
             // Delivery Location Map Modal
             document.getElementById('openLocationMapBtn').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
-                initMap(); // Initialize map when map modal opens
+                // IMPORTANT: Call invalidateSize after the modal is visible
+                // A small timeout ensures the modal is fully rendered before map tries to size itself
+                setTimeout(() => {
+                    initMap(); 
+                    if (map) map.invalidateSize();
+                }, 100); 
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
-                // Destroy map instance when modal is closed to prevent issues
+                // Destroy map instance and clear watcher when modal is closed
+                clearGeolocationWatcher();
                 if (map) {
                     map.remove();
                     map = null;
@@ -799,26 +806,34 @@
             getCurrentLocationForMap();
         }
 
-        // Get current location for map initialization and marker placement
+        // Get current location for map initialization and marker placement (using watchPosition)
         function getCurrentLocationForMap() {
-            mapLocationStatus.textContent = 'Getting your current GPS location...';
+            mapLocationStatus.textContent = 'Getting your current GPS location (real-time updates)...';
+            // Clear any existing watcher first
+            clearGeolocationWatcher();
+
             if (!navigator.geolocation) {
                 mapLocationStatus.textContent = 'Geolocation is not supported by your browser. Please search for a location or drag the marker.';
                 showNotification('Geolocation not supported. Please search for a location or drag the marker.', 'error');
                 return;
             }
 
-            navigator.geolocation.getCurrentPosition(
+            // Start watching position
+            geolocationWatcherId = navigator.geolocation.watchPosition(
                 (position) => {
                     const latLng = [position.coords.latitude, position.coords.longitude];
-                    map.setView(latLng, 16); // Set map view to current location
+                    // Only update map view if the accuracy is good enough (e.g., < 100m)
+                    // and if the map is not currently being dragged by the user
+                    if (position.coords.accuracy < 100 && !map.dragging.enabled()) {
+                        map.setView(latLng, 16); // Set map view to current location
+                    }
                     deliveryMarker.setLatLng(latLng); // Move marker to current location
                     customerLocation = {
                         latitude: position.coords.latitude,
                         longitude: position.coords.longitude
                     };
-                    mapLocationStatus.textContent = `Your current location: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}`;
-                    showNotification('Current location set on map!', 'success');
+                    mapLocationStatus.textContent = `Your current location: Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)} (Accuracy: ${position.coords.accuracy.toFixed(0)}m)`;
+                    showNotification('Current location updating on map!', 'success');
                 },
                 (error) => {
                     console.error('Error getting location:', error);
@@ -831,9 +846,19 @@
                     mapLocationStatus.textContent = errorMessage;
                     customerLocation = null; // Reset location
                     showNotification(errorMessage, 'error');
+                    clearGeolocationWatcher(); // Stop watching on error
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
+        }
+
+        // Function to clear the geolocation watcher
+        function clearGeolocationWatcher() {
+            if (geolocationWatcherId !== null) {
+                navigator.geolocation.clearWatch(geolocationWatcherId);
+                geolocationWatcherId = null;
+                console.log('Geolocation watcher stopped.');
+            }
         }
 
         // Save the delivery location from the map
@@ -848,6 +873,9 @@
                 latitude: latLng.lat,
                 longitude: latLng.lng
             };
+
+            // Stop the real-time location watcher once location is saved
+            clearGeolocationWatcher();
 
             // Update hidden inputs in checkout form
             document.getElementById('customerLatitude').value = customerLocation.latitude;
@@ -996,6 +1024,7 @@
                     deliveryMarker = null;
                     geocoderControl = null;
                 }
+                clearGeolocationWatcher(); // Ensure watcher is stopped on checkout completion
             }
         }
 
@@ -1062,11 +1091,14 @@
                 const modalId = e.target.id;
                 toggleModal(modalId);
                 // If deliveryLocationModal is closed, destroy map
-                if (modalId === 'deliveryLocationModal' && map) {
-                    map.remove();
-                    map = null;
-                    deliveryMarker = null;
-                    geocoderControl = null;
+                if (modalId === 'deliveryLocationModal') {
+                    clearGeolocationWatcher(); // Ensure watcher is stopped
+                    if (map) {
+                        map.remove();
+                        map = null;
+                        deliveryMarker = null;
+                        geocoderControl = null;
+                    }
                 }
             }
         });
