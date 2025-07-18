@@ -528,7 +528,8 @@
                 setTimeout(() => {
                     initMap(); 
                     if (map) map.invalidateSize(); // Force map to redraw
-                }, 100); 
+                    console.log('Map invalidateSize called after modal visible.');
+                }, 250); // Increased timeout for better reliability 
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
@@ -541,6 +542,7 @@
                     liveMarker = null;
                     userCircle = null;
                     geocoderControl = null;
+                    console.log('Map instance destroyed.');
                 }
             });
             document.getElementById('mapGetCurrentLocation').addEventListener('click', getCurrentLocationForMap);
@@ -555,6 +557,7 @@
                         liveMarker.openPopup();
                         setTimeout(()=>liveMarker._icon.classList.remove("live-marker-anim"), 1200);
                     }
+                    console.log('Recentered map to last known live location.');
                 } else {
                     showNotification('Live location not yet available. Please enable GPS and try again.', 'warning');
                 }
@@ -821,9 +824,11 @@
 
         // Initialize Leaflet Map in the popup modal
         function initMap() {
+            console.log('initMap: Function started.');
             mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
             if (map) {
                 map.remove(); // Remove existing map if any
+                console.log('Existing map instance removed.');
             }
 
             // Esri World Imagery (Satellite) tile layer
@@ -843,12 +848,14 @@
                 zoomControl: false, // Hide default zoom control
                 attributionControl: true // Keep attribution
             });
+            console.log('Map initialized with center:', initialCenter, 'zoom:', initialZoom);
 
             // Add a draggable delivery marker
             deliveryMarker = L.marker(initialCenter, { // Place marker at initial center
                 icon: pinIcon, // Use the new pin icon
                 draggable: true
             }).addTo(map);
+            console.log('Delivery marker added.');
 
             // Update customerLocation when delivery marker is dragged
             deliveryMarker.on('dragend', function(e) {
@@ -858,7 +865,7 @@
                     longitude: latLng.lng
                 };
                 mapLocationStatus.textContent = `Pinned: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
-                // No need to calculate delivery cost here, it will be done on Save Location
+                console.log('Delivery marker dragged to:', customerLocation);
             });
 
             // Initialize Geocoder control for search
@@ -871,6 +878,7 @@
                     serviceUrl: 'https://nominatim.openstreetmap.org/search/'
                 })
             }).addTo(map);
+            console.log('Geocoder control added.');
 
             // Listen for geocoding results and move the delivery marker
             geocoderControl.on('markgeocode', function(e) {
@@ -882,6 +890,7 @@
                     longitude: latLng.lng
                 };
                 mapLocationStatus.textContent = `Selected: ${e.geocode.name}`;
+                console.log('Location selected via search:', customerLocation);
             });
 
             // Attempt to get current live location on map init
@@ -891,7 +900,8 @@
         // Get current location for map initialization and marker placement (using watchPosition)
         function getCurrentLocationForMap() {
             mapLoadingOverlay.classList.remove('hidden'); // Show map loading spinner
-            mapLocationStatus.textContent = 'Getting your current GPS location (real-time updates)...';
+            mapLocationStatus.textContent = 'Attempting to get your GPS location (real-time updates)...';
+            console.log('getCurrentLocationForMap: Attempting to get live location.');
             // Clear any existing watcher first
             clearGeolocationWatcher();
 
@@ -899,6 +909,7 @@
                 mapLocationStatus.textContent = 'Geolocation is not supported by your browser. Please search for a location or drag the marker.';
                 showNotification('Geolocation not supported. Please search for a location or drag the marker.', 'error');
                 mapLoadingOverlay.classList.add('hidden'); // Hide spinner on error
+                console.warn('Geolocation not supported.');
                 return;
             }
 
@@ -914,6 +925,7 @@
                         liveMarker.setLatLng(latLng);
                     } else {
                         liveMarker = L.marker(latLng, {icon:liveSVGIcon()}).addTo(map);
+                        console.log('Live marker added.');
                     }
                     liveMarker.bindPopup(`You're here!<br>Accuracy: ±${Math.round(position.coords.accuracy)}m`).openPopup();
 
@@ -924,23 +936,26 @@
                         userCircle = L.circle(latLng, {
                             radius:position.coords.accuracy, color:'#1976d2', fillColor:'#90caf9', fillOpacity:0.12, opacity:0.19
                         }).addTo(map);
+                        console.log('Accuracy circle added.');
                     }
                     
                     // Only update map view if the accuracy is good enough (< 100m)
                     // and if the map is not currently being dragged by the user
                     if (position.coords.accuracy < 100 && !map.dragging.enabled()) {
                         map.setView(latLng, 16); // Set map view to current location
+                        console.log('Map view updated to live location (good accuracy).');
                     }
                     
                     mapLocationStatus.textContent = `Your current location: Lat: ${lastKnownLiveCoords.latitude.toFixed(4)}, Lon: ${lastKnownLiveCoords.longitude.toFixed(4)} (Accuracy: ${position.coords.accuracy.toFixed(0)}m)`;
+                    // showNotification('Current location updating on map!', 'success'); // Too frequent notification
                 },
                 (error) => {
                     console.error('Error getting location:', error);
                     let errorMessage = 'Could not get current location. Please search for a location or drag the marker.';
                     if (error.code === error.PERMISSION_DENIED) {
-                        errorMessage = 'Location access denied. Please enable location services for this site or search manually.';
+                        errorMessage = 'Geolocation permission denied. Please enable location services for this site or search manually.';
                     } else if (error.code === error.TIMEOUT) {
-                        errorMessage = 'Location request timed out. Please try again or search manually.';
+                        errorMessage = 'Geolocation request timed out. Please try again or search manually.';
                     }
                     mapLocationStatus.textContent = errorMessage;
                     // customerLocation = null; // Do not reset customerLocation here, it's for delivery point
@@ -973,6 +988,7 @@
                 latitude: latLng.lat,
                 longitude: latLng.lng
             };
+            console.log('Saving delivery location:', customerLocation);
 
             // Stop the real-time location watcher once location is saved
             clearGeolocationWatcher();
@@ -991,10 +1007,12 @@
                         document.getElementById('deliveryAddress').value = `Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
                         selectedLocationDisplay.textContent = `Delivery location: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
                     }
+                    console.log('Reverse geocoded address:', document.getElementById('deliveryAddress').value);
                 });
             } else {
                 document.getElementById('deliveryAddress').value = `Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
                 selectedLocationDisplay.textContent = `Delivery location: Lat: ${latLng.lat.toFixed(4)}, Lon: ${latLng.lng.toFixed(4)}`;
+                console.log('No geocoder, set address from coordinates:', document.getElementById('deliveryAddress').value);
             }
             
             await calculateDeliveryCost(); // Calculate delivery cost after saving location
@@ -1010,10 +1028,12 @@
                 updateCartSummary();
                 updateCheckoutSummary(); // Also update checkout summary if it's open
                 selectedLocationDisplay.textContent = 'Shop settings or delivery rates not configured. Delivery cost is 0.';
+                console.warn('Cannot calculate delivery cost: Missing customerLocation, shopSettings, or deliveryRates.');
                 return;
             }
 
             try {
+                console.log('Calculating delivery cost for customerLocation:', customerLocation);
                 const response = await fetch('/api/calculate-delivery-cost', {
                     method: 'POST',
                     headers: {
@@ -1032,6 +1052,7 @@
                 updateCartSummary();
                 updateCheckoutSummary();
                 selectedLocationDisplay.textContent += ` (Delivery: ₹${deliveryCost.toFixed(2)})`;
+                console.log(`Delivery cost calculated: ₹${deliveryCost.toFixed(2)}`);
             } catch (error) {
                 console.error('Error calculating delivery cost:', error);
                 deliveryCost = 0; // Default to 0 on error
@@ -1054,6 +1075,7 @@
 
             placeOrderBtn.disabled = true;
             placeOrderBtn.innerHTML = '<div class="loading-spinner"></div> Placing Order...';
+            console.log('Attempting to place order...');
 
             try {
                 const customerName = document.getElementById('customerName').value;
@@ -1081,6 +1103,7 @@
                     transportTax: deliveryCost,
                     totalAmount
                 };
+                console.log('Order data being sent:', orderData);
 
                 const response = await fetch('/api/order', {
                     method: 'POST',
@@ -1096,6 +1119,7 @@
                 }
 
                 const result = await response.json();
+                console.log('Order placed successfully, response:', result);
                 
                 // Clear cart and close modals
                 cart = [];
@@ -1159,15 +1183,17 @@
         }
 
 
-        // Toggle modal
+        // Toggle modal - ensures flex is added before hidden is removed
         function toggleModal(modalId) {
             const modal = document.getElementById(modalId);
             if (modal.classList.contains('hidden')) {
                 modal.classList.add('flex'); // Add flex first
                 modal.classList.remove('hidden');
+                console.log(`${modalId} opened.`);
             } else {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex'); // Remove flex after hidden
+                console.log(`${modalId} closed.`);
             }
         }
 
@@ -1207,6 +1233,7 @@
                         liveMarker = null;
                         userCircle = null;
                         geocoderControl = null;
+                        console.log('Map instance destroyed by outside click.');
                     }
                 }
             }
