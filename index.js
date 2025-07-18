@@ -428,8 +428,12 @@ async function loadAndInitializeClient() {
                 case '1':
                 case '!profile':
                 case 'profile':
-                    await msg.reply(`Aapka profile yahaan hai! (Your profile is here!) Your registered WhatsApp number is: ${senderNumber}. We're working on adding more personalized profile features soon. Stay tuned!`);
-                    console.log(`Replied to ${senderNumber} with profile info.`);
+                    try {
+                        await client.sendMessage(msg.from, `Aapka profile yahaan hai! (Your profile is here!) Your registered WhatsApp number is: ${senderNumber}. We're working on adding more personalized profile features soon. Stay tuned!`);
+                        console.log(`Replied to ${senderNumber} with profile info.`);
+                    } catch (error) {
+                        console.error(`Error sending profile message to ${senderNumber}:`, error);
+                    }
                     break;
                 case '2':
                 case '!orders':
@@ -441,15 +445,27 @@ async function loadAndInitializeClient() {
                             customerOrders.forEach((order, index) => {
                                 orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
                             });
-                            await msg.reply(orderList + '\nFor more details, visit the web menu or contact support.');
-                            console.log(`Replied to ${senderNumber} with recent orders.`);
+                            try {
+                                await client.sendMessage(msg.from, orderList + '\nFor more details, visit the web menu or contact support.');
+                                console.log(`Replied to ${senderNumber} with recent orders.`);
+                            } catch (error) {
+                                console.error(`Error sending order list message to ${senderNumber}:`, error);
+                            }
                         } else {
-                            await msg.reply('You have no recent orders. Why not place one now? Reply with *1* for menu.');
-                            console.log(`Replied to ${senderNumber} with no recent orders message.`);
+                            try {
+                                await client.sendMessage(msg.from, 'You have no recent orders. Why not place one now? Reply with *1* for menu.');
+                                console.log(`Replied to ${senderNumber} with no recent orders message.`);
+                            } catch (error) {
+                                console.error(`Error sending no orders message to ${senderNumber}:`, error);
+                            }
                         }
                     } catch (error) {
                         console.error('Error fetching orders for bot:', error);
-                        await msg.reply('Sorry, I could not fetch your orders at the moment. Please try again later.');
+                        try {
+                            await client.sendMessage(msg.from, 'Sorry, I could not fetch your orders at the moment. Please try again later.');
+                        } catch (error) {
+                            console.error(`Error sending generic error message to ${senderNumber}:`, error);
+                        }
                     }
                     break;
                 case '3':
@@ -457,24 +473,36 @@ async function loadAndInitializeClient() {
                 case 'help':
                 case '!support':
                 case 'support':
-                    await msg.reply('For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
-                    console.log(`Replied to ${senderNumber} with help message.`);
+                    try {
+                        await client.sendMessage(msg.from, 'For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
+                        console.log(`Replied to ${senderNumber} with help message.`);
+                    } catch (error) {
+                        console.error(`Error sending help message to ${senderNumber}:`, error);
+                    }
                     break;
                 case 'menu': // Explicitly handle 'menu' as a direct link request
-                    await msg.reply(`Check out our delicious menu here: ${menuUrl}`);
-                    console.log(`Replied to ${senderNumber} with direct menu link.`);
+                    try {
+                        await client.sendMessage(msg.from, `Check out our delicious menu here: ${menuUrl}`);
+                        console.log(`Replied to ${senderNumber} with direct menu link.`);
+                    } catch (error) {
+                        console.error(`Error sending menu link message to ${senderNumber}:`, error);
+                    }
                     break;
                 default:
                     // Default response: send the welcome message for any other input
-                    await msg.reply(welcomeMessage);
-                    console.log(`Replied to ${senderNumber} with welcome message (default).`);
+                    try {
+                        await client.sendMessage(msg.from, welcomeMessage);
+                        console.log(`Replied to ${senderNumber} with welcome message (default).`);
+                    } catch (error) {
+                        console.error(`Error sending welcome message to ${senderNumber}:`, error);
+                    }
                     break;
             }
         } catch (error) {
             console.error(`Error processing message from ${msg.from}:`, error);
             // Attempt to send a generic error message back to the user
             try {
-                await msg.reply('Sorry, something went wrong while processing your request. Please try again or contact support.');
+                await client.sendMessage(msg.from, 'Sorry, something went wrong while processing your request. Please try again or contact support.');
             } catch (replyError) {
                 console.error(`Failed to send error reply to ${msg.from}:`, replyError);
             }
@@ -845,7 +873,11 @@ app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
         console.log(`Order ${id} updated successfully to status: ${order.status}`);
         // Optional: Notify customer via WhatsApp about status update
         if (clientReady && client) { // Only send if client is ready and not null
-            client.sendMessage(order.customerPhone + '@c.us', `Your order #${order._id.toString().substring(0,6)} has been updated to: ${order.status}`);
+            try {
+                await client.sendMessage(order.customerPhone + '@c.us', `Your order #${order._id.toString().substring(0,6)} has been updated to: ${order.status}`);
+            } catch (error) {
+                console.error(`Error sending WhatsApp notification to customer ${order.customerPhone}:`, error);
+            }
         } else {
             console.warn(`WhatsApp client not ready or null, cannot notify customer ${order.customerPhone} about order status update.`);
         }
@@ -1136,9 +1168,12 @@ app.post('/api/order', async (req, res) => {
                                  `Payment Method: ${newOrder.paymentMethod}\n` + // Include payment method in admin notification
                                  `Address: ${newOrder.deliveryAddress}\n\n` +
                                  `View on Dashboard: ${baseUrl}/admin/dashboard`;
-            client.sendMessage(ADMIN_NUMBER + '@c.us', adminMessage)
-                .then(() => console.log('Admin notified via WhatsApp for new order'))
-                .catch(err => console.error('Error sending WhatsApp notification to admin:', err));
+            try {
+                await client.sendMessage(ADMIN_NUMBER + '@c.us', adminMessage);
+                console.log('Admin notified via WhatsApp for new order');
+            } catch (error) {
+                console.error('Error sending WhatsApp notification to admin:', error);
+            }
         } else {
             console.warn('WhatsApp client not ready or null, cannot send admin notification.');
         }
