@@ -445,11 +445,11 @@
                         console.log('Leaflet scripts loaded. Preparing map initialization with requestAnimationFrame...');
                         // Use requestAnimationFrame for robust layout calculation
                         requestAnimationFrame(() => {
-                            // A second requestAnimationFrame or a setTimeout(0) can sometimes help for complex layouts
+                            // A setTimeout(0) can sometimes help for complex layouts after rAF
                             setTimeout(() => {
                                 console.log('Calling initMap after requestAnimationFrame and setTimeout(0).');
                                 initMap();
-                            }, 0); // Use 0ms timeout to put it at the end of the event queue
+                            }, 0); 
                         });
                     }).catch(error => {
                         console.error('Failed to load Leaflet scripts:', error);
@@ -459,11 +459,11 @@
                     console.log('Leaflet scripts already loaded. Preparing map initialization with requestAnimationFrame...');
                     // Use requestAnimationFrame for robust layout calculation
                     requestAnimationFrame(() => {
-                        // A second requestAnimationFrame or a setTimeout(0) can sometimes help for complex layouts
+                        // A setTimeout(0) can sometimes help for complex layouts after rAF
                         setTimeout(() => {
                             console.log('Calling initMap after requestAnimationFrame and setTimeout(0) (scripts already loaded).');
                             initMap();
-                        }, 0); // Use 0ms timeout to put it at the end of the event queue
+                        }, 0); 
                     });
                 }
             });
@@ -495,6 +495,7 @@
                     console.log("Leaflet.js already loaded.");
                     // Check if Geocoder is also loaded, if not, load it
                     if (typeof L.Control.Geocoder === 'undefined') {
+                        console.log("Attempting to load Leaflet-Control-Geocoder.js...");
                         const geocoderScript = document.createElement('script');
                         geocoderScript.src = "https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js";
                         geocoderScript.onload = () => {
@@ -514,6 +515,7 @@
                 }
 
                 // Load Leaflet.js first
+                console.log("Attempting to load Leaflet.js...");
                 const leafletScript = document.createElement('script');
                 leafletScript.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
                 leafletScript.integrity = "sha256-20nQCchB9co0qIjGwZZ1Xz0GbnSe75Lp9js+9dxFVQ=";
@@ -523,6 +525,7 @@
                     console.log("Leaflet.js loaded successfully.");
 
                     // Then load Leaflet-Control-Geocoder.js
+                    console.log("Attempting to load Leaflet-Control-Geocoder.js...");
                     const geocoderScript = document.createElement('script');
                     geocoderScript.src = "https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js";
                     geocoderScript.onload = () => {
@@ -776,7 +779,8 @@
         function initMap() {
             // Ensure Leaflet (L) is available before proceeding
             if (typeof L === 'undefined' || !L.map) {
-                showMapError("Leaflet library not loaded. Cannot initialize map.");
+                showMapError("Leaflet library not loaded. Cannot initialize map. Please try refreshing the page.");
+                console.error("CRITICAL: L is undefined or L.map is not a function. Leaflet library failed to load.");
                 return;
             }
 
