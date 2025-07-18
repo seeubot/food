@@ -164,6 +164,15 @@
             transform: translateY(-100%);
         }
 
+        /* Map specific styles */
+        #map {
+            height: 300px; /* Fixed height for the map */
+            width: 100%;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            background-color: #333; /* Dark background for map while loading */
+        }
+
         /* Specific style for the "Use My Current Location" button */
         #getLoc {
             background-color: #ffffff !important; /* White background */
@@ -282,7 +291,7 @@
                     <textarea id="deliveryAddress" required rows="3" class="w-full px-3 py-2" placeholder="Enter your complete delivery address"></textarea>
                 </div>
 
-                <!-- Button to open Location Selection (now non-map based) -->
+                <!-- Button to open Location Selection Map -->
                 <button type="button" id="openLocationMapBtn" class="btn-primary w-full py-3 rounded-lg font-semibold">
                     📍 Select Delivery Location
                 </button>
@@ -314,7 +323,7 @@
         </div>
     </div>
 
-    <!-- Delivery Location Modal (NOW NON-VISUAL MAP) -->
+    <!-- Delivery Location Map Modal -->
     <div id="deliveryLocationModal" class="modal fixed inset-0 hidden items-center justify-center z-50 modal-bg">
         <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-2 shadow-lg">
             <div class="flex justify-between items-center mb-3">
@@ -323,11 +332,8 @@
             </div>
             <div id="errorBanner" class="hidden bg-red-700 text-white p-4 mb-2 rounded text-center"></div>
             
-            <!-- New: Manual Address Input -->
-            <div class="mb-3">
-                <label for="manualAddressInput" class="block text-white text-sm font-medium mb-2">Enter Address Manually (Optional)</label>
-                <input type="text" id="manualAddressInput" class="w-full px-3 py-2" placeholder="e.g., 123 Main St, City, State, Country">
-            </div>
+            <!-- Map Container -->
+            <div id="map" class="mb-3"></div>
 
             <p id="locationStatus" class="text-sm text-gray-300 text-center mb-2"></p>
             <div class="flex flex-col sm:flex-row gap-2 mb-1">
@@ -335,7 +341,7 @@
                 <button id="getLoc" class="bg-white text-black px-4 py-2 rounded font-semibold flex-1 flex items-center justify-center">📍 Use My Current Location</button>
                 <button id="saveLoc" class="bg-gray-600 text-white px-4 py-2 rounded font-semibold flex-1">Save Location</button>
             </div>
-            <div class="text-gray-400 text-xs text-center mt-2" id="coordsDisp">No location selected</div>
+            <div class="text-gray-400 text-xs text-center mt-2" id="coordsDisp">No pin placed</div>
         </div>
     </div>
 
@@ -361,6 +367,10 @@
 
 
     <script>
+        // IMPORTANT: Replace 'YOUR_GOOGLE_MAPS_API_KEY' with your actual Google Maps API Key
+        // Ensure the API key has "Maps JavaScript API" and "Geolocation API" enabled.
+        const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY'; 
+
         // Global variables
         let menuItems = [];
         let cart = [];
@@ -384,13 +394,19 @@
         const productDetailAddToCartBtn = document.getElementById('productDetailAddToCartBtn'); // Add to cart button in detail modal
         const placeOrderBtn = document.getElementById('placeOrderBtn'); // Reference to place order button
 
-        // Location related DOM elements
+        // Map related DOM elements
         const errorBanner = document.getElementById('errorBanner');
         const locationStatus = document.getElementById('locationStatus');
         const coordsDisp = document.getElementById('coordsDisp');
         const getLocBtn = document.getElementById('getLoc');
         const saveLocBtn = document.getElementById('saveLoc');
-        const manualAddressInput = document.getElementById('manualAddressInput'); // New manual input
+        const mapDiv = document.getElementById('map'); // Reference to the map container
+
+        // Google Maps variables
+        let map = null;
+        let userMarker = null;
+        let geocoder = null; // Google Maps Geocoder service
+        let googleMapsLoaded = false; // Flag to track Google Maps script loading
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
@@ -417,26 +433,32 @@
             });
             document.getElementById('closeCheckoutModal').addEventListener('click', () => toggleModal('checkoutModal'));
             
-            // Delivery Location Modal (now non-map based)
+            // Delivery Location Map Modal
             document.getElementById('openLocationMapBtn').addEventListener('click', () => {
                 errorBanner.classList.add('hidden'); // Hide any previous error message
-                locationStatus.textContent = "Use current location or enter address.";
-                coordsDisp.textContent = "No location selected";
-                // If a location was previously selected, populate manual input for editing
-                if (customerLocation && customerLocation.address) {
-                    manualAddressInput.value = customerLocation.address;
-                    coordsDisp.textContent = `Selected: ${customerLocation.latitude.toFixed(6)}, ${customerLocation.longitude.toFixed(6)}`;
-                } else {
-                    manualAddressInput.value = '';
-                }
                 toggleModal('deliveryLocationModal');
+                // Dynamically load Google Maps JS only when modal opens
+                if (!googleMapsLoaded) {
+                    loadGoogleMapsScript().then(() => {
+                        console.log('Google Maps scripts loaded. Initializing map...');
+                        initMap();
+                    }).catch(error => {
+                        console.error('Failed to load Google Maps scripts:', error);
+                        showNotification('Failed to load map components. Please check your internet connection and API key.', 'error');
+                        showMapError('Failed to load map. Check console for details.');
+                    });
+                } else {
+                    console.log('Google Maps scripts already loaded. Re-initializing map...');
+                    initMap(); // Re-initialize map if already loaded
+                }
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
                 toggleModal('deliveryLocationModal');
+                cleanupMap(); // Clean up map resources
             });
 
-            // Location button listeners
-            getLocBtn.addEventListener('click', getGeolocationAndSetLocation);
+            // Map button listeners
+            getLocBtn.addEventListener('click', getGeolocationAndSetMap);
             saveLocBtn.addEventListener('click', saveDeliveryLocation);
             
             // Product Detail Modal
@@ -447,6 +469,36 @@
 
             // Scroll event for header
             window.addEventListener('scroll', handleScroll);
+        }
+
+        // Dynamically load Google Maps JavaScript API
+        function loadGoogleMapsScript() {
+            return new Promise((resolve, reject) => {
+                // Check if google.maps object already exists
+                if (typeof google !== 'undefined' && google.maps) {
+                    googleMapsLoaded = true;
+                    console.log("Google Maps API already loaded.");
+                    resolve();
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMapCallback`;
+                script.async = true;
+                script.defer = true;
+                script.onerror = (e) => {
+                    console.error("Failed to load Google Maps script:", e);
+                    reject(new Error("Failed to load Google Maps script."));
+                };
+                document.head.appendChild(script);
+
+                // Global callback function required by Google Maps API
+                window.initMapCallback = () => {
+                    googleMapsLoaded = true;
+                    console.log("Google Maps API loaded successfully via callback.");
+                    resolve();
+                };
+            });
         }
 
         // Handle header hide/show on scroll
@@ -668,56 +720,155 @@
             document.getElementById('checkoutTotal').textContent = `₹${(subtotal + deliveryCost).toFixed(2)}`;
         }
 
-        // --- Location Functions (Non-Visual Map) ---
+        // --- Google Maps Functions ---
 
-        // Helper to show location-specific error messages
-        function showLocationError(msg) {
+        // Helper to show map-specific error messages
+        function showMapError(msg) {
             errorBanner.classList.remove("hidden");
             errorBanner.textContent = msg;
-            locationStatus.textContent = "Location Error.";
-            console.error("Location Error:", msg);
+            locationStatus.textContent = "Map or Geolocation Error.";
+            console.error("Map Error:", msg);
         }
 
-        // Gets current geolocation and sets the location data
-        function getGeolocationAndSetLocation() {
+        // Initialize the Google Map
+        function initMap() {
+            // Ensure google.maps object is available
+            if (typeof google === 'undefined' || !google.maps) {
+                showMapError("Google Maps API not loaded. Cannot initialize map.");
+                return;
+            }
+
+            // If map already exists, destroy it for a clean re-initialization
+            if (map) {
+                console.log('initMap: Map already initialized. Destroying existing instance.');
+                // Google Maps doesn't have a direct 'destroy' method like Leaflet.
+                // We just null out the map object and let garbage collection handle it.
+                // Re-creating it in the same div will overwrite the old one.
+                map = null; 
+                userMarker = null;
+                mapDiv.innerHTML = ''; // Clear the div content
+            }
+
+            console.log('initMap: Attempting to initialize Google Map...');
+            errorBanner.classList.add("hidden"); // Hide any previous error
+
+            // Default location (India)
+            const defaultLat = 22.5937;
+            const defaultLng = 78.9629;
+            let initialLatLng = { lat: defaultLat, lng: defaultLng };
+            let initialZoom = 5; // Country level zoom
+
+            // If a location was previously selected, use it as the initial center
+            if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
+                initialLatLng = { lat: customerLocation.latitude, lng: customerLocation.longitude };
+                initialZoom = 16; // Zoom in to street level
+            }
+
+            map = new google.maps.Map(mapDiv, {
+                center: initialLatLng,
+                zoom: initialZoom,
+                mapTypeId: 'hybrid', // Hybrid view (satellite with roads)
+                fullscreenControl: false,
+                mapTypeControl: false,
+                streetViewControl: false,
+                zoomControl: true,
+                scaleControl: true,
+                gestureHandling: 'greedy' // Allow single-finger pan on mobile
+            });
+            console.log('Google Map instance created.');
+
+            geocoder = new google.maps.Geocoder();
+
+            // Place initial marker
+            userMarker = new google.maps.Marker({
+                position: initialLatLng,
+                map: map,
+                draggable: true,
+                title: "Your Delivery Location"
+            });
+            console.log('Initial marker placed.');
+
+            // Event listener for marker drag end
+            userMarker.addListener('dragend', () => {
+                const newPosition = userMarker.getPosition();
+                updateLocationAndAddress(newPosition.lat(), newPosition.lng());
+                console.log('Marker dragged to:', newPosition.lat(), newPosition.lng());
+            });
+
+            // Event listener for map clicks
+            map.addListener('click', (e) => {
+                updateLocationAndAddress(e.latLng.lat(), e.latLng.lng());
+                console.log('Map clicked at:', e.latLng.lat(), e.latLng.lng());
+            });
+
+            // Try to get current geolocation if no previous location was set
+            if (!customerLocation) {
+                getGeolocationAndSetMap();
+            } else {
+                // If a previous location was set, update display with its address
+                updateLocationAndAddress(customerLocation.latitude, customerLocation.longitude);
+            }
+        }
+
+        // Updates customerLocation and performs reverse geocoding
+        function updateLocationAndAddress(lat, lng) {
+            const latLng = { lat: lat, lng: lng };
+            userMarker.setPosition(latLng); // Move marker to new position
+            map.setCenter(latLng); // Center map on marker
+
+            customerLocation = { latitude: lat, longitude: lng }; // Temporarily save coords
+
+            coordsDisp.textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lng.toFixed(6)}`;
+            locationStatus.textContent = "Getting address...";
+
+            geocoder.geocode({ 'location': latLng }, (results, status) => {
+                if (status === 'OK') {
+                    if (results[0]) {
+                        customerLocation.address = results[0].formatted_address;
+                        locationStatus.textContent = `Address: ${customerLocation.address}`;
+                        console.log('Reverse geocoded address:', customerLocation.address);
+                    } else {
+                        customerLocation.address = `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`;
+                        locationStatus.textContent = "No address found for this location.";
+                        console.warn('No address results found for reverse geocoding.');
+                    }
+                } else {
+                    customerLocation.address = `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`;
+                    locationStatus.textContent = `Geocoder failed: ${status}. Coordinates saved.`;
+                    console.error('Geocoder failed due to: ' + status);
+                }
+            });
+        }
+
+        // Gets current geolocation and sets the map view/marker
+        function getGeolocationAndSetMap() {
             errorBanner.classList.add("hidden");
             if (!navigator.geolocation) {
-                showLocationError("Geolocation not supported by your browser. Please enter your address manually.");
+                showMapError("Geolocation not supported by your browser. Please manually select a location on the map.");
                 return;
             }
             locationStatus.textContent = "Locating your position...";
             console.log('Attempting to get current geolocation...');
 
             navigator.geolocation.getCurrentPosition(
-                async function(pos) {
+                function(pos) {
                     let lat = pos.coords.latitude;
                     let lng = pos.coords.longitude;
-                    coordsDisp.textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lng.toFixed(6)}`;
-                    locationStatus.textContent = "Location found! Getting address...";
-
-                    try {
-                        const address = await reverseGeocode(lat, lng);
-                        customerLocation = { latitude: lat, longitude: lng, address: address };
-                        manualAddressInput.value = address; // Populate manual input
-                        locationStatus.textContent = "Location and address retrieved!";
-                        showNotification('Current location found and address populated.', 'success');
-                    } catch (error) {
-                        console.error("Reverse geocoding failed:", error);
-                        customerLocation = { latitude: lat, longitude: lng, address: `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}` };
-                        manualAddressInput.value = `Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}`;
-                        showLocationError("Could not get a readable address for your location. Coordinates saved.");
-                    }
+                    updateLocationAndAddress(lat, lng);
+                    map.setZoom(18); // Zoom in to high accuracy
+                    locationStatus.textContent = "Location found! (You may adjust pin)";
+                    console.log('Geolocation successful:', { lat, lng });
                 },
                 function(err) {
                     let msg = "Failed to get current location.";
                     if (err.code === err.PERMISSION_DENIED) {
                         msg = "Permission denied. Please allow location access for this site in your browser settings.";
                     } else if (err.code === err.TIMEOUT) {
-                        msg = "Location request timed out. Please try again or enter your address manually.";
+                        msg = "Location request timed out. Try again or drag the pin manually.";
                     } else {
-                        msg = "Unable to determine your location. Please enter your address manually.";
+                        msg = "Unable to determine your location. Please manually select a location on the map.";
                     }
-                    showLocationError(msg);
+                    showMapError(msg);
                     locationStatus.textContent = msg;
                     console.error('Geolocation error:', err);
                 },
@@ -725,78 +876,43 @@
             );
         }
 
-        // Reverse Geocoding function using Nominatim API
-        async function reverseGeocode(lat, lon) {
-            const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-            try {
-                const response = await fetch(url, {
-                    headers: { 'User-Agent': 'DeliciousBitesApp/1.0 (your-email@example.com)' } // Good practice to include User-Agent
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                return data.display_name || `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
-            } catch (error) {
-                console.error("Error during reverse geocoding:", error);
-                throw error; // Re-throw to be caught by calling function
+        // Cleanup map resources when modal closes
+        function cleanupMap() {
+            // For Google Maps, setting map to null and clearing div is often sufficient.
+            // The API object itself remains loaded.
+            if (map) {
+                map = null;
+                userMarker = null;
+                mapDiv.innerHTML = ''; // Clear the map div
+                console.log('Google Map instance cleared.');
             }
+            errorBanner.classList.add("hidden"); // Hide error banner
+            locationStatus.textContent = ""; // Clear status
+            coordsDisp.textContent = "No pin placed"; // Reset coordinates display
         }
 
-        // Save the delivery location
+        // Save the delivery location from the map
         async function saveDeliveryLocation() {
-            const addressFromInput = manualAddressInput.value.trim();
-
-            if (customerLocation && customerLocation.latitude && customerLocation.longitude && customerLocation.address) {
-                // If location was set by GPS and has an address, use it
-                document.getElementById('deliveryAddress').value = customerLocation.address;
-                document.getElementById('customerLatitude').value = customerLocation.latitude;
-                document.getElementById('customerLongitude').value = customerLocation.longitude;
-                selectedLocationDisplay.textContent = `Delivery location: ${customerLocation.address}`;
-                showNotification('Delivery location saved!', 'success');
-                await calculateDeliveryCost();
-                toggleModal('deliveryLocationModal');
-            } else if (addressFromInput) {
-                // If manual input is provided, attempt to forward geocode it
-                locationStatus.textContent = "Searching for address...";
-                try {
-                    const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressFromInput)}&limit=1`;
-                    const response = await fetch(geocodeUrl, {
-                        headers: { 'User-Agent': 'DeliciousBitesApp/1.0 (your-email@example.com)' }
-                    });
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-
-                    if (data && data.length > 0) {
-                        const result = data[0];
-                        customerLocation = {
-                            latitude: parseFloat(result.lat),
-                            longitude: parseFloat(result.lon),
-                            address: result.display_name
-                        };
-                        document.getElementById('deliveryAddress').value = customerLocation.address;
-                        document.getElementById('customerLatitude').value = customerLocation.latitude;
-                        document.getElementById('customerLongitude').value = customerLocation.longitude;
-                        selectedLocationDisplay.textContent = `Delivery location: ${customerLocation.address}`;
-                        showNotification('Delivery location saved!', 'success');
-                        await calculateDeliveryCost();
-                        toggleModal('deliveryLocationModal');
-                    } else {
-                        showLocationError("Could not find coordinates for the entered address. Please try a different address or use your current location.");
-                        locationStatus.textContent = "Address not found.";
-                    }
-                } catch (error) {
-                    console.error("Error during forward geocoding:", error);
-                    showLocationError("Failed to process address. Please check your internet connection or try again.");
-                }
-            } else {
-                showLocationError("Please use your current location or enter an address manually.");
-                showNotification('Please select a delivery location or enter an address.', 'warning');
+            if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined' || !customerLocation.address) {
+                locationStatus.textContent = "Please select a location on the map or use your current location.";
+                showNotification('Please select a delivery location on the map by dragging the marker or clicking.', 'warning');
+                return;
             }
-        }
 
+            console.log('Saving delivery location:', customerLocation);
+
+            // Update hidden inputs in checkout form
+            document.getElementById('customerLatitude').value = customerLocation.latitude;
+            document.getElementById('customerLongitude').value = customerLocation.longitude;
+            document.getElementById('deliveryAddress').value = customerLocation.address; // Populate address textarea
+
+            selectedLocationDisplay.textContent = `Delivery location: ${customerLocation.address}`;
+            
+            await calculateDeliveryCost(); // Calculate delivery cost after saving location
+            showNotification('Delivery location saved!', 'success');
+            toggleModal('deliveryLocationModal'); // Close map modal
+            cleanupMap(); // Ensure map is cleaned up after saving
+        }
 
         // Calculate delivery cost
         async function calculateDeliveryCost() {
@@ -852,8 +968,8 @@
             e.preventDefault();
             
             // Basic validation for location
-            if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined') {
-                showNotification('Please select your delivery location.', 'warning');
+            if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined' || !customerLocation.address) {
+                showNotification('Please select your delivery location on the map.', 'warning');
                 return;
             }
 
@@ -869,12 +985,13 @@
                 const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 const totalAmount = subtotal + deliveryCost;
 
-                // Generate a unique orderId
-                const orderId = crypto.randomUUID();
-                console.log('Generated orderId:', orderId);
+                // Generate a unique orderId using crypto.randomUUID()
+                const uniqueOrderId = crypto.randomUUID();
+                console.log('Generated uniqueOrderId:', uniqueOrderId);
 
                 const orderData = {
-                    orderId: orderId, // Add the generated orderId
+                    _id: uniqueOrderId, // Add _id, often used as primary key in MongoDB
+                    orderId: uniqueOrderId, // Also add orderId, as the index is on it
                     items: cart.map(item => ({
                         productId: item._id,
                         name: item.name,
@@ -892,7 +1009,7 @@
                     transportTax: deliveryCost,
                     totalAmount
                 };
-                console.log('Order data being sent:', orderData);
+                console.log('Order data being sent (JSON.stringify):', JSON.stringify(orderData)); // Log the exact JSON payload
 
                 const response = await fetch('/api/order', {
                     method: 'POST',
@@ -930,6 +1047,8 @@
             } finally {
                 placeOrderBtn.disabled = false;
                 placeOrderBtn.innerHTML = 'Place Order';
+                // Ensure map is destroyed if it was open
+                cleanupMap(); // Call cleanup here too
             }
         }
 
@@ -1002,6 +1121,10 @@
             if (e.target.classList.contains('modal')) {
                 const modalId = e.target.id;
                 toggleModal(modalId);
+                // If deliveryLocationModal is closed, destroy map
+                if (modalId === 'deliveryLocationModal') {
+                    cleanupMap();
+                }
             }
         });
     </script>
