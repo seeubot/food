@@ -7,10 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Custom styles for the black and white theme and responsiveness */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8f8f8; /* Light background */
-            color: #333;
+            background-color: #000000; /* Pure black background */
+            color: #ffffff; /* Pure white text */
         }
         .container {
             max-width: 1200px;
@@ -18,10 +19,10 @@
             padding: 1rem;
         }
         .header {
-            background-color: #fff;
-            border-bottom: 1px solid #eee;
+            background-color: #1a1a1a; /* Dark gray for header */
+            border-bottom: 1px solid #333333;
             padding: 1rem 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 4px rgba(255,255,255,0.05);
         }
         .menu-grid {
             display: grid;
@@ -29,23 +30,24 @@
             gap: 1.5rem;
         }
         .menu-item {
-            background-color: #fff;
+            background-color: #1a1a1a; /* Dark gray for menu items */
             border-radius: 0.75rem;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 8px rgba(255,255,255,0.08);
             overflow: hidden;
             display: flex;
             flex-direction: column;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer; /* Indicate clickable */
         }
         .menu-item:hover {
             transform: translateY(-5px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+            box-shadow: 0 6px 12px rgba(255,255,255,0.12);
         }
         .menu-item img {
             width: 100%;
             height: 180px;
             object-fit: cover;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #333333;
         }
         .menu-item-content {
             padding: 1rem;
@@ -56,24 +58,24 @@
         .menu-item h3 {
             font-size: 1.25rem;
             font-weight: 600;
-            color: #222;
+            color: #ffffff;
             margin-bottom: 0.5rem;
         }
         .menu-item p {
             font-size: 0.9rem;
-            color: #666;
+            color: #cccccc;
             margin-bottom: 0.75rem;
             flex-grow: 1;
         }
         .menu-item .price {
             font-size: 1.1rem;
             font-weight: 700;
-            color: #4CAF50; /* Green for price */
+            color: #66ff66; /* Light green for price */
             margin-bottom: 0.75rem;
         }
         .add-to-cart-btn {
-            background-color: #4CAF50; /* Green */
-            color: white;
+            background-color: #66ff66; /* Light green */
+            color: #000000; /* Black text */
             padding: 0.6rem 1rem;
             border-radius: 0.5rem;
             text-align: center;
@@ -82,38 +84,40 @@
             cursor: pointer;
         }
         .add-to-cart-btn:hover {
-            background-color: #45a049;
+            background-color: #44ee44;
         }
-        .cart-summary {
-            background-color: #fff;
+        .cart-summary, .modal-content {
+            background-color: #1a1a1a; /* Dark gray for modals/summaries */
             border-radius: 0.75rem;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 8px rgba(255,255,255,0.08);
             padding: 1.5rem;
             margin-top: 1.5rem;
+            color: #ffffff;
         }
         .cart-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 0.5rem 0;
-            border-bottom: 1px dashed #eee;
+            border-bottom: 1px dashed #333333;
         }
         .cart-item:last-child {
             border-bottom: none;
         }
         .quantity-controls button {
-            background-color: #f0f0f0;
+            background-color: #333333;
+            color: #ffffff;
             border-radius: 0.3rem;
             padding: 0.2rem 0.6rem;
             font-weight: 600;
             transition: background-color 0.2s;
         }
         .quantity-controls button:hover {
-            background-color: #e0e0e0;
+            background-color: #555555;
         }
         .checkout-btn {
-            background-color: #FF5722; /* Deep Orange */
-            color: white;
+            background-color: #ffffff; /* White button */
+            color: #000000; /* Black text */
             padding: 0.8rem 1.5rem;
             border-radius: 0.5rem;
             font-weight: 700;
@@ -121,7 +125,7 @@
             cursor: pointer;
         }
         .checkout-btn:hover {
-            background-color: #e64a19;
+            background-color: #e0e0e0;
         }
         .modal {
             display: none; /* Hidden by default */
@@ -132,22 +136,23 @@
             width: 100%; /* Full width */
             height: 100%; /* Full height */
             overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+            background-color: rgba(0,0,0,0.8); /* Darker overlay */
             justify-content: center;
             align-items: center;
         }
         .modal-content {
-            background-color: #fefefe;
+            background-color: #1a1a1a;
             margin: auto;
             padding: 2rem;
             border-radius: 0.75rem;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 5px 15px rgba(255,255,255,0.1);
             width: 90%;
-            max-width: 500px;
+            max-width: 600px; /* Increased max-width for product details */
             position: relative;
+            color: #ffffff;
         }
         .close-button {
-            color: #aaa;
+            color: #aaaaaa;
             position: absolute;
             top: 1rem;
             right: 1rem;
@@ -157,13 +162,13 @@
         }
         .close-button:hover,
         .close-button:focus {
-            color: #333;
+            color: #ffffff;
             text-decoration: none;
             cursor: pointer;
         }
         .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #4CAF50;
+            border: 4px solid #333333;
+            border-top: 4px solid #66ff66;
             border-radius: 50%;
             width: 24px;
             height: 24px;
@@ -176,72 +181,157 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* Input field styling */
+        input[type="text"],
+        input[type="tel"],
+        textarea {
+            background-color: #222222;
+            border: 1px solid #444444;
+            color: #ffffff;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            width: 100%;
+        }
+        input[type="text"]::placeholder,
+        input[type="tel"]::placeholder,
+        textarea::placeholder {
+            color: #888888;
+        }
+        /* Button styling for Get Location */
+        #get-location-btn {
+            background-color: #666666; /* Darker gray for utility buttons */
+            color: #ffffff;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+        }
+        #get-location-btn:hover {
+            background-color: #888888;
+        }
+        /* Radio button styling */
+        .form-radio {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            display: inline-block;
+            vertical-align: middle;
+            height: 1.25rem;
+            width: 1.25rem;
+            border-radius: 50%;
+            border: 2px solid #888888;
+            background-color: #222222;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .form-radio:checked {
+            border-color: #66ff66;
+            background-color: #66ff66;
+        }
+        .form-radio:checked::before {
+            content: '';
+            display: block;
+            height: 0.5rem;
+            width: 0.5rem;
+            background-color: #000000; /* Black dot */
+            border-radius: 50%;
+            margin: 0.25rem;
+        }
+        .form-radio:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .form-radio:disabled:checked {
+            border-color: #444444;
+            background-color: #444444;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
     <header class="header sticky top-0 z-50">
         <div class="container flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-green-600">Delicious Bites</h1>
-            <button id="view-cart-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-600 transition duration-200">
+            <h1 class="text-3xl font-bold text-white">Delicious Bites</h1>
+            <button id="view-cart-btn" class="bg-white text-black px-4 py-2 rounded-lg shadow-md hover:bg-gray-200 transition duration-200">
                 View Cart (<span id="cart-count">0</span>)
             </button>
         </div>
     </header>
 
     <main class="container flex-grow py-8">
-        <h2 class="text-3xl font-bold text-gray-800 mb-6">Our Menu</h2>
+        <h2 class="text-3xl font-bold text-white mb-6">Our Menu</h2>
         <div id="menu-items" class="menu-grid">
             <!-- Menu items will be loaded here by JavaScript -->
             <div class="text-center py-10" id="loading-menu">
                 <div class="loader mx-auto mb-4"></div>
-                <p class="text-gray-600">Loading menu...</p>
+                <p class="text-gray-400">Loading delicious items...</p>
             </div>
         </div>
     </main>
+
+    <!-- Product Details Modal -->
+    <div id="product-details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-product-details-modal">&times;</span>
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="md:w-1/2">
+                    <img id="product-detail-image" src="" alt="Product Image" class="w-full h-auto rounded-lg mb-4 object-cover" onerror="this.onerror=null;this.src='https://placehold.co/400x300/333333/cccccc?text=No+Image';">
+                </div>
+                <div class="md:w-1/2 flex flex-col justify-between">
+                    <div>
+                        <h2 id="product-detail-name" class="text-3xl font-bold text-white mb-2"></h2>
+                        <p id="product-detail-description" class="text-gray-300 mb-4"></p>
+                        <p class="text-2xl font-bold text-green-400 mb-4">₹<span id="product-detail-price"></span></p>
+                        <p id="product-detail-availability" class="text-sm font-semibold"></p>
+                    </div>
+                    <button id="add-to-cart-from-detail-btn" class="add-to-cart-btn w-full mt-4">Add to Cart</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Cart Modal -->
     <div id="cart-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
-            <h2 class="text-2xl font-bold text-gray-800 mb-4">Your Cart</h2>
+            <h2 class="text-2xl font-bold text-white mb-4">Your Cart</h2>
             <div id="cart-items-list" class="mb-4">
                 <!-- Cart items will be listed here -->
-                <p id="empty-cart-message" class="text-gray-600 text-center hidden">Your cart is empty.</p>
+                <p id="empty-cart-message" class="text-gray-400 text-center hidden">Your cart is empty. Time to fill it up!</p>
             </div>
             <div class="text-right text-lg font-semibold mb-4">
                 Subtotal: ₹<span id="cart-subtotal">0.00</span>
             </div>
 
             <div class="mb-4">
-                <h3 class="text-xl font-bold text-gray-800 mb-2">Delivery Details</h3>
+                <h3 class="text-xl font-bold text-white mb-2">Delivery Details</h3>
                 <div class="mb-2">
-                    <label for="customer-name" class="block text-gray-700 text-sm font-bold mb-1">Your Name:</label>
-                    <input type="text" id="customer-name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter your name">
+                    <label for="customer-name" class="block text-gray-300 text-sm font-bold mb-1">Your Name:</label>
+                    <input type="text" id="customer-name" class="w-full py-2 px-3" placeholder="Enter your name">
                 </div>
                 <div class="mb-2">
-                    <label for="customer-phone" class="block text-gray-700 text-sm font-bold mb-1">Your Phone (WhatsApp):</label>
-                    <input type="tel" id="customer-phone" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g., 918897350151">
+                    <label for="customer-phone" class="block text-gray-300 text-sm font-bold mb-1">Your Phone (WhatsApp):</label>
+                    <input type="tel" id="customer-phone" class="w-full py-2 px-3" placeholder="e.g., 918897350151">
                 </div>
                 <div class="mb-2">
-                    <label for="delivery-address" class="block text-gray-700 text-sm font-bold mb-1">Delivery Address:</label>
-                    <textarea id="delivery-address" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" rows="3" placeholder="Enter your full delivery address"></textarea>
-                    <button id="get-location-btn" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600 transition duration-200">
+                    <label for="delivery-address" class="block text-gray-300 text-sm font-bold mb-1">Delivery Address:</label>
+                    <textarea id="delivery-address" class="w-full py-2 px-3" rows="3" placeholder="Enter your full delivery address"></textarea>
+                    <button id="get-location-btn" class="mt-2 bg-gray-600 text-white px-3 py-1 rounded-md text-sm hover:bg-gray-700 transition duration-200">
                         Get Current Location
                     </button>
-                    <p id="location-status" class="text-sm text-gray-500 mt-1"></p>
+                    <p id="location-status" class="text-sm text-gray-400 mt-1"></p>
                 </div>
             </div>
 
-            <!-- New Payment Options Section -->
+            <!-- Payment Options Section -->
             <div class="mb-4">
-                <h3 class="text-xl font-bold text-gray-800 mb-2">Payment Method</h3>
+                <h3 class="text-xl font-bold text-white mb-2">Payment Method</h3>
                 <div id="payment-options" class="flex flex-col space-y-2">
                     <label class="inline-flex items-center">
-                        <input type="radio" name="paymentMethod" value="COD" class="form-radio text-green-600" checked>
-                        <span class="ml-2 text-gray-700">Cash on Delivery (COD)</span>
+                        <input type="radio" name="paymentMethod" value="COD" class="form-radio" checked>
+                        <span class="ml-2 text-gray-300">Cash on Delivery (COD)</span>
                     </label>
                     <label class="inline-flex items-center">
-                        <input type="radio" name="paymentMethod" value="Online" class="form-radio text-green-600" disabled>
+                        <input type="radio" name="paymentMethod" value="Online" class="form-radio" disabled>
                         <span class="ml-2 text-gray-500">Online Payment (Coming Soon)</span>
                     </label>
                 </div>
@@ -250,7 +340,7 @@
             <div class="text-right text-xl font-bold mt-4">
                 Transport Tax: ₹<span id="transport-tax">0.00</span>
             </div>
-            <div class="text-right text-2xl font-bold text-green-600 mt-2 mb-6">
+            <div class="text-right text-2xl font-bold text-green-400 mt-2 mb-6">
                 Total Amount: ₹<span id="total-amount">0.00</span>
             </div>
 
@@ -266,13 +356,13 @@
     <div id="order-confirmation-modal" class="modal">
         <div class="modal-content">
             <span class="close-button" id="close-confirmation-modal">&times;</span>
-            <h2 class="text-2xl font-bold text-green-600 mb-4 text-center">Order Placed Successfully!</h2>
-            <p class="text-gray-700 text-center mb-4">Your order has been received and is being processed.</p>
-            <p class="text-gray-700 text-center mb-2"><strong>Order ID:</strong> <span id="confirmed-order-id"></span></p>
-            <p class="text-gray-700 text-center mb-2"><strong>Total Amount:</strong> ₹<span id="confirmed-total-amount"></span></p>
-            <p class="text-gray-700 text-center mb-4">We will send you a WhatsApp message shortly with your order details.</p>
-            <button id="track-order-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-600 transition duration-200 w-full mb-2">Track My Order</button>
-            <button id="continue-shopping-btn" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow-md hover:bg-gray-400 transition duration-200 w-full">Continue Shopping</button>
+            <h2 class="text-2xl font-bold text-green-400 mb-4 text-center">Order Placed Successfully!</h2>
+            <p class="text-gray-300 text-center mb-4">Your order has been received and is being processed.</p>
+            <p class="text-gray-300 text-center mb-2"><strong>Order ID:</strong> <span id="confirmed-order-id"></span></p>
+            <p class="text-gray-300 text-center mb-2"><strong>Total Amount:</strong> ₹<span id="confirmed-total-amount"></span></p>
+            <p class="text-gray-300 text-center mb-4">We will send you a WhatsApp message shortly with your order details.</p>
+            <button id="track-order-btn" class="bg-white text-black px-4 py-2 rounded-lg shadow-md hover:bg-gray-200 transition duration-200 w-full mb-2">Track My Order</button>
+            <button id="continue-shopping-btn" class="bg-gray-700 text-white px-4 py-2 rounded-lg shadow-md hover:bg-gray-600 transition duration-200 w-full">Continue Shopping</button>
         </div>
     </div>
 
@@ -280,12 +370,12 @@
     <div id="order-tracking-modal" class="modal">
         <div class="modal-content">
             <span class="close-button" id="close-tracking-modal">&times;</span>
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Order Status</h2>
-            <p class="text-gray-700 mb-2"><strong>Order ID:</strong> <span id="tracking-order-id"></span></p>
-            <p class="text-gray-700 mb-2"><strong>Status:</strong> <span id="tracking-order-status" class="font-semibold text-blue-600"></span></p>
-            <p class="text-gray-700 mb-4"><strong>Last Updated:</strong> <span id="tracking-last-updated"></span></p>
+            <h2 class="text-2xl font-bold text-white mb-4 text-center">Order Status</h2>
+            <p class="text-gray-300 mb-2"><strong>Order ID:</strong> <span id="tracking-order-id"></span></p>
+            <p class="text-gray-300 mb-2"><strong>Status:</strong> <span id="tracking-order-status" class="font-semibold text-blue-400"></span></p>
+            <p class="text-gray-300 mb-4"><strong>Last Updated:</strong> <span id="tracking-last-updated"></span></p>
             <div class="flex justify-center">
-                <button id="refresh-order-status-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-600 transition duration-200">Refresh Status</button>
+                <button id="refresh-order-status-btn" class="bg-white text-black px-4 py-2 rounded-lg shadow-md hover:bg-gray-200 transition duration-200">Refresh Status</button>
             </div>
         </div>
     </div>
@@ -331,6 +421,16 @@
         const trackingOrderStatusSpan = document.getElementById('tracking-order-status');
         const trackingLastUpdatedSpan = document.getElementById('tracking-last-updated');
         const refreshOrderStatusBtn = document.getElementById('refresh-order-status-btn');
+
+        const productDetailsModal = document.getElementById('product-details-modal');
+        const closeProductDetailsModalBtn = document.getElementById('close-product-details-modal');
+        const productDetailImage = document.getElementById('product-detail-image');
+        const productDetailName = document.getElementById('product-detail-name');
+        const productDetailDescription = document.getElementById('product-detail-description');
+        const productDetailPrice = document.getElementById('product-detail-price');
+        const productDetailAvailability = document.getElementById('product-detail-availability');
+        const addToCartFromDetailBtn = document.getElementById('add-to-cart-from-detail-btn');
+
 
         let currentTrackingOrderId = null;
 
@@ -446,7 +546,7 @@
 
         async function getCurrentLocationAndAddress() {
             locationStatusP.textContent = 'Getting your location...';
-            locationStatusP.style.color = '#333';
+            locationStatusP.style.color = '#cccccc'; // Light gray
             getLocationBtn.disabled = true;
 
             if (navigator.geolocation) {
@@ -458,7 +558,7 @@
                     const address = await getAddressFromCoordinates(customerCurrentLocation.latitude, customerCurrentLocation.longitude);
                     deliveryAddressInput.value = address;
                     locationStatusP.textContent = 'Location obtained.';
-                    locationStatusP.style.color = '#4CAF50'; // Green
+                    locationStatusP.style.color = '#66ff66'; // Light green
                     getLocationBtn.disabled = false;
                     updateTotalAmount(parseFloat(cartSubtotalSpan.textContent)); // Recalculate total with new location
                 }, (error) => {
@@ -479,7 +579,7 @@
                             break;
                     }
                     locationStatusP.textContent = errorMessage;
-                    locationStatusP.style.color = '#FF5722'; // Deep Orange
+                    locationStatusP.style.color = '#ff6666'; // Light red
                     getLocationBtn.disabled = false;
                     customerCurrentLocation = null; // Clear location if failed
                     updateTotalAmount(parseFloat(cartSubtotalSpan.textContent)); // Recalculate total
@@ -490,7 +590,7 @@
                 });
             } else {
                 locationStatusP.textContent = 'Geolocation is not supported by your browser.';
-                locationStatusP.style.color = '#FF5722'; // Deep Orange
+                locationStatusP.style.color = '#ff6666'; // Light red
                 getLocationBtn.disabled = false;
                 customerCurrentLocation = null; // Clear location if not supported
                 updateTotalAmount(parseFloat(cartSubtotalSpan.textContent)); // Recalculate total
@@ -499,18 +599,35 @@
 
         // --- Event Listeners ---
 
-        // Add to cart functionality
+        // Add to cart functionality (from main menu)
         menuItemsContainer.addEventListener('click', (event) => {
-            if (event.target.classList.contains('add-to-cart-btn')) {
-                const productId = event.target.dataset.id;
-                if (cart[productId]) {
-                    cart[productId].quantity++;
-                } else {
-                    cart[productId] = { productId: productId, quantity: 1 };
-                }
-                updateCartSummary();
+            const target = event.target;
+            const menuItemDiv = target.closest('.menu-item');
+
+            if (target.classList.contains('add-to-cart-btn')) {
+                const productId = target.dataset.id;
+                addToCart(productId);
+            } else if (menuItemDiv) { // Clicked on the menu item card itself
+                const productId = menuItemDiv.dataset.id;
+                openProductDetailsModal(productId);
             }
         });
+
+        // Add to cart from product detail modal
+        addToCartFromDetailBtn.addEventListener('click', () => {
+            const productId = addToCartFromDetailBtn.dataset.id;
+            addToCart(productId);
+            productDetailsModal.style.display = 'none'; // Close modal after adding to cart
+        });
+
+        function addToCart(productId) {
+            if (cart[productId]) {
+                cart[productId].quantity++;
+            } else {
+                cart[productId] = { productId: productId, quantity: 1 };
+            }
+            updateCartSummary();
+        }
 
         // Cart quantity controls
         cartItemsList.addEventListener('click', (event) => {
@@ -542,6 +659,10 @@
             orderMessage.style.color = '';
         });
 
+        closeProductDetailsModalBtn.addEventListener('click', () => {
+            productDetailsModal.style.display = 'none';
+        });
+
         window.addEventListener('click', (event) => {
             if (event.target === cartModal) {
                 cartModal.style.display = 'none';
@@ -553,6 +674,9 @@
             }
             if (event.target === orderTrackingModal) {
                 orderTrackingModal.style.display = 'none';
+            }
+            if (event.target === productDetailsModal) {
+                productDetailsModal.style.display = 'none';
             }
         });
 
@@ -566,12 +690,12 @@
 
             if (!customerName || !customerPhone || !deliveryAddress) {
                 orderMessage.textContent = 'Please fill in all delivery details.';
-                orderMessage.style.color = '#FF5722';
+                orderMessage.style.color = '#ff6666'; // Light red
                 return;
             }
             if (Object.values(cart).every(item => item.quantity === 0)) {
                 orderMessage.textContent = 'Your cart is empty. Please add items before placing an order.';
-                orderMessage.style.color = '#FF5722';
+                orderMessage.style.color = '#ff6666'; // Light red
                 return;
             }
 
@@ -579,7 +703,7 @@
             placeOrderLoader.classList.remove('hidden');
             placeOrderText.classList.add('hidden');
             orderMessage.textContent = 'Placing your order...';
-            orderMessage.style.color = '#333';
+            orderMessage.style.color = '#cccccc'; // Light gray
 
             const orderItems = Object.keys(cart).map(productId => {
                 const product = products.find(p => p._id === productId);
@@ -618,7 +742,7 @@
 
                 if (response.ok) {
                     orderMessage.textContent = 'Order placed successfully!';
-                    orderMessage.style.color = '#4CAF50';
+                    orderMessage.style.color = '#66ff66'; // Light green
 
                     // Show confirmation modal
                     confirmedOrderIdSpan.textContent = result.orderId.substring(0, 8); // Display first 8 chars
@@ -638,12 +762,12 @@
                     currentTrackingOrderId = result.orderId; // Set order ID for tracking
                 } else {
                     orderMessage.textContent = `Failed to place order: ${result.message || response.statusText}. Please try again.`;
-                    orderMessage.style.color = '#FF5722';
+                    orderMessage.style.color = '#ff6666'; // Light red
                     console.error('Order placement error:', result);
                 }
             } catch (error) {
                 orderMessage.textContent = `Failed to place order: ${error.message}. Please check your connection.`;
-                orderMessage.style.color = '#FF5722';
+                orderMessage.style.color = '#ff6666'; // Light red
                 console.error('Network or server error during order placement:', error);
             } finally {
                 placeOrderBtn.disabled = false;
@@ -668,7 +792,8 @@
                 await fetchOrderStatus(currentTrackingOrderId);
                 orderTrackingModal.style.display = 'flex';
             } else {
-                alert('No order ID available to track.'); // Use a custom modal in a real app
+                // In a real app, you'd have a more user-friendly way to handle this
+                alert('No order ID available to track.');
             }
         });
 
@@ -713,20 +838,21 @@
         function displayMenuItems() {
             menuItemsContainer.innerHTML = ''; // Clear loading message
             if (products.length === 0) {
-                menuItemsContainer.innerHTML = '<p class="text-gray-600 text-center">No menu items available at the moment. Please check back later!</p>';
+                menuItemsContainer.innerHTML = '<p class="text-gray-400 text-center">No menu items available at the moment. Please check back later!</p>';
                 return;
             }
             products.forEach(product => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'menu-item';
+                itemDiv.dataset.id = product._id; // Add data-id for click handling
                 itemDiv.innerHTML = `
-                    <img src="${product.imageUrl}" alt="${product.name}" onerror="this.onerror=null;this.src='https://placehold.co/300x200/cccccc/333333?text=No+Image';" class="w-full h-48 object-cover rounded-t-lg">
+                    <img src="${product.imageUrl}" alt="${product.name}" onerror="this.onerror=null;this.src='https://placehold.co/300x200/333333/cccccc?text=No+Image';" class="w-full h-48 object-cover rounded-t-lg">
                     <div class="menu-item-content">
-                        <h3 class="text-xl font-semibold text-gray-800">${product.name}</h3>
-                        <p class="text-gray-600 mb-2">${product.description || 'Delicious food item.'}</p>
+                        <h3 class="text-xl font-semibold text-white">${product.name}</h3>
+                        <p class="text-gray-300 mb-2">${product.description || 'Delicious food item.'}</p>
                         <div class="flex justify-between items-center mt-auto">
-                            <span class="text-green-600 font-bold text-lg">₹${product.price.toFixed(2)}</span>
-                            ${product.isAvailable ? `<button class="add-to-cart-btn" data-id="${product._id}">Add to Cart</button>` : `<span class="text-red-500 font-semibold">Unavailable</span>`}
+                            <span class="text-green-400 font-bold text-lg">₹${product.price.toFixed(2)}</span>
+                            ${product.isAvailable ? `<button class="add-to-cart-btn bg-green-500 text-black px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200" data-id="${product._id}">Add to Cart</button>` : `<span class="text-red-400 font-semibold">Unavailable</span>`}
                         </div>
                     </div>
                 `;
@@ -734,10 +860,31 @@
             });
         }
 
+        function openProductDetailsModal(productId) {
+            const product = products.find(p => p._id === productId);
+            if (!product) return;
+
+            productDetailImage.src = product.imageUrl;
+            productDetailImage.onerror = () => { productDetailImage.src = 'https://placehold.co/400x300/333333/cccccc?text=No+Image'; };
+            productDetailName.textContent = product.name;
+            productDetailDescription.textContent = product.description || 'No description available.';
+            productDetailPrice.textContent = product.price.toFixed(2);
+            productDetailAvailability.textContent = product.isAvailable ? 'Available' : 'Currently Unavailable';
+            productDetailAvailability.className = `text-sm font-semibold ${product.isAvailable ? 'text-green-400' : 'text-red-400'}`;
+            
+            addToCartFromDetailBtn.dataset.id = productId; // Set product ID for add to cart button
+            addToCartFromDetailBtn.disabled = !product.isAvailable;
+            addToCartFromDetailBtn.classList.toggle('opacity-50', !product.isAvailable);
+            addToCartFromDetailBtn.classList.toggle('cursor-not-allowed', !product.isAvailable);
+
+            productDetailsModal.style.display = 'flex';
+        }
+
+
         async function fetchOrderStatus(orderId) {
             trackingOrderIdSpan.textContent = orderId.substring(0, 8);
             trackingOrderStatusSpan.textContent = 'Loading...';
-            trackingOrderStatusSpan.className = 'font-semibold text-gray-500';
+            trackingOrderStatusSpan.className = 'font-semibold text-gray-400';
             trackingLastUpdatedSpan.textContent = 'N/A';
 
             try {
@@ -751,29 +898,29 @@
                 // Update status color
                 switch (order.status) {
                     case 'Pending':
-                        trackingOrderStatusSpan.className = 'font-semibold text-yellow-600';
+                        trackingOrderStatusSpan.className = 'font-semibold text-yellow-400';
                         break;
                     case 'Confirmed':
                     case 'Preparing':
-                        trackingOrderStatusSpan.className = 'font-semibold text-blue-600';
+                        trackingOrderStatusSpan.className = 'font-semibold text-blue-400';
                         break;
                     case 'Out for Delivery':
-                        trackingOrderStatusSpan.className = 'font-semibold text-purple-600';
+                        trackingOrderStatusSpan.className = 'font-semibold text-purple-400';
                         break;
                     case 'Delivered':
-                        trackingOrderStatusSpan.className = 'font-semibold text-green-600';
+                        trackingOrderStatusSpan.className = 'font-semibold text-green-400';
                         break;
                     case 'Cancelled':
-                        trackingOrderStatusSpan.className = 'font-semibold text-red-600';
+                        trackingOrderStatusSpan.className = 'font-semibold text-red-400';
                         break;
                     default:
-                        trackingOrderStatusSpan.className = 'font-semibold text-gray-600';
+                        trackingOrderStatusSpan.className = 'font-semibold text-gray-400';
                 }
 
             } catch (error) {
                 console.error('Error fetching order status:', error);
                 trackingOrderStatusSpan.textContent = 'Error fetching status';
-                trackingOrderStatusSpan.className = 'font-semibold text-red-600';
+                trackingOrderStatusSpan.className = 'font-semibold text-red-400';
                 trackingLastUpdatedSpan.textContent = 'Failed to load';
             }
         }
