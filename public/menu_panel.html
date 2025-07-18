@@ -180,6 +180,16 @@
         }
         /* Leaflet controls hidden by default in JS */
         .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
+
+        /* Specific style for the "Use My Current Location" button */
+        #getLoc {
+            background-color: #ffffff !important; /* White background */
+            color: #000000 !important; /* Black text */
+            box-shadow: 0 2px 4px rgba(255, 255, 255, 0.2); /* Subtle white shadow */
+        }
+        #getLoc:hover {
+            background-color: #e0e0e0 !important; /* Slightly darker white on hover */
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -333,6 +343,7 @@
             <div id="map" class="mb-3"></div>
             <p id="locationStatus" class="text-sm text-gray-300 text-center mb-2"></p>
             <div class="flex flex-col sm:flex-row gap-2 mb-1">
+                <!-- Applied specific white background and black text to this button -->
                 <button id="getLoc" class="bg-white text-black px-4 py-2 rounded font-semibold flex-1 flex items-center justify-center">📍 Use My Current Location</button>
                 <button id="saveLoc" class="bg-gray-600 text-white px-4 py-2 rounded font-semibold flex-1">Save Location</button>
             </div>
@@ -478,7 +489,7 @@
         // Dynamically load Leaflet JavaScript and Geocoder
         function loadLeafletScripts() {
             return new Promise((resolve, reject) => {
-                // Check if L (Leaflet global object) already exists, meaning script is loaded
+                // Check if L (Leaflet global object) already exists, meaning main script is loaded
                 if (typeof L !== 'undefined' && L.map) {
                     leafletLoaded = true;
                     console.log("Leaflet.js already loaded.");
@@ -490,8 +501,8 @@
                             console.log("Leaflet-Control-Geocoder.js loaded successfully.");
                             resolve();
                         };
-                        geocoderScript.onerror = () => {
-                            console.error("Failed to load Leaflet-Control-Geocoder.js. Search functionality might be limited.");
+                        geocoderScript.onerror = (e) => {
+                            console.error("Failed to load Leaflet-Control-Geocoder.js. Search functionality might be limited:", e);
                             resolve(); // Still resolve even if geocoder fails, main map should work
                         };
                         document.head.appendChild(geocoderScript);
