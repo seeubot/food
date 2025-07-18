@@ -427,7 +427,7 @@
                         <line x1="13" x2="13" y1="0" y2="5"/>
                         <line x1="13" x2="13" y1="21" y2="26"/>
                         <line x1="0" x2="5" y1="13" y2="13"/>
-                        <line x1="21" x2="26" y1="13" y2="13"/>
+                        <line x1="21" x2="26" y1="13" y1="13"/>
                     </g>
                 </svg>
             </button>
@@ -530,8 +530,9 @@
                 mapErrorMessage.classList.add('hidden'); // Hide any previous error message
                 toggleModal('deliveryLocationModal');
                 // Give the modal a moment to become visible before initializing the map
+                // The _initializeLeafletMapCore will handle map.invalidateSize() within map.whenReady()
                 setTimeout(() => {
-                    _initializeLeafletMapCore(); // Call the new core initialization function
+                    _initializeLeafletMapCore(); 
                 }, 100); // Short delay to allow modal to render
             });
             document.getElementById('closeDeliveryLocationModal').addEventListener('click', () => {
@@ -819,7 +820,7 @@
         // Core map initialization function
         function _initializeLeafletMapCore() {
             if (mapInitialized) {
-                console.log('_initializeLeafletMapCore: Map already initialized, skipping. Re-invalidating size.');
+                console.log('_initializeLeafletMapCore: Map already initialized. Re-invalidating size and getting location.');
                 if (map) map.invalidateSize(); // In case modal was resized
                 getCurrentLocationForMap(); // Still try to get location
                 return;
@@ -838,6 +839,17 @@
                 geocoderControl = null;
                 mapInitialized = false;
                 console.log('Previous map instance removed for fresh initialization.');
+            }
+
+            const mapDiv = document.getElementById('map');
+            console.log(`Map div dimensions before L.map(): Width=${mapDiv.offsetWidth}, Height=${mapDiv.offsetHeight}`);
+            if (mapDiv.offsetWidth === 0 || mapDiv.offsetHeight === 0) {
+                console.error('Map div has zero dimensions. Cannot initialize Leaflet map.');
+                mapLoadingOverlay.classList.add('hidden');
+                mapErrorMessage.classList.remove('hidden');
+                mapLocationStatus.textContent = 'Map container is not visible or has no size. Cannot load map.';
+                showNotification('Map container error. Please ensure the dialog is fully visible.', 'error');
+                return;
             }
 
             // Esri World Imagery (Satellite) tile layer
@@ -863,6 +875,11 @@
                 map.whenReady(() => {
                     map.invalidateSize();
                     console.log('Map invalidateSize called via whenReady. Map should now be visible.');
+                    // Additional small timeout for robustness
+                    setTimeout(() => {
+                        map.invalidateSize();
+                        console.log('Map invalidateSize called again after small timeout for robustness.');
+                    }, 50);
 
                     // Add a draggable delivery marker
                     deliveryMarker = L.marker(initialCenter, {
@@ -906,6 +923,7 @@
                 mapLoadingOverlay.classList.add('hidden');
                 mapErrorMessage.classList.remove('hidden'); // Show error message
                 mapInitialized = false; // Ensure flag is false if initialization fails
+                mapLocationStatus.textContent = 'Map initialization failed. Check console for details.';
                 showNotification('Map failed to load. Please try again.', 'error');
             }
         }
@@ -1056,6 +1074,7 @@
                 console.log('Map and geolocation resources cleaned up.');
             }
             mapErrorMessage.classList.add('hidden'); // Ensure error message is hidden on cleanup
+            mapLoadingOverlay.classList.add('hidden'); // Ensure loading overlay is hidden on cleanup
         }
 
         // Save the delivery location from the map
