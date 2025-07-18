@@ -1,5 +1,5 @@
 // index.js
-const { Client, LocalAuth } = require('whatsapp-web.js'); // Using LocalAuth or no explicit strategy
+const { Client } = require('whatsapp-web.js'); // Removed LocalAuth
 const qrcode = require('qrcode');
 const express = require('express');
 const http = require('http');
@@ -137,7 +137,8 @@ const orderSchema = new mongoose.Schema({
     transportTax: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
     status: { type: String, enum: ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'], default: 'Pending' },
-    orderDate: { type: Date, default: Date.now }
+    orderDate: { type: Date, default: Date.now },
+    paymentMethod: { type: String, enum: ['COD', 'Online'], default: 'COD' } // NEW: Payment Method field
 });
 const Order = mongoose.model('Order', orderSchema);
 
@@ -249,7 +250,7 @@ function updateBotStatus(status, qrData = null) {
 let client = null; // Declare client here, will be initialized dynamically
 
 async function loadAndInitializeClient() {
-    let sessionData;
+    let sessionData = null; // Initialize as null
     try {
         const storedSession = await WhatsappSession.findOne({ id: 'whatsapp-session' });
         if (storedSession && storedSession.sessionData) {
@@ -263,12 +264,10 @@ async function loadAndInitializeClient() {
         console.log('Proceeding without stored session.');
     }
 
-    // Initialize the client with or without session data
-    // Using LocalAuth to ensure session is managed by whatsapp-web.js
+    // Initialize the client. Pass session data directly if available.
+    // IMPORTANT: Removed LocalAuth here to manually manage session from MongoDB.
     client = new Client({
-        authStrategy: new LocalAuth({
-            clientId: 'whatsapp-session' // Use a fixed client ID for consistent session storage
-        }),
+        session: sessionData, // Pass the loaded session data directly
         puppeteer: {
             headless: true,
             args: [
@@ -356,6 +355,7 @@ async function loadAndInitializeClient() {
             } catch (err) {
                 console.error('Error deleting old session data from MongoDB on max auth failures:', err);
             } finally {
+                // Introduce a delay before re-initializing after auth_failure and clearing session
                 setTimeout(() => {
                     if (client) client.destroy().then(() => loadAndInitializeClient()).catch(err => console.error("Error destroying client:", err));
                     else loadAndInitializeClient(); // Fallback if client is somehow null
@@ -407,7 +407,7 @@ async function loadAndInitializeClient() {
 
         const senderNumber = msg.from.split('@')[0];
         // Direct menu URL as requested
-        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
+        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
 
         try {
             // Update customer notification date on any message received
@@ -512,8 +512,8 @@ async function updateCustomerNotification(customerPhone) {
 
 // NEW: Function to send weekly notifications to users
 async function sendWeeklyNotifications() {
-    if (!clientReady) {
-        console.log('WhatsApp client not ready for sending weekly notifications. Skipping.');
+    if (!clientReady || !client) { // Added check for client being null
+        console.log('WhatsApp client not ready or null for sending weekly notifications. Skipping.');
         return;
     }
 
@@ -532,7 +532,7 @@ async function sendWeeklyNotifications() {
         }
 
         // Direct menu URL for notifications
-        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
+        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
 
         for (const customer of customersToNotify) {
             // Pick a random product to suggest
@@ -542,14 +542,10 @@ async function sendWeeklyNotifications() {
 
             try {
                 // Send message to customer
-                if (clientReady && client) { // Ensure client is ready and not null before sending
-                    await client.sendMessage(customer.customerPhone + '@c.us', message);
-                    // Update last notified date for this customer
-                    await CustomerNotification.findByIdAndUpdate(customer._id, { lastNotifiedDate: new Date() });
-                    console.log(`Sent weekly notification to ${customer.customerPhone}`);
-                } else {
-                    console.warn(`Client not ready or null, skipping weekly notification to ${customer.customerPhone}`);
-                }
+                await client.sendMessage(customer.customerPhone + '@c.us', message);
+                // Update last notified date for this customer
+                await CustomerNotification.findByIdAndUpdate(customer._id, { lastNotifiedDate: new Date() });
+                console.log(`Sent weekly notification to ${customer.customerPhone}`);
             } catch (msgError) {
                 console.error(`Error sending weekly notification to ${customer.customerPhone}:`, msgError);
             }
@@ -777,8 +773,11 @@ app.post('/api/public/request-qr', async (req, res) => {
         // Re-initialize the client (this will trigger a new QR)
         if (client) {
             client.destroy().then(() => { // Destroy existing client instance
-                loadAndInitializeClient(); // Re-create and initialize a new client
-                res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
+                // Add a small delay after destroy before re-initializing
+                setTimeout(() => {
+                    loadAndInitializeClient(); // Re-create and initialize a new client
+                    res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
+                }, 1000); // 1 second delay
             }).catch(err => {
                 console.error('Error destroying client before re-initialization:', err);
                 res.status(500).json({ message: 'Error re-initializing client for new QR.' });
@@ -1091,12 +1090,12 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
 // API for Placing Orders
 app.post('/api/order', async (req, res) => {
     console.log('API: /api/order POST hit.');
-    const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount } = req.body;
+    const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount, paymentMethod } = req.body; // Added paymentMethod
 
     // Log the incoming request body for debugging
     console.log('Incoming order request body:', JSON.stringify(req.body, null, 2));
 
-    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined') {
+    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined' || !paymentMethod) {
         console.warn('Missing required order details in POST /api/order.');
         return res.status(400).json({ message: 'Missing required order details.' });
     }
@@ -1116,7 +1115,8 @@ app.post('/api/order', async (req, res) => {
             subtotal,
             transportTax,
             totalAmount,
-            status: 'Pending'
+            status: 'Pending',
+            paymentMethod // Save the payment method
         });
         await newOrder.save();
         console.log('New order placed successfully:', newOrder._id);
@@ -1133,6 +1133,7 @@ app.post('/api/order', async (req, res) => {
                                  `Customer: ${newOrder.customerName}\n` +
                                  `Phone: ${newOrder.customerPhone}\n` +
                                  `Total: ₹${newOrder.totalAmount.toFixed(2)}\n` +
+                                 `Payment Method: ${newOrder.paymentMethod}\n` + // Include payment method in admin notification
                                  `Address: ${newOrder.deliveryAddress}\n\n` +
                                  `View on Dashboard: ${baseUrl}/admin/dashboard`;
             client.sendMessage(ADMIN_NUMBER + '@c.us', adminMessage)
