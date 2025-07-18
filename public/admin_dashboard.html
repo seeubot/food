@@ -417,6 +417,7 @@
         const menuItemMessage = document.getElementById('menu-item-message');
 
         let currentActiveTab = 'orders'; // Default active tab
+        let shopLocationData = null; // To store shop location for customer tracking
 
         // --- Tab Switching Logic ---
         function switchTab(tabName) {
@@ -888,6 +889,7 @@
                 document.getElementById('shop-longitude').value = settings.shopLocation ? settings.shopLocation.longitude : 0;
                 displayDeliveryRates(settings.deliveryRates || []);
                 settingsMessage.textContent = '';
+                shopLocationData = settings.shopLocation; // Store shop location for customer tracking
             } catch (error) {
                 console.error('Error fetching settings:', error);
                 settingsMessage.textContent = `Failed to load settings: ${error.message}`;
@@ -965,6 +967,7 @@
                 if (response.ok) {
                     settingsMessage.textContent = 'Settings saved successfully!';
                     settingsMessage.className = 'mt-2 text-sm text-green-500 text-center';
+                    shopLocationData = result.shopLocation; // Update shop location data after saving
                 } else {
                     settingsMessage.textContent = `Error saving settings: ${result.message || response.statusText}`;
                     settingsMessage.className = 'mt-2 text-sm text-red-500 text-center';
@@ -1014,6 +1017,7 @@
                         <th>Phone</th>
                         <th>Last Known Location</th>
                         <th>Distance from Shop (km)</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="customers-table-body"></tbody>
@@ -1023,11 +1027,38 @@
 
             customers.forEach(customer => {
                 const row = tbody.insertRow();
+                const customerPhoneClean = customer.customerPhone.replace(/\D/g, ''); // Remove non-digits for tel: link
+
+                let locationText = 'N/A';
+                let distanceFromShop = 'N/A';
+                let callButton = `<a href="tel:+${customerPhoneClean}" class="btn-secondary text-sm py-1 px-3 mr-2">Call</a>`;
+                let trackButton = `<button class="btn-secondary text-sm py-1 px-3" disabled>Track</button>`; // Disabled by default
+
+                if (customer.lastKnownLocation && customer.lastKnownLocation.latitude && customer.lastKnownLocation.longitude) {
+                    locationText = `Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`;
+                    if (shopLocationData && shopLocationData.latitude && shopLocationData.longitude) {
+                        const dist = haversineDistance(
+                            shopLocationData.latitude,
+                            shopLocationData.longitude,
+                            customer.lastKnownLocation.latitude,
+                            customer.lastKnownLocation.longitude
+                        );
+                        distanceFromShop = dist.toFixed(2);
+                        // Enable track button if shop and customer locations are available
+                        const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${shopLocationData.latitude},${shopLocationData.longitude}&destination=${customer.lastKnownLocation.latitude},${customer.lastKnownLocation.longitude}&travelmode=driving`;
+                        trackButton = `<a href="${googleMapsUrl}" target="_blank" class="btn-secondary text-sm py-1 px-3">Track</a>`;
+                    }
+                }
+
                 row.innerHTML = `
                     <td>${customer.customerName || 'N/A'}</td>
                     <td>${customer.customerPhone}</td>
-                    <td>${customer.lastKnownLocation && customer.lastKnownLocation.latitude ? `Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}` : 'N/A'}</td>
-                    <td>${customer.lastKnownLocation && customer.shopLocation ? haversineDistance(customer.shopLocation.latitude, customer.shopLocation.longitude, customer.lastKnownLocation.latitude, customer.lastKnownLocation.longitude).toFixed(2) : 'N/A'}</td>
+                    <td>${locationText}</td>
+                    <td>${distanceFromShop}</td>
+                    <td>
+                        ${callButton}
+                        ${trackButton}
+                    </td>
                 `;
             });
         }
