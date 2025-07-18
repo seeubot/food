@@ -364,7 +364,7 @@
         // Global variables
         let menuItems = [];
         let cart = [];
-        let customerLocation = null; // Stores {latitude, longitude} of the selected delivery point
+        let customerLocation = null; // Stores {latitude, longitude, address} of the selected delivery point
         let shopSettings = null;
         let deliveryCost = 0;
         let lastScrollTop = 0; // For header hide/show on scroll
@@ -869,7 +869,12 @@
                 const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
                 const totalAmount = subtotal + deliveryCost;
 
+                // Generate a unique orderId
+                const orderId = crypto.randomUUID();
+                console.log('Generated orderId:', orderId);
+
                 const orderData = {
+                    orderId: orderId, // Add the generated orderId
                     items: cart.map(item => ({
                         productId: item._id,
                         name: item.name,
