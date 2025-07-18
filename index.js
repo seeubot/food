@@ -407,7 +407,7 @@ async function loadAndInitializeClient() {
 
         const senderNumber = msg.from.split('@')[0];
         // Direct menu URL as requested
-        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
+        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
 
         try {
             // Update customer notification date on any message received
@@ -532,7 +532,7 @@ async function sendWeeklyNotifications() {
         }
 
         // Direct menu URL for notifications
-        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu_panel";
+        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
 
         for (const customer of customersToNotify) {
             // Pick a random product to suggest
