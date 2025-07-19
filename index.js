@@ -1,12 +1,10 @@
-// Removed: require('dotenv').config();
-
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-const fs = require('fs'); // Still included for now, but its .env check will be removed
-const qrcode = require('qrcode');
+// const qrcode = require('qrcode-terminal'); // Removed qrcode-terminal
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -16,57 +14,46 @@ const Order = require('./models/order');
 const MenuItem = require('./models/menuItem');
 const Customer = require('./models/customer');
 const Settings = require('./models/settings');
-const Admin = require('./models/admin');
+const Admin = require('./models/admin'); // Assuming you have an admin model
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
-
-// --- HARDCODED CREDENTIALS (TEMPORARY SOLUTION) ---
-// REPLACE THESE WITH YOUR ACTUAL MONGODB URI AND JWT SECRET
-// For debugging purposes, using the placeholder from your .env file
-const MONGODB_URI = "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
-const JWT_SECRET = "4459707ad73dccddf5cda5589c57be66";
-// --- END HARDCODED CREDENTIALS ---
-
-
-// Removed: All previous diagnostic logs and FATAL ERROR checks for MONGODB_URI and JWT_SECRET
-// Removed: .env file presence check using fs module
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey'; // Use a strong, unique key in production
+const MONGODB_URI = process.env.MONGODB_URI; // Ensure this is loaded from .env
 
 // Middleware
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json()); // For parsing application/json
+app.use(express.static(path.join(__dirname, 'public'))); // Serve static files from 'public' directory
 
 // MongoDB Connection
-mongoose.connect(MONGODB_URI)
-    .then(() => console.log('MongoDB connected successfully.'))
-    .catch(err => {
-        console.error('MongoDB connection error:', err);
-        // For now, we won't exit, but log the error clearly.
-    });
+mongoose.connect(MONGODB_URI) // Use the loaded MONGODB_URI
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
-// WhatsApp Client Initialization (rest of the logic remains the same)
+// WhatsApp Client Initialization
 let whatsappClient;
-let qrCodeData = null;
-let whatsappStatus = 'initializing';
+let qrCodeData = null; // Store QR code data (base64 image URL)
+let whatsappStatus = 'initializing'; // Global status for the bot
 
 function updateBotStatus(status, data = null) {
     whatsappStatus = status;
-    io.emit('status', status);
+    io.emit('status', status); // Emit status to all connected admin dashboards
     if (status === 'qr_received' && data) {
-        qrCodeData = data;
-        io.emit('qrCode', data);
+        qrCodeData = data; // Store base64 image data
+        io.emit('qrCode', data); // Emit QR code data to admin dashboard
     } else if (status === 'ready' || status === 'disconnected' || status === 'auth_failure') {
-        qrCodeData = null;
-        io.emit('qrCode', null);
+        qrCodeData = null; // Clear QR data when connected or disconnected
+        io.emit('qrCode', null); // Clear QR on dashboard
     }
     console.log(`WhatsApp Bot Status: ${status}`);
 }
 
 async function initializeWhatsAppClient(loadSession = true) {
     if (whatsappClient) {
+        // If client already exists, destroy it before reinitializing
         await whatsappClient.destroy().catch(e => console.error("Error destroying old client:", e));
         whatsappClient = null;
     }
@@ -74,8 +61,8 @@ async function initializeWhatsAppClient(loadSession = true) {
     updateBotStatus('initializing');
     whatsappClient = new Client({
         authStrategy: new LocalAuth({
-            clientId: 'whatsapp-bot',
-            dataPath: './.wwebjs_auth'
+            clientId: 'whatsapp-bot', // Unique ID for this session
+            dataPath: './.wwebjs_auth' // Directory to store session data
         }),
         puppeteer: {
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -83,12 +70,14 @@ async function initializeWhatsAppClient(loadSession = true) {
     });
 
     whatsappClient.on('qr', async (qr) => {
+        // Convert QR string to base64 image data URL
+        const qrcode = require('qrcode'); // Require qrcode here to avoid global import if not always needed
         qrcode.toDataURL(qr, { small: false }, (err, url) => {
             if (err) {
                 console.error('Error generating QR code data URL:', err);
                 updateBotStatus('qr_error');
             } else {
-                updateBotStatus('qr_received', url);
+                updateBotStatus('qr_received', url); // Pass base64 image URL
             }
         });
     });
@@ -111,10 +100,12 @@ async function initializeWhatsAppClient(loadSession = true) {
     whatsappClient.on('disconnected', (reason) => {
         updateBotStatus('disconnected');
         console.log('WhatsApp Client was disconnected', reason);
+        // Attempt to reinitialize after a delay, or wait for admin action
         setTimeout(() => {
             if (whatsappStatus !== 'ready' && whatsappStatus !== 'initializing') {
+                 // Only reinitialize if not already in ready/initializing state
                 console.log('Attempting to reinitialize after disconnection...');
-                initializeWhatsAppClient(true);
+                initializeWhatsAppClient(true); // Attempt to load session again
             }
         }, 5000);
     });
@@ -124,32 +115,38 @@ async function initializeWhatsAppClient(loadSession = true) {
         if (state === 'CONNECTED') {
             updateBotStatus('ready');
         } else if (state === 'DISCONNECTED') {
+             // This might overlap with 'disconnected' event, ensuring status is set.
             updateBotStatus('disconnected');
         } else {
-            updateBotStatus(state);
+            updateBotStatus(state); // For other states like 'OPENING', 'PAIRING', 'TIMEOUT'
         }
     });
 
     whatsappClient.on('message', async message => {
         console.log('Message received:', message.body);
 
+        // Fetch customer or create if not exists
         let customer = await Customer.findOne({ customerPhone: message.from });
         if (!customer) {
             customer = new Customer({
                 customerPhone: message.from,
-                customerName: message._data.notifyName || 'Customer'
+                customerName: message._data.notifyName || 'Customer' // Get name from WhatsApp
             });
             await customer.save();
         } else {
+            // Update customer name if it's generic and WhatsApp provides a better one
             if (customer.customerName === 'Customer' && message._data.notifyName) {
                 customer.customerName = message._data.notifyName;
                 await customer.save();
             }
         }
 
+
+        // Fetch current shop settings for dynamic responses
         const settings = await Settings.findOne({});
         const shopName = settings ? settings.shopName : 'Our Shop';
 
+        // --- Bot Logic ---
         const lowerCaseMessage = message.body.toLowerCase().trim();
 
         if (lowerCaseMessage === 'hi' || lowerCaseMessage === 'hello' || lowerCaseMessage === 'start') {
@@ -194,8 +191,9 @@ async function initializeWhatsAppClient(loadSession = true) {
                 message.reply('Sorry, our menu is currently empty. Please check back later!');
             }
         } else if (lowerCaseMessage === '3' || lowerCaseMessage.includes('my orders')) {
+            // FIX: This section is updated to fetch and format orders more robustly.
             const customerPhone = message.from;
-            const orders = await Order.find({ customerPhone }).sort({ orderDate: -1 }).limit(5);
+            const orders = await Order.find({ customerPhone }).sort({ orderDate: -1 }).limit(5); // Fetch last 5 orders
 
             if (orders.length === 0) {
                 message.reply('You have no recent orders. Why not place one now?');
@@ -221,11 +219,13 @@ async function initializeWhatsAppClient(loadSession = true) {
                 message.reply('Shop location is not configured yet. Please check back later!');
             }
         } else if (lowerCaseMessage === '5' || lowerCaseMessage.includes('contact us')) {
+            // Provide contact information based on settings or default
             message.reply(`You can reach us directly on this WhatsApp number or call us at ${message.from}.`);
         } else if (lowerCaseMessage.includes('cancel order')) {
              message.reply("If you wish to cancel an order, please provide the Order ID or describe the order clearly so we can assist you. For example: 'Cancel order ID 123456'.");
         }
         else {
+            // Attempt to parse order from message
             const orderRegex = /([a-zA-Z0-9\s]+)\s*x\s*(\d+)/g;
             let match;
             const requestedItems = [];
@@ -240,7 +240,7 @@ async function initializeWhatsAppClient(loadSession = true) {
 
                 for (const reqItem of requestedItems) {
                     const menuItem = await MenuItem.findOne({
-                        name: { $regex: new RegExp(`^${reqItem.name}$`, 'i') },
+                        name: { $regex: new RegExp(`^${reqItem.name}$`, 'i') }, // Case-insensitive match
                         isAvailable: true
                     });
 
@@ -263,16 +263,18 @@ async function initializeWhatsAppClient(loadSession = true) {
                         responseMessage += `*${item.name}* x${item.quantity} = ₹${(item.price * item.quantity).toFixed(2)}\n`;
                     });
 
+                    // Calculate transport tax based on distance (if customer location is known and settings exist)
                     let transportTax = 0;
-                    let deliveryAddress = customer.deliveryAddress || 'Not provided yet';
-                    let customerLocation = customer.lastKnownLocation;
+                    let deliveryAddress = customer.deliveryAddress || 'Not provided yet'; // Use stored address or prompt
+                    let customerLocation = customer.lastKnownLocation; // Use stored location if available
 
                     if (!customerLocation && message.hasMedia && message.type === 'location') {
+                        // If user sent location with the order
                         customerLocation = {
                             latitude: message.location.latitude,
                             longitude: message.location.longitude
                         };
-                        customer.lastKnownLocation = customerLocation;
+                        customer.lastKnownLocation = customerLocation; // Update customer's last known location
                         await customer.save();
                         responseMessage += `\n*Delivery Location:* Received from your message.`;
                     } else if (!customerLocation) {
@@ -286,16 +288,14 @@ async function initializeWhatsAppClient(loadSession = true) {
                         );
                         responseMessage += `\n*Distance:* ${dist.toFixed(2)} km`;
 
-                        const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
-
-                        for (let i = 0; i < sortedRates.length; i++) {
-                            const rate = sortedRates[i];
+                        for (const rate of settings.deliveryRates.sort((a, b) => a.kms - b.kms)) {
                             if (dist <= rate.kms) {
                                 transportTax = rate.amount;
                                 break;
                             }
-                            if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
-                                transportTax = sortedRates[i].amount;
+                            // If it's the last rate and distance is greater, use this rate
+                            if (i === settings.deliveryRates.length - 1 && dist > settings.deliveryRates[i].kms) {
+                                transportTax = settings.deliveryRates[i].amount;
                             }
                         }
                         responseMessage += `\n*Delivery Fee:* ₹${transportTax.toFixed(2)}`;
@@ -313,6 +313,9 @@ async function initializeWhatsAppClient(loadSession = true) {
                     responseMessage += `To confirm your order, please reply with *Confirm Order*.`;
                     message.reply(responseMessage);
 
+                    // Store pending order details in a temporary session or directly to DB with 'Pending Confirmation' status
+                    // For simplicity, we'll assume the next "Confirm Order" message confirms the last parsed order intention
+                    // In a real app, you'd use a state machine or temporary storage
                     await Order.create({
                         customerPhone: message.from,
                         customerName: customer.customerName,
@@ -320,10 +323,10 @@ async function initializeWhatsAppClient(loadSession = true) {
                         subtotal,
                         transportTax,
                         totalAmount,
-                        deliveryAddress: deliveryAddress,
+                        deliveryAddress: deliveryAddress, // Will be updated on confirmation if location is new
                         customerLocation: customerLocation,
-                        status: 'Pending Confirmation',
-                        paymentMethod: 'COD'
+                        status: 'Pending Confirmation', // Temporary status
+                        paymentMethod: 'COD' // Default
                     });
 
                 } else if (invalidItems.length > 0) {
@@ -335,13 +338,17 @@ async function initializeWhatsAppClient(loadSession = true) {
                 const latestOrder = await Order.findOne({ customerPhone: message.from }).sort({ orderDate: -1 });
 
                 if (latestOrder && latestOrder.status === 'Pending Confirmation') {
-                    latestOrder.status = 'Pending';
+                    latestOrder.status = 'Pending'; // Change to actual 'Pending' status
+                    // If customer's location was sent just before, it's already updated on the customer object.
+                    // If no explicit address was given, we might prompt for one or use general location.
+                    // For now, assume location is for delivery address if provided.
                     if (customer.lastKnownLocation && !latestOrder.deliveryAddress) {
+                        // A more sophisticated system would reverse geocode the coordinates
                         latestOrder.deliveryAddress = `Delivery near Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`;
                     }
                     await latestOrder.save();
                     message.reply(`Thank you for confirming! Your order (ID: ${latestOrder._id.toString().substring(0, 8)}...) has been placed and is *Pending*. We will process it shortly.`);
-                    io.emit('new_order', latestOrder);
+                    io.emit('new_order', latestOrder); // Notify admin dashboard
 
                 } else {
                     message.reply('No pending order to confirm. Please place an order first!');
@@ -359,8 +366,9 @@ async function initializeWhatsAppClient(loadSession = true) {
     });
 }
 
+// Haversine distance function (for calculating distance between two coordinates)
 function haversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
+    const R = 6371; // Radius of Earth in kilometers
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a =
@@ -368,12 +376,14 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * c; // Distance in km
 }
 
+
+// --- Admin Authentication Middleware ---
 const authenticateAdmin = (req, res, next) => {
-    const token = req.cookies && req.cookies.token;
-    if (!token && req.headers.authorization) {
+    const token = req.cookies && req.cookies.token; // Check for token in cookies (assuming cookie-parser might be used, but not explicitly added here)
+    if (!token && req.headers.authorization) { // Fallback to Authorization header if no cookie
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
             token = authHeader.split(' ')[1];
@@ -386,7 +396,7 @@ const authenticateAdmin = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.admin = decoded.admin;
+        req.admin = decoded.admin; // Attach admin payload to request
         next();
     } catch (err) {
         console.error('Token verification error:', err);
@@ -394,6 +404,9 @@ const authenticateAdmin = (req, res, next) => {
     }
 };
 
+// --- Admin Routes ---
+
+// Admin Login
 app.post('/api/admin/login', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -415,6 +428,8 @@ app.post('/api/admin/login', async (req, res) => {
 
         jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' }, (err, token) => {
             if (err) throw err;
+            // For simplicity, we'll send token in JSON response.
+            // In a real app, you'd set it as an HttpOnly cookie.
             res.json({ token, message: 'Login successful' });
         });
     } catch (err) {
@@ -423,35 +438,42 @@ app.post('/api/admin/login', async (req, res) => {
     }
 });
 
+// Admin Logout (Client-side clears token usually)
 app.get('/admin/logout', (req, res) => {
-    res.redirect('/admin/login.html');
+    // For JWT in HTTP-only cookies: res.clearCookie('token');
+    res.redirect('/admin/login.html'); // Redirect to login page
 });
 
+// Route to serve the admin dashboard HTML
 app.get('/admin/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_dashboard.html'));
 });
 
+// Route to serve the admin login HTML
 app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
+// Initial bot status check for dashboard load
 app.get('/api/admin/bot-status', authenticateAdmin, (req, res) => {
     res.json({ status: whatsappStatus, qrCode: qrCodeData });
 });
 
-app.post('/api/public/request-qr', (req, res) => {
+// Request New QR Code
+app.post('/api/public/request-qr', (req, res) => { // Public route as it's for initial setup
     try {
         if (whatsappClient) {
             console.log('Requesting new QR...');
             whatsappClient.destroy().then(() => {
-                initializeWhatsAppClient(false);
+                 // Reinitialize to get a new QR
+                initializeWhatsAppClient(false); // Don't try to load existing session
                 res.status(200).json({ message: 'New QR generation initiated. Check dashboard in a moment.' });
             }).catch(e => {
                 console.error("Error destroying client for new QR:", e);
                 res.status(500).json({ message: 'Failed to reset bot for new QR.' });
             });
         } else {
-            initializeWhatsAppClient(false);
+            initializeWhatsAppClient(false); // Start if not already running, don't load session
             res.status(200).json({ message: 'WhatsApp bot initialization started. QR will appear shortly.' });
         }
     } catch (error) {
@@ -460,10 +482,11 @@ app.post('/api/public/request-qr', (req, res) => {
     }
 });
 
+// Load Saved Session (for disconnected bot)
 app.post('/api/admin/load-session', authenticateAdmin, (req, res) => {
     try {
         console.log('Attempting to load saved session...');
-        initializeWhatsAppClient(true);
+        initializeWhatsAppClient(true); // Attempt to load saved session
         res.status(200).json({ message: 'Attempting to load saved session. Check bot status.' });
     } catch (error) {
         console.error('Error loading session:', error);
@@ -471,6 +494,9 @@ app.post('/api/admin/load-session', authenticateAdmin, (req, res) => {
     }
 });
 
+// --- API Routes for Frontend (Admin Dashboard) ---
+
+// Get all orders
 app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
     try {
         const orders = await Order.find().sort({ orderDate: -1 });
@@ -481,6 +507,7 @@ app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Get single order by ID
 app.get('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
@@ -490,13 +517,14 @@ app.get('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
         res.json(order);
     } catch (err) {
         console.error(err.message);
-        if (err.kind === 'ObjectId') {
+        if (err.kind === 'ObjectId') { // Handle invalid ID format
             return res.status(400).json({ message: 'Invalid Order ID' });
         }
         res.status(500).send('Server Error');
     }
 });
 
+// Update order status
 app.put('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     const { status } = req.body;
     try {
@@ -508,8 +536,9 @@ app.put('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
         order.status = status;
         await order.save();
 
+        // Optional: Send WhatsApp notification to customer about status update
         if (whatsappClient && whatsappStatus === 'ready') {
-            const customerPhone = order.customerPhone.includes('@c.us') ? order.customerPhone : `${order.customerPhone}@c.us`;
+            const customerPhone = order.customerPhone.includes('@c.us') ? order.customerPhone : `${order.customerPhone}@c.us`; // Ensure correct format
             const statusMessage = `📢 Your order (ID: ${order._id.toString().substring(0, 8)}...) from *${(await Settings.findOne({}))?.shopName || 'Delicious Bites'}* has been updated to: *${status}*!`;
             whatsappClient.sendMessage(customerPhone, statusMessage).catch(e => console.error("Failed to send status update:", e));
         }
@@ -521,6 +550,7 @@ app.put('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+// NEW: Delete an order
 app.delete('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     try {
         const order = await Order.findByIdAndDelete(req.params.id);
@@ -537,9 +567,11 @@ app.delete('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+// NEW: Manually create an order (Admin) - Basic implementation
 app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
     const { customerPhone, customerName, deliveryAddress, customerLocation, items, paymentMethod = 'COD' } = req.body;
 
+    // Validate essential fields
     if (!customerPhone || !customerName || !items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'Missing required order fields (customerPhone, customerName, items).' });
     }
@@ -569,17 +601,14 @@ app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
                 settings.shopLocation.latitude, settings.shopLocation.longitude,
                 customerLocation.latitude, customerLocation.longitude
             );
-            const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
-
-            for (let i = 0; i < sortedRates.length; i++) {
-                const rate = sortedRates[i];
+            for (const rate of settings.deliveryRates.sort((a, b) => a.kms - b.kms)) {
                 if (dist <= rate.kms) {
                     transportTax = rate.amount;
                     break;
                 }
-                if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
-                    transportTax = sortedRates[i].amount;
-                }
+            }
+            if (transportTax === 0 && dist > settings.deliveryRates[settings.deliveryRates.length - 1].kms) {
+                transportTax = settings.deliveryRates[settings.deliveryRates.length - 1].amount;
             }
         }
 
@@ -593,21 +622,23 @@ app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
             transportTax,
             totalAmount,
             deliveryAddress: deliveryAddress || (customerLocation ? `Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}` : 'Address not specified'),
-            customerLocation,
-            status: 'Confirmed',
+            customerLocation, // Store provided customer location
+            status: 'Confirmed', // Manually added orders are typically confirmed
             paymentMethod,
             orderDate: new Date()
         });
 
         await newOrder.save();
         res.status(201).json(newOrder);
-        io.emit('new_order', newOrder);
+        io.emit('new_order', newOrder); // Notify admin dashboard of new order
     } catch (err) {
         console.error('Error creating order:', err.message);
         res.status(500).send('Server Error');
     }
 });
 
+
+// Get all menu items
 app.get('/api/admin/menu', authenticateAdmin, async (req, res) => {
     try {
         const menuItems = await MenuItem.find();
@@ -618,6 +649,7 @@ app.get('/api/admin/menu', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Add/Update menu item
 app.post('/api/admin/menu', authenticateAdmin, async (req, res) => {
     const { name, description, price, imageUrl, category, isAvailable, isTrending } = req.body;
     try {
@@ -652,6 +684,7 @@ app.put('/api/admin/menu/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Delete menu item
 app.delete('/api/admin/menu/:id', authenticateAdmin, async (req, res) => {
     try {
         const item = await MenuItem.findByIdAndDelete(req.params.id);
@@ -665,16 +698,18 @@ app.delete('/api/admin/menu/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Get shop settings
 app.get('/api/admin/settings', authenticateAdmin, async (req, res) => {
     try {
         const settings = await Settings.findOne({});
-        res.json(settings || {});
+        res.json(settings || {}); // Return empty object if no settings found
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
     }
 });
 
+// Update shop settings
 app.put('/api/admin/settings', authenticateAdmin, async (req, res) => {
     const { shopName, shopLocation, deliveryRates } = req.body;
     try {
@@ -694,6 +729,7 @@ app.put('/api/admin/settings', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Get all customers with their last known locations
 app.get('/api/admin/customers', authenticateAdmin, async (req, res) => {
     try {
         const customers = await Customer.find().sort({ lastSeen: -1 });
@@ -704,6 +740,7 @@ app.get('/api/admin/customers', authenticateAdmin, async (req, res) => {
     }
 });
 
+// NEW: Delete a customer
 app.delete('/api/admin/customers/:phone', authenticateAdmin, async (req, res) => {
     try {
         const customerPhone = req.params.phone;
@@ -711,6 +748,8 @@ app.delete('/api/admin/customers/:phone', authenticateAdmin, async (req, res) =>
         if (!customer) {
             return res.status(404).json({ message: 'Customer not found' });
         }
+        // Optional: Also delete associated orders or set them to anonymous if customer is deleted.
+        // For now, we'll just delete the customer profile.
         res.json({ message: 'Customer deleted successfully' });
     } catch (err) {
         console.error(err.message);
@@ -718,6 +757,7 @@ app.delete('/api/admin/customers/:phone', authenticateAdmin, async (req, res) =>
     }
 });
 
+// NEW: Manually add a customer (Admin) - Basic implementation
 app.post('/api/admin/customers', authenticateAdmin, async (req, res) => {
     const { customerPhone, customerName, lastKnownLocation, deliveryAddress } = req.body;
 
@@ -745,28 +785,34 @@ app.post('/api/admin/customers', authenticateAdmin, async (req, res) => {
     }
 });
 
+
+// --- Public API for Web Orders (assuming a separate web frontend for ordering) ---
 app.post('/api/orders', async (req, res) => {
     const { customerName, customerPhone, items, deliveryAddress, customerLocation, paymentMethod } = req.body;
 
+    // Basic validation
     if (!customerName || !customerPhone || !items || !Array.isArray(items) || items.length === 0 || !deliveryAddress) {
         return res.status(400).json({ message: 'Missing required order details' });
     }
 
     try {
+        // Find or create customer
         let customer = await Customer.findOne({ customerPhone });
         if (!customer) {
             customer = new Customer({ customerPhone, customerName });
         }
+        // Update customer's name if a new one is provided or it was generic
         if (customer.customerName === 'Customer' || (customerName && customer.customerName !== customerName)) {
             customer.customerName = customerName;
         }
+        // Update customer's last known location and delivery address
         if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
             customer.lastKnownLocation = customerLocation;
         }
         if (deliveryAddress) {
             customer.deliveryAddress = deliveryAddress;
         }
-        await customer.save();
+        await customer.save(); // Save updated customer info
 
         let subtotal = 0;
         const orderItems = [];
@@ -791,18 +837,15 @@ app.post('/api/orders', async (req, res) => {
                 settings.shopLocation.latitude, settings.shopLocation.longitude,
                 customerLocation.latitude, customerLocation.longitude
             );
-            const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
-
-            for (let i = 0; i < sortedRates.length; i++) {
-                const rate = sortedRates[i];
+            for (const rate of settings.deliveryRates.sort((a, b) => a.kms - b.kms)) {
                 if (dist <= rate.kms) {
                     transportTax = rate.amount;
                     break;
                 }
-                if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
-                    transportTax = sortedRates[i].amount;
-                }
+             if (transportTax === 0 && dist > settings.deliveryRates[settings.deliveryRates.length - 1].kms) {
+                transportTax = settings.deliveryRates[settings.deliveryRates.length - 1].amount;
             }
+        }
         }
 
         const totalAmount = subtotal + transportTax;
@@ -815,18 +858,20 @@ app.post('/api/orders', async (req, res) => {
             transportTax,
             totalAmount,
             deliveryAddress,
-            customerLocation: customerLocation || null,
-            status: 'Pending',
-            paymentMethod: paymentMethod || 'COD'
+            customerLocation: customerLocation || null, // FIX: Ensure location is stored
+            status: 'Pending', // Initial status for web orders
+            paymentMethod: paymentMethod || 'COD' // Default to COD if not specified
         });
 
         await newOrder.save();
 
+        // Notify admin dashboard via Socket.IO
         io.emit('new_order', newOrder);
 
+        // Optional: Send WhatsApp confirmation to customer
         if (whatsappClient && whatsappStatus === 'ready') {
             const confirmationMessage = `🎉 Your order (ID: ${newOrder._id.toString().substring(0, 8)}...) has been placed successfully from *${settings?.shopName || 'Delicious Bites'}*!\nTotal: ₹${newOrder.totalAmount.toFixed(2)}\nStatus: *Pending*\nWe will confirm and process it shortly.`;
-            const formattedPhone = customerPhone.includes('@c.us') ? customerPhone : `${customerPhone.replace(/\D/g, '')}@c.us`;
+            const formattedPhone = customerPhone.includes('@c.us') ? customerPhone : `${customerPhone.replace(/\D/g, '')}@c.us`; // Ensure correct format
             whatsappClient.sendMessage(formattedPhone, confirmationMessage).catch(e => console.error("Failed to send order confirmation:", e));
         }
 
@@ -837,81 +882,11 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
-app.get('/api/order/:id', async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id);
-        if (!order) {
-            return res.status(404).json({ message: 'Order not found' });
-        }
-        res.json(order);
-    } catch (err) {
-        console.error(err.message);
-        if (err.kind === 'ObjectId') {
-            return res.status(400).json({ message: 'Invalid Order ID' });
-        }
-        res.status(500).send('Server Error');
-    }
-});
 
-app.get('/api/public/settings', async (req, res) => {
-    try {
-        const settings = await Settings.findOne({});
-        if (settings) {
-            return res.json({
-                shopName: settings.shopName,
-                shopLocation: settings.shopLocation,
-                deliveryRates: settings.deliveryRates
-            });
-        }
-        res.json({});
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
-    }
-});
-
-app.post('/api/calculate-delivery-cost', async (req, res) => {
-    const { customerLocation } = req.body;
-
-    if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined') {
-        return res.status(400).json({ message: 'Customer location (latitude and longitude) is required.' });
-    }
-
-    try {
-        const settings = await Settings.findOne({});
-        if (!settings || !settings.shopLocation || !settings.deliveryRates || settings.deliveryRates.length === 0) {
-            return res.status(400).json({ message: 'Delivery settings are not configured on the server.' });
-        }
-
-        const dist = haversineDistance(
-            settings.shopLocation.latitude, settings.shopLocation.longitude,
-            customerLocation.latitude, customerLocation.longitude
-        );
-
-        let transportTax = 0;
-        const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
-
-        for (let i = 0; i < sortedRates.length; i++) {
-            const rate = sortedRates[i];
-            if (dist <= rate.kms) {
-                transportTax = rate.amount;
-                break;
-            }
-            if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
-                transportTax = sortedRates[i].amount;
-            }
-        }
-
-        res.json({ distance: dist, transportTax: transportTax });
-
-    } catch (err) {
-        console.error('Error calculating delivery cost:', err.message);
-        res.status(500).json({ message: 'Error calculating delivery cost', error: err.message });
-    }
-});
-
+// --- WebSocket (Socket.IO) Connection ---
 io.on('connection', (socket) => {
     console.log('Admin dashboard connected');
+    // Send current bot status and QR code data to newly connected client
     socket.emit('status', whatsappStatus);
     if (qrCodeData) {
         socket.emit('qrCode', qrCodeData);
@@ -922,13 +897,13 @@ io.on('connection', (socket) => {
     });
 });
 
-initializeWhatsAppClient(true);
+// Start WhatsApp client initially
+initializeWhatsAppClient(true); // Attempt to load saved session on startup
 
+// Start the server
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Admin Dashboard: http://localhost:${PORT}/admin/login`);
-    console.log(`Public Menu: http://localhost:${PORT}/menu`);
-    console.log(`Bot Status: http://localhost:${PORT}/bot_status`);
 });
 
 
