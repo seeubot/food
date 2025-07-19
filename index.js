@@ -1,11 +1,12 @@
-require('dotenv').config(); // Load environment variables from .env file
+// Ensure dotenv is loaded as early as possible
+require('dotenv').config();
 
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-const qrcode = require('qrcode'); // Explicitly require qrcode for QR generation
+const qrcode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -22,30 +23,36 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey'; // Use a strong, unique key in production
+const JWT_SECRET = process.env.JWT_SECRET; // Get JWT_SECRET from .env
+const MONGODB_URI = process.env.MONGODB_URI; // Get MONGODB_URI from .env
 
-// --- IMPORTANT: Check MONGODB_URI loading ---
-const MONGODB_URI = process.env.MONGODB_URI;
-console.log('Attempting to connect to MongoDB with URI:', MONGODB_URI ? 'URI Loaded (not displayed for security)' : 'URI UNDEFINED - Check your .env file!');
+// --- DIAGNOSTIC LOGS: TEMPORARY - REMOVE AFTER FIXING ENV ISSUE ---
+console.log('--- Environment Variables Loaded (Diagnostic) ---');
+console.log('process.env.NODE_ENV:', process.env.NODE_ENV);
+console.log('process.env.MONGODB_URI:', MONGODB_URI ? 'URI Loaded (value hidden for security)' : 'URI UNDEFINED');
+console.log('process.env.JWT_SECRET:', JWT_SECRET ? 'Secret Loaded (value hidden for security)' : 'SECRET UNDEFINED');
+// console.log('Full process.env:', process.env); // Uncomment this line if the above is still undefined, but be careful with logs!
+console.log('--- End Environment Variables Diagnostic ---');
+// --- END DIAGNOSTIC LOGS ---
 
+// Critical check for MongoDB URI
 if (!MONGODB_URI) {
-    console.error('FATAL ERROR: MONGODB_URI is not defined in your .env file or environment variables.');
-    console.error('Please create a .env file in the root directory with MONGODB_URI="your_connection_string".');
-    process.exit(1); // Exit the process if URI is not found
+    console.error('FATAL ERROR: MONGODB_URI is not defined.');
+    console.error('Please ensure you have a .env file in the root of your project with MONGODB_URI="your_connection_string".');
+    console.error('Also, double-check for typos, extra spaces, or incorrect quotes in your .env file.');
+    process.exit(1); // Exit the application if the critical variable is missing
 }
-// --- End MONGODB_URI check ---
-
-
-// Middleware
-app.use(express.json()); // For parsing application/json
-app.use(express.static(path.join(__dirname, 'public'))); // Serve static files from 'public' directory
 
 // MongoDB Connection
-mongoose.connect(MONGODB_URI) // Use the loaded MONGODB_URI
+mongoose.connect(MONGODB_URI)
     .then(() => console.log('MongoDB connected successfully.'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .catch(err => {
+        console.error('MongoDB connection error:', err);
+        // Do not exit here, allow the app to run without DB if needed for other features,
+        // but log the error clearly. For a production app, you might want to exit.
+    });
 
-// WhatsApp Client Initialization
+// WhatsApp Client Initialization (rest of the logic remains the same)
 let whatsappClient;
 let qrCodeData = null; // Store QR code data (base64 image URL)
 let whatsappStatus = 'initializing'; // Global status for the bot
@@ -65,7 +72,6 @@ function updateBotStatus(status, data = null) {
 
 async function initializeWhatsAppClient(loadSession = true) {
     if (whatsappClient) {
-        // If client already exists, destroy it before reinitializing
         await whatsappClient.destroy().catch(e => console.error("Error destroying old client:", e));
         whatsappClient = null;
     }
@@ -73,8 +79,8 @@ async function initializeWhatsAppClient(loadSession = true) {
     updateBotStatus('initializing');
     whatsappClient = new Client({
         authStrategy: new LocalAuth({
-            clientId: 'whatsapp-bot', // Unique ID for this session
-            dataPath: './.wwebjs_auth' // Directory to store session data
+            clientId: 'whatsapp-bot',
+            dataPath: './.wwebjs_auth'
         }),
         puppeteer: {
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -82,13 +88,12 @@ async function initializeWhatsAppClient(loadSession = true) {
     });
 
     whatsappClient.on('qr', async (qr) => {
-        // Convert QR string to base64 image data URL
         qrcode.toDataURL(qr, { small: false }, (err, url) => {
             if (err) {
                 console.error('Error generating QR code data URL:', err);
                 updateBotStatus('qr_error');
             } else {
-                updateBotStatus('qr_received', url); // Pass base64 image URL
+                updateBotStatus('qr_received', url);
             }
         });
     });
@@ -111,12 +116,10 @@ async function initializeWhatsAppClient(loadSession = true) {
     whatsappClient.on('disconnected', (reason) => {
         updateBotStatus('disconnected');
         console.log('WhatsApp Client was disconnected', reason);
-        // Attempt to reinitialize after a delay, or wait for admin action
         setTimeout(() => {
             if (whatsappStatus !== 'ready' && whatsappStatus !== 'initializing') {
-                 // Only reinitialize if not already in ready/initializing state
                 console.log('Attempting to reinitialize after disconnection...');
-                initializeWhatsAppClient(true); // Attempt to load session again
+                initializeWhatsAppClient(true);
             }
         }, 5000);
     });
@@ -126,38 +129,32 @@ async function initializeWhatsAppClient(loadSession = true) {
         if (state === 'CONNECTED') {
             updateBotStatus('ready');
         } else if (state === 'DISCONNECTED') {
-             // This might overlap with 'disconnected' event, ensuring status is set.
             updateBotStatus('disconnected');
         } else {
-            updateBotStatus(state); // For other states like 'OPENING', 'PAIRING', 'TIMEOUT'
+            updateBotStatus(state);
         }
     });
 
     whatsappClient.on('message', async message => {
         console.log('Message received:', message.body);
 
-        // Fetch customer or create if not exists
         let customer = await Customer.findOne({ customerPhone: message.from });
         if (!customer) {
             customer = new Customer({
                 customerPhone: message.from,
-                customerName: message._data.notifyName || 'Customer' // Get name from WhatsApp
+                customerName: message._data.notifyName || 'Customer'
             });
             await customer.save();
         } else {
-            // Update customer name if it's generic and WhatsApp provides a better one
             if (customer.customerName === 'Customer' && message._data.notifyName) {
                 customer.customerName = message._data.notifyName;
                 await customer.save();
             }
         }
 
-
-        // Fetch current shop settings for dynamic responses
         const settings = await Settings.findOne({});
         const shopName = settings ? settings.shopName : 'Our Shop';
 
-        // --- Bot Logic ---
         const lowerCaseMessage = message.body.toLowerCase().trim();
 
         if (lowerCaseMessage === 'hi' || lowerCaseMessage === 'hello' || lowerCaseMessage === 'start') {
@@ -202,9 +199,8 @@ async function initializeWhatsAppClient(loadSession = true) {
                 message.reply('Sorry, our menu is currently empty. Please check back later!');
             }
         } else if (lowerCaseMessage === '3' || lowerCaseMessage.includes('my orders')) {
-            // FIX: This section is updated to fetch and format orders more robustly.
             const customerPhone = message.from;
-            const orders = await Order.find({ customerPhone }).sort({ orderDate: -1 }).limit(5); // Fetch last 5 orders
+            const orders = await Order.find({ customerPhone }).sort({ orderDate: -1 }).limit(5);
 
             if (orders.length === 0) {
                 message.reply('You have no recent orders. Why not place one now?');
@@ -230,13 +226,11 @@ async function initializeWhatsAppClient(loadSession = true) {
                 message.reply('Shop location is not configured yet. Please check back later!');
             }
         } else if (lowerCaseMessage === '5' || lowerCaseMessage.includes('contact us')) {
-            // Provide contact information based on settings or default
             message.reply(`You can reach us directly on this WhatsApp number or call us at ${message.from}.`);
         } else if (lowerCaseMessage.includes('cancel order')) {
              message.reply("If you wish to cancel an order, please provide the Order ID or describe the order clearly so we can assist you. For example: 'Cancel order ID 123456'.");
         }
         else {
-            // Attempt to parse order from message
             const orderRegex = /([a-zA-Z0-9\s]+)\s*x\s*(\d+)/g;
             let match;
             const requestedItems = [];
@@ -251,7 +245,7 @@ async function initializeWhatsAppClient(loadSession = true) {
 
                 for (const reqItem of requestedItems) {
                     const menuItem = await MenuItem.findOne({
-                        name: { $regex: new RegExp(`^${reqItem.name}$`, 'i') }, // Case-insensitive match
+                        name: { $regex: new RegExp(`^${reqItem.name}$`, 'i') },
                         isAvailable: true
                     });
 
@@ -274,18 +268,16 @@ async function initializeWhatsAppClient(loadSession = true) {
                         responseMessage += `*${item.name}* x${item.quantity} = ₹${(item.price * item.quantity).toFixed(2)}\n`;
                     });
 
-                    // Calculate transport tax based on distance (if customer location is known and settings exist)
                     let transportTax = 0;
-                    let deliveryAddress = customer.deliveryAddress || 'Not provided yet'; // Use stored address or prompt
-                    let customerLocation = customer.lastKnownLocation; // Use stored location if available
+                    let deliveryAddress = customer.deliveryAddress || 'Not provided yet';
+                    let customerLocation = customer.lastKnownLocation;
 
                     if (!customerLocation && message.hasMedia && message.type === 'location') {
-                        // If user sent location with the order
                         customerLocation = {
                             latitude: message.location.latitude,
                             longitude: message.location.longitude
                         };
-                        customer.lastKnownLocation = customerLocation; // Update customer's last known location
+                        customer.lastKnownLocation = customerLocation;
                         await customer.save();
                         responseMessage += `\n*Delivery Location:* Received from your message.`;
                     } else if (!customerLocation) {
@@ -299,7 +291,6 @@ async function initializeWhatsAppClient(loadSession = true) {
                         );
                         responseMessage += `\n*Distance:* ${dist.toFixed(2)} km`;
 
-                        // Sort delivery rates by kms in ascending order
                         const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
 
                         for (let i = 0; i < sortedRates.length; i++) {
@@ -308,7 +299,6 @@ async function initializeWhatsAppClient(loadSession = true) {
                                 transportTax = rate.amount;
                                 break;
                             }
-                            // If it's the last rate and distance is greater, use this rate
                             if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
                                 transportTax = sortedRates[i].amount;
                             }
@@ -328,9 +318,6 @@ async function initializeWhatsAppClient(loadSession = true) {
                     responseMessage += `To confirm your order, please reply with *Confirm Order*.`;
                     message.reply(responseMessage);
 
-                    // Store pending order details in a temporary session or directly to DB with 'Pending Confirmation' status
-                    // For simplicity, we'll assume the next "Confirm Order" message confirms the last parsed order intention
-                    // In a real app, you'd use a state machine or temporary storage
                     await Order.create({
                         customerPhone: message.from,
                         customerName: customer.customerName,
@@ -338,10 +325,10 @@ async function initializeWhatsAppClient(loadSession = true) {
                         subtotal,
                         transportTax,
                         totalAmount,
-                        deliveryAddress: deliveryAddress, // Will be updated on confirmation if location is new
+                        deliveryAddress: deliveryAddress,
                         customerLocation: customerLocation,
-                        status: 'Pending Confirmation', // Temporary status
-                        paymentMethod: 'COD' // Default
+                        status: 'Pending Confirmation',
+                        paymentMethod: 'COD'
                     });
 
                 } else if (invalidItems.length > 0) {
@@ -353,17 +340,13 @@ async function initializeWhatsAppClient(loadSession = true) {
                 const latestOrder = await Order.findOne({ customerPhone: message.from }).sort({ orderDate: -1 });
 
                 if (latestOrder && latestOrder.status === 'Pending Confirmation') {
-                    latestOrder.status = 'Pending'; // Change to actual 'Pending' status
-                    // If customer's location was sent just before, it's already updated on the customer object.
-                    // If no explicit address was given, we might prompt for one or use general location.
-                    // For now, assume location is for delivery address if provided.
+                    latestOrder.status = 'Pending';
                     if (customer.lastKnownLocation && !latestOrder.deliveryAddress) {
-                        // A more sophisticated system would reverse geocode the coordinates
                         latestOrder.deliveryAddress = `Delivery near Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`;
                     }
                     await latestOrder.save();
                     message.reply(`Thank you for confirming! Your order (ID: ${latestOrder._id.toString().substring(0, 8)}...) has been placed and is *Pending*. We will process it shortly.`);
-                    io.emit('new_order', latestOrder); // Notify admin dashboard
+                    io.emit('new_order', latestOrder);
 
                 } else {
                     message.reply('No pending order to confirm. Please place an order first!');
@@ -381,9 +364,8 @@ async function initializeWhatsAppClient(loadSession = true) {
     });
 }
 
-// Haversine distance function (for calculating distance between two coordinates)
 function haversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of Earth in kilometers
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a =
@@ -391,14 +373,12 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
+    return R * c;
 }
 
-
-// --- Admin Authentication Middleware ---
 const authenticateAdmin = (req, res, next) => {
-    const token = req.cookies && req.cookies.token; // Check for token in cookies (assuming cookie-parser might be used, but not explicitly added here)
-    if (!token && req.headers.authorization) { // Fallback to Authorization header if no cookie
+    const token = req.cookies && req.cookies.token;
+    if (!token && req.headers.authorization) {
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
             token = authHeader.split(' ')[1];
@@ -411,7 +391,7 @@ const authenticateAdmin = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.admin = decoded.admin; // Attach admin payload to request
+        req.admin = decoded.admin;
         next();
     } catch (err) {
         console.error('Token verification error:', err);
@@ -419,9 +399,6 @@ const authenticateAdmin = (req, res, next) => {
     }
 };
 
-// --- Admin Routes ---
-
-// Admin Login
 app.post('/api/admin/login', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -443,8 +420,6 @@ app.post('/api/admin/login', async (req, res) => {
 
         jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' }, (err, token) => {
             if (err) throw err;
-            // For simplicity, we'll send token in JSON response.
-            // In a real app, you'd set it as an HttpOnly cookie.
             res.json({ token, message: 'Login successful' });
         });
     } catch (err) {
@@ -453,42 +428,35 @@ app.post('/api/admin/login', async (req, res) => {
     }
 });
 
-// Admin Logout (Client-side clears token usually)
 app.get('/admin/logout', (req, res) => {
-    // For JWT in HTTP-only cookies: res.clearCookie('token');
-    res.redirect('/admin/login.html'); // Redirect to login page
+    res.redirect('/admin/login.html');
 });
 
-// Route to serve the admin dashboard HTML
 app.get('/admin/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_dashboard.html'));
 });
 
-// Route to serve the admin login HTML
 app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
-// Initial bot status check for dashboard load
 app.get('/api/admin/bot-status', authenticateAdmin, (req, res) => {
     res.json({ status: whatsappStatus, qrCode: qrCodeData });
 });
 
-// Request New QR Code
-app.post('/api/public/request-qr', (req, res) => { // Public route as it's for initial setup
+app.post('/api/public/request-qr', (req, res) => {
     try {
         if (whatsappClient) {
             console.log('Requesting new QR...');
             whatsappClient.destroy().then(() => {
-                 // Reinitialize to get a new QR
-                initializeWhatsAppClient(false); // Don't try to load existing session
+                initializeWhatsAppClient(false);
                 res.status(200).json({ message: 'New QR generation initiated. Check dashboard in a moment.' });
             }).catch(e => {
                 console.error("Error destroying client for new QR:", e);
                 res.status(500).json({ message: 'Failed to reset bot for new QR.' });
             });
         } else {
-            initializeWhatsAppClient(false); // Start if not already running, don't load session
+            initializeWhatsAppClient(false);
             res.status(200).json({ message: 'WhatsApp bot initialization started. QR will appear shortly.' });
         }
     } catch (error) {
@@ -497,11 +465,10 @@ app.post('/api/public/request-qr', (req, res) => { // Public route as it's for i
     }
 });
 
-// Load Saved Session (for disconnected bot)
 app.post('/api/admin/load-session', authenticateAdmin, (req, res) => {
     try {
         console.log('Attempting to load saved session...');
-        initializeWhatsAppClient(true); // Attempt to load saved session
+        initializeWhatsAppClient(true);
         res.status(200).json({ message: 'Attempting to load saved session. Check bot status.' });
     } catch (error) {
         console.error('Error loading session:', error);
@@ -509,9 +476,6 @@ app.post('/api/admin/load-session', authenticateAdmin, (req, res) => {
     }
 });
 
-// --- API Routes for Frontend (Admin Dashboard) ---
-
-// Get all orders
 app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
     try {
         const orders = await Order.find().sort({ orderDate: -1 });
@@ -522,7 +486,6 @@ app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Get single order by ID
 app.get('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
@@ -532,14 +495,13 @@ app.get('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
         res.json(order);
     } catch (err) {
         console.error(err.message);
-        if (err.kind === 'ObjectId') { // Handle invalid ID format
+        if (err.kind === 'ObjectId') {
             return res.status(400).json({ message: 'Invalid Order ID' });
         }
         res.status(500).send('Server Error');
     }
 });
 
-// Update order status
 app.put('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     const { status } = req.body;
     try {
@@ -551,9 +513,8 @@ app.put('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
         order.status = status;
         await order.save();
 
-        // Optional: Send WhatsApp notification to customer about status update
         if (whatsappClient && whatsappStatus === 'ready') {
-            const customerPhone = order.customerPhone.includes('@c.us') ? order.customerPhone : `${order.customerPhone}@c.us`; // Ensure correct format
+            const customerPhone = order.customerPhone.includes('@c.us') ? order.customerPhone : `${order.customerPhone}@c.us`;
             const statusMessage = `📢 Your order (ID: ${order._id.toString().substring(0, 8)}...) from *${(await Settings.findOne({}))?.shopName || 'Delicious Bites'}* has been updated to: *${status}*!`;
             whatsappClient.sendMessage(customerPhone, statusMessage).catch(e => console.error("Failed to send status update:", e));
         }
@@ -565,7 +526,6 @@ app.put('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-// NEW: Delete an order
 app.delete('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     try {
         const order = await Order.findByIdAndDelete(req.params.id);
@@ -582,11 +542,9 @@ app.delete('/api/admin/orders/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-// NEW: Manually create an order (Admin) - Basic implementation
 app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
     const { customerPhone, customerName, deliveryAddress, customerLocation, items, paymentMethod = 'COD' } = req.body;
 
-    // Validate essential fields
     if (!customerPhone || !customerName || !items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'Missing required order fields (customerPhone, customerName, items).' });
     }
@@ -616,7 +574,6 @@ app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
                 settings.shopLocation.latitude, settings.shopLocation.longitude,
                 customerLocation.latitude, customerLocation.longitude
             );
-            // Sort delivery rates by kms in ascending order
             const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
 
             for (let i = 0; i < sortedRates.length; i++) {
@@ -625,7 +582,6 @@ app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
                     transportTax = rate.amount;
                     break;
                 }
-                // If it's the last rate and distance is greater, use this rate
                 if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
                     transportTax = sortedRates[i].amount;
                 }
@@ -642,23 +598,21 @@ app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
             transportTax,
             totalAmount,
             deliveryAddress: deliveryAddress || (customerLocation ? `Lat: ${customerLocation.latitude.toFixed(4)}, Lon: ${customerLocation.longitude.toFixed(4)}` : 'Address not specified'),
-            customerLocation, // Store provided customer location
-            status: 'Confirmed', // Manually added orders are typically confirmed
+            customerLocation,
+            status: 'Confirmed',
             paymentMethod,
             orderDate: new Date()
         });
 
         await newOrder.save();
         res.status(201).json(newOrder);
-        io.emit('new_order', newOrder); // Notify admin dashboard of new order
+        io.emit('new_order', newOrder);
     } catch (err) {
         console.error('Error creating order:', err.message);
         res.status(500).send('Server Error');
     }
 });
 
-
-// Get all menu items
 app.get('/api/admin/menu', authenticateAdmin, async (req, res) => {
     try {
         const menuItems = await MenuItem.find();
@@ -669,7 +623,6 @@ app.get('/api/admin/menu', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Add/Update menu item
 app.post('/api/admin/menu', authenticateAdmin, async (req, res) => {
     const { name, description, price, imageUrl, category, isAvailable, isTrending } = req.body;
     try {
@@ -704,7 +657,6 @@ app.put('/api/admin/menu/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Delete menu item
 app.delete('/api/admin/menu/:id', authenticateAdmin, async (req, res) => {
     try {
         const item = await MenuItem.findByIdAndDelete(req.params.id);
@@ -718,18 +670,16 @@ app.delete('/api/admin/menu/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Get shop settings
 app.get('/api/admin/settings', authenticateAdmin, async (req, res) => {
     try {
         const settings = await Settings.findOne({});
-        res.json(settings || {}); // Return empty object if no settings found
+        res.json(settings || {});
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
     }
 });
 
-// Update shop settings
 app.put('/api/admin/settings', authenticateAdmin, async (req, res) => {
     const { shopName, shopLocation, deliveryRates } = req.body;
     try {
@@ -749,7 +699,6 @@ app.put('/api/admin/settings', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Get all customers with their last known locations
 app.get('/api/admin/customers', authenticateAdmin, async (req, res) => {
     try {
         const customers = await Customer.find().sort({ lastSeen: -1 });
@@ -760,7 +709,6 @@ app.get('/api/admin/customers', authenticateAdmin, async (req, res) => {
     }
 });
 
-// NEW: Delete a customer
 app.delete('/api/admin/customers/:phone', authenticateAdmin, async (req, res) => {
     try {
         const customerPhone = req.params.phone;
@@ -768,8 +716,6 @@ app.delete('/api/admin/customers/:phone', authenticateAdmin, async (req, res) =>
         if (!customer) {
             return res.status(404).json({ message: 'Customer not found' });
         }
-        // Optional: Also delete associated orders or set them to anonymous if customer is deleted.
-        // For now, we'll just delete the customer profile.
         res.json({ message: 'Customer deleted successfully' });
     } catch (err) {
         console.error(err.message);
@@ -777,7 +723,6 @@ app.delete('/api/admin/customers/:phone', authenticateAdmin, async (req, res) =>
     }
 });
 
-// NEW: Manually add a customer (Admin) - Basic implementation
 app.post('/api/admin/customers', authenticateAdmin, async (req, res) => {
     const { customerPhone, customerName, lastKnownLocation, deliveryAddress } = req.body;
 
@@ -805,34 +750,28 @@ app.post('/api/admin/customers', authenticateAdmin, async (req, res) => {
     }
 });
 
-
-// --- Public API for Web Orders (assuming a separate web frontend for ordering) ---
 app.post('/api/orders', async (req, res) => {
     const { customerName, customerPhone, items, deliveryAddress, customerLocation, paymentMethod } = req.body;
 
-    // Basic validation
     if (!customerName || !customerPhone || !items || !Array.isArray(items) || items.length === 0 || !deliveryAddress) {
         return res.status(400).json({ message: 'Missing required order details' });
     }
 
     try {
-        // Find or create customer
         let customer = await Customer.findOne({ customerPhone });
         if (!customer) {
             customer = new Customer({ customerPhone, customerName });
         }
-        // Update customer's name if a new one is provided or it was generic
         if (customer.customerName === 'Customer' || (customerName && customer.customerName !== customerName)) {
             customer.customerName = customerName;
         }
-        // Update customer's last known location and delivery address
         if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
             customer.lastKnownLocation = customerLocation;
         }
         if (deliveryAddress) {
             customer.deliveryAddress = deliveryAddress;
         }
-        await customer.save(); // Save updated customer info
+        await customer.save();
 
         let subtotal = 0;
         const orderItems = [];
@@ -857,7 +796,6 @@ app.post('/api/orders', async (req, res) => {
                 settings.shopLocation.latitude, settings.shopLocation.longitude,
                 customerLocation.latitude, customerLocation.longitude
             );
-            // Sort delivery rates by kms in ascending order
             const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
 
             for (let i = 0; i < sortedRates.length; i++) {
@@ -866,7 +804,6 @@ app.post('/api/orders', async (req, res) => {
                     transportTax = rate.amount;
                     break;
                 }
-                // If it's the last rate and distance is greater, use this rate
                 if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
                     transportTax = sortedRates[i].amount;
                 }
@@ -883,20 +820,18 @@ app.post('/api/orders', async (req, res) => {
             transportTax,
             totalAmount,
             deliveryAddress,
-            customerLocation: customerLocation || null, // FIX: Ensure location is stored
-            status: 'Pending', // Initial status for web orders
-            paymentMethod: paymentMethod || 'COD' // Default to COD if not specified
+            customerLocation: customerLocation || null,
+            status: 'Pending',
+            paymentMethod: paymentMethod || 'COD'
         });
 
         await newOrder.save();
 
-        // Notify admin dashboard via Socket.IO
         io.emit('new_order', newOrder);
 
-        // Optional: Send WhatsApp confirmation to customer
         if (whatsappClient && whatsappStatus === 'ready') {
             const confirmationMessage = `🎉 Your order (ID: ${newOrder._id.toString().substring(0, 8)}...) has been placed successfully from *${settings?.shopName || 'Delicious Bites'}*!\nTotal: ₹${newOrder.totalAmount.toFixed(2)}\nStatus: *Pending*\nWe will confirm and process it shortly.`;
-            const formattedPhone = customerPhone.includes('@c.us') ? customerPhone : `${customerPhone.replace(/\D/g, '')}@c.us`; // Ensure correct format
+            const formattedPhone = customerPhone.includes('@c.us') ? customerPhone : `${customerPhone.replace(/\D/g, '')}@c.us`;
             whatsappClient.sendMessage(formattedPhone, confirmationMessage).catch(e => console.error("Failed to send order confirmation:", e));
         }
 
@@ -907,7 +842,6 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
-// Public API to get a single order for tracking
 app.get('/api/order/:id', async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
@@ -924,12 +858,9 @@ app.get('/api/order/:id', async (req, res) => {
     }
 });
 
-
-// Public API to get public shop settings
 app.get('/api/public/settings', async (req, res) => {
     try {
         const settings = await Settings.findOne({});
-        // Only return necessary public settings
         if (settings) {
             return res.json({
                 shopName: settings.shopName,
@@ -937,14 +868,13 @@ app.get('/api/public/settings', async (req, res) => {
                 deliveryRates: settings.deliveryRates
             });
         }
-        res.json({}); // Return empty if no settings
+        res.json({});
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
     }
 });
 
-// Public API to calculate delivery cost
 app.post('/api/calculate-delivery-cost', async (req, res) => {
     const { customerLocation } = req.body;
 
@@ -985,11 +915,8 @@ app.post('/api/calculate-delivery-cost', async (req, res) => {
     }
 });
 
-
-// --- WebSocket (Socket.IO) Connection ---
 io.on('connection', (socket) => {
     console.log('Admin dashboard connected');
-    // Send current bot status and QR code data to newly connected client
     socket.emit('status', whatsappStatus);
     if (qrCodeData) {
         socket.emit('qrCode', qrCodeData);
@@ -1000,10 +927,8 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start WhatsApp client initially
-initializeWhatsAppClient(true); // Attempt to load saved session on startup
+initializeWhatsAppClient(true);
 
-// Start the server
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Admin Dashboard: http://localhost:${PORT}/admin/login`);
