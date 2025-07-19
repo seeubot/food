@@ -1,10 +1,11 @@
-require('dotenv').config();
+require('dotenv').config(); // Load environment variables from .env file
+
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-// const qrcode = require('qrcode-terminal'); // Removed qrcode-terminal
+const qrcode = require('qrcode'); // Explicitly require qrcode for QR generation
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -14,7 +15,7 @@ const Order = require('./models/order');
 const MenuItem = require('./models/menuItem');
 const Customer = require('./models/customer');
 const Settings = require('./models/settings');
-const Admin = require('./models/admin'); // Assuming you have an admin model
+const Admin = require('./models/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,7 +23,18 @@ const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey'; // Use a strong, unique key in production
-const MONGODB_URI = process.env.MONGODB_URI; // Ensure this is loaded from .env
+
+// --- IMPORTANT: Check MONGODB_URI loading ---
+const MONGODB_URI = process.env.MONGODB_URI;
+console.log('Attempting to connect to MongoDB with URI:', MONGODB_URI ? 'URI Loaded (not displayed for security)' : 'URI UNDEFINED - Check your .env file!');
+
+if (!MONGODB_URI) {
+    console.error('FATAL ERROR: MONGODB_URI is not defined in your .env file or environment variables.');
+    console.error('Please create a .env file in the root directory with MONGODB_URI="your_connection_string".');
+    process.exit(1); // Exit the process if URI is not found
+}
+// --- End MONGODB_URI check ---
+
 
 // Middleware
 app.use(express.json()); // For parsing application/json
@@ -30,7 +42,7 @@ app.use(express.static(path.join(__dirname, 'public'))); // Serve static files f
 
 // MongoDB Connection
 mongoose.connect(MONGODB_URI) // Use the loaded MONGODB_URI
-    .then(() => console.log('MongoDB connected'))
+    .then(() => console.log('MongoDB connected successfully.'))
     .catch(err => console.error('MongoDB connection error:', err));
 
 // WhatsApp Client Initialization
@@ -71,7 +83,6 @@ async function initializeWhatsAppClient(loadSession = true) {
 
     whatsappClient.on('qr', async (qr) => {
         // Convert QR string to base64 image data URL
-        const qrcode = require('qrcode'); // Require qrcode here to avoid global import if not always needed
         qrcode.toDataURL(qr, { small: false }, (err, url) => {
             if (err) {
                 console.error('Error generating QR code data URL:', err);
@@ -288,14 +299,18 @@ async function initializeWhatsAppClient(loadSession = true) {
                         );
                         responseMessage += `\n*Distance:* ${dist.toFixed(2)} km`;
 
-                        for (const rate of settings.deliveryRates.sort((a, b) => a.kms - b.kms)) {
+                        // Sort delivery rates by kms in ascending order
+                        const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
+
+                        for (let i = 0; i < sortedRates.length; i++) {
+                            const rate = sortedRates[i];
                             if (dist <= rate.kms) {
                                 transportTax = rate.amount;
                                 break;
                             }
                             // If it's the last rate and distance is greater, use this rate
-                            if (i === settings.deliveryRates.length - 1 && dist > settings.deliveryRates[i].kms) {
-                                transportTax = settings.deliveryRates[i].amount;
+                            if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
+                                transportTax = sortedRates[i].amount;
                             }
                         }
                         responseMessage += `\n*Delivery Fee:* ₹${transportTax.toFixed(2)}`;
@@ -601,14 +616,19 @@ app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
                 settings.shopLocation.latitude, settings.shopLocation.longitude,
                 customerLocation.latitude, customerLocation.longitude
             );
-            for (const rate of settings.deliveryRates.sort((a, b) => a.kms - b.kms)) {
+            // Sort delivery rates by kms in ascending order
+            const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
+
+            for (let i = 0; i < sortedRates.length; i++) {
+                const rate = sortedRates[i];
                 if (dist <= rate.kms) {
                     transportTax = rate.amount;
                     break;
                 }
-            }
-            if (transportTax === 0 && dist > settings.deliveryRates[settings.deliveryRates.length - 1].kms) {
-                transportTax = settings.deliveryRates[settings.deliveryRates.length - 1].amount;
+                // If it's the last rate and distance is greater, use this rate
+                if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
+                    transportTax = sortedRates[i].amount;
+                }
             }
         }
 
@@ -837,15 +857,20 @@ app.post('/api/orders', async (req, res) => {
                 settings.shopLocation.latitude, settings.shopLocation.longitude,
                 customerLocation.latitude, customerLocation.longitude
             );
-            for (const rate of settings.deliveryRates.sort((a, b) => a.kms - b.kms)) {
+            // Sort delivery rates by kms in ascending order
+            const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
+
+            for (let i = 0; i < sortedRates.length; i++) {
+                const rate = sortedRates[i];
                 if (dist <= rate.kms) {
                     transportTax = rate.amount;
                     break;
                 }
-             if (transportTax === 0 && dist > settings.deliveryRates[settings.deliveryRates.length - 1].kms) {
-                transportTax = settings.deliveryRates[settings.deliveryRates.length - 1].amount;
+                // If it's the last rate and distance is greater, use this rate
+                if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
+                    transportTax = sortedRates[i].amount;
+                }
             }
-        }
         }
 
         const totalAmount = subtotal + transportTax;
@@ -882,6 +907,84 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
+// Public API to get a single order for tracking
+app.get('/api/order/:id', async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+        res.json(order);
+    } catch (err) {
+        console.error(err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ message: 'Invalid Order ID' });
+        }
+        res.status(500).send('Server Error');
+    }
+});
+
+
+// Public API to get public shop settings
+app.get('/api/public/settings', async (req, res) => {
+    try {
+        const settings = await Settings.findOne({});
+        // Only return necessary public settings
+        if (settings) {
+            return res.json({
+                shopName: settings.shopName,
+                shopLocation: settings.shopLocation,
+                deliveryRates: settings.deliveryRates
+            });
+        }
+        res.json({}); // Return empty if no settings
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// Public API to calculate delivery cost
+app.post('/api/calculate-delivery-cost', async (req, res) => {
+    const { customerLocation } = req.body;
+
+    if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined') {
+        return res.status(400).json({ message: 'Customer location (latitude and longitude) is required.' });
+    }
+
+    try {
+        const settings = await Settings.findOne({});
+        if (!settings || !settings.shopLocation || !settings.deliveryRates || settings.deliveryRates.length === 0) {
+            return res.status(400).json({ message: 'Delivery settings are not configured on the server.' });
+        }
+
+        const dist = haversineDistance(
+            settings.shopLocation.latitude, settings.shopLocation.longitude,
+            customerLocation.latitude, customerLocation.longitude
+        );
+
+        let transportTax = 0;
+        const sortedRates = [...settings.deliveryRates].sort((a, b) => a.kms - b.kms);
+
+        for (let i = 0; i < sortedRates.length; i++) {
+            const rate = sortedRates[i];
+            if (dist <= rate.kms) {
+                transportTax = rate.amount;
+                break;
+            }
+            if (i === sortedRates.length - 1 && dist > sortedRates[i].kms) {
+                transportTax = sortedRates[i].amount;
+            }
+        }
+
+        res.json({ distance: dist, transportTax: transportTax });
+
+    } catch (err) {
+        console.error('Error calculating delivery cost:', err.message);
+        res.status(500).json({ message: 'Error calculating delivery cost', error: err.message });
+    }
+});
+
 
 // --- WebSocket (Socket.IO) Connection ---
 io.on('connection', (socket) => {
@@ -904,6 +1007,8 @@ initializeWhatsAppClient(true); // Attempt to load saved session on startup
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Admin Dashboard: http://localhost:${PORT}/admin/login`);
+    console.log(`Public Menu: http://localhost:${PORT}/menu`);
+    console.log(`Bot Status: http://localhost:${PORT}/bot_status`);
 });
 
 
