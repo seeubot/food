@@ -26,7 +26,9 @@
     "mongoose": "^8.4.1",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
-    "whatsapp-web.js": "^1.23.0"
+    "whatsapp-web.js": "^1.23.0",
+    "puppeteer-extra": "^3.3.6",             
+    "puppeteer-extra-plugin-stealth": "^2.11.2"  
   },
   "devDependencies": {
     "nodemon": "^3.1.3"
