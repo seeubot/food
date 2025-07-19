@@ -1,28 +1,29 @@
 {
-  "name": "food-delivery-bot",
+  "name": "delicious-bites-bot",
   "version": "1.0.0",
-  "description": "A WhatsApp bot for food ordering and delivery management.",
+  "description": "WhatsApp Food Ordering Bot with Admin Panel",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
   "keywords": [
-    "whatsapp-bot",
-    "food-delivery",
+    "whatsapp",
+    "bot",
+    "food-ordering",
     "nodejs",
     "express",
-    "mongodb",
-    "whatsapp-web.js"
+    "mongodb"
   ],
-  "author": "Your Name/Organization",
-  "license": "MIT",
+  "author": "Your Name",
+  "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "connect-mongo": "^5.1.0",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
-    "mongoose": "^8.4.3",
+    "mongoose": "^8.4.1",
     "qrcode": "^1.5.3",
     "socket.io": "^4.7.5",
     "whatsapp-web.js": "^1.23.0"
