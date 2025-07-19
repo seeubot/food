@@ -228,6 +228,7 @@ async function initializeAdminAndSettings() {
 let qrCodeDataURL = null;
 let clientReady = false;
 let qrExpiryTimer = null; // To track QR code validity
+let client = null; // Declare client here, will be initialized dynamically
 let botCurrentStatus = 'initializing'; // Initial status: bot is initializing
 
 // Update bot status and emit via Socket.IO
@@ -247,25 +248,19 @@ function updateBotStatus(status, qrData = null) {
     }
 }
 
-let client = null; // Declare client here, will be initialized dynamically
-
-async function loadAndInitializeClient() {
-    let sessionData = null; // Initialize as null
-    try {
-        const storedSession = await WhatsappSession.findOne({ id: 'whatsapp-session' });
-        if (storedSession && storedSession.sessionData) {
-            sessionData = storedSession.sessionData;
-            console.log('Found existing WhatsApp session in MongoDB. Attempting to restore...');
-        } else {
-            console.log('No existing WhatsApp session found in MongoDB. Starting fresh.');
+async function initializeClientWithSession(sessionData = null) {
+    // If a client already exists, destroy it first to ensure a clean re-initialization
+    if (client) {
+        try {
+            console.log('Destroying existing WhatsApp client instance...');
+            await client.destroy();
+            client = null; // Clear the client instance
+        } catch (err) {
+            console.error('Error destroying existing client:', err);
+            // Continue even if destroy fails, try to re-initialize anyway
         }
-    } catch (error) {
-        console.error('Error loading session from MongoDB:', error);
-        console.log('Proceeding without stored session.');
     }
 
-    // Initialize the client. Pass session data directly if available.
-    // IMPORTANT: Removed LocalAuth here to manually manage session from MongoDB.
     client = new Client({
         session: sessionData, // Pass the loaded session data directly
         puppeteer: {
@@ -357,8 +352,7 @@ async function loadAndInitializeClient() {
             } finally {
                 // Introduce a delay before re-initializing after auth_failure and clearing session
                 setTimeout(() => {
-                    if (client) client.destroy().then(() => loadAndInitializeClient()).catch(err => console.error("Error destroying client:", err));
-                    else loadAndInitializeClient(); // Fallback if client is somehow null
+                    initializeClientWithSession(); // Re-initialize without session to get QR
                     updateBotStatus('reconnecting');
                 }, RECONNECT_DELAY_MS);
             }
@@ -366,8 +360,7 @@ async function loadAndInitializeClient() {
             console.log('Attempting to re-initialize client without clearing session...');
             clientReady = false; // Set to false while re-initializing
             setTimeout(() => {
-                if (client) client.destroy().then(() => loadAndInitializeClient()).catch(err => console.error("Error destroying client:", err));
-                else loadAndInitializeClient(); // Fallback if client is somehow null
+                initializeClientWithSession(); // Re-initialize without session to get QR
                 updateBotStatus('reconnecting');
             }, RECONNECT_DELAY_MS);
         }
@@ -389,13 +382,11 @@ async function loadAndInitializeClient() {
         authFailureCount = 0;
         // Re-initialize automatically after a short delay
         setTimeout(() => {
-            if (client) client.destroy().then(() => loadAndInitializeClient()).catch(err => console.error("Error destroying client:", err));
-            else loadAndInitializeClient(); // Fallback if client is somehow null
+            initializeClientWithSession(); // Re-initialize without session to get QR
             updateBotStatus('reconnecting');
         }, RECONNECT_DELAY_MS);
     });
 
-    // MOVED: The client.on('message') listener is now here
     client.on('message', async msg => {
         console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body); // Log message reception
 
@@ -502,7 +493,12 @@ async function loadAndInitializeClient() {
             console.error(`Error processing message from ${msg.from}:`, error);
             // Attempt to send a generic error message back to the user
             try {
-                await client.sendMessage(msg.from, 'Sorry, something went wrong while processing your request. Please try again or contact support.');
+                // Check if client is still valid before attempting to send a reply
+                if (client && clientReady) {
+                    await client.sendMessage(msg.from, 'Sorry, something went wrong while processing your request. Please try again or contact support.');
+                } else {
+                    console.warn(`Client not ready or null, cannot send error reply to ${msg.from}.`);
+                }
             } catch (replyError) {
                 console.error(`Failed to send error reply to ${msg.from}:`, replyError);
             }
@@ -511,6 +507,30 @@ async function loadAndInitializeClient() {
 
     // Finally, initialize the client
     client.initialize();
+}
+
+async function loadAndInitializeClient() {
+    updateBotStatus('initializing');
+    let sessionData = null;
+    let sessionLoadedSuccessfully = false;
+
+    try {
+        const storedSession = await WhatsappSession.findOne({ id: 'whatsapp-session' });
+        if (storedSession && storedSession.sessionData) {
+            sessionData = storedSession.sessionData;
+            console.log('Found existing WhatsApp session in MongoDB. Attempting to restore...');
+            sessionLoadedSuccessfully = true;
+        } else {
+            console.log('No existing WhatsApp session found in MongoDB. Starting fresh (will generate QR).');
+        }
+    } catch (error) {
+        console.error('Error loading session from MongoDB:', error);
+        console.log('Proceeding without stored session, will generate QR.');
+        // Do not set sessionLoadedSuccessfully to true if there was a DB error
+    }
+
+    // Now, initialize the client based on whether session data was loaded
+    initializeClientWithSession(sessionData);
 }
 
 
@@ -768,13 +788,22 @@ app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
     });
 });
 
+// NEW API: Load WhatsApp session from DB
+app.post('/api/admin/load-session', isAuthenticated, async (req, res) => {
+    console.log('API: /api/admin/load-session hit. Attempting to load session from DB.');
+    try {
+        await loadAndInitializeClient(); // This function now handles session loading or QR generation
+        res.json({ message: 'Attempting to load session. Check bot status for updates.' });
+    } catch (error) {
+        console.error('Error in /api/admin/load-session:', error);
+        res.status(500).json({ message: 'Error initiating session load.' });
+    }
+});
+
+
 // NEW PUBLIC API: Request a new QR code for WhatsApp bot (accessible from public panel)
 app.post('/api/public/request-qr', async (req, res) => {
     console.log('API: /api/public/request-qr hit.');
-    if (clientReady) {
-        // If bot is already ready, don't force a new QR unless explicitly requested to reset
-        console.warn('Bot is currently ready, but a new QR was requested. Forcing session clear.');
-    }
     console.log('Public QR request received. Clearing session from DB and re-initializing client...');
     // Clear any existing QR expiry timer if a new request comes in
     if (qrExpiryTimer) {
@@ -788,33 +817,19 @@ app.post('/api/public/request-qr', async (req, res) => {
         console.log('Weekly notification scheduler stopped due to new QR request.');
     }
     try {
-        // Clear session data from MongoDB
+        // Always clear session data from MongoDB to force a new QR
         await WhatsappSession.deleteOne({ id: 'whatsapp-session' }); // Delete the manually stored session
         console.log('Deleted old WhatsApp session data from MongoDB.');
         authFailureCount = 0; // Reset auth failure count on manual QR request
     } catch (err) {
         console.error('Error deleting old session data from MongoDB during manual QR request:', err);
-        // Continue even if deletion fails, client.initialize might still work
+        // Continue even if deletion fails, initializeClientWithSession might still work
     } finally {
         // Set status to initializing and clear current QR data immediately
         updateBotStatus('initializing'); // This will clear qrCodeDataURL and emit
         // Re-initialize the client (this will trigger a new QR)
-        if (client) {
-            client.destroy().then(() => { // Destroy existing client instance
-                // Add a small delay after destroy before re-initializing
-                setTimeout(() => {
-                    loadAndInitializeClient(); // Re-create and initialize a new client
-                    res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
-                }, 1000); // 1 second delay
-            }).catch(err => {
-                console.error('Error destroying client before re-initialization:', err);
-                res.status(500).json({ message: 'Error re-initializing client for new QR.' });
-            });
-        } else {
-            // If client was never initialized, just load and initialize
-            loadAndInitializeClient();
-            res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
-        }
+        initializeClientWithSession(); // Call without sessionData to force QR generation
+        res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
     }
 });
 
