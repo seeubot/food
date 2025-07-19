@@ -1,4 +1,4 @@
-Require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -97,21 +97,10 @@ const WhatsappSession = mongoose.model('WhatsappSession', WhatsappSessionSchema)
 // Admin User setup
 async function setupAdminUser() {
     try {
-        console.log('--- Admin Setup Initiated ---');
-        console.log('Env ADMIN_USERNAME:', process.env.ADMIN_USERNAME);
-        // WARNING: Do not log process.env.ADMIN_PASSWORD in production for security reasons.
-        // For debugging, we'll show its presence, not value.
-        console.log('Env ADMIN_PASSWORD is set:', !!process.env.ADMIN_PASSWORD);
-
         let settings = await Setting.findOne();
         if (!settings) {
             console.log('No settings found, creating default admin user...');
-            if (!process.env.ADMIN_PASSWORD) {
-                console.error('ERROR: ADMIN_PASSWORD environment variable is not set. Cannot create default admin user.');
-                return;
-            }
             const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
-            console.log('Hashed password for new admin:', hashedPassword); // Log the hashed password
             settings = new Setting({
                 shopName: 'Delicious Bites',
                 shopLocation: { latitude: 0, longitude: 0 },
@@ -122,20 +111,14 @@ async function setupAdminUser() {
             await settings.save();
             console.log('Default admin user created.');
         } else {
-            console.log('Existing settings found.');
             // Optional: Update admin credentials if env vars change and if not already hashed
-            if (process.env.ADMIN_PASSWORD && !bcrypt.getRounds(settings.adminPassword)) { // Check if password is not hashed
+            if (!bcrypt.getRounds(settings.adminPassword)) { // Check if password is not hashed
                  const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
                  settings.adminPassword = hashedPassword;
                  await settings.save();
                  console.log('Admin password re-hashed based on .env.');
-            } else if (process.env.ADMIN_PASSWORD && bcrypt.getRounds(settings.adminPassword)) {
-                console.log('Admin password already hashed in DB.');
             }
-            console.log('Stored Admin Username:', settings.adminUsername);
-            // console.log('Stored Hashed Admin Password:', settings.adminPassword); // For deep debugging, but be cautious
         }
-        console.log('--- Admin Setup Complete ---');
     } catch (err) {
         console.error('Error setting up admin user:', err);
     }
@@ -592,41 +575,23 @@ app.get('/admin/login', (req, res) => {
 
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
-    console.log('--- Admin Login Attempt ---');
-    console.log('Attempted Username:', username);
-    // WARNING: Do not log raw password in production! Only for debugging.
-    console.log('Attempted Password:', password);
-
     try {
         const settings = await Setting.findOne();
         if (!settings) {
-            console.log('Login failed: Admin settings not found in DB.');
             return res.status(500).json({ message: 'Admin settings not configured.' });
         }
 
-        console.log('Stored Admin Username (from DB):', settings.adminUsername);
-        console.log('Stored Hashed Admin Password (from DB):', settings.adminPassword);
-
-        const isUsernameMatch = (username === settings.adminUsername);
         const isPasswordValid = await bcrypt.compare(password, settings.adminPassword);
 
-        console.log('Username Match:', isUsernameMatch);
-        console.log('Password Valid (bcrypt.compare result):', isPasswordValid);
-
-
-        if (isUsernameMatch && isPasswordValid) {
+        if (username === settings.adminUsername && isPasswordValid) {
             req.session.isAuthenticated = true;
-            console.log('Login successful for user:', username);
             return res.json({ success: true, message: 'Login successful!' });
         } else {
-            console.log('Login failed: Invalid credentials.');
             return res.status(401).json({ success: false, message: 'Invalid credentials.' });
         }
     } catch (err) {
         console.error('Login error:', err);
         res.status(500).json({ message: 'An error occurred during login.' });
-    } finally {
-        console.log('--- Admin Login Attempt End ---');
     }
 });
 
@@ -936,8 +901,8 @@ initializeBot();
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Access Admin Dashboard: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/admin/dashboard`);
-    console.log(`View Public Menu: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/menu`);
-    console.log(`View Bot Status: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/`);
+    console.log(`Access Admin Dashboard: ${process.env.YOUR_KOYEB_URL}/admin/dashboard`);
+    console.log(`View Public Menu: ${process.env.YOUR_KOYEB_URL}/menu`);
+    console.log(`View Bot Status: ${process.env.YOUR_KOYEB_URL}/`);
 });
 
