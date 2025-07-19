@@ -1,18 +1,11 @@
-// Ensure dotenv is loaded as early as possible
-// Adding a try-catch around dotenv.config() to see if it throws an error internally
-try {
-    require('dotenv').config();
-} catch (e) {
-    console.error('Error loading .env file with dotenv:', e.message);
-    console.error('This might indicate a malformed .env file or a critical issue with dotenv itself.');
-}
+// Removed: require('dotenv').config();
 
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-const fs = require('fs'); // Import Node.js File System module
+const fs = require('fs'); // Still included for now, but its .env check will be removed
 const qrcode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const http = require('http');
@@ -30,42 +23,17 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET;
-const MONGODB_URI = process.env.MONGODB_URI;
 
-// --- DIAGNOSTIC LOGS: TEMPORARY - REMOVE AFTER FIXING ENV ISSUE ---
-console.log('--- Environment Variables Loaded (Diagnostic) ---');
-console.log('process.env.NODE_ENV:', process.env.NODE_ENV);
-console.log('process.env.MONGODB_URI:', MONGODB_URI ? 'URI Loaded (value hidden for security)' : 'URI UNDEFINED');
-console.log('process.env.JWT_SECRET:', JWT_SECRET ? 'Secret Loaded (value hidden for security)' : 'SECRET UNDEFINED');
-// console.log('Full process.env:', process.env); // Uncomment this line if the above is still undefined, but be careful with logs!
-console.log('--- End Environment Variables Diagnostic ---');
-
-// --- NEW: Direct .env file presence check ---
-const envFilePath = path.resolve(process.cwd(), '.env');
-console.log(`Checking for .env file at: ${envFilePath}`);
-try {
-    if (fs.existsSync(envFilePath)) {
-        console.log('.env file found! Attempting to read its content (first 100 chars for debug):');
-        const envContent = fs.readFileSync(envFilePath, 'utf8');
-        console.log(envContent.substring(0, 100) + (envContent.length > 100 ? '...' : ''));
-    } else {
-        console.error('CRITICAL: .env file NOT FOUND at the expected path!');
-        console.error('This is likely the root cause. Ensure your .env file is in the correct directory for the running application.');
-    }
-} catch (fsError) {
-    console.error('Error reading .env file directly:', fsError.message);
-}
-// --- END NEW DIAGNOSTIC ---
+// --- HARDCODED CREDENTIALS (TEMPORARY SOLUTION) ---
+// REPLACE THESE WITH YOUR ACTUAL MONGODB URI AND JWT SECRET
+// For debugging purposes, using the placeholder from your .env file
+const MONGODB_URI = "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
+const JWT_SECRET = "your_super_secret_jwt_key_here_please_change_this";
+// --- END HARDCODED CREDENTIALS ---
 
 
-// Critical check for MongoDB URI
-if (!MONGODB_URI) {
-    console.error('FATAL ERROR: MONGODB_URI is not defined.');
-    console.error('Despite .env file presence check, MONGODB_URI is still undefined.');
-    console.error('Possible causes: Incorrect variable name in .env, malformed .env file, or environment variable conflict.');
-    process.exit(1);
-}
+// Removed: All previous diagnostic logs and FATAL ERROR checks for MONGODB_URI and JWT_SECRET
+// Removed: .env file presence check using fs module
 
 // Middleware
 app.use(express.json());
@@ -76,7 +44,7 @@ mongoose.connect(MONGODB_URI)
     .then(() => console.log('MongoDB connected successfully.'))
     .catch(err => {
         console.error('MongoDB connection error:', err);
-        // In a production app, you might want to exit here if DB is critical
+        // For now, we won't exit, but log the error clearly.
     });
 
 // WhatsApp Client Initialization (rest of the logic remains the same)
