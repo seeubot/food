@@ -28,7 +28,7 @@ const PORT = process.env.PORT || 3000;
 // REPLACE THESE WITH YOUR ACTUAL MONGODB URI AND JWT SECRET
 // For debugging purposes, using the placeholder from your .env file
 const MONGODB_URI = "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
-const JWT_SECRET = "your_super_secret_jwt_key_here_please_change_this";
+const JWT_SECRET = "be1e1c27b693453a25d2f83d6611eba00beedcf976fab97794877f50ed7e9631b804db2b54153cd616a7de4acab9fea578e4368412480491";
 // --- END HARDCODED CREDENTIALS ---
 
 
