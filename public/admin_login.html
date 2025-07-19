@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Base styles for black and white theme */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #000000; /* Pure black background */
@@ -15,15 +16,24 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            padding: 1rem;
         }
         .login-container {
-            background-color: #1a1a1a; /* Dark gray for login panel */
-            padding: 2.5rem;
+            background-color: #1a1a1a; /* Dark gray for the login panel */
             border-radius: 0.75rem;
-            box-shadow: 0 4px 12px rgba(255,255,255,0.1);
+            box-shadow: 0 4px 8px rgba(255,255,255,0.08);
+            padding: 2.5rem;
             width: 100%;
             max-width: 400px;
+            text-align: center;
         }
+        h1 {
+            color: #ffffff;
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+        }
+        /* Input field styling */
         input[type="text"],
         input[type="password"] {
             background-color: #222222; /* Slightly lighter dark gray for inputs */
@@ -32,10 +42,12 @@
             padding: 0.75rem 1rem;
             border-radius: 0.375rem;
             width: 100%;
+            margin-bottom: 1.25rem;
         }
         input::placeholder {
             color: #888888; /* Lighter gray for placeholders */
         }
+        /* Button styling */
         .btn-primary {
             background-color: #ffffff; /* White background */
             color: #000000; /* Black text */
@@ -44,36 +56,59 @@
             font-weight: 600;
             transition: background-color 0.2s ease-in-out;
             width: 100%;
+            cursor: pointer;
         }
         .btn-primary:hover {
             background-color: #e0e0e0;
         }
-        .alert-red {
-            background-color: #440000;
-            color: #ff6666;
-            border: 1px solid #ff6666;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #333333;
+            color: #999999;
+        }
+        .message {
+            margin-top: 1.5rem;
             font-weight: 600;
-            text-align: center;
+        }
+        .message.error {
+            color: #ff6666; /* Light red for error */
+        }
+        .message.success {
+            color: #66ff66; /* Light green for success */
+        }
+        .loader {
+            border: 4px solid #333333;
+            border-top: 4px solid #66ff66; /* Green loader */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <h1 class="text-3xl font-bold text-white mb-6 text-center">Admin Login</h1>
-        <form id="login-form" class="space-y-4">
+        <h1>Admin Login</h1>
+        <form id="login-form">
             <div>
-                <label for="username" class="block text-gray-300 text-sm font-bold mb-2">Username:</label>
-                <input type="text" id="username" name="username" required>
+                <input type="text" id="username" name="username" placeholder="Username" required autocomplete="username">
             </div>
             <div>
-                <label for="password" class="block text-gray-300 text-sm font-bold mb-2">Password:</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" placeholder="Password" required autocomplete="current-password">
             </div>
-            <p id="login-message" class="text-red-500 text-sm text-center hidden"></p>
-            <button type="submit" class="btn-primary">Login</button>
+            <button type="submit" class="btn-primary flex items-center justify-center">
+                <span id="login-loader" class="loader hidden"></span>
+                <span id="login-text">Login</span>
+            </button>
+            <p id="login-message" class="message"></p>
         </form>
     </div>
 
@@ -81,18 +116,26 @@
         const loginForm = document.getElementById('login-form');
         const usernameInput = document.getElementById('username');
         const passwordInput = document.getElementById('password');
+        const loginButton = loginForm.querySelector('button[type="submit"]');
+        const loginLoader = document.getElementById('login-loader');
+        const loginText = document.getElementById('login-text');
         const loginMessage = document.getElementById('login-message');
 
         loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            loginMessage.classList.add('hidden'); // Hide previous messages
-            loginMessage.classList.remove('alert-red'); // Remove alert styling
+            e.preventDefault(); // Prevent default form submission
 
             const username = usernameInput.value;
             const password = passwordInput.value;
 
+            // Disable button and show loader
+            loginButton.disabled = true;
+            loginLoader.classList.remove('hidden');
+            loginText.classList.add('hidden');
+            loginMessage.textContent = ''; // Clear previous messages
+            loginMessage.classList.remove('error', 'success');
+
             try {
-                const response = await fetch('/api/admin/login', {
+                const response = await fetch('/admin/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -100,38 +143,28 @@
                     body: JSON.stringify({ username, password })
                 });
 
-                const data = await response.json();
+                const result = await response.json();
 
                 if (response.ok) {
-                    // For simplicity, storing token in localStorage.
-                    // In a production app, use HttpOnly cookies for better security.
-                    localStorage.setItem('adminToken', data.token);
-                    window.location.href = '/admin/dashboard'; // Redirect to dashboard
+                    loginMessage.textContent = result.message;
+                    loginMessage.classList.add('success');
+                    // Redirect to dashboard on successful login
+                    window.location.href = '/admin/dashboard';
                 } else {
-                    loginMessage.textContent = data.message || 'Login failed. Please try again.';
-                    loginMessage.classList.remove('hidden');
-                    loginMessage.classList.add('alert-red');
+                    loginMessage.textContent = result.message || 'Login failed. Please try again.';
+                    loginMessage.classList.add('error');
                 }
             } catch (error) {
-                console.error('Login error:', error);
-                loginMessage.textContent = 'Network error. Please try again later.';
-                loginMessage.classList.remove('hidden');
-                loginMessage.classList.add('alert-red');
+                console.error('Network error during login:', error);
+                loginMessage.textContent = 'Network error. Please check your connection.';
+                loginMessage.classList.add('error');
+            } finally {
+                // Re-enable button and hide loader
+                loginButton.disabled = false;
+                loginLoader.classList.add('hidden');
+                loginText.classList.remove('hidden');
             }
         });
-
-        // Check for existing token and redirect if valid (basic check)
-        // In a real app, you'd send the token to a /verify endpoint
-        const token = localStorage.getItem('adminToken');
-        if (token) {
-            // A simple client-side check, server-side validation is crucial
-            // For a more robust solution, you'd make a request to a protected endpoint
-            // e.g., fetch('/api/admin/check-auth') and redirect based on response.
-            // For now, we'll just assume if a token exists, they might be logged in.
-            // This is primarily to prevent showing login page if already authenticated.
-            // The dashboard itself is protected by server-side middleware.
-            window.location.href = '/admin/dashboard';
-        }
     </script>
 </body>
 </html>
