@@ -242,8 +242,8 @@
             }
 
             alertMessage.textContent = message;
-            botStatusAlert.classList.add(alertClass);
-            botStatusAlert.classList.remove('hidden');
+            statusAlert.classList.add(alertClass);
+            statusAlert.classList.remove('hidden');
         });
 
         socket.on('qrCode', (qrDataURL) => {
