@@ -113,6 +113,8 @@
         </div>
 
         <p class="status-text">Current Status: <span id="bot-status">Loading...</span></p>
+        <p class="text-gray-400 mb-6">Last Authenticated: <span id="last-auth-time" class="font-semibold text-white">N/A</span></p>
+
 
         <div id="qr-code-section" class="mb-4 hidden">
             <p class="text-gray-300 mb-2">Scan this QR code with your WhatsApp app:</p>
@@ -140,6 +142,7 @@
     <script>
         const socket = io();
         const botStatusSpan = document.getElementById('bot-status');
+        const lastAuthTimeSpan = document.getElementById('last-auth-time'); // New span for last auth time
         const qrCodeSection = document.getElementById('qr-code-section');
         const qrCodeImg = document.getElementById('qr-code-img');
         const qrCountdownSpan = document.getElementById('qr-countdown');
@@ -213,7 +216,8 @@
                     updateAlert('Error generating QR code. Check server logs.', 'red');
                     break;
                 default:
-                    updateAlert(`Unknown status: ${status}`, 'yellow');
+                    message = `Unknown status: ${status}`;
+                    alertClass = 'alert-yellow';
             }
         });
 
@@ -228,6 +232,16 @@
                 if (qrTimerInterval) clearInterval(qrTimerInterval);
             }
         });
+
+        // New: Listen for sessionInfo to update last authenticated time
+        socket.on('sessionInfo', (data) => {
+            if (data.lastAuthenticatedAt) {
+                lastAuthTimeSpan.textContent = new Date(data.lastAuthenticatedAt).toLocaleString();
+            } else {
+                lastAuthTimeSpan.textContent = 'N/A';
+            }
+        });
+
 
         requestQrBtn.addEventListener('click', async () => {
             requestQrBtn.disabled = true;
@@ -293,6 +307,12 @@
             .then(response => response.json())
             .then(data => {
                 // The socket.io 'status' event will handle the display
+                // Manually update lastAuthTimeSpan on initial fetch too
+                if (data.lastAuthenticatedAt) {
+                    lastAuthTimeSpan.textContent = new Date(data.lastAuthenticatedAt).toLocaleString();
+                } else {
+                    lastAuthTimeSpan.textContent = 'N/A';
+                }
             })
             .catch(error => {
                 console.error('Error fetching initial bot status:', error);
