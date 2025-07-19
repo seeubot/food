@@ -8,6 +8,7 @@ const path = require('path');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const bcrypt = require('bcryptjs');
+const qrcode = require('qrcode'); // Import the qrcode library
 
 // --- New Puppeteer Imports ---
 const puppeteer = require('puppeteer-extra');
@@ -252,12 +253,21 @@ async function initializeBot() {
         session: loadedSession // Pass the loaded session object if available
     });
 
-    client.on('qr', (qr) => {
-        console.log('QR RECEIVED', qr);
-        io.emit('qrCode', qr);
-        io.emit('status', 'qr_received');
-        botStatus = 'qr_received';
-        lastAuthenticatedAt = null; // Reset on new QR
+    client.on('qr', async (qrString) => { // Renamed 'qr' to 'qrString' for clarity
+        console.log('QR STRING RECEIVED:', qrString);
+        try {
+            // Generate data URL from QR string
+            const qrDataURL = await qrcode.toDataURL(qrString);
+            console.log('QR DATA URL GENERATED.');
+            io.emit('qrCode', qrDataURL); // Emit the data URL to the frontend
+            io.emit('status', 'qr_received');
+            botStatus = 'qr_received';
+            lastAuthenticatedAt = null; // Reset on new QR
+        } catch (err) {
+            console.error('Error generating QR code data URL:', err);
+            io.emit('status', 'qr_error');
+            botStatus = 'qr_error';
+        }
     });
 
     client.on('authenticated', async (session) => {
@@ -948,9 +958,7 @@ io.on('connection', (socket) => {
     console.log('A user connected via Socket.IO');
     // Send current status to newly connected client
     socket.emit('status', botStatus);
-    if (botStatus === 'qr_received' && client && client.qr) {
-        socket.emit('qrCode', client.qr);
-    }
+    // Removed direct client.qr emit here, it's now handled by the client.on('qr') event after generation
     socket.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt });
 
     socket.on('disconnect', () => {
