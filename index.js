@@ -1,1221 +1,768 @@
-// index.js
-const { Client } = require('whatsapp-web.js'); // Removed LocalAuth
-const qrcode = require('qrcode');
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
+const socketIo = require('socket.io');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const path = require('path');
 const session = require('express-session');
-const MongoSessionStore = require('connect-mongo');
+const MongoStore = require('connect-mongo');
+const bcrypt = require('bcryptjs');
 
-// --- Configuration ---
-const PORT = process.env.PORT || 8080;
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://room:room@room.4vris.mongodb.net/?retryWrites=true&w=majority&appName=room";
-const ADMIN_NUMBER = process.env.ADMIN_NUMBER || '918897350151'; // Admin WhatsApp number for notifications (without +)
-const SESSION_SECRET = process.env.SESSION_SECRET || 'supersecretkeyforfoodbot'; // CHANGE THIS IN PRODUCTION!
-
-// Admin Credentials from Environment Variables or Default
-const DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'adminpassword';
-
-// New: Reconnection and QR expiry settings
-const RECONNECT_DELAY_MS = 5000; // 5 seconds delay before trying to re-initialize
-const QR_EXPIRY_MS = 60000; // QR code considered expired after 60 seconds if not scanned
-const WEEKLY_NOTIFICATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // Check for notifications every 24 hours
-
-// NEW: Auth failure retry mechanism
-const MAX_AUTH_FAILURES = 3; // Max retries before clearing session
-let authFailureCount = 0; // Counter for consecutive auth failures
-
-// --- Express App Setup ---
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE"]
-    }
-});
+const io = socketIo(server);
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+})
+.then(() => console.log('MongoDB connected'))
+.catch(err => console.error('MongoDB connection error:', err));
 
-// Session Middleware (for Express admin panel)
-app.use(session({
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    store: MongoSessionStore.create({ // Use MongoSessionStore for Express sessions
-        mongoUrl: MONGODB_URI,
-        collectionName: 'sessions', // Collection for Express sessions
-        ttl: 14 * 24 * 60 * 60
-    }),
-    cookie: {
-        maxAge: 1000 * 60 * 60 * 24 * 7,
-        secure: process.env.NODE_ENV === 'production'
-    }
-}));
-
-// Serve static files (e.g., CSS, images for frontend if you have them)
-app.use(express.static(path.join(__dirname, 'public')));
-
-// --- MongoDB Connection ---
-let mongoDbConnected = false; // Flag to track MongoDB connection status
-mongoose.connect(MONGODB_URI)
-    .then(() => {
-        console.log('MongoDB connected successfully');
-        mongoDbConnected = true;
-        // Initialize admin and settings ONLY after DB connection is established
-        initializeAdminAndSettings();
-    })
-    .catch(err => {
-        console.error('MongoDB connection error:', err);
-        // Exit process if initial setup fails critically
-        process.exit(1);
-    });
-
-// --- Mongoose Schemas ---
-
-// User Schema (for admin and potentially future customer profiles)
-const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    isAdmin: { type: Boolean, default: false }
-});
-
-userSchema.pre('save', async function(next) {
-    if (this.isModified('password')) {
-        this.password = await bcrypt.hash(this.password, 10);
-        console.log(`Password for user ${this.username} hashed.`);
-    }
-    next();
-});
-
-userSchema.methods.comparePassword = function(candidatePassword) {
-    return bcrypt.compare(candidatePassword, this.password);
-};
-
-const User = mongoose.model('User', userSchema);
-
-// Product (Menu Item) Schema
-const productSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    description: { type: String },
-    price: { type: Number, required: true, min: 0 },
-    imageUrl: { type: String, default: 'https://placehold.co/300x200/cccccc/333333?text=Food+Item' },
-    category: { type: String, default: 'Main Course' },
-    isAvailable: { type: Boolean, default: false }, // Default to false, admin sets true
-    isTrending: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
-});
-const Product = mongoose.model('Product', productSchema);
-
-// Order Schema
-const orderSchema = new mongoose.Schema({
+// Mongoose Schemas and Models
+const OrderSchema = new mongoose.Schema({
     items: [{
-        productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+        productId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
         name: String,
         price: Number,
-        quantity: { type: Number, required: true, min: 1 }
+        quantity: Number,
     }],
     customerName: { type: String, required: true },
-    customerPhone: { type: String, required: true },
+    customerPhone: { type: String, required: true }, // E.g., 918897350151
     deliveryAddress: { type: String, required: true },
-    customerLocation: {
-        latitude: { type: Number },
-        longitude: { type: Number }
-    },
-    // NEW: Store shop location at time of order for tracking
-    deliveryFromLocation: {
-        latitude: { type: Number },
-        longitude: { type: Number }
+    customerLocation: { // Store customer's last known coordinates
+        latitude: Number,
+        longitude: Number
     },
     subtotal: { type: Number, required: true },
     transportTax: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
-    status: { type: String, enum: ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'], default: 'Pending' },
+    paymentMethod: { type: String, default: 'COD' },
+    status: { type: String, default: 'Pending' }, // Pending, Confirmed, Preparing, Out for Delivery, Delivered, Cancelled
     orderDate: { type: Date, default: Date.now },
-    paymentMethod: { type: String, enum: ['COD', 'Online'], default: 'COD' } // NEW: Payment Method field
 });
-const Order = mongoose.model('Order', orderSchema);
 
-// Admin Settings Schema (for shop location and delivery rates)
-const adminSettingsSchema = new mongoose.Schema({
-    shopName: { type: String, default: 'My Food Business' },
-    shopLocation: {
+const MenuItemSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    description: String,
+    price: { type: Number, required: true },
+    imageUrl: String,
+    category: String,
+    isAvailable: { type: Boolean, default: true },
+    isTrending: { type: Boolean, default: false },
+});
+
+const SettingsSchema = new mongoose.Schema({
+    shopName: { type: String, default: 'Delicious Bites' },
+    shopLocation: { // Shop's coordinates
         latitude: { type: Number, default: 0 },
         longitude: { type: Number, default: 0 }
     },
-    deliveryRates: [{
-        kms: { type: Number, required: true, min: 0 },
-        amount: { type: Number, required: true, min: 0 }
-    }]
+    deliveryRates: [{ // { kms: Number, amount: Number }
+        kms: Number,
+        amount: Number
+    }],
+    adminUsername: { type: String, required: true, unique: true },
+    adminPassword: { type: String, required: true },
 });
-const AdminSettings = mongoose.model('AdminSettings', adminSettingsSchema);
 
-// NEW: Customer Notification Schema for weekly reminders
-const customerNotificationSchema = new mongoose.Schema({
+const CustomerSchema = new mongoose.Schema({
     customerPhone: { type: String, required: true, unique: true },
-    lastNotifiedDate: { type: Date, default: Date.now }
+    customerName: { type: String },
+    lastKnownLocation: { // Last known coordinates of the customer
+        latitude: Number,
+        longitude: Number
+    },
+    totalOrders: { type: Number, default: 0 },
+    lastOrderDate: { type: Date }
 });
-const CustomerNotification = mongoose.model('CustomerNotification', customerNotificationSchema);
 
-// NEW: WhatsApp Session Schema for manual storage
-const whatsappSessionSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true }, // Usually 'session' or a specific client ID
-    sessionData: { type: Object, required: true } // The actual session object from whatsapp-web.js
+// New Session Schema
+const WhatsappSessionSchema = new mongoose.Schema({
+    sessionData: Object, // The session object from whatsapp-web.js
+    lastAuthenticatedAt: { type: Date, default: Date.now }, // Timestamp of last successful authentication
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
 });
-const WhatsappSession = mongoose.model('WhatsappSession', whatsappSessionSchema);
 
+const Order = mongoose.model('Order', OrderSchema);
+const MenuItem = mongoose.model('MenuItem', MenuItemSchema);
+const Setting = mongoose.model('Setting', SettingsSchema);
+const Customer = mongoose.model('Customer', CustomerSchema);
+const WhatsappSession = mongoose.model('WhatsappSession', WhatsappSessionSchema);
 
-// --- Initial Data Setup ---
-async function initializeAdminAndSettings() {
+// Admin User setup
+async function setupAdminUser() {
     try {
-        // Ensure the admin user exists and has isAdmin: true
-        const adminUser = await User.findOneAndUpdate(
-            { username: DEFAULT_ADMIN_USERNAME },
-            {
-                $setOnInsert: { password: await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10) }, // Only hash and set password on insert
-                $set: { isAdmin: true } // Always ensure isAdmin is true
-            },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-        console.log(`Admin user '${DEFAULT_ADMIN_USERNAME}' ensured. Details:`, adminUser);
-
-        let settings = await AdminSettings.findOne();
+        let settings = await Setting.findOne();
         if (!settings) {
-            settings = new AdminSettings({
+            console.log('No settings found, creating default admin user...');
+            const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+            settings = new Setting({
                 shopName: 'Delicious Bites',
-                shopLocation: { latitude: 17.4375, longitude: 78.4482 }, // Example: Hyderabad coordinates
-                deliveryRates: [
-                    { kms: 5, amount: 30 },
-                    { kms: 10, amount: 60 },
-                    { kms: 20, amount: 100 }
-                ]
+                shopLocation: { latitude: 0, longitude: 0 },
+                deliveryRates: [],
+                adminUsername: process.env.ADMIN_USERNAME,
+                adminPassword: hashedPassword,
             });
             await settings.save();
-            console.log('Default admin settings created.');
-        }
-
-        // Start the Express server ONLY after admin and settings are initialized
-        server.listen(PORT, () => {
-            console.log(`Server listening on port ${PORT}`);
-            console.log('Initializing WhatsApp client...');
-            console.log('Visit the root URL of your deployment to check status and scan the QR.');
-            console.log(`Admin login: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/admin/login`);
-            console.log(`Public menu: ${process.env.YOUR_KOYEB_URL || 'http://localhost:8080'}/menu`);
-        });
-
-        // Initial client initialization on server startup
-        // Ensure MongoDB is connected before initializing WhatsApp client
-        if (mongoDbConnected) {
-            loadAndInitializeClient(); // Call the new function to load session and initialize
+            console.log('Default admin user created.');
         } else {
-            console.error('MongoDB not connected. WhatsApp client initialization deferred.');
+            // Optional: Update admin credentials if env vars change and if not already hashed
+            // This logic can be more sophisticated in production, e.g., only on first boot
+            if (!bcrypt.getRounds(settings.adminPassword)) { // Check if password is not hashed
+                 const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+                 settings.adminPassword = hashedPassword;
+                 await settings.save();
+                 console.log('Admin password re-hashed based on .env.');
+            }
         }
-
-    } catch (error) {
-        console.error('Error initializing admin and settings:', error);
-        // Exit process if initial setup fails critically
-        process.exit(1);
+    } catch (err) {
+        console.error('Error setting up admin user:', err);
     }
 }
+setupAdminUser(); // Call on startup
 
-// --- WhatsApp Bot Setup ---
-let qrCodeDataURL = null;
-let clientReady = false;
-let qrExpiryTimer = null; // To track QR code validity
-let client = null; // Declare client here, will be initialized dynamically
-let botCurrentStatus = 'initializing'; // Initial status: bot is initializing
+// Express Session Middleware
+const store = MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI,
+    collectionName: 'sessions',
+    ttl: 14 * 24 * 60 * 60, // 14 days
+    autoRemove: 'interval',
+    autoRemoveInterval: 10, // In minutes. Every 10 minutes, the database is scanned for expired sessions.
+});
 
-// Update bot status and emit via Socket.IO
-function updateBotStatus(status, qrData = null) {
-    botCurrentStatus = status;
-    io.emit('status', status);
-    if (qrData) {
-        qrCodeDataURL = qrData;
-        io.emit('qrCode', qrData); // Emit QR code data for the public panel
-    } else if (status === 'ready' || status === 'authenticated' || status === 'initializing' || status === 'reconnecting') {
-        // Do not clear QR if bot is ready, authenticated, initializing, or reconnecting
-        // This allows the QR to persist if it's still valid or if a new one is coming
+app.use(session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    store: store,
+    cookie: {
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+        httpOnly: true,
+    }
+}));
+
+// Authentication Middleware
+const isAuthenticated = (req, res, next) => {
+    if (req.session.isAuthenticated) {
+        next();
     } else {
-        // Clear QR for other statuses (disconnected, auth_failure, qr_error, qr_expired)
-        qrCodeDataURL = null;
-        io.emit('qrCode', null); // Clear QR code data for the public panel
+        res.status(401).send('Unauthorized');
     }
-}
+};
 
-async function initializeClientWithSession(sessionData = null) {
-    // If a client already exists, destroy it first to ensure a clean re-initialization
-    if (client) {
-        try {
-            console.log('Destroying existing WhatsApp client instance...');
-            await client.destroy();
-            client = null; // Clear the client instance
-        } catch (err) {
-            console.error('Error destroying existing client:', err);
-            // Continue even if destroy fails, try to re-initialize anyway
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+
+// WhatsApp Client Initialization
+let client;
+let botStatus = 'initializing';
+let lastAuthenticatedAt = null; // To store the timestamp of last successful authentication
+
+async function initializeBot() {
+    console.log('Initializing WhatsApp bot...');
+    io.emit('status', 'initializing');
+    botStatus = 'initializing';
+
+    let loadedSession;
+    try {
+        const latestSession = await WhatsappSession.findOne().sort({ updatedAt: -1 });
+        if (latestSession && latestSession.sessionData) {
+            loadedSession = latestSession.sessionData;
+            console.log('Loaded session from database.');
+        } else {
+            console.log('No saved session found in database. Starting fresh.');
         }
+    } catch (dbErr) {
+        console.error('Error loading session from DB:', dbErr);
+        console.warn('Proceeding without loading a saved session.');
     }
 
+    // Initialize client with loaded session if available
     client = new Client({
-        session: sessionData, // Pass the loaded session data directly
+        authStrategy: new LocalAuth({
+            clientId: "bot-client", // LocalAuth persists session to disk, but we also save to DB
+            dataPath: './.wwebjs_auth/' // Path to store local session files
+        }),
         puppeteer: {
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-video-decode',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu',
-                '--single-process'
-            ]
-        }
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        },
+        session: loadedSession // Pass the loaded session object if available
     });
 
-    // Attach ALL WhatsApp client event listeners *here*, after client is initialized
     client.on('qr', (qr) => {
         console.log('QR RECEIVED', qr);
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-
-        qrcode.toDataURL(qr, { small: false }, (err, url) => {
-            if (err) {
-                console.error('Error generating QR code data URL:', err);
-                updateBotStatus('qr_error');
-            } else {
-                updateBotStatus('qr_received', url);
-
-                qrExpiryTimer = setTimeout(() => {
-                    updateBotStatus('qr_expired');
-                    console.log('QR code expired. Please request a new QR.');
-                }, QR_EXPIRY_MS);
-            }
-        });
-    });
-
-    client.on('ready', () => {
-        console.log('Client is ready!');
-        clientReady = true;
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        console.log('WhatsApp bot is connected and operational.');
-        updateBotStatus('ready');
-        authFailureCount = 0; // Reset auth failure count on successful ready
-        // Start weekly notification scheduler only when client is ready
-        if (!global.weeklyNotificationInterval) {
-            global.weeklyNotificationInterval = setInterval(sendWeeklyNotifications, WEEKLY_NOTIFICATION_INTERVAL_MS);
-            console.log('Weekly notification scheduler started.');
-        }
+        io.emit('qrCode', qr);
+        io.emit('status', 'qr_received');
+        botStatus = 'qr_received';
+        lastAuthenticatedAt = null; // Reset on new QR
     });
 
     client.on('authenticated', async (session) => {
         console.log('AUTHENTICATED', session);
-        updateBotStatus('authenticated');
-        authFailureCount = 0; // Reset auth failure count on successful authentication
+        io.emit('status', 'authenticated');
+        botStatus = 'authenticated';
+        lastAuthenticatedAt = new Date(); // Set timestamp on authentication
 
-        // Manually save the session to MongoDB
+        // Save/Update session data in MongoDB
         try {
             await WhatsappSession.findOneAndUpdate(
-                { id: 'whatsapp-session' },
-                { sessionData: session },
-                { upsert: true, new: true }
+                {}, // Find any existing session (assuming one bot instance)
+                { sessionData: session, lastAuthenticatedAt: lastAuthenticatedAt, updatedAt: new Date() },
+                { upsert: true, new: true } // Create if not exists, return new doc
             );
-            console.log('WhatsApp session saved to MongoDB successfully.');
-        } catch (error) {
-            console.error('Error saving WhatsApp session to MongoDB:', error);
+            console.log('Session data saved to MongoDB.');
+        } catch (dbErr) {
+            console.error('Error saving session to MongoDB:', dbErr);
         }
     });
 
     client.on('auth_failure', async msg => {
         console.error('AUTHENTICATION FAILURE', msg);
-        authFailureCount++;
-        console.log(`Consecutive auth failures: ${authFailureCount}`);
-
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        updateBotStatus('auth_failure'); // Indicate auth failure
-
-        if (authFailureCount >= MAX_AUTH_FAILURES) {
-            console.log(`Max auth failures (${MAX_AUTH_FAILURES}) reached. Clearing session from DB and re-initializing...`);
-            clientReady = false;
-            try {
-                // Clear session data from MongoDB
-                await WhatsappSession.deleteOne({ id: 'whatsapp-session' });
-                console.log('Deleted old WhatsApp session data from MongoDB.');
-                authFailureCount = 0; // Reset counter after clearing
-            } catch (err) {
-                console.error('Error deleting old session data from MongoDB on max auth failures:', err);
-            } finally {
-                // Introduce a delay before re-initializing after auth_failure and clearing session
-                setTimeout(() => {
-                    initializeClientWithSession(); // Re-initialize without session to get QR
-                    updateBotStatus('reconnecting');
-                }, RECONNECT_DELAY_MS);
-            }
-        } else {
-            console.log('Attempting to re-initialize client without clearing session...');
-            clientReady = false; // Set to false while re-initializing
-            setTimeout(() => {
-                initializeClientWithSession(); // Re-initialize without session to get QR
-                updateBotStatus('reconnecting');
-            }, RECONNECT_DELAY_MS);
+        io.emit('status', 'auth_failure');
+        botStatus = 'auth_failure';
+        lastAuthenticatedAt = null; // Reset on failure
+        // Optionally, delete the stored session if it's permanently invalid
+        try {
+            await WhatsappSession.deleteMany({}); // Or find and delete specific one
+            console.log('Authentication failed, cleared session data from MongoDB.');
+        } catch (dbErr) {
+            console.error('Error clearing session from MongoDB on auth failure:', dbErr);
         }
+    });
+
+    client.on('ready', () => {
+        console.log('WhatsApp Client is ready!');
+        io.emit('status', 'ready');
+        botStatus = 'ready';
+        lastAuthenticatedAt = new Date(); // Update timestamp on ready
+
+        // Update lastUsedAt in DB for the active session
+        WhatsappSession.findOneAndUpdate(
+            { sessionData: { $ne: null } }, // Find an existing session
+            { lastAuthenticatedAt: lastAuthenticatedAt, updatedAt: new Date() },
+            { new: true }
+        ).catch(dbErr => console.error('Error updating session lastUsedAt:', dbErr));
+
+        // Initial fetch of settings to get shopLocation for distance calculation
+        Setting.findOne().then(settings => {
+            if (settings && settings.shopLocation) {
+                shopLocationData = settings.shopLocation;
+            }
+        }).catch(err => console.error('Error fetching settings on bot ready:', err));
     });
 
     client.on('disconnected', async (reason) => {
-        console.log('Client disconnected', reason);
-        clientReady = false;
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        updateBotStatus('disconnected'); // Indicate disconnected
-        console.log('WhatsApp client disconnected. Re-initializing...');
-        // Clear any existing weekly notification interval
-        if (global.weeklyNotificationInterval) {
-            clearInterval(global.weeklyNotificationInterval);
-            global.weeklyNotificationInterval = null;
-            console.log('Weekly notification scheduler stopped due to disconnection.');
-        }
-        // Always reset authFailureCount on disconnection, as it might be a temporary network issue
-        authFailureCount = 0;
-        // Re-initialize automatically after a short delay
-        setTimeout(() => {
-            initializeClientWithSession(); // Re-initialize without session to get QR
-            updateBotStatus('reconnecting');
-        }, RECONNECT_DELAY_MS);
+        console.log('WhatsApp Client was disconnected:', reason);
+        io.emit('status', 'disconnected');
+        botStatus = 'disconnected';
+        lastAuthenticatedAt = null; // Reset on disconnect
+        // Optionally, handle specific reasons to clear session or attempt reconnect
+        // For now, if disconnected, client will try to initialize again on next request or server restart
+        // client.destroy(); // Destroy current client instance
+        // initializeBot(); // Attempt to re-initialize
     });
 
     client.on('message', async msg => {
-        console.log('MESSAGE RECEIVED from:', msg.from, 'Body:', msg.body); // Log message reception
+        console.log('MESSAGE RECEIVED', msg.body);
 
-        // Ensure the bot is ready before processing messages
-        if (!clientReady) {
-            console.log(`Bot not ready, ignoring message from ${msg.from}.`);
-            return;
-        }
-
-        const senderNumber = msg.from.split('@')[0];
-        // Direct menu URL as requested
-        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
-
-        try {
-            // Update customer notification date on any message received
-            await updateCustomerNotification(senderNumber);
-
-            // Welcome message content with numbered options and Indian dialogues
-            const welcomeMessage = `Namaste! Craving something delicious? 😋 Welcome to Delicious Bites, where every bite is a delight!
-                    \nKya chahiye aapko? (What do you need?) Just reply with the number:
-                    \n1. My Profile (Dekho apni jaankari!)
-                    \n2. My Recent Orders (Pichle orders dekho!)
-                    \n3. Support (Madad chahiye? Hum hain na!)
-                    \n\nTo view our full menu, simply type 'Menu' or click here: ${menuUrl}`;
-
-            // Handle specific commands (case-insensitive and number-based)
-            const lowerCaseBody = msg.body.toLowerCase().trim();
-
-            switch (lowerCaseBody) {
-                case '1':
-                case '!profile':
-                case 'profile':
-                    try {
-                        await client.sendMessage(msg.from, `Aapka profile yahaan hai! (Your profile is here!) Your registered WhatsApp number is: ${senderNumber}. We're working on adding more personalized profile features soon. Stay tuned!`);
-                        console.log(`Replied to ${senderNumber} with profile info.`);
-                    } catch (error) {
-                        console.error(`Error sending profile message to ${senderNumber}:`, error);
-                    }
-                    break;
-                case '2':
-                case '!orders':
-                case 'orders':
-                    try {
-                        const customerOrders = await Order.find({ customerPhone: senderNumber }).sort({ orderDate: -1 }).limit(5);
-                        if (customerOrders.length > 0) {
-                            let orderList = 'Your recent orders:\n';
-                            customerOrders.forEach((order, index) => {
-                                orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status}\n`;
-                            });
-                            try {
-                                await client.sendMessage(msg.from, orderList + '\nFor more details, visit the web menu or contact support.');
-                                console.log(`Replied to ${senderNumber} with recent orders.`);
-                            } catch (error) {
-                                console.error(`Error sending order list message to ${senderNumber}:`, error);
-                            }
-                        } else {
-                            try {
-                                await client.sendMessage(msg.from, 'You have no recent orders. Why not place one now? Reply with *1* for menu.');
-                                console.log(`Replied to ${senderNumber} with no recent orders message.`);
-                            } catch (error) {
-                                console.error(`Error sending no orders message to ${senderNumber}:`, error);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error fetching orders for bot:', error);
-                        try {
-                            await client.sendMessage(msg.from, 'Sorry, I could not fetch your orders at the moment. Please try again later.');
-                        } catch (error) {
-                            console.error(`Error sending generic error message to ${senderNumber}:`, error);
-                        }
-                    }
-                    break;
-                case '3':
-                case '!help':
-                case 'help':
-                case '!support':
-                case 'support':
-                    try {
-                        await client.sendMessage(msg.from, 'For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
-                        console.log(`Replied to ${senderNumber} with help message.`);
-                    } catch (error) {
-                        console.error(`Error sending help message to ${senderNumber}:`, error);
-                    }
-                    break;
-                case 'menu': // Explicitly handle 'menu' as a direct link request
-                    try {
-                        await client.sendMessage(msg.from, `Check out our delicious menu here: ${menuUrl}`);
-                        console.log(`Replied to ${senderNumber} with direct menu link.`);
-                    } catch (error) {
-                        console.error(`Error sending menu link message to ${senderNumber}:`, error);
-                    }
-                    break;
-                default:
-                    // Default response: send the welcome message for any other input
-                    try {
-                        await client.sendMessage(msg.from, welcomeMessage);
-                        console.log(`Replied to ${senderNumber} with welcome message (default).`);
-                    } catch (error) {
-                        console.error(`Error sending welcome message to ${senderNumber}:`, error);
-                    }
-                    break;
-            }
-        } catch (error) {
-            console.error(`Error processing message from ${msg.from}:`, error);
-            // Attempt to send a generic error message back to the user
-            try {
-                // Check if client is still valid before attempting to send a reply
-                if (client && clientReady) {
-                    await client.sendMessage(msg.from, 'Sorry, something went wrong while processing your request. Please try again or contact support.');
-                } else {
-                    console.warn(`Client not ready or null, cannot send error reply to ${msg.from}.`);
-                }
-            } catch (replyError) {
-                console.error(`Failed to send error reply to ${msg.from}:`, replyError);
-            }
+        if (msg.body === '!menu') {
+            const menuLink = `${process.env.YOUR_KOYEB_URL}/menu`;
+            await client.sendMessage(msg.from, `Welcome to Delicious Bites! 🍽️\n\nCheck out our full menu here: ${menuLink}\n\nTo place an order, simply add items to your cart on the menu page and proceed to checkout.`);
+        } else if (msg.body === '!status') {
+            // Placeholder for order status check
+            await client.sendMessage(msg.from, 'To check your order status, please visit the order tracking page on our website after placing an order.');
         }
     });
 
-    // Finally, initialize the client
-    client.initialize();
+    client.initialize()
+        .catch(err => console.error('Client initialization failed:', err));
 }
 
-async function loadAndInitializeClient() {
-    updateBotStatus('initializing');
-    let sessionData = null;
-    let sessionLoadedSuccessfully = false;
+// Global variable to store shop location data for distance calculation
+let shopLocationData = null;
 
+// Periodically fetch settings to keep shopLocationData updated
+setInterval(async () => {
     try {
-        const storedSession = await WhatsappSession.findOne({ id: 'whatsapp-session' });
-        if (storedSession && storedSession.sessionData) {
-            sessionData = storedSession.sessionData;
-            console.log('Found existing WhatsApp session in MongoDB. Attempting to restore...');
-            sessionLoadedSuccessfully = true;
-        } else {
-            console.log('No existing WhatsApp session found in MongoDB. Starting fresh (will generate QR).');
+        const settings = await Setting.findOne();
+        if (settings && settings.shopLocation) {
+            shopLocationData = settings.shopLocation;
         }
-    } catch (error) {
-        console.error('Error loading session from MongoDB:', error);
-        console.log('Proceeding without stored session, will generate QR.');
-        // Do not set sessionLoadedSuccessfully to true if there was a DB error
+    } catch (err) {
+        console.error('Error fetching settings periodically:', err);
     }
+}, 60000); // Every 1 minute
 
-    // Now, initialize the client based on whether session data was loaded
-    initializeClientWithSession(sessionData);
-}
+// Public Routes (Accessible by customers)
+app.get('/menu', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'menu.html'));
+});
 
+// Serve the bot status page at the root
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'bot_status.html'));
+});
 
-// Initial Socket.IO connection handling
-io.on('connection', (socket) => {
-    console.log('A user connected to Socket.IO');
-    // Emit current status and QR code to newly connected clients
-    socket.emit('status', botCurrentStatus); // Emit current status
-    if (qrCodeDataURL) {
-        socket.emit('qrCode', qrCodeDataURL); // Emit QR code data if available
+// API for menu items (public)
+app.get('/api/menu', async (req, res) => {
+    try {
+        const menuItems = await MenuItem.find({ isAvailable: true });
+        res.json(menuItems);
+    } catch (err) {
+        console.error('Error fetching public menu items:', err);
+        res.status(500).json({ message: 'Failed to fetch menu items.' });
     }
 });
 
-// Helper function to upsert customer notification entry
-async function updateCustomerNotification(customerPhone) {
+// API for public settings (e.g., shop location, delivery rates)
+app.get('/api/public/settings', async (req, res) => {
     try {
-        await CustomerNotification.findOneAndUpdate(
-            { customerPhone: customerPhone },
-            { $set: { lastNotifiedDate: new Date() } },
-            { upsert: true, new: true }
-        );
-        console.log(`Updated last notified date for ${customerPhone}`);
-    } catch (error) {
-        console.error(`Error updating customer notification for ${customerPhone}:`, error);
+        const settings = await Setting.findOne();
+        if (!settings) {
+            return res.status(404).json({ message: 'Settings not found.' });
+        }
+        res.json({
+            shopName: settings.shopName,
+            shopLocation: settings.shopLocation,
+            deliveryRates: settings.deliveryRates,
+        });
+    } catch (err) {
+        console.error('Error fetching public settings:', err);
+        res.status(500).json({ message: 'Failed to fetch settings.' });
     }
-}
+});
 
-// NEW: Function to send weekly notifications to users
-async function sendWeeklyNotifications() {
-    if (!clientReady || !client) { // Added check for client being null
-        console.log('WhatsApp client not ready or null for sending weekly notifications. Skipping.');
-        return;
-    }
-
-    console.log('Checking for weekly notifications to send...');
+// API for placing an order (public)
+app.post('/api/order', async (req, res) => {
     try {
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        // Find customers whose last notified date is older than 7 days
-        const customersToNotify = await CustomerNotification.find({
-            lastNotifiedDate: { $lte: sevenDaysAgo }
+        const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount, paymentMethod } = req.body;
+
+        if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || !totalAmount) {
+            return res.status(400).json({ message: 'Missing required order details.' });
+        }
+
+        // Validate items and retrieve full product details for storing
+        const itemDetails = [];
+        for (const item of items) {
+            const product = await MenuItem.findById(item.productId);
+            if (!product || !product.isAvailable) {
+                return res.status(400).json({ message: `Item ${item.name || item.productId} is not available.` });
+            }
+            itemDetails.push({
+                productId: product._id,
+                name: product.name,
+                price: product.price,
+                quantity: item.quantity,
+            });
+        }
+
+        const newOrder = new Order({
+            items: itemDetails,
+            customerName,
+            customerPhone,
+            deliveryAddress,
+            customerLocation, // Save customer's location
+            subtotal,
+            transportTax,
+            totalAmount,
+            paymentMethod,
+            status: 'Pending',
         });
 
-        const products = await Product.find({ isAvailable: true });
-        if (products.length === 0) {
-            console.log('No products available to suggest in weekly notification. Skipping.');
-            return;
-        }
+        await newOrder.save();
 
-        // Direct menu URL for notifications
-        const menuUrl = "https://jolly-phebe-seeutech-5259d95c.koyeb.app/menu";
+        // Update/Create Customer record
+        await Customer.findOneAndUpdate(
+            { customerPhone: customerPhone },
+            {
+                $set: {
+                    customerName: customerName,
+                    lastKnownLocation: customerLocation,
+                    lastOrderDate: new Date()
+                },
+                $inc: { totalOrders: 1 }
+            },
+            { upsert: true, new: true } // Create if not exists, return new doc
+        );
 
-        for (const customer of customersToNotify) {
-            // Pick a random product to suggest
-            const randomProduct = products[Math.floor(Math.random() * products.length)];
 
-            const message = `👋 Hey there! It's been a while since your last order. How about trying our delicious *${randomProduct.name}* today? It's only ₹${randomProduct.price.toFixed(2)}!\n\nCheck out our full menu here: ${menuUrl}\n\nWe hope to serve you soon! 😊`;
+        // Notify admin via WhatsApp (if bot is ready)
+        if (botStatus === 'ready' && process.env.ADMIN_NUMBER) {
+            const adminNumber = process.env.ADMIN_NUMBER; // Ensure this is a valid WhatsApp number
+            let orderSummary = `*New Order Received!* 🎉\n\n*Order ID:* ${newOrder._id.toString().substring(0, 8)}\n*Customer:* ${customerName}\n*Phone:* ${customerPhone}\n*Address:* ${deliveryAddress}\n`;
+            if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
+                orderSummary += `*Location:* http://www.google.com/maps/place/${customerLocation.latitude},${customerLocation.longitude}\n`;
+            }
+            orderSummary += `*Payment:* ${paymentMethod}\n\n*Items:*\n`;
+            itemDetails.forEach(item => {
+                orderSummary += `- ${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)\n`;
+            });
+            orderSummary += `\n*Subtotal:* ₹${subtotal.toFixed(2)}\n*Transport Tax:* ₹${transportTax.toFixed(2)}\n*Total:* ₹${totalAmount.toFixed(2)}\n\n`;
+            orderSummary += `Manage this order: ${process.env.YOUR_KOYEB_URL}/admin/dashboard`;
 
             try {
-                // Send message to customer
-                await client.sendMessage(customer.customerPhone + '@c.us', message);
-                // Update last notified date for this customer
-                await CustomerNotification.findByIdAndUpdate(customer._id, { lastNotifiedDate: new Date() });
-                console.log(`Sent weekly notification to ${customer.customerPhone}`);
-            } catch (msgError) {
-                console.error(`Error sending weekly notification to ${customer.customerPhone}:`, msgError);
+                await client.sendMessage(`${adminNumber}@c.us`, orderSummary);
+                console.log(`Admin notified for order ${newOrder._id}`);
+            } catch (waError) {
+                console.error('Error sending WhatsApp notification to admin:', waError);
             }
+        } else {
+            console.warn('WhatsApp bot not ready or ADMIN_NUMBER not set. Admin not notified.');
         }
-    } catch (error) {
-        console.error('Error in sendWeeklyNotifications:', error);
-    }
-}
 
+        res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder._id, order: newOrder });
 
-// --- Helper for Haversine Distance Calculation ---
-function haversineDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of Earth in kilometers
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
-}
-
-// --- Express Routes ---
-
-// Admin Authentication Middleware
-function isAuthenticated(req, res, next) {
-    console.log('isAuthenticated check:', {
-        sessionId: req.session.id,
-        userId: req.session.userId,
-        isAdmin: req.session.isAdmin,
-        path: req.path
-    });
-
-    if (req.session.userId && req.session.isAdmin) {
-        return next();
-    }
-
-    // For API requests, send a 401 JSON response
-    if (req.path.startsWith('/api/admin/')) {
-        console.warn(`Unauthorized API access attempt to ${req.path}. Session invalid.`);
-        return res.status(401).json({ message: 'Unauthorized: Session expired or not logged in.' });
-    }
-
-    // For regular page requests, redirect to login
-    console.log('Redirecting to admin login due to unauthorized access.');
-    res.redirect('/admin/login');
-}
-
-// Root route for bot status and QR display (Public Panel) - now serves bot_status.html
-app.get('/', async (req, res) => {
-    try {
-        res.sendFile(path.join(__dirname, 'public', 'bot_status.html'));
-    } catch (error) {
-        console.error('Error serving bot_status.html:', error);
-        res.status(500).send('<h1>Error loading bot status page.</h1><p>Please check server logs.</p>');
+    } catch (err) {
+        console.error('Error placing order:', err);
+        res.status(500).json({ message: 'Failed to place order.' });
     }
 });
 
-// Admin Login Page
+// API to get single order status (public for tracking)
+app.get('/api/order/:id', async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found.' });
+        }
+        res.json({
+            orderId: order._id,
+            status: order.status,
+            orderDate: order.orderDate,
+            totalAmount: order.totalAmount,
+            // Include other details necessary for public tracking if desired
+        });
+    } catch (err) {
+        console.error('Error fetching order status:', err);
+        res.status(500).json({ message: 'Failed to fetch order status.' });
+    }
+});
+
+// Admin Routes
 app.get('/admin/login', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Admin Login</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-            <style>
-                body { font-family: 'Inter', sans-serif; }
-                /* Apply black and white theme overrides */
-                body {
-                    background-color: #000000 !important; /* Pure black background */
-                    color: #ffffff !important; /* Pure white text */
-                }
-                .bg-gray-100 {
-                    background-color: #000000 !important;
-                }
-                .bg-white, .bg-gray-800 {
-                    background-color: #1a1a1a !important; /* Very dark gray */
-                }
-                .text-gray-800 {
-                    color: #ffffff !important;
-                }
-                .text-gray-700, .text-gray-300 {
-                    color: #dddddd !important;
-                }
-                input {
-                    background-color: #222222 !important;
-                    border-color: #444444 !important;
-                    color: #ffffff !important;
-                }
-                input::placeholder {
-                    color: #888888 !important;
-                }
-                button {
-                    background-color: #ffffff !important; /* White background */
-                    color: #000000 !important; /* Black text */
-                    box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.2), 0 2px 4px -1px rgba(255, 255, 255, 0.1) !important;
-                }
-                button:hover {
-                    background-color: #e0e0e0 !important;
-                }
-                .text-red-500 {
-                    color: #ff6666 !important; /* Slightly brighter red for error messages */
-                }
-            </style>
-        </head>
-        <body class="bg-gray-100 flex items-center justify-center min-h-screen">
-            <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
-                <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Admin Login</h2>
-                <form action="/admin/login" method="POST" class="space-y-4">
-                    <div>
-                        <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Username:</label>
-                        <input type="text" id="username" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                    </div>
-                    <div>
-                        <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Password:</label>
-                        <input type="password" id="password" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" required>
-                    </div>
-                    <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full transition duration-300 ease-in-out">Login</button>
-                </form>
-                ${req.session.message ? `<p class="text-red-500 text-center mt-4">${req.session.message}</p>` : ''}
-            </div>
-        </body>
-        </html>
-    `);
-    delete req.session.message;
+    res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        const user = await User.findOne({ username });
-        if (user) {
-            console.log(`Login attempt for user: ${username}, isAdmin: ${user.isAdmin}`);
-            if (await user.comparePassword(password)) {
-                req.session.userId = user._id;
-                req.session.isAdmin = user.isAdmin;
-                console.log(`Session established for ${username}: userId=${req.session.userId}, isAdmin=${req.session.isAdmin}`);
-
-                if (user.isAdmin) {
-                    return res.redirect('/admin/dashboard');
-                } else {
-                    req.session.message = 'You are not authorized to access the admin panel.';
-                    console.log(`User ${username} is not an admin. Redirecting to login.`);
-                    return res.redirect('/admin/login');
-                }
-            } else {
-                req.session.message = 'Invalid username or password.';
-                console.log(`Invalid password for user: ${username}`);
-                return res.redirect('/admin/login');
-            }
-        } else {
-            req.session.message = 'Invalid username or password.';
-            console.log(`User not found: ${username}`);
-            return res.redirect('/admin/login');
+        const settings = await Setting.findOne();
+        if (!settings) {
+            return res.status(500).json({ message: 'Admin settings not configured.' });
         }
-    } catch (error) {
-        console.error('Login error:', error);
-        req.session.message = 'An error occurred during login.';
-        res.redirect('/admin/login');
+
+        const isPasswordValid = await bcrypt.compare(password, settings.adminPassword);
+
+        if (username === settings.adminUsername && isPasswordValid) {
+            req.session.isAuthenticated = true;
+            return res.json({ success: true, message: 'Login successful!' });
+        } else {
+            return res.status(401).json({ success: false, message: 'Invalid credentials.' });
+        }
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ message: 'An error occurred during login.' });
     }
 });
 
 app.get('/admin/logout', (req, res) => {
     req.session.destroy(err => {
-        if (err) console.error('Error destroying session:', err);
-        console.log('Session destroyed. Redirecting to login.');
+        if (err) {
+            return res.status(500).json({ message: 'Could not log out.' });
+        }
         res.redirect('/admin/login');
     });
 });
 
-// Admin Dashboard (Protected) - now serves admin_dashboard.html
-app.get('/admin/dashboard', isAuthenticated, async (req, res) => {
-    try {
-        res.sendFile(path.join(__dirname, 'public', 'admin_dashboard.html'));
-    } catch (error) {
-        console.error('Error serving admin_dashboard.html:', error);
-        res.status(500).send('<h1>Error loading Admin Dashboard.</h1><p>Please check server logs.</p>');
-    }
+app.get('/admin/dashboard', isAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin_dashboard.html'));
 });
 
-// API: Get bot status for admin dashboard (NO QR data here)
+// Admin API for bot status (emits to Socket.IO, frontend consumes)
 app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
-    console.log('API: /api/admin/bot-status hit.');
-    res.json({
-        status: botCurrentStatus,
-        // Removed qrCodeDataURL from here, it's only for the public panel
-    });
-});
-
-// NEW API: Load WhatsApp session from DB
-app.post('/api/admin/load-session', isAuthenticated, async (req, res) => {
-    console.log('API: /api/admin/load-session hit. Attempting to load session from DB.');
-    try {
-        await loadAndInitializeClient(); // This function now handles session loading or QR generation
-        res.json({ message: 'Attempting to load session. Check bot status for updates.' });
-    } catch (error) {
-        console.error('Error in /api/admin/load-session:', error);
-        res.status(500).json({ message: 'Error initiating session load.' });
+    // This endpoint primarily serves to allow the frontend to trigger a status update fetch,
+    // though the real-time updates happen via socket.io.
+    io.emit('status', botStatus); // Emit current status to all connected clients
+    if (botStatus === 'qr_received' && client && client.qr) {
+        io.emit('qrCode', client.qr);
     }
+    io.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt }); // Emit session timestamp
+    res.json({ status: botStatus, lastAuthenticatedAt: lastAuthenticatedAt });
 });
 
-
-// NEW PUBLIC API: Request a new QR code for WhatsApp bot (accessible from public panel)
+// Admin API to request new QR (via backend trigger)
 app.post('/api/public/request-qr', async (req, res) => {
-    console.log('API: /api/public/request-qr hit.');
-    console.log('Public QR request received. Clearing session from DB and re-initializing client...');
-    // Clear any existing QR expiry timer if a new request comes in
-    if (qrExpiryTimer) {
-        clearTimeout(qrExpiryTimer);
-        qrExpiryTimer = null;
-    }
-    // Clear any existing weekly notification interval
-    if (global.weeklyNotificationInterval) {
-        clearInterval(global.weeklyNotificationInterval);
-        global.weeklyNotificationInterval = null;
-        console.log('Weekly notification scheduler stopped due to new QR request.');
-    }
     try {
-        // Always clear session data from MongoDB to force a new QR
-        await WhatsappSession.deleteOne({ id: 'whatsapp-session' }); // Delete the manually stored session
-        console.log('Deleted old WhatsApp session data from MongoDB.');
-        authFailureCount = 0; // Reset auth failure count on manual QR request
-    } catch (err) {
-        console.error('Error deleting old session data from MongoDB during manual QR request:', err);
-        // Continue even if deletion fails, initializeClientWithSession might still work
-    } finally {
-        // Set status to initializing and clear current QR data immediately
-        updateBotStatus('initializing'); // This will clear qrCodeDataURL and emit
-        // Re-initialize the client (this will trigger a new QR)
-        initializeClientWithSession(); // Call without sessionData to force QR generation
-        res.json({ message: 'Attempting to generate new QR code. Check the public bot status page for updates.' });
+        if (client) {
+            await client.destroy(); // Destroy existing session
+            console.log('Client destroyed. Requesting new QR.');
+        }
+        initializeBot(); // Re-initialize to get a new QR
+        res.json({ message: 'New QR request initiated. Check status panel for QR.' });
+    } catch (error) {
+        console.error('Error requesting new QR:', error);
+        res.status(500).json({ message: 'Failed to request new QR.' });
+    }
+});
+
+// Admin API to load saved session
+app.post('/api/admin/load-session', isAuthenticated, async (req, res) => {
+    try {
+        if (client) {
+            await client.destroy(); // Destroy current client to allow new session load
+        }
+        await initializeBot(); // Re-initialize, which will attempt to load from DB
+        res.json({ message: 'Attempting to load saved session. Check status panel.' });
+    } catch (error) {
+        console.error('Error loading saved session:', error);
+        res.status(500).json({ message: 'Failed to load saved session.' });
     }
 });
 
 
-// --- API for Admin Dashboard Orders ---
+// Admin API for Orders
 app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
-    console.log('API: /api/admin/orders hit.');
     try {
         const orders = await Order.find().sort({ orderDate: -1 });
-        console.log(`Fetched ${orders.length} admin orders.`);
         res.json(orders);
-    }
-    catch (error) {
-        console.error('Error fetching admin orders:', error.message);
-        res.status(500).json({ message: 'Error fetching orders' });
+    } catch (err) {
+        console.error('Error fetching orders:', err);
+        res.status(500).json({ message: 'Failed to fetch orders.' });
     }
 });
 
 app.get('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
-    console.log(`API: /api/admin/orders/${req.params.id} hit.`);
     try {
-        // Ensure that subtotal, transportTax, and totalAmount are always numbers.
-        // This is a safety measure for potentially inconsistent old data,
-        // as the schema already marks them as required numbers for new data.
-        const order = await Order.findById(req.params.id).lean(); // Use .lean() for plain JS objects for modification
+        const order = await Order.findById(req.params.id);
         if (!order) {
-            console.log(`Order ${req.params.id} not found.`);
-            return res.status(404).json({ message: 'Order not found' });
+            return res.status(404).json({ message: 'Order not found.' });
         }
-
-        // Ensure numeric fields are actually numbers, default to 0 if null/undefined
-        order.subtotal = typeof order.subtotal === 'number' ? order.subtotal : 0;
-        order.transportTax = typeof order.transportTax === 'number' ? order.transportTax : 0;
-        order.totalAmount = typeof order.totalAmount === 'number' ? order.totalAmount : 0;
-
-        console.log(`Fetched order ${req.params.id} details.`);
         res.json(order);
-    } catch (error) {
-        console.error('Error fetching single order:', error.message);
-        res.status(500).json({ message: 'Error fetching order' });
+    } catch (err) {
+        console.error('Error fetching single order:', err);
+        res.status(500).json({ message: 'Failed to fetch order.' });
     }
 });
-
 
 app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
-    console.log(`API: /api/admin/orders/${req.params.id} PUT hit.`);
     try {
-        const { id } = req.params;
         const { status } = req.body;
-        console.log(`Updating order ${id} to status: ${status}`); // Log update attempt
-        const order = await Order.findByIdAndUpdate(id, { status }, { new: true });
-        if (!order) {
-            console.warn(`Order ${id} not found for status update.`);
-            return res.status(404).json({ message: 'Order not found' });
+        const updatedOrder = await Order.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true }
+        );
+        if (!updatedOrder) {
+            return res.status(404).json({ message: 'Order not found.' });
         }
-        console.log(`Order ${id} updated successfully to status: ${order.status}`);
-        // Optional: Notify customer via WhatsApp about status update
-        if (clientReady && client) { // Only send if client is ready and not null
-            try {
-                await client.sendMessage(order.customerPhone + '@c.us', `Your order #${order._id.toString().substring(0,6)} has been updated to: ${order.status}`);
-            } catch (error) {
-                console.error(`Error sending WhatsApp notification to customer ${order.customerPhone}:`, error);
+
+        // Notify customer (if bot is ready and order status changes significantly)
+        if (botStatus === 'ready' && updatedOrder.customerPhone) {
+            let customerMessage = `Hello ${updatedOrder.customerName || 'customer'}! Your order *${updatedOrder._id.toString().substring(0, 8)}* status has been updated to: *${updatedOrder.status}*`;
+            if (updatedOrder.status === 'Out for Delivery') {
+                customerMessage += '\n\nYour delicious meal is on its way! 🛵💨';
+                if (shopLocationData && shopLocationData.latitude && shopLocationData.longitude && updatedOrder.customerLocation && updatedOrder.customerLocation.latitude) {
+                     customerMessage += `\nTrack your order: ${process.env.YOUR_KOYEB_URL}/track?orderId=${updatedOrder._id}`;
+                }
+            } else if (updatedOrder.status === 'Delivered') {
+                customerMessage += '\n\nYour order has been delivered! Enjoy your meal. 😊';
+            } else if (updatedOrder.status === 'Cancelled') {
+                customerMessage += '\n\nWe apologize, your order has been cancelled. Please contact us for more details.';
             }
-        } else {
-            console.warn(`WhatsApp client not ready or null, cannot notify customer ${order.customerPhone} about order status update.`);
+             try {
+                await client.sendMessage(`${updatedOrder.customerPhone}@c.us`, customerMessage);
+                console.log(`Customer ${updatedOrder.customerPhone} notified of status update.`);
+            } catch (waError) {
+                console.error('Error sending WhatsApp notification to customer:', waError);
+            }
         }
-        res.json(order);
-    } catch (error) {
-        console.error('Error updating order status:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error updating order status' });
+        res.json(updatedOrder);
+    } catch (err) {
+        console.error('Error updating order status:', err);
+        res.status(500).json({ message: 'Failed to update order status.' });
     }
 });
 
-// --- API for Admin Menu Management (CRUD) ---
-app.get('/api/admin/menu', isAuthenticated, async (req, res) => {
-    console.log('API: /api/admin/menu hit.');
+app.delete('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
     try {
-        const products = await Product.find().sort({ name: 1 });
-        console.log(`Fetched ${products.length} admin menu items.`);
-        res.json(products);
-    } catch (error) {
-        console.error('Error fetching admin menu:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error fetching menu items' });
+        const deletedOrder = await Order.findByIdAndDelete(req.params.id);
+        if (!deletedOrder) {
+            return res.status(404).json({ message: 'Order not found.' });
+        }
+        res.json({ message: 'Order deleted successfully.' });
+    } catch (err) {
+        console.error('Error deleting order:', err);
+        res.status(500).json({ message: 'Failed to delete order.' });
+    }
+});
+
+// Admin API for Menu Items
+app.get('/api/admin/menu', isAuthenticated, async (req, res) => {
+    try {
+        const menuItems = await MenuItem.find();
+        res.json(menuItems);
+    } catch (err) {
+        console.error('Error fetching menu items:', err);
+        res.status(500).json({ message: 'Failed to fetch menu items.' });
     }
 });
 
 app.get('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
-    console.log(`API: /api/admin/menu/${req.params.id} hit.`);
     try {
-        const product = await Product.findById(req.params.id);
-        if (!product) {
-            console.log(`Product ${req.params.id} not found.`);
-            return res.status(404).json({ message: 'Product not found' });
+        const menuItem = await MenuItem.findById(req.params.id);
+        if (!menuItem) {
+            return res.status(404).json({ message: 'Menu item not found.' });
         }
-        console.log(`Fetched product ${product.name} for edit.`);
-        res.json(product);
-    }
-    catch (error) {
-        console.error('Error fetching single product:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error fetching product' });
+        res.json(menuItem);
+    } catch (err) {
+        console.error('Error fetching single menu item:', err);
+        res.status(500).json({ message: 'Failed to fetch menu item.' });
     }
 });
 
 app.post('/api/admin/menu', isAuthenticated, async (req, res) => {
-    console.log('API: /api/admin/menu POST hit.');
     try {
-        console.log('Attempting to add new menu item. Received body:', req.body); // Log received body
-        const newProduct = new Product(req.body);
-        await newProduct.save();
-        console.log('New menu item added successfully:', newProduct.name);
-        res.status(201).json(newProduct);
-    } catch (error) {
-        console.error('Error adding menu item:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error adding menu item', details: error.message }); // Send details to frontend for debugging
+        const newMenuItem = new MenuItem(req.body);
+        await newMenuItem.save();
+        res.status(201).json(newMenuItem);
+    } catch (err) {
+        console.error('Error creating menu item:', err);
+        res.status(500).json({ message: 'Failed to create menu item.' });
     }
 });
 
 app.put('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
-    console.log(`API: /api/admin/menu/${req.params.id} PUT hit.`);
     try {
-        console.log(`Attempting to update menu item ${req.params.id}. Received body:`, req.body); // Log received body
-        const updatedProduct = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }); // runValidators ensures schema validation on update
-        if (!updatedProduct) {
-            console.warn(`Menu item ${req.params.id} not found for update.`);
-            return res.status(404).json({ message: 'Product not found' });
+        const updatedMenuItem = await MenuItem.findByIdAndUpdate(
+            req.params.id,
+            req.body,
+            { new: true }
+        );
+        if (!updatedMenuItem) {
+            return res.status(404).json({ message: 'Menu item not found.' });
         }
-        console.log('Menu item updated successfully:', updatedProduct.name);
-        res.json(updatedProduct);
-    } catch (error) {
-        console.error('Error updating menu item:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error updating menu item', details: error.message }); // Send details to frontend for debugging
+        res.json(updatedMenuItem);
+    } catch (err) {
+        console.error('Error updating menu item:', err);
+        res.status(500).json({ message: 'Failed to update menu item.' });
     }
 });
 
 app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
-    console.log(`API: /api/admin/menu/${req.params.id} DELETE hit.`);
     try {
-        console.log(`Attempting to delete menu item ${req.params.id}.`);
-        const deletedProduct = await Product.findByIdAndDelete(req.params.id);
-        if (!deletedProduct) {
-            console.warn(`Menu item ${req.params.id} not found for deletion.`);
-            return res.status(404).json({ message: 'Product not found' });
+        const deletedMenuItem = await MenuItem.findByIdAndDelete(req.params.id);
+        if (!deletedMenuItem) {
+            return res.status(404).json({ message: 'Menu item not found.' });
         }
-        console.log('Menu item deleted successfully:', deletedProduct.name);
-        res.json({ message: 'Product deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting menu item:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error deleting menu item' });
+        res.json({ message: 'Menu item deleted successfully.' });
+    } catch (err) {
+        console.error('Error deleting menu item:', err);
+        res.status(500).json({ message: 'Failed to delete menu item.' });
     }
 });
 
-// --- API for Admin Shop Settings ---
+// Admin API for Shop Settings
 app.get('/api/admin/settings', isAuthenticated, async (req, res) => {
-    console.log('API: /api/admin/settings hit.');
     try {
-        const settings = await AdminSettings.findOne();
+        const settings = await Setting.findOne();
         if (!settings) {
-            console.warn('Admin settings not found in DB. Returning default structure.');
-            return res.json({ shopName: 'My Food Business', shopLocation: { latitude: 0, longitude: 0 }, deliveryRates: [] });
+            return res.status(404).json({ message: 'Settings not found.' });
         }
-        console.log('Fetched admin settings:', settings);
-        res.json(settings);
-    } catch (error) {
-        console.error('Error fetching admin settings:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error fetching settings' });
+        // Exclude password hash from response
+        const { adminPassword, ...safeSettings } = settings.toObject();
+        res.json(safeSettings);
+    } catch (err) {
+        console.error('Error fetching settings:', err);
+        res.status(500).json({ message: 'Failed to fetch settings.' });
     }
 });
 
 app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
-    console.log('API: /api/admin/settings PUT hit.');
     try {
-        console.log('Attempting to update admin settings. Received body:', req.body); // Log received body
-        const updatedSettings = await AdminSettings.findOneAndUpdate({}, req.body, { new: true, upsert: true, runValidators: true }); // runValidators ensures schema validation
-        console.log('Admin settings updated successfully:', updatedSettings);
-        res.json(updatedSettings);
-    } catch (error) {
-        console.error('Error updating admin settings:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error updating settings', details: error.message }); // Send details to frontend for debugging
+        const { shopName, shopLocation, deliveryRates, adminUsername, adminPassword } = req.body;
+
+        let settings = await Setting.findOne();
+        if (!settings) {
+            return res.status(404).json({ message: 'Settings not found. Please create defaults first.' });
+        }
+
+        settings.shopName = shopName || settings.shopName;
+        settings.shopLocation = shopLocation || settings.shopLocation;
+        settings.deliveryRates = deliveryRates || settings.deliveryRates;
+
+        if (adminUsername && adminUsername !== settings.adminUsername) {
+            settings.adminUsername = adminUsername;
+        }
+        if (adminPassword) { // Only update password if provided
+            settings.adminPassword = await bcrypt.hash(adminPassword, 10);
+        }
+
+        await settings.save();
+        // Update the global shopLocationData immediately
+        shopLocationData = settings.shopLocation;
+        const { adminPassword: _, ...safeSettings } = settings.toObject(); // Exclude password hash
+        res.json({ message: 'Settings updated successfully!', ...safeSettings });
+    } catch (err) {
+        console.error('Error updating settings:', err);
+        res.status(500).json({ message: 'Failed to update settings.' });
     }
 });
 
-// NEW API: Get all customers with their last known location from orders
+
+// Admin API for Customers (including last known location)
 app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
-    console.log('API: /api/admin/customers hit.');
     try {
-        const customerNotifications = await CustomerNotification.find({});
-        const customersData = [];
-        const settings = await AdminSettings.findOne({}, 'shopLocation'); // Get shop location for tracking
+        const customers = await Customer.find().sort({ lastOrderDate: -1 });
+        res.json(customers);
+    } catch (err) {
+        console.error('Error fetching customers:', err);
+        res.status(500).json({ message: 'Failed to fetch customer data.' });
+    }
+});
 
-        for (const customerNotif of customerNotifications) {
-            const latestOrder = await Order.findOne({ customerPhone: customerNotif.customerPhone })
-                                            .sort({ orderDate: -1 })
-                                            .select('customerName customerPhone customerLocation') // Select only needed fields
-                                            .lean(); // Return plain JavaScript objects
-
-            if (latestOrder) {
-                customersData.push({
-                    customerName: latestOrder.customerName,
-                    customerPhone: latestOrder.customerPhone,
-                    lastKnownLocation: latestOrder.customerLocation || null, // Can be null if order didn't have location
-                    shopLocation: settings ? settings.shopLocation : null // Include shop location
-                });
-            } else {
-                // If no order found, still list the customer from notifications but without location
-                customersData.push({
-                    customerName: 'N/A', // Or try to infer from other data if available
-                    customerPhone: customerNotif.customerPhone,
-                    lastKnownLocation: null,
-                    shopLocation: settings ? settings.shopLocation : null
-                });
-            }
+app.delete('/api/admin/customers/:id', isAuthenticated, async (req, res) => {
+    try {
+        const deletedCustomer = await Customer.findByIdAndDelete(req.params.id);
+        if (!deletedCustomer) {
+            return res.status(404).json({ message: 'Customer not found.' });
         }
-        console.log(`Fetched ${customersData.length} customer records.`);
-        res.json(customersData);
-    } catch (error) {
-        console.error('Error fetching customer data:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error fetching customer data' });
+        res.json({ message: 'Customer deleted successfully.' });
+    } catch (err) {
+        console.error('Error deleting customer:', err);
+        res.status(500).json({ message: 'Failed to delete customer.' });
     }
 });
 
-
-// Public Web Menu Panel - now serves menu_panel.html
-app.get('/menu', async (req, res) => {
-    try {
-        res.sendFile(path.join(__dirname, 'public', 'menu_panel.html'));
-    } catch (error) {
-        console.error('Error serving menu_panel.html:', error);
-        res.status(500).send('<h1>Error loading Menu Panel.</h1><p>Please check server logs.</p>');
+// Socket.IO connection
+io.on('connection', (socket) => {
+    console.log('A user connected via Socket.IO');
+    // Send current status to newly connected client
+    socket.emit('status', botStatus);
+    if (botStatus === 'qr_received' && client && client.qr) {
+        socket.emit('qrCode', client.qr);
     }
+    socket.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt });
+
+    socket.on('disconnect', () => {
+        console.log('User disconnected from Socket.IO');
+    });
 });
 
-// API for Public Menu
-app.get('/api/menu', async (req, res) => {
-    console.log('API: /api/menu hit.');
-    try {
-        const products = await Product.find({ isAvailable: true }).sort({ category: 1, name: 1 });
-        console.log(`Fetched ${products.length} public menu items.`);
-        res.json(products);
-    } catch (error) {
-        console.error('Error fetching public menu:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error fetching menu items' });
-    }
+// Start the bot client on server start
+initializeBot();
+
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Access Admin Dashboard: ${process.env.YOUR_KOYEB_URL}/admin/dashboard`);
+    console.log(`View Public Menu: ${process.env.YOUR_KOYEB_URL}/menu`);
+    console.log(`View Bot Status: ${process.env.YOUR_KOYEB_URL}/`);
 });
 
-// API for Public Shop Settings (only what's needed for delivery calculation)
-app.get('/api/public/settings', async (req, res) => {
-    console.log('API: /api/public/settings hit.');
-    try {
-        const settings = await AdminSettings.findOne({}, 'shopLocation deliveryRates shopName'); // Fetch shopName as well
-        console.log('Fetched public settings:', settings);
-        res.json(settings);
-    }
-    catch (error) {
-        console.error('Error fetching public settings:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error fetching settings' });
-    }
-});
-
-
-// API for Delivery Cost Calculation
-app.post('/api/calculate-delivery-cost', async (req, res) => {
-    console.log('API: /api/calculate-delivery-cost hit.');
-    const { customerLocation } = req.body;
-    if (!customerLocation || typeof customerLocation.latitude === 'undefined' || typeof customerLocation.longitude === 'undefined') {
-        console.warn('Missing customer location for delivery cost calculation.');
-        return res.status(400).json({ message: 'Customer location (latitude, longitude) is required.' });
-    }
-
-    try {
-        const settings = await AdminSettings.findOne();
-        if (!settings || !settings.shopLocation || !settings.deliveryRates || settings.deliveryRates.length === 0) {
-            console.warn('Shop location or delivery rates not configured by admin for delivery cost calculation.');
-            return res.status(500).json({ message: 'Shop location or delivery rates not configured by admin.' });
-        }
-
-        const distance = haversineDistance(
-            settings.shopLocation.latitude,
-            settings.shopLocation.longitude,
-            customerLocation.latitude,
-            customerLocation.longitude
-        );
-
-        let transportTax = 0;
-        // Find the appropriate tax rate based on distance
-        const sortedRates = settings.deliveryRates.sort((a, b) => a.kms - b.kms);
-        for (let i = 0; i < sortedRates.length; i++) {
-            if (distance <= sortedRates[i].kms) {
-                transportTax = sortedRates[i].amount;
-                break;
-            }
-            // If it's the last rate and distance is greater, use this rate
-            if (i === sortedRates.length - 1 && distance > sortedRates[i].kms) { // Corrected logic: only apply if distance exceeds this last rate's KMS
-                transportTax = sortedRates[i].amount;
-            }
-        }
-        console.log(`Calculated distance: ${distance.toFixed(2)}km, transport tax: ₹${transportTax.toFixed(2)}`);
-        res.json({ distance, transportTax });
-
-    } catch (error) {
-        console.error('Error calculating delivery cost:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error calculating delivery cost' });
-    }
-});
-
-// API for Placing Orders
-app.post('/api/order', async (req, res) => {
-    console.log('API: /api/order POST hit.');
-    const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount, paymentMethod } = req.body; // Added paymentMethod
-
-    // Log the incoming request body for debugging
-    console.log('Incoming order request body:', JSON.stringify(req.body, null, 2));
-
-    if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || typeof subtotal === 'undefined' || typeof totalAmount === 'undefined' || !paymentMethod) {
-        console.warn('Missing required order details in POST /api/order.');
-        return res.status(400).json({ message: 'Missing required order details.' });
-    }
-
-    try {
-        // Fetch shop location at the time of order
-        const settings = await AdminSettings.findOne();
-        const deliveryFromLocation = settings ? settings.shopLocation : { latitude: 0, longitude: 0 }; // Default if not found
-
-        const newOrder = new Order({
-            items,
-            customerName,
-            customerPhone,
-            deliveryAddress,
-            customerLocation,
-            deliveryFromLocation, // Save shop location for tracking
-            subtotal,
-            transportTax,
-            totalAmount,
-            status: 'Pending',
-            paymentMethod // Save the payment method
-        });
-        await newOrder.save();
-        console.log('New order placed successfully:', newOrder._id);
-
-        // Update customer notification date to reset weekly reminder timer
-        await updateCustomerNotification(customerPhone);
-
-        // Notify Admin via WhatsApp
-        if (clientReady && client) { // Ensure client is ready and not null before sending
-            // Use YOUR_KOYEB_URL if set, otherwise fallback to localhost for development
-            const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
-            const adminMessage = `🔔 NEW ORDER PLACED! 🔔\n\n` +
-                                 `Order ID: ${newOrder._id.toString().substring(0, 6)}...\n` +
-                                 `Customer: ${newOrder.customerName}\n` +
-                                 `Phone: ${newOrder.customerPhone}\n` +
-                                 `Total: ₹${newOrder.totalAmount.toFixed(2)}\n` +
-                                 `Payment Method: ${newOrder.paymentMethod}\n` + // Include payment method in admin notification
-                                 `Address: ${newOrder.deliveryAddress}\n\n` +
-                                 `View on Dashboard: ${baseUrl}/admin/dashboard`;
-            try {
-                await client.sendMessage(ADMIN_NUMBER + '@c.us', adminMessage);
-                console.log('Admin notified via WhatsApp for new order');
-            } catch (error) {
-                console.error('Error sending WhatsApp notification to admin:', error);
-            }
-        } else {
-            console.warn('WhatsApp client not ready or null, cannot send admin notification.');
-        }
-
-        // Notify Admin Dashboard via Socket.IO
-        io.emit('newOrder', newOrder);
-
-        res.status(201).json({ message: 'Order placed successfully!', order: newOrder, orderId: newOrder._id }); // Return orderId for tracking
-    } catch (error) {
-        console.error('Error placing order:', error); // Log the full error object
-        res.status(500).json({ message: 'Error placing order.' });
-    }
-});
-
-// API for fetching a single order by ID (for tracking)
-app.get('/api/order/:id', async (req, res) => {
-    console.log(`API: /api/order/${req.params.id} hit.`);
-    try {
-        const order = await Order.findById(req.params.id);
-        if (!order) {
-            console.log(`Order ${req.params.id} not found for tracking.`);
-            return res.status(404).json({ message: 'Order not found' });
-        }
-        console.log(`Fetched order ${order._id} for tracking.`);
-        res.json(order);
-    } catch (error) {
-        console.error('Error fetching order for tracking:', error.message); // Log specific error
-        res.status(500).json({ message: 'Error fetching order details.' });
-    }
-});
