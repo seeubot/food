@@ -271,6 +271,7 @@
             <!-- Orders Tab Content -->
             <div id="orders-tab" class="tab-content">
                 <h2 class="text-3xl font-bold text-white mb-6">Recent Orders</h2>
+                <button id="add-order-btn" class="btn-primary mb-4">Add New Order</button>
                 <div class="bg-panel p-4 table-responsive">
                     <div id="orders-list">
                         <p class="text-gray-400 text-center">Loading orders...</p>
@@ -317,6 +318,7 @@
             <!-- Customers Tab Content -->
             <div id="customers-tab" class="tab-content hidden">
                 <h2 class="text-3xl font-bold text-white mb-6">Customer Locations</h2>
+                <button id="add-customer-btn" class="btn-primary mb-4">Add New Customer</button>
                 <div class="bg-panel p-4 table-responsive">
                     <div id="customers-list">
                         <p class="text-gray-400 text-center">Loading customer data...</p>
@@ -326,7 +328,7 @@
         </main>
     </div>
 
-    <!-- Modals (Order Details, Menu Item Form) -->
+    <!-- Modals (Order Details, Menu Item Form, Add Order, Add Customer) -->
 
     <!-- Order Details Modal -->
     <div id="order-details-modal" class="modal">
@@ -393,6 +395,78 @@
         </div>
     </div>
 
+    <!-- Add New Order Modal -->
+    <div id="add-order-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4">Add New Order</h2>
+            <form id="add-order-form" class="space-y-4">
+                <div>
+                    <label for="add-order-customer-name" class="block text-gray-300 text-sm font-bold mb-2">Customer Name:</label>
+                    <input type="text" id="add-order-customer-name" name="customerName" required>
+                </div>
+                <div>
+                    <label for="add-order-customer-phone" class="block text-gray-300 text-sm font-bold mb-2">Customer Phone:</label>
+                    <input type="text" id="add-order-customer-phone" name="customerPhone" placeholder="e.g., 91xxxxxxxxxx" required>
+                </div>
+                <div>
+                    <label for="add-order-delivery-address" class="block text-gray-300 text-sm font-bold mb-2">Delivery Address:</label>
+                    <textarea id="add-order-delivery-address" name="deliveryAddress" rows="3"></textarea>
+                </div>
+                <div>
+                    <label class="block text-gray-300 text-sm font-bold mb-2">Customer Location (Optional - Latitude, Longitude):</label>
+                    <input type="number" step="any" id="add-order-latitude" name="latitude" placeholder="Latitude" class="mb-2">
+                    <input type="number" step="any" id="add-order-longitude" name="longitude" placeholder="Longitude">
+                </div>
+                <div class="border-t border-gray-700 pt-4">
+                    <h3 class="text-xl font-bold text-white mb-2">Order Items:</h3>
+                    <div id="add-order-items-container" class="space-y-2">
+                        <!-- Dynamic item inputs will go here -->
+                    </div>
+                    <button type="button" id="add-order-item-btn" class="mt-4 btn-secondary">Add Item</button>
+                </div>
+                <div class="flex items-center mt-4">
+                    <label for="add-order-payment-method" class="block text-gray-300 text-sm font-bold mr-2">Payment Method:</label>
+                    <select id="add-order-payment-method" name="paymentMethod" class="w-auto">
+                        <option value="COD">Cash on Delivery</option>
+                        <option value="Online">Online Payment</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary">Create Order</button>
+                <p id="add-order-message" class="mt-2 text-sm text-center"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add New Customer Modal -->
+    <div id="add-customer-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-4">Add New Customer</h2>
+            <form id="add-customer-form" class="space-y-4">
+                <div>
+                    <label for="add-customer-phone" class="block text-gray-300 text-sm font-bold mb-2">Customer Phone:</label>
+                    <input type="text" id="add-customer-phone" name="customerPhone" placeholder="e.g., 91xxxxxxxxxx" required>
+                </div>
+                <div>
+                    <label for="add-customer-name" class="block text-gray-300 text-sm font-bold mb-2">Customer Name:</label>
+                    <input type="text" id="add-customer-name" name="customerName" required>
+                </div>
+                <div>
+                    <label for="add-customer-delivery-address" class="block text-gray-300 text-sm font-bold mb-2">Delivery Address (Optional):</label>
+                    <textarea id="add-customer-delivery-address" name="deliveryAddress" rows="3"></textarea>
+                </div>
+                <div>
+                    <label class="block text-gray-300 text-sm font-bold mb-2">Last Known Location (Optional - Latitude, Longitude):</label>
+                    <input type="number" step="any" id="add-customer-latitude" name="latitude" placeholder="Latitude" class="mb-2">
+                    <input type="number" step="any" id="add-customer-longitude" name="longitude" placeholder="Longitude">
+                </div>
+                <button type="submit" class="btn-primary">Add Customer</button>
+                <p id="add-customer-message" class="mt-2 text-sm text-center"></p>
+            </form>
+        </div>
+    </div>
+
 
     <script>
         const socket = io();
@@ -442,6 +516,24 @@
         const itemIsAvailableInput = document.getElementById('item-is-available');
         const itemIsTrendingInput = document.getElementById('item-is-trending');
         const menuItemMessage = document.getElementById('menu-item-message');
+
+        // New Order Modal elements
+        const addOrderBtn = document.getElementById('add-order-btn');
+        const addOrderModal = document.getElementById('add-order-modal');
+        const closeAddOrderModalBtn = addOrderModal.querySelector('.close-button');
+        const addOrderForm = document.getElementById('add-order-form');
+        const addOrderItemsContainer = document.getElementById('add-order-items-container');
+        const addOrderItemBtn = document.getElementById('add-order-item-btn');
+        const addOrderMessage = document.getElementById('add-order-message');
+        let availableMenuItems = []; // To populate dropdown in add order form
+
+        // New Customer Modal elements
+        const addCustomerBtn = document.getElementById('add-customer-btn');
+        const addCustomerModal = document.getElementById('add-customer-modal');
+        const closeAddCustomerModalBtn = addCustomerModal.querySelector('.close-button');
+        const addCustomerForm = document.getElementById('add-customer-form');
+        const addCustomerMessage = document.getElementById('add-customer-message');
+
 
         let currentActiveTab = 'orders'; // Default active tab
         let shopLocationData = null; // To store shop location for customer tracking
@@ -672,8 +764,9 @@
                         ">${order.status}</span>
                     </td>
                     <td>${new Date(order.orderDate).toLocaleString()}</td>
-                    <td>
+                    <td class="flex flex-wrap gap-2">
                         <button data-id="${order._id}" class="view-order-btn btn-secondary text-sm py-1 px-3">View</button>
+                        <button data-id="${order._id}" class="delete-order-btn btn-danger text-sm py-1 px-3">Delete</button>
                     </td>
                 `;
             });
@@ -681,7 +774,153 @@
             ordersList.querySelectorAll('.view-order-btn').forEach(button => {
                 button.addEventListener('click', (e) => openOrderDetailsModal(e.target.dataset.id));
             });
+            ordersList.querySelectorAll('.delete-order-btn').forEach(button => {
+                button.addEventListener('click', (e) => deleteOrder(e.target.dataset.id));
+            });
         }
+
+        async function deleteOrder(orderId) {
+            if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+                return;
+            }
+            try {
+                const response = await fetch(`/api/admin/orders/${orderId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    alert('Order deleted successfully!');
+                    fetchOrders(); // Refresh the list
+                } else {
+                    const result = await response.json();
+                    alert(`Failed to delete order: ${result.message || response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Error deleting order:', error);
+                alert(`Network error: ${error.message}`);
+            }
+        }
+
+        addOrderBtn.addEventListener('click', async () => {
+            addOrderForm.reset();
+            addOrderMessage.textContent = '';
+            addOrderItemsContainer.innerHTML = ''; // Clear previous items
+            addOrderItem(); // Add one empty item row by default
+
+            // Fetch available menu items to populate dropdowns
+            try {
+                const response = await fetch('/api/admin/menu');
+                if (!response.ok) throw new Error('Failed to fetch menu items for order form.');
+                availableMenuItems = await response.json();
+                // Re-render items to include fetched menu items
+                addOrderItemsContainer.innerHTML = '';
+                addOrderItem(); // Add the first item row with populated dropdown
+            } catch (error) {
+                console.error('Error fetching menu items for add order form:', error);
+                addOrderMessage.textContent = `Error loading menu items: ${error.message}`;
+                addOrderMessage.className = 'mt-2 text-sm text-red-500 text-center';
+            }
+
+            addOrderModal.style.display = 'flex';
+        });
+
+        closeAddOrderModalBtn.addEventListener('click', () => {
+            addOrderModal.style.display = 'none';
+        });
+
+        addOrderItemBtn.addEventListener('click', addOrderItem);
+
+        function addOrderItem() {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center mb-2';
+            itemDiv.innerHTML = `
+                <select class="order-item-select w-full sm:w-2/3 p-2 rounded-md bg-gray-700 text-white">
+                    <option value="">Select Item</option>
+                    ${availableMenuItems.map(item => `<option value="${item._id}" data-price="${item.price}">${item.name} (₹${item.price.toFixed(2)})</option>`).join('')}
+                </select>
+                <input type="number" class="order-item-quantity w-full sm:w-1/3 p-2 rounded-md bg-gray-700 text-white" placeholder="Quantity" value="1" min="1">
+                <button type="button" class="remove-order-item-btn btn-danger text-sm py-1 px-2 mt-2 sm:mt-0">Remove</button>
+            `;
+            addOrderItemsContainer.appendChild(itemDiv);
+
+            itemDiv.querySelector('.remove-order-item-btn').addEventListener('click', (e) => {
+                e.target.closest('.flex').remove();
+            });
+        }
+
+        addOrderForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const customerName = document.getElementById('add-order-customer-name').value.trim();
+            const customerPhone = document.getElementById('add-order-customer-phone').value.trim();
+            const deliveryAddress = document.getElementById('add-order-delivery-address').value.trim();
+            const latitude = parseFloat(document.getElementById('add-order-latitude').value);
+            const longitude = parseFloat(document.getElementById('add-order-longitude').value);
+            const paymentMethod = document.getElementById('add-order-payment-method').value;
+
+            const orderItems = [];
+            let isValid = true;
+            addOrderItemsContainer.querySelectorAll('.flex').forEach(itemDiv => {
+                const select = itemDiv.querySelector('.order-item-select');
+                const quantityInput = itemDiv.querySelector('.order-item-quantity');
+                const selectedMenuItemId = select.value;
+                const quantity = parseInt(quantityInput.value);
+
+                if (selectedMenuItemId && quantity > 0) {
+                    orderItems.push({
+                        menuItemId: selectedMenuItemId,
+                        quantity: quantity
+                    });
+                } else {
+                    isValid = false;
+                }
+            });
+
+            if (!isValid || orderItems.length === 0) {
+                addOrderMessage.textContent = 'Please select at least one item with a valid quantity.';
+                addOrderMessage.className = 'mt-2 text-sm text-red-500 text-center';
+                return;
+            }
+
+            const orderData = {
+                customerName,
+                customerPhone,
+                deliveryAddress,
+                customerLocation: (isNaN(latitude) || isNaN(longitude)) ? null : { latitude, longitude },
+                items: orderItems,
+                paymentMethod
+            };
+
+            addOrderMessage.textContent = 'Creating order...';
+            addOrderMessage.className = 'mt-2 text-sm text-yellow-500 text-center';
+            addOrderForm.querySelector('button[type="submit"]').disabled = true;
+
+            try {
+                const response = await fetch('/api/admin/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    addOrderMessage.textContent = 'Order created successfully!';
+                    addOrderMessage.className = 'mt-2 text-sm text-green-500 text-center';
+                    fetchOrders(); // Refresh the orders list
+                    setTimeout(() => addOrderModal.style.display = 'none', 1500);
+                } else {
+                    addOrderMessage.textContent = `Error creating order: ${result.message || response.statusText}`;
+                    addOrderMessage.className = 'mt-2 text-sm text-red-500 text-center';
+                }
+            } catch (error) {
+                console.error('Error creating order:', error);
+                addOrderMessage.textContent = `Network error: ${error.message}`;
+                addOrderMessage.className = 'mt-2 text-sm text-red-500 text-center';
+            } finally {
+                addOrderForm.querySelector('button[type="submit"]').disabled = false;
+            }
+        });
+
 
         async function openOrderDetailsModal(orderId) {
             currentOrderId = orderId;
@@ -1121,13 +1360,97 @@
                     <td>${customer.customerPhone}</td>
                     <td>${locationText}</td>
                     <td>${distanceFromShop}</td>
-                    <td>
-                        <a href="tel:${customerPhoneNumber}" class="btn-action text-sm py-1 px-3 mr-2">Call</a>
+                    <td class="flex flex-wrap gap-2">
+                        <a href="tel:${customerPhoneNumber}" class="btn-action text-sm py-1 px-3">Call</a>
                         ${trackButtonHtml}
+                        <button data-phone="${customer.customerPhone}" class="delete-customer-btn btn-danger text-sm py-1 px-3">Delete</button>
                     </td>
                 `;
             });
+
+            customersList.querySelectorAll('.delete-customer-btn').forEach(button => {
+                button.addEventListener('click', (e) => deleteCustomer(e.target.dataset.phone));
+            });
         }
+
+        async function deleteCustomer(customerPhone) {
+            if (!confirm(`Are you sure you want to delete customer ${customerPhone}? This will not delete their orders.`)) {
+                return;
+            }
+            try {
+                const response = await fetch(`/api/admin/customers/${customerPhone}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    alert('Customer deleted successfully!');
+                    fetchCustomers(); // Refresh the list
+                } else {
+                    const result = await response.json();
+                    alert(`Failed to delete customer: ${result.message || response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Error deleting customer:', error);
+                alert(`Network error: ${error.message}`);
+            }
+        }
+
+        addCustomerBtn.addEventListener('click', () => {
+            addCustomerForm.reset();
+            addCustomerMessage.textContent = '';
+            addCustomerModal.style.display = 'flex';
+        });
+
+        closeAddCustomerModalBtn.addEventListener('click', () => {
+            addCustomerModal.style.display = 'none';
+        });
+
+        addCustomerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const customerPhone = document.getElementById('add-customer-phone').value.trim();
+            const customerName = document.getElementById('add-customer-name').value.trim();
+            const deliveryAddress = document.getElementById('add-customer-delivery-address').value.trim();
+            const latitude = parseFloat(document.getElementById('add-customer-latitude').value);
+            const longitude = parseFloat(document.getElementById('add-customer-longitude').value);
+
+            const customerData = {
+                customerPhone,
+                customerName,
+                deliveryAddress: deliveryAddress || undefined,
+                lastKnownLocation: (isNaN(latitude) || isNaN(longitude)) ? undefined : { latitude, longitude }
+            };
+
+            addCustomerMessage.textContent = 'Adding customer...';
+            addCustomerMessage.className = 'mt-2 text-sm text-yellow-500 text-center';
+            addCustomerForm.querySelector('button[type="submit"]').disabled = true;
+
+            try {
+                const response = await fetch('/api/admin/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(customerData)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    addCustomerMessage.textContent = 'Customer added successfully!';
+                    addCustomerMessage.className = 'mt-2 text-sm text-green-500 text-center';
+                    fetchCustomers(); // Refresh the list
+                    setTimeout(() => addCustomerModal.style.display = 'none', 1500);
+                } else {
+                    addCustomerMessage.textContent = `Error adding customer: ${result.message || response.statusText}`;
+                    addCustomerMessage.className = 'mt-2 text-sm text-red-500 text-center';
+                }
+            } catch (error) {
+                console.error('Error adding customer:', error);
+                addCustomerMessage.textContent = `Network error: ${error.message}`;
+                addCustomerMessage.className = 'mt-2 text-sm text-red-500 text-center';
+            } finally {
+                addCustomerForm.querySelector('button[type="submit"]').disabled = false;
+            }
+        });
+
 
         // Haversine distance function (duplicated from menu_panel for self-containment)
         function haversineDistance(lat1, lon1, lat2, lon2) {
