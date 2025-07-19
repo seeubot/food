@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-const qrcode = require('qrcode-terminal');
+// const qrcode = require('qrcode-terminal'); // Removed qrcode-terminal
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -22,26 +22,27 @@ const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey'; // Use a strong, unique key in production
+const MONGODB_URI = process.env.MONGODB_URI; // Ensure this is loaded from .env
 
 // Middleware
 app.use(express.json()); // For parsing application/json
 app.use(express.static(path.join(__dirname, 'public'))); // Serve static files from 'public' directory
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(MONGODB_URI) // Use the loaded MONGODB_URI
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.error('MongoDB connection error:', err));
 
 // WhatsApp Client Initialization
 let whatsappClient;
-let qrCodeData = null; // Store QR code data
+let qrCodeData = null; // Store QR code data (base64 image URL)
 let whatsappStatus = 'initializing'; // Global status for the bot
 
 function updateBotStatus(status, data = null) {
     whatsappStatus = status;
     io.emit('status', status); // Emit status to all connected admin dashboards
     if (status === 'qr_received' && data) {
-        qrCodeData = data;
+        qrCodeData = data; // Store base64 image data
         io.emit('qrCode', data); // Emit QR code data to admin dashboard
     } else if (status === 'ready' || status === 'disconnected' || status === 'auth_failure') {
         qrCodeData = null; // Clear QR data when connected or disconnected
@@ -68,10 +69,17 @@ async function initializeWhatsAppClient(loadSession = true) {
         }
     });
 
-    whatsappClient.on('qr', (qr) => {
-        qrCodeData = qr; // Store QR code
-        qrcode.generate(qr, { small: true });
-        updateBotStatus('qr_received', qr);
+    whatsappClient.on('qr', async (qr) => {
+        // Convert QR string to base64 image data URL
+        const qrcode = require('qrcode'); // Require qrcode here to avoid global import if not always needed
+        qrcode.toDataURL(qr, { small: false }, (err, url) => {
+            if (err) {
+                console.error('Error generating QR code data URL:', err);
+                updateBotStatus('qr_error');
+            } else {
+                updateBotStatus('qr_received', url); // Pass base64 image URL
+            }
+        });
     });
 
     whatsappClient.on('ready', () => {
@@ -285,10 +293,10 @@ async function initializeWhatsAppClient(loadSession = true) {
                                 transportTax = rate.amount;
                                 break;
                             }
-                        }
-                        if (transportTax === 0 && dist > settings.deliveryRates[settings.deliveryRates.length - 1].kms) {
-                            // If distance is beyond the max defined rate, use the max rate's amount
-                            transportTax = settings.deliveryRates[settings.deliveryRates.length - 1].amount;
+                            // If it's the last rate and distance is greater, use this rate
+                            if (i === settings.deliveryRates.length - 1 && dist > settings.deliveryRates[i].kms) {
+                                transportTax = settings.deliveryRates[i].amount;
+                            }
                         }
                         responseMessage += `\n*Delivery Fee:* ₹${transportTax.toFixed(2)}`;
                     } else {
@@ -834,10 +842,10 @@ app.post('/api/orders', async (req, res) => {
                     transportTax = rate.amount;
                     break;
                 }
-            }
              if (transportTax === 0 && dist > settings.deliveryRates[settings.deliveryRates.length - 1].kms) {
                 transportTax = settings.deliveryRates[settings.deliveryRates.length - 1].amount;
             }
+        }
         }
 
         const totalAmount = subtotal + transportTax;
@@ -897,4 +905,5 @@ server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Admin Dashboard: http://localhost:${PORT}/admin/login`);
 });
+
 
