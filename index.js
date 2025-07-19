@@ -93,27 +93,35 @@ const WhatsappSession = mongoose.model('WhatsappSession', WhatsappSessionSchema)
 
 // Admin User setup
 async function setupAdminUser() {
+    // --- IMPORTANT: Hardcoded Credentials as requested ---
+    // In a production environment, it's highly recommended to use environment variables
+    // or a more secure configuration management system for credentials.
+    const DEFAULT_ADMIN_USERNAME = "admin";
+    const DEFAULT_ADMIN_PASSWORD = "adminpassword"; // Consider using a stronger password in production
+
     try {
         let settings = await Setting.findOne();
         if (!settings) {
             console.log('No settings found, creating default admin user...');
-            const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+            const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
             settings = new Setting({
                 shopName: 'Delicious Bites',
                 shopLocation: { latitude: 0, longitude: 0 },
                 deliveryRates: [],
-                adminUsername: process.env.ADMIN_USERNAME,
+                adminUsername: DEFAULT_ADMIN_USERNAME,
                 adminPassword: hashedPassword,
             });
             await settings.save();
-            console.log('Default admin user created.');
+            console.log('Default admin user created with hardcoded credentials.');
         } else {
-            // Optional: Update admin credentials if env vars change and if not already hashed
-            if (!bcrypt.getRounds(settings.adminPassword)) { // Check if password is not hashed
-                 const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
+            // Optional: If you want to update the password if it's not hashed or if it changes
+            // This logic ensures the password is always hashed.
+            if (!bcrypt.getRounds(settings.adminPassword) || settings.adminUsername !== DEFAULT_ADMIN_USERNAME) {
+                 const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
                  settings.adminPassword = hashedPassword;
+                 settings.adminUsername = DEFAULT_ADMIN_USERNAME; // Ensure username matches
                  await settings.save();
-                 console.log('Admin password re-hashed based on .env.');
+                 console.log('Admin credentials updated/re-hashed based on hardcoded values.');
             }
         }
     } catch (err) {
@@ -188,7 +196,18 @@ async function initializeBot() {
             dataPath: './.wwebjs_auth/' // Path to store local session files
         }),
         puppeteer: {
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            // --- Updated Puppeteer Arguments for QR Code Stability ---
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage', // Fixes issues with /dev/shm in some environments
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process', // Helps with memory on some systems
+                '--disable-gpu' // Often good for headless environments
+            ],
+            // headless: false, // Uncomment for debugging browser UI, but keep true for production
         },
         session: loadedSession // Pass the loaded session object if available
     });
@@ -578,9 +597,13 @@ app.post('/admin/login', async (req, res) => {
             return res.status(500).json({ message: 'Admin settings not configured.' });
         }
 
+        // --- Use hardcoded admin credentials for validation ---
+        const DEFAULT_ADMIN_USERNAME = "admin";
+        const DEFAULT_ADMIN_PASSWORD = "adminpassword"; // This will be hashed in DB after first run
+
         const isPasswordValid = await bcrypt.compare(password, settings.adminPassword);
 
-        if (username === settings.adminUsername && isPasswordValid) {
+        if (username === DEFAULT_ADMIN_USERNAME && isPasswordValid) {
             req.session.isAuthenticated = true;
             return res.json({ success: true, message: 'Login successful!' });
         } else {
@@ -833,6 +856,9 @@ app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
         settings.shopLocation = shopLocation || settings.shopLocation;
         settings.deliveryRates = deliveryRates || settings.deliveryRates;
 
+        // If adminUsername or adminPassword are provided in the request body, update them.
+        // For this specific request, we are hardcoding, so this part might be less relevant
+        // if the frontend doesn't send these fields.
         if (adminUsername && adminUsername !== settings.adminUsername) {
             settings.adminUsername = adminUsername;
         }
