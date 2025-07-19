@@ -272,12 +272,100 @@ async function initializeBot() {
     client.on('message', async msg => {
         console.log('MESSAGE RECEIVED', msg.body);
 
-        if (msg.body === '!menu') {
-            const menuLink = `${process.env.YOUR_KOYEB_URL}/menu`;
-            await client.sendMessage(msg.from, `Welcome to Delicious Bites! 🍽️\n\nCheck out our full menu here: ${menuLink}\n\nTo place an order, simply add items to your cart on the menu page and proceed to checkout.`);
-        } else if (msg.body === '!status') {
-            // Placeholder for order status check
-            await client.sendMessage(msg.from, 'To check your order status, please visit the order tracking page on our website after placing an order.');
+        const senderNumber = msg.from.split('@')[0]; // Extract just the number
+
+        // Base URL for web links
+        const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
+
+        // Handle specific commands (case-insensitive and number-based)
+        const lowerCaseBody = msg.body.toLowerCase().trim();
+
+        switch (lowerCaseBody) {
+            case '1':
+            case '!profile':
+            case 'profile':
+                try {
+                    await client.sendMessage(msg.from, `Aapka profile yahaan hai! (Your profile is here!) Your registered WhatsApp number is: ${senderNumber}. We're working on adding more personalized profile features soon. Stay tuned!`);
+                    console.log(`Replied to ${senderNumber} with profile info.`);
+                } catch (error) {
+                    console.error(`Error sending profile message to ${senderNumber}:`, error);
+                }
+                break;
+            case '2':
+            case '!orders':
+            case 'orders':
+                try {
+                    // Fetch only active orders (not Delivered or Cancelled)
+                    const customerOrders = await Order.find({
+                        customerPhone: senderNumber,
+                        status: { $nin: ['Delivered', 'Cancelled'] }
+                    }).sort({ orderDate: -1 }).limit(5);
+
+                    if (customerOrders.length > 0) {
+                        let orderList = 'Aapke active orders:\n'; // Your active orders
+                        customerOrders.forEach((order, index) => {
+                            const orderLink = `${baseUrl}/menu?orderId=${order._id}`; // Link to tracking
+                            orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status} - Track: ${orderLink}\n`;
+                        });
+                        try {
+                            await client.sendMessage(msg.from, orderList + '\nFor more details or to view past orders, visit our web menu.');
+                            console.log(`Replied to ${senderNumber} with active orders.`);
+                        } catch (error) {
+                            console.error(`Error sending order list message to ${senderNumber}:`, error);
+                        }
+                    } else {
+                        try {
+                            await client.sendMessage(msg.from, 'Aapke koi active orders nahi hain. Naya order place karne ke liye, "Menu" type karein ya link par click karein: ' + `${baseUrl}/menu`); // You have no active orders. To place a new order, type "Menu" or click the link.
+                            console.log(`Replied to ${senderNumber} with no active orders message.`);
+                        } catch (error) {
+                            console.error(`Error sending no orders message to ${senderNumber}:`, error);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching orders for bot:', error);
+                    try {
+                        await client.sendMessage(msg.from, 'Maaf kijiye, main abhi aapke orders fetch nahi kar paya. Kripya baad mein dobara prayas karein.'); // Sorry, I could not fetch your orders at the moment. Please try again later.
+                    } catch (error) {
+                        console.error(`Error sending generic error message to ${senderNumber}:`, error);
+                    }
+                }
+                break;
+            case '3':
+            case '!help':
+            case 'help':
+            case '!support':
+            case 'support':
+                try {
+                    await client.sendMessage(msg.from, 'Kisi bhi sahayata ke liye, kripya hamari support team se +91-XXXX-XXXXXX par sampark karein ya hamari website par jaayen.'); // For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.
+                    console.log(`Replied to ${senderNumber} with help message.`);
+                } catch (error) {
+                    console.error(`Error sending help message to ${senderNumber}:`, error);
+                }
+                break;
+            case 'menu': // Explicitly handle 'menu' as a direct link request
+            case '!menu':
+                try {
+                    await client.sendMessage(msg.from, `Hamara swadisht menu yahaan dekhein: ${baseUrl}/menu`); // Check out our delicious menu here
+                    console.log(`Replied to ${senderNumber} with direct menu link.`);
+                } catch (error) {
+                    console.error(`Error sending menu link message to ${senderNumber}:`, error);
+                }
+                break;
+            default:
+                // Default response: send the welcome message for any other input
+                const welcomeMessage = `Namaste! Swadisht bhojan ki talash hai? 😋 Delicious Bites mein aapka swagat hai, jahaan har bite ek anand hai!
+                \nKya chahiye aapko? Bas number type karein:
+                \n1. Mera Profile (Apni jaankari dekhein!)
+                \n2. Mere Orders (Pichle orders dekhein!)
+                \n3. Sahayata (Madad chahiye? Hum hain na!)
+                \n\nHumara poora menu dekhne ke liye, "Menu" type karein ya yahaan click karein: ${baseUrl}/menu`; // Hindi translations added
+                try {
+                    await client.sendMessage(msg.from, welcomeMessage);
+                    console.log(`Replied to ${senderNumber} with welcome message (default).`);
+                } catch (error) {
+                    console.error(`Error sending welcome message to ${senderNumber}:`, error);
+                }
+                break;
         }
     });
 
@@ -303,6 +391,18 @@ setInterval(async () => {
 // Public Routes (Accessible by customers)
 app.get('/menu', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'menu.html'));
+});
+
+// New route for order tracking links
+app.get('/track', (req, res) => {
+    // Redirect to the menu page, passing the orderId as a query parameter
+    // The menu.html JavaScript will then read this parameter and open the tracking modal
+    const orderId = req.query.orderId;
+    if (orderId) {
+        res.redirect(`/menu?orderId=${orderId}`);
+    } else {
+        res.redirect('/menu'); // Redirect to menu if no orderId provided
+    }
 });
 
 // Serve the bot status page at the root
@@ -392,29 +492,52 @@ app.post('/api/order', async (req, res) => {
             { upsert: true, new: true } // Create if not exists, return new doc
         );
 
+        const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
+        const orderTrackingLink = `${baseUrl}/track?orderId=${newOrder._id}`;
 
-        // Notify admin via WhatsApp (if bot is ready)
+        // Notify Admin via WhatsApp (if bot is ready)
         if (botStatus === 'ready' && process.env.ADMIN_NUMBER) {
             const adminNumber = process.env.ADMIN_NUMBER; // Ensure this is a valid WhatsApp number
-            let orderSummary = `*New Order Received!* 🎉\n\n*Order ID:* ${newOrder._id.toString().substring(0, 8)}\n*Customer:* ${customerName}\n*Phone:* ${customerPhone}\n*Address:* ${deliveryAddress}\n`;
+            let adminOrderSummary = `*New Order Received!* 🎉\n\n` +
+                                 `*Order ID:* ${newOrder._id.toString().substring(0, 8)}\n` +
+                                 `*Customer:* ${customerName}\n` +
+                                 `*Phone:* ${customerPhone}\n` +
+                                 `*Address:* ${deliveryAddress}\n`;
             if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
-                orderSummary += `*Location:* http://www.google.com/maps/place/${customerLocation.latitude},${customerLocation.longitude}\n`;
+                adminOrderSummary += `*Location:* http://www.google.com/maps/place/${customerLocation.latitude},${customerLocation.longitude}\n`;
             }
-            orderSummary += `*Payment:* ${paymentMethod}\n\n*Items:*\n`;
+            adminOrderSummary += `*Payment:* ${paymentMethod}\n\n*Items:*\n`;
             itemDetails.forEach(item => {
-                orderSummary += `- ${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)\n`;
+                adminOrderSummary += `- ${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)\n`;
             });
-            orderSummary += `\n*Subtotal:* ₹${subtotal.toFixed(2)}\n*Transport Tax:* ₹${transportTax.toFixed(2)}\n*Total:* ₹${totalAmount.toFixed(2)}\n\n`;
-            orderSummary += `Manage this order: ${process.env.YOUR_KOYEB_URL}/admin/dashboard`;
+            adminOrderSummary += `\n*Subtotal:* ₹${subtotal.toFixed(2)}\n*Transport Tax:* ₹${transportTax.toFixed(2)}\n*Total:* ₹${totalAmount.toFixed(2)}\n\n`;
+            adminOrderSummary += `Manage this order: ${baseUrl}/admin/dashboard`;
 
             try {
-                await client.sendMessage(`${adminNumber}@c.us`, orderSummary);
+                await client.sendMessage(`${adminNumber}@c.us`, adminOrderSummary);
                 console.log(`Admin notified for order ${newOrder._id}`);
             } catch (waError) {
                 console.error('Error sending WhatsApp notification to admin:', waError);
             }
         } else {
             console.warn('WhatsApp bot not ready or ADMIN_NUMBER not set. Admin not notified.');
+        }
+
+        // Notify Customer via WhatsApp (Order Confirmation)
+        if (botStatus === 'ready') {
+            const customerConfirmationMessage = `Namaste ${customerName}!\n\nAapka order *${newOrder._id.toString().substring(0, 8)}* successfully place ho gaya hai! 🎉\n\n` +
+                                                `*Total Amount:* ₹${totalAmount.toFixed(2)}\n` +
+                                                `*Payment Method:* ${paymentMethod}\n\n` +
+                                                `Hum aapko jaldi hi update denge. Apne order ka status yahaan track karein: ${orderTrackingLink}\n\n` +
+                                                `Dhanyawad, Delicious Bites! 😊`; // Hindi translation
+            try {
+                await client.sendMessage(`${customerPhone}@c.us`, customerConfirmationMessage);
+                console.log(`Customer ${customerPhone} notified of order confirmation.`);
+            } catch (waError) {
+                console.error('Error sending WhatsApp confirmation to customer:', waError);
+            }
+        } else {
+            console.warn('WhatsApp bot not ready. Customer not notified of order confirmation.');
         }
 
         res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder._id, order: newOrder });
@@ -563,19 +686,34 @@ app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
             return res.status(404).json({ message: 'Order not found.' });
         }
 
+        const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
+        const orderTrackingLink = `${baseUrl}/track?orderId=${updatedOrder._id}`;
+
         // Notify customer (if bot is ready and order status changes significantly)
         if (botStatus === 'ready' && updatedOrder.customerPhone) {
-            let customerMessage = `Hello ${updatedOrder.customerName || 'customer'}! Your order *${updatedOrder._id.toString().substring(0, 8)}* status has been updated to: *${updatedOrder.status}*`;
-            if (updatedOrder.status === 'Out for Delivery') {
-                customerMessage += '\n\nYour delicious meal is on its way! 🛵💨';
-                if (shopLocationData && shopLocationData.latitude && shopLocationData.longitude && updatedOrder.customerLocation && updatedOrder.customerLocation.latitude) {
-                     customerMessage += `\nTrack your order: ${process.env.YOUR_KOYEB_URL}/track?orderId=${updatedOrder._id}`;
-                }
-            } else if (updatedOrder.status === 'Delivered') {
-                customerMessage += '\n\nYour order has been delivered! Enjoy your meal. 😊';
-            } else if (updatedOrder.status === 'Cancelled') {
-                customerMessage += '\n\nWe apologize, your order has been cancelled. Please contact us for more details.';
+            let customerMessage = `Namaste ${updatedOrder.customerName || 'customer'}!\n\n`;
+
+            switch (updatedOrder.status) {
+                case 'Confirmed':
+                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* confirm ho gaya hai! Humne ise taiyaar karna shuru kar diya hai.`; // Your order is confirmed! We've started preparing it.
+                    break;
+                case 'Preparing':
+                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* abhi taiyaar ho raha hai. Jaldi hi aapke paas hoga!`; // Your order is currently being prepared. It will be with you soon!
+                    break;
+                case 'Out for Delivery':
+                    customerMessage += `Khushkhabri! Aapka order *${updatedOrder._id.toString().substring(0, 8)}* delivery ke liye nikal chuka hai! 🛵💨\n\n`; // Good news! Your order is out for delivery!
+                    customerMessage += `Apne order ko yahaan track karein: ${orderTrackingLink}`; // Track your order here
+                    break;
+                case 'Delivered':
+                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* deliver ho gaya hai! Apne bhojan ka anand lein. 😊`; // Your order has been delivered! Enjoy your meal.
+                    break;
+                case 'Cancelled':
+                    customerMessage += `Maaf kijiye, aapka order *${updatedOrder._id.toString().substring(0, 8)}* cancel kar diya gaya hai. Kripya adhik jaankari ke liye humse sampark karein.`; // Sorry, your order has been cancelled. Please contact us for more details.
+                    break;
+                default:
+                    customerMessage += `Aapke order *${updatedOrder._id.toString().substring(0, 8)}* ka status update ho gaya hai: *${updatedOrder.status}*`; // Your order status has been updated to:
             }
+
              try {
                 await client.sendMessage(`${updatedOrder.customerPhone}@c.us`, customerMessage);
                 console.log(`Customer ${updatedOrder.customerPhone} notified of status update.`);
@@ -662,7 +800,8 @@ app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
             return res.status(404).json({ message: 'Menu item not found.' });
         }
         res.json({ message: 'Menu item deleted successfully.' });
-    } catch (err) {
+    }
+    catch (err) {
         console.error('Error deleting menu item:', err);
         res.status(500).json({ message: 'Failed to delete menu item.' });
     }
