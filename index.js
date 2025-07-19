@@ -1,11 +1,18 @@
 // Ensure dotenv is loaded as early as possible
-require('dotenv').config();
+// Adding a try-catch around dotenv.config() to see if it throws an error internally
+try {
+    require('dotenv').config();
+} catch (e) {
+    console.error('Error loading .env file with dotenv:', e.message);
+    console.error('This might indicate a malformed .env file or a critical issue with dotenv itself.');
+}
 
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const fs = require('fs'); // Import Node.js File System module
 const qrcode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const http = require('http');
@@ -23,8 +30,8 @@ const server = http.createServer(app);
 const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET; // Get JWT_SECRET from .env
-const MONGODB_URI = process.env.MONGODB_URI; // Get MONGODB_URI from .env
+const JWT_SECRET = process.env.JWT_SECRET;
+const MONGODB_URI = process.env.MONGODB_URI;
 
 // --- DIAGNOSTIC LOGS: TEMPORARY - REMOVE AFTER FIXING ENV ISSUE ---
 console.log('--- Environment Variables Loaded (Diagnostic) ---');
@@ -33,39 +40,59 @@ console.log('process.env.MONGODB_URI:', MONGODB_URI ? 'URI Loaded (value hidden 
 console.log('process.env.JWT_SECRET:', JWT_SECRET ? 'Secret Loaded (value hidden for security)' : 'SECRET UNDEFINED');
 // console.log('Full process.env:', process.env); // Uncomment this line if the above is still undefined, but be careful with logs!
 console.log('--- End Environment Variables Diagnostic ---');
-// --- END DIAGNOSTIC LOGS ---
+
+// --- NEW: Direct .env file presence check ---
+const envFilePath = path.resolve(process.cwd(), '.env');
+console.log(`Checking for .env file at: ${envFilePath}`);
+try {
+    if (fs.existsSync(envFilePath)) {
+        console.log('.env file found! Attempting to read its content (first 100 chars for debug):');
+        const envContent = fs.readFileSync(envFilePath, 'utf8');
+        console.log(envContent.substring(0, 100) + (envContent.length > 100 ? '...' : ''));
+    } else {
+        console.error('CRITICAL: .env file NOT FOUND at the expected path!');
+        console.error('This is likely the root cause. Ensure your .env file is in the correct directory for the running application.');
+    }
+} catch (fsError) {
+    console.error('Error reading .env file directly:', fsError.message);
+}
+// --- END NEW DIAGNOSTIC ---
+
 
 // Critical check for MongoDB URI
 if (!MONGODB_URI) {
     console.error('FATAL ERROR: MONGODB_URI is not defined.');
-    console.error('Please ensure you have a .env file in the root of your project with MONGODB_URI="your_connection_string".');
-    console.error('Also, double-check for typos, extra spaces, or incorrect quotes in your .env file.');
-    process.exit(1); // Exit the application if the critical variable is missing
+    console.error('Despite .env file presence check, MONGODB_URI is still undefined.');
+    console.error('Possible causes: Incorrect variable name in .env, malformed .env file, or environment variable conflict.');
+    process.exit(1);
 }
+
+// Middleware
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // MongoDB Connection
 mongoose.connect(MONGODB_URI)
     .then(() => console.log('MongoDB connected successfully.'))
     .catch(err => {
         console.error('MongoDB connection error:', err);
-        // Do not exit here, allow the app to run without DB if needed for other features,
-        // but log the error clearly. For a production app, you might want to exit.
+        // In a production app, you might want to exit here if DB is critical
     });
 
 // WhatsApp Client Initialization (rest of the logic remains the same)
 let whatsappClient;
-let qrCodeData = null; // Store QR code data (base64 image URL)
-let whatsappStatus = 'initializing'; // Global status for the bot
+let qrCodeData = null;
+let whatsappStatus = 'initializing';
 
 function updateBotStatus(status, data = null) {
     whatsappStatus = status;
-    io.emit('status', status); // Emit status to all connected admin dashboards
+    io.emit('status', status);
     if (status === 'qr_received' && data) {
-        qrCodeData = data; // Store base64 image data
-        io.emit('qrCode', data); // Emit QR code data to admin dashboard
+        qrCodeData = data;
+        io.emit('qrCode', data);
     } else if (status === 'ready' || status === 'disconnected' || status === 'auth_failure') {
-        qrCodeData = null; // Clear QR data when connected or disconnected
-        io.emit('qrCode', null); // Clear QR on dashboard
+        qrCodeData = null;
+        io.emit('qrCode', null);
     }
     console.log(`WhatsApp Bot Status: ${status}`);
 }
