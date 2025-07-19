@@ -12,6 +12,9 @@
             font-family: 'Inter', sans-serif;
             background-color: #000000; /* Pure black background */
             color: #ffffff; /* Pure white text */
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
         .container {
             max-width: 1200px;
@@ -23,6 +26,14 @@
             border-bottom: 1px solid #333333;
             padding: 1rem 0;
             box-shadow: 0 2px 4px rgba(255,255,255,0.05);
+            position: sticky; /* Make header sticky */
+            top: 0;
+            width: 100%;
+            z-index: 50;
+            transition: transform 0.3s ease-in-out; /* Smooth transition for hiding/showing */
+        }
+        .header.header-hidden {
+            transform: translateY(-100%); /* Move header up to hide */
         }
         .menu-grid {
             display: grid;
@@ -247,7 +258,7 @@
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
-    <header class="header sticky top-0 z-50">
+    <header id="main-header" class="header sticky top-0 z-50">
         <div class="container flex justify-between items-center">
             <h1 class="text-3xl font-bold text-white">Delicious Bites</h1>
             <button id="view-cart-btn" class="bg-white text-black px-4 py-2 rounded-lg shadow-md hover:bg-gray-200 transition duration-200">
@@ -430,6 +441,9 @@
         const productDetailPrice = document.getElementById('product-detail-price');
         const productDetailAvailability = document.getElementById('product-detail-availability');
         const addToCartFromDetailBtn = document.getElementById('add-to-cart-from-detail-btn');
+
+        const mainHeader = document.getElementById('main-header'); // Get the header element
+        let lastScrollY = window.scrollY; // Track last scroll position
 
 
         let currentTrackingOrderId = null;
@@ -925,9 +939,23 @@
             }
         }
 
+        // --- Header Scroll Hide/Show Logic ---
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > lastScrollY && window.scrollY > mainHeader.offsetHeight) {
+                // Scrolling down and past the header height
+                mainHeader.classList.add('header-hidden');
+            } else if (window.scrollY < lastScrollY) {
+                // Scrolling up
+                mainHeader.classList.remove('header-hidden');
+            }
+            lastScrollY = window.scrollY;
+        });
+
+
         // Initial fetch
         fetchMenuAndSettings();
 
     </script>
 </body>
 </html>
+
