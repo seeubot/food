@@ -183,48 +183,73 @@
 
         socket.on('status', (status) => {
             botStatusSpan.textContent = status;
-            qrCodeSection.classList.add('hidden'); // Hide QR by default
+            qrCodeSection.classList.add('hidden'); // Hide QR by default for any new status
             if (qrTimerInterval) clearInterval(qrTimerInterval); // Clear any existing timer
+
+            let message = '';
+            let alertClass = '';
 
             switch (status) {
                 case 'ready':
-                    updateAlert('WhatsApp bot is connected and ready!', 'green');
+                    message = 'WhatsApp bot is connected and ready!';
+                    alertClass = 'alert-green';
                     break;
                 case 'authenticated':
-                    updateAlert('WhatsApp bot authenticated. Waiting for ready state...', 'yellow');
+                    message = 'WhatsApp bot authenticated. Waiting for ready state...';
+                    alertClass = 'alert-yellow';
                     break;
                 case 'qr_received':
-                    // QR image will be received via 'qrCode' event
-                    updateAlert('QR Code received. Scan it with your WhatsApp app.', 'yellow');
+                    message = 'QR Code received. Scan it with your WhatsApp app.';
+                    alertClass = 'alert-yellow';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
+                    qrCodeSection.classList.remove('hidden'); // <--- IMPORTANT: Explicitly show QR section here
                     break;
                 case 'qr_expired':
-                    updateAlert('QR Code expired. Please request a new one.', 'red');
+                    message = 'QR Code expired. Please request a new one.';
+                    alertClass = 'alert-red';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
+                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
                     break;
                 case 'auth_failure':
-                    updateAlert('Authentication failed. Please request a new QR code and re-scan.', 'red');
+                    message = 'Authentication failed. Please request a new QR code and re-scan.';
+                    alertClass = 'alert-red';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
+                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
                     break;
                 case 'disconnected':
-                    updateAlert('WhatsApp bot disconnected. Attempting to reconnect or waiting for new QR.', 'red');
+                    message = 'WhatsApp bot disconnected. Attempting to reconnect or waiting for new QR.';
+                    alertClass = 'alert-red';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
+                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
                     break;
                 case 'initializing':
-                    updateAlert('WhatsApp bot is initializing...', 'yellow');
+                    message = 'WhatsApp bot is initializing...';
+                    alertClass = 'alert-yellow';
                     break;
                 case 'reconnecting':
-                    updateAlert('WhatsApp bot is reconnecting...', 'yellow');
+                    message = 'WhatsApp bot is reconnecting...';
+                    alertClass = 'alert-yellow';
                     break;
                 case 'qr_error':
-                    updateAlert('Error generating QR code. Check server logs.', 'red');
+                    message = 'Error generating QR code. Check server logs.';
+                    alertClass = 'alert-red';
+                    requestQrBtn.classList.remove('hidden'); // Show QR button
+                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
                     break;
                 default:
                     message = `Unknown status: ${status}`;
                     alertClass = 'alert-yellow';
             }
+
+            alertMessage.textContent = message;
+            botStatusAlert.classList.add(alertClass);
+            botStatusAlert.classList.remove('hidden');
         });
 
         socket.on('qrCode', (qrDataURL) => {
             if (qrDataURL) {
                 qrCodeImg.src = qrDataURL;
-                qrCodeSection.classList.remove('hidden');
+                qrCodeSection.classList.remove('hidden'); // Also ensure it's visible when QR data arrives
                 startQrCountdown(); // Start countdown when QR is received
             } else {
                 qrCodeImg.src = '';
@@ -233,7 +258,7 @@
             }
         });
 
-        // New: Listen for sessionInfo to update last authenticated time
+        // Listen for sessionInfo to update last authenticated time
         socket.on('sessionInfo', (data) => {
             if (data.lastAuthenticatedAt) {
                 lastAuthTimeSpan.textContent = new Date(data.lastAuthenticatedAt).toLocaleString();
@@ -280,9 +305,6 @@
             qrCodeSection.classList.add('hidden'); // Hide QR immediately
 
             try {
-                // Note: This API is currently '/api/admin/load-session'.
-                // If you intend for it to be publicly accessible from this status page,
-                // you might want to make a public version or be aware of the security implication.
                 const response = await fetch('/api/admin/load-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
