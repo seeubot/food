@@ -1,4 +1,11 @@
 require('dotenv').config();
+
+// Check if MONGODB_URI is defined
+if (!process.env.MONGODB_URI) {
+    console.error('Error: MONGODB_URI environment variable is not defined. Please create a .env file in the root directory of your project and set MONGODB_URI to your MongoDB connection string.');
+    process.exit(1); // Exit the process if this critical environment variable is missing
+}
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
