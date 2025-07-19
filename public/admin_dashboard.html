@@ -85,6 +85,29 @@
         .btn-danger:hover {
             background-color: #ee4444;
         }
+        /* New action buttons for Call/Track */
+        .btn-action {
+            background-color: #66ff66; /* Light green for actions */
+            color: #000000; /* Black text */
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.3rem;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+            white-space: nowrap; /* Prevent text wrapping */
+            display: inline-flex; /* Use flex for icon/text alignment if needed */
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-action:hover {
+            background-color: #44ee44;
+        }
+        .btn-action.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #333333; /* Darker background when disabled */
+            color: #999999; /* Lighter text when disabled */
+        }
+
         /* Alert styling */
         .alert {
             padding: 1rem;
@@ -230,7 +253,10 @@
             <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status</h2>
             <div id="bot-status-alert" class="alert hidden">
                 <span id="alert-message"></span>
-                <button id="request-qr-btn" class="btn-secondary ml-4 hidden">Request New QR</button>
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                    <button id="load-session-btn" class="btn-secondary hidden">Load Saved Session</button>
+                    <button id="request-qr-btn" class="btn-secondary hidden">Request New QR</button>
+                </div>
             </div>
             <p class="text-gray-400 mb-6">Current Status: <span id="bot-status" class="font-semibold text-white">Loading...</span></p>
 
@@ -374,6 +400,7 @@
         const botStatusAlert = document.getElementById('bot-status-alert');
         const alertMessage = document.getElementById('alert-message');
         const requestQrBtn = document.getElementById('request-qr-btn');
+        const loadSessionBtn = document.getElementById('load-session-btn'); // New button
 
         const ordersTabBtn = document.querySelector('[data-tab="orders"]');
         const menuTabBtn = document.querySelector('[data-tab="menu"]');
@@ -455,6 +482,7 @@
             botStatusSpan.textContent = status;
             botStatusAlert.classList.remove('alert-red', 'alert-yellow', 'alert-green', 'hidden');
             requestQrBtn.classList.add('hidden'); // Hide by default
+            loadSessionBtn.classList.add('hidden'); // Hide by default
 
             let message = '';
             let alertClass = '';
@@ -477,16 +505,19 @@
                     message = 'QR Code expired. Please request a new one.';
                     alertClass = 'alert-red';
                     requestQrBtn.classList.remove('hidden'); // Show QR button
+                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
                     break;
                 case 'auth_failure':
                     message = 'Authentication failed. Please request a new QR code and re-scan.';
                     alertClass = 'alert-red';
                     requestQrBtn.classList.remove('hidden'); // Show QR button
+                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
                     break;
                 case 'disconnected':
                     message = 'WhatsApp bot disconnected. Attempting to reconnect or waiting for new QR.';
                     alertClass = 'alert-red';
                     requestQrBtn.classList.remove('hidden'); // Show QR button
+                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
                     break;
                 case 'initializing':
                     message = 'WhatsApp bot is initializing...';
@@ -500,6 +531,7 @@
                     message = 'Error generating QR code. Check server logs.';
                     alertClass = 'alert-red';
                     requestQrBtn.classList.remove('hidden'); // Show QR button
+                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
                     break;
                 default:
                     message = `Unknown status: ${status}`;
@@ -513,6 +545,7 @@
 
         requestQrBtn.addEventListener('click', async () => {
             requestQrBtn.disabled = true;
+            loadSessionBtn.disabled = true;
             alertMessage.textContent = 'Requesting new QR...';
             botStatusAlert.classList.remove('alert-red', 'alert-yellow', 'alert-green');
             botStatusAlert.classList.add('alert-yellow');
@@ -537,8 +570,41 @@
                 botStatusAlert.classList.add('alert-red');
             } finally {
                 requestQrBtn.disabled = false;
+                loadSessionBtn.disabled = false;
             }
         });
+
+        loadSessionBtn.addEventListener('click', async () => {
+            loadSessionBtn.disabled = true;
+            requestQrBtn.disabled = true;
+            alertMessage.textContent = 'Attempting to load saved session...';
+            botStatusAlert.classList.remove('alert-red', 'alert-yellow', 'alert-green');
+            botStatusAlert.classList.add('alert-yellow');
+
+            try {
+                const response = await fetch('/api/admin/load-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alertMessage.textContent = result.message;
+                    // Status update will come via socket.io
+                } else {
+                    alertMessage.textContent = `Error: ${result.message || 'Failed to load session.'}`;
+                    botStatusAlert.classList.remove('alert-yellow');
+                    botStatusAlert.classList.add('alert-red');
+                }
+            } catch (error) {
+                alertMessage.textContent = `Network error loading session: ${error.message}`;
+                botStatusAlert.classList.remove('alert-yellow');
+                botStatusAlert.classList.add('alert-red');
+            } finally {
+                loadSessionBtn.disabled = false;
+                requestQrBtn.disabled = false;
+            }
+        });
+
 
         // --- Orders Tab Functions ---
         async function fetchOrders() {
@@ -1027,12 +1093,12 @@
 
             customers.forEach(customer => {
                 const row = tbody.insertRow();
-                const customerPhoneClean = customer.customerPhone.replace(/\D/g, ''); // Remove non-digits for tel: link
+                // Use the phone number directly for tel: link, as it handles formatting
+                const customerPhoneNumber = customer.customerPhone;
 
                 let locationText = 'N/A';
                 let distanceFromShop = 'N/A';
-                let callButton = `<a href="tel:+${customerPhoneClean}" class="btn-secondary text-sm py-1 px-3 mr-2">Call</a>`;
-                let trackButton = `<button class="btn-secondary text-sm py-1 px-3" disabled>Track</button>`; // Disabled by default
+                let trackButtonHtml = `<button class="btn-action disabled text-sm py-1 px-3">Track</button>`; // Disabled by default
 
                 if (customer.lastKnownLocation && customer.lastKnownLocation.latitude && customer.lastKnownLocation.longitude) {
                     locationText = `Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`;
@@ -1046,7 +1112,7 @@
                         distanceFromShop = dist.toFixed(2);
                         // Enable track button if shop and customer locations are available
                         const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${shopLocationData.latitude},${shopLocationData.longitude}&destination=${customer.lastKnownLocation.latitude},${customer.lastKnownLocation.longitude}&travelmode=driving`;
-                        trackButton = `<a href="${googleMapsUrl}" target="_blank" class="btn-secondary text-sm py-1 px-3">Track</a>`;
+                        trackButtonHtml = `<a href="${googleMapsUrl}" target="_blank" class="btn-action text-sm py-1 px-3">Track</a>`;
                     }
                 }
 
@@ -1056,8 +1122,8 @@
                     <td>${locationText}</td>
                     <td>${distanceFromShop}</td>
                     <td>
-                        ${callButton}
-                        ${trackButton}
+                        <a href="tel:${customerPhoneNumber}" class="btn-action text-sm py-1 px-3 mr-2">Call</a>
+                        ${trackButtonHtml}
                     </td>
                 `;
             });
@@ -1103,6 +1169,7 @@
                     botStatusAlert.classList.remove('alert-yellow', 'alert-green');
                     botStatusAlert.classList.add('alert-red');
                     requestQrBtn.classList.remove('hidden');
+                    loadSessionBtn.classList.remove('hidden'); // Also show load session button on error
                 });
         }, 5000); // Poll every 5 seconds
     </script>
