@@ -1,11 +1,4 @@
 require('dotenv').config();
-
-// Check if MONGODB_URI is defined
-if (!process.env.MONGODB_URI) {
-    console.error('Error: MONGODB_URI environment variable is not defined. Please create a .env file in the root directory of your project and set MONGODB_URI to your MongoDB connection string.');
-    process.exit(1); // Exit the process if this critical environment variable is missing
-}
-
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -100,6 +93,7 @@ const Setting = mongoose.model('Setting', SettingsSchema);
 const Customer = mongoose.model('Customer', CustomerSchema);
 const WhatsappSession = mongoose.model('WhatsappSession', WhatsappSessionSchema);
 
+
 // Admin User setup
 async function setupAdminUser() {
     try {
@@ -118,7 +112,6 @@ async function setupAdminUser() {
             console.log('Default admin user created.');
         } else {
             // Optional: Update admin credentials if env vars change and if not already hashed
-            // This logic can be more sophisticated in production, e.g., only on first boot
             if (!bcrypt.getRounds(settings.adminPassword)) { // Check if password is not hashed
                  const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
                  settings.adminPassword = hashedPassword;
@@ -522,12 +515,12 @@ app.post('/api/order', async (req, res) => {
 
             try {
                 await client.sendMessage(`${adminNumber}@c.us`, adminOrderSummary);
-                console.log(`Admin notified for order ${newOrder._id}`);
+                console.log(`Admin notified via WhatsApp for order ${newOrder._id}`);
             } catch (waError) {
                 console.error('Error sending WhatsApp notification to admin:', waError);
             }
         } else {
-            console.warn('WhatsApp bot not ready or ADMIN_NUMBER not set. Admin not notified.');
+            console.warn('WhatsApp bot not ready or ADMIN_NUMBER not set. Admin not notified via WhatsApp.');
         }
 
         // Notify Customer via WhatsApp (Order Confirmation)
@@ -885,6 +878,7 @@ app.delete('/api/admin/customers/:id', isAuthenticated, async (req, res) => {
         res.status(500).json({ message: 'Failed to delete customer.' });
     }
 });
+
 
 // Socket.IO connection
 io.on('connection', (socket) => {
