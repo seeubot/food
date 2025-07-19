@@ -1,7 +1,3 @@
-Okay, I understand. I will focus solely on the index.js (backend) file for now, addressing the server-side logic for web order location tracking, improving WhatsApp user order updates, and adding "remove" (delete) and "add" (create) endpoints for orders and customers.
-The Leaflet map implementation and any frontend UI changes will be deferred until your next command.
-Here's the improved index.js file:
-index.js (Backend Server)
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -901,5 +897,4 @@ server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Admin Dashboard: http://localhost:${PORT}/admin/login`);
 });
-
 
