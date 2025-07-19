@@ -9,8 +9,8 @@
         process.exit(1);
     }
 
-    const username = 'admin'; // You can change this username
-    const password = 'password123'; // CHANGE THIS TO A STRONG, SECURE PASSWORD!
+    const username = 'siddhik'; // You can change this username
+    const password = 'reddy123'; // CHANGE THIS TO A STRONG, SECURE PASSWORD!
 
     async function createAdminUser() {
         try {
