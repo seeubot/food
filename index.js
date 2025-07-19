@@ -9,6 +9,13 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const bcrypt = require('bcryptjs');
 
+// --- New Puppeteer Imports ---
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
+// --- End New Puppeteer Imports ---
+
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
@@ -35,7 +42,7 @@ const OrderSchema = new mongoose.Schema({
     },
     subtotal: { type: Number, required: true },
     transportTax: { type: Number, default: 0 },
-    totalAmount: { type: Number, required: true },
+    totalAmount: { type : Number, required: true },
     paymentMethod: { type: String, default: 'COD' },
     status: { type: String, default: 'Pending' }, // Pending, Confirmed, Preparing, Out for Delivery, Delivered, Cancelled
     orderDate: { type: Date, default: Date.now },
@@ -195,17 +202,50 @@ async function initializeBot() {
             clientId: "bot-client", // LocalAuth persists session to disk, but we also save to DB
             dataPath: './.wwebjs_auth/' // Path to store local session files
         }),
+        // --- Use puppeteer-extra here ---
         puppeteer: {
-            // --- Updated Puppeteer Arguments for QR Code Stability ---
+            executablePath: process.env.CHROME_BIN || null, // Use CHROME_BIN if available (for some hosting envs)
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage', // Fixes issues with /dev/shm in some environments
+                '--disable-dev-shm-usage',
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process', // Helps with memory on some systems
-                '--disable-gpu' // Often good for headless environments
+                '--single-process',
+                '--disable-gpu',
+                '--disable-infobars', // Disable "Chrome is being controlled by automated test software"
+                '--disable-extensions', // Disable browser extensions
+                '--disable-background-networking',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-breakpad',
+                '--disable-client-side-phishing-detection',
+                '--disable-component-update',
+                '--disable-default-apps',
+                '--disable-features=site-per-process',
+                '--disable-hang-monitor',
+                '--disable-ipc-flooding-protection',
+                '--disable-notifications',
+                '--disable-offer-store-unmasked-wallet-cards',
+                '--disable-popup-blocking',
+                '--disable-print-preview',
+                '--disable-prompt-on-repost',
+                '--disable-renderer-backgrounding',
+                '--disable-sync',
+                '--disable-web-security', // May be needed for some cross-origin issues
+                '--hide-scrollbars',
+                '--metrics-recording-only',
+                '--mute-audio',
+                '--no-default-browser-check',
+                '--no-experiments',
+                '--no-first-run',
+                '--no-pings',
+                '--no-sandbox',
+                '--no-zygote',
+                '--password-store=basic',
+                '--use-gl=swiftshader', // Use software renderer for GL
+                '--window-size=1920,1080' // Set a consistent window size
             ],
             // headless: false, // Uncomment for debugging browser UI, but keep true for production
         },
