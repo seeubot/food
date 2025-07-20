@@ -773,13 +773,40 @@
             }, 1000);
         }
 
-        // --- Fetch Data Functions ---
+        // --- Centralized Fetch Helper ---
+        // This function handles token injection and robust error parsing
+        async function authenticatedFetch(url, options = {}) {
+            const token = localStorage.getItem('jwtToken');
+            const headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            };
+
+            const response = await fetch(url, { ...options, headers });
+
+            if (!response.ok) {
+                let errorData;
+                try {
+                    // Try to parse error as JSON (backend should send JSON errors)
+                    errorData = await response.json();
+                } catch (e) {
+                    // If parsing fails, it means the response was not JSON (e.g., plain text "Unauthorized")
+                    // Use the status text or a generic message
+                    throw new Error(response.statusText || 'Unknown server error');
+                }
+                // Throw an error with the message from the JSON response
+                throw new Error(errorData.message || 'Failed to perform operation');
+            }
+
+            return response.json(); // Only parse as JSON if response is OK
+        }
+
+        // --- Fetch Data Functions (using the new helper) ---
 
         async function fetchBotStatus() {
             showLoader(requestQrLoader, requestQrText, botMessage, 'Fetching bot status...', 'info');
             try {
-                const response = await fetch('/api/admin/bot-status');
-                const data = await response.json();
+                const data = await authenticatedFetch('/api/admin/bot-status');
                 updateBotStatusDisplay(data.status);
                 if (data.lastAuthenticatedAt) {
                     lastAuthTimeSpan.textContent = new Date(data.lastAuthenticatedAt).toLocaleString();
@@ -792,6 +819,10 @@
                 hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error fetching status: ${error.message}`);
                 botStatusSpan.textContent = 'Error';
                 botStatusSpan.classList.add('text-red-400');
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -799,8 +830,7 @@
             ordersListDiv.innerHTML = '<p class="text-center text-gray-400">Loading orders...</p>';
             ordersMessage.classList.add('hidden');
             try {
-                const response = await fetch('/api/admin/orders');
-                const orders = await response.json();
+                const orders = await authenticatedFetch('/api/admin/orders');
                 renderOrders(orders);
             } catch (error) {
                 console.error('Error fetching orders:', error);
@@ -808,6 +838,10 @@
                 ordersMessage.textContent = `Error: ${error.message}`;
                 ordersMessage.className = 'message mt-3 error';
                 ordersMessage.classList.remove('hidden');
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -815,8 +849,7 @@
             menuItemsListDiv.innerHTML = '<p class="text-center text-gray-400">Loading menu items...</p>';
             menuMessage.classList.add('hidden');
             try {
-                const response = await fetch('/api/admin/menu');
-                const items = await response.json();
+                const items = await authenticatedFetch('/api/admin/menu');
                 renderMenuItems(items);
             } catch (error) {
                 console.error('Error fetching menu items:', error);
@@ -824,6 +857,10 @@
                 menuMessage.textContent = `Error: ${error.message}`;
                 menuMessage.className = 'message mt-3 error';
                 menuMessage.classList.remove('hidden');
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -831,8 +868,7 @@
             customersListDiv.innerHTML = '<p class="text-center text-gray-400">Loading customer data...</p>';
             customersMessage.classList.add('hidden');
             try {
-                const response = await fetch('/api/admin/customers');
-                const customers = await response.json();
+                const customers = await authenticatedFetch('/api/admin/customers');
                 renderCustomers(customers);
             } catch (error) {
                 console.error('Error fetching customers:', error);
@@ -840,13 +876,16 @@
                 customersMessage.textContent = `Error: ${error.message}`;
                 customersMessage.className = 'message mt-3 error';
                 customersMessage.classList.remove('hidden');
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
         async function fetchSettings() {
             try {
-                const response = await fetch('/api/admin/settings');
-                const settings = await response.json();
+                const settings = await authenticatedFetch('/api/admin/settings');
                 shopNameInput.value = settings.shopName || '';
                 shopLatInput.value = settings.shopLocation ? settings.shopLocation.latitude : '';
                 shopLonInput.value = settings.shopLocation ? settings.shopLocation.longitude : '';
@@ -856,13 +895,17 @@
                 settingsMessage.textContent = `Error loading settings: ${error.message}`;
                 settingsMessage.className = 'message mt-3 error';
                 settingsMessage.classList.remove('hidden');
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
         // --- Render Functions ---
 
         function renderOrders(orders) {
-            if (orders.length === 0) {
+            if (!Array.isArray(orders) || orders.length === 0) {
                 ordersListDiv.innerHTML = '<p class="text-center text-gray-400">No orders found.</p>';
                 return;
             }
@@ -909,14 +952,13 @@
             tableHtml += `</tbody></table>`;
             ordersListDiv.innerHTML = tableHtml;
 
-            // Add event listeners for view buttons
             document.querySelectorAll('.view-order-btn').forEach(button => {
                 button.addEventListener('click', () => openOrderDetailsModal(button.dataset.id));
             });
         }
 
         function renderMenuItems(items) {
-            if (items.length === 0) {
+            if (!Array.isArray(items) || items.length === 0) {
                 menuItemsListDiv.innerHTML = '<p class="text-center text-gray-400">No menu items found. Add some!</p>';
                 return;
             }
@@ -950,7 +992,6 @@
             tableHtml += `</tbody></table>`;
             menuItemsListDiv.innerHTML = tableHtml;
 
-            // Add event listeners for edit/delete buttons
             document.querySelectorAll('.edit-menu-item-btn').forEach(button => {
                 button.addEventListener('click', () => openMenuItemModal(button.dataset.id));
             });
@@ -960,7 +1001,7 @@
         }
 
         function renderCustomers(customers) {
-            if (customers.length === 0) {
+            if (!Array.isArray(customers) || customers.length === 0) {
                 customersListDiv.innerHTML = '<p class="text-center text-gray-400">No customer data found.</p>';
                 return;
             }
@@ -1004,7 +1045,6 @@
             tableHtml += `</tbody></table>`;
             customersListDiv.innerHTML = tableHtml;
 
-            // Add event listeners for new buttons
             document.querySelectorAll('.view-latest-order-btn').forEach(button => {
                 button.addEventListener('click', () => viewLatestCustomerOrder(button.dataset.phone));
             });
@@ -1014,6 +1054,10 @@
         }
 
         function renderDeliveryRates(rates) {
+            if (!Array.isArray(rates) || rates.length === 0) {
+                deliveryRatesContainer.innerHTML = '<p class="text-gray-400 text-sm">No delivery rates configured. Add some!</p>';
+                return;
+            }
             deliveryRatesContainer.innerHTML = '';
             rates.sort((a, b) => a.kms - b.kms);
 
@@ -1047,8 +1091,7 @@
             if (itemId) {
                 menuItemModalTitle.textContent = 'Edit Menu Item';
                 menuItemText.textContent = 'Update Item';
-                fetch(`/api/admin/menu/${itemId}`)
-                    .then(res => res.json())
+                authenticatedFetch(`/api/admin/menu/${itemId}`)
                     .then(item => {
                         menuItemIdInput.value = item._id;
                         itemNameInput.value = item.name;
@@ -1064,6 +1107,10 @@
                         menuItemMessage.textContent = `Error loading item: ${error.message}`;
                         menuItemMessage.className = 'message mt-3 error';
                         menuItemMessage.classList.remove('hidden');
+                        if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                            alert('Session expired or unauthorized. Please log in again.');
+                            window.location.href = '/admin/login';
+                        }
                     });
             } else {
                 menuItemModalTitle.textContent = 'Add New Menu Item';
@@ -1078,8 +1125,7 @@
             showLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, 'Loading order details...', 'info');
 
             try {
-                const response = await fetch(`/api/admin/orders/${orderId}`);
-                const order = await response.json();
+                const order = await authenticatedFetch(`/api/admin/orders/${orderId}`);
 
                 orderDetailIdDisplay.textContent = order._id.substring(0, 8);
                 orderDetailCustomerName.textContent = order.customerName;
@@ -1092,11 +1138,14 @@
                 orderDetailTotalAmount.textContent = order.totalAmount.toFixed(2);
 
                 orderDetailItemsList.innerHTML = '';
-                order.items.forEach(item => {
-                    const li = document.createElement('li');
-                    li.textContent = `${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)`;
-                    orderDetailItemsList.appendChild(li);
-                });
+                if (Array.isArray(order.items)) {
+                    order.items.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = `${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)`;
+                        orderDetailItemsList.appendChild(li);
+                    });
+                }
+
 
                 orderStatusSelect.value = order.status;
                 updateOrderStatusBtn.dataset.id = order._id;
@@ -1107,6 +1156,10 @@
             } catch (error) {
                 console.error('Error fetching order details:', error);
                 hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error loading order: ${error.message}`);
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -1129,22 +1182,21 @@
 
             showLoader(menuItemLoader, menuItemText, menuItemMessage, 'Saving item...');
             try {
-                const response = await fetch(url, {
+                const result = await authenticatedFetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(itemData)
                 });
-                const result = await response.json();
-                if (response.ok) {
-                    hideLoader(menuItemLoader, menuItemText, menuItemMessage, true, `Item ${itemId ? 'updated' : 'added'} successfully!`);
-                    fetchMenuItems();
-                    setTimeout(() => menuItemModal.style.display = 'none', 1500);
-                } else {
-                    hideLoader(menuItemLoader, menuItemText, menuItemMessage, false, `Error: ${result.message || 'Failed to save item.'}`);
-                }
+                hideLoader(menuItemLoader, menuItemText, menuItemMessage, true, `Item ${itemId ? 'updated' : 'added'} successfully!`);
+                fetchMenuItems();
+                setTimeout(() => menuItemModal.style.display = 'none', 1500);
             } catch (error) {
                 console.error('Error saving menu item:', error);
-                hideLoader(menuItemLoader, menuItemText, menuItemMessage, false, `Network error: ${error.message}`);
+                hideLoader(menuItemLoader, menuItemText, menuItemMessage, false, `Error: ${error.message}`);
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -1153,45 +1205,41 @@
             menuMessage.classList.add('hidden');
 
             try {
-                const response = await fetch(`/api/admin/menu/${itemId}`, { method: 'DELETE' });
-                const result = await response.json();
-                if (response.ok) {
-                    menuMessage.textContent = result.message;
-                    menuMessage.className = 'message mt-3 success';
-                    menuMessage.classList.remove('hidden');
-                    fetchMenuItems();
-                } else {
-                    menuMessage.textContent = `Error: ${result.message || 'Failed to delete item.'}`;
-                    menuMessage.className = 'message mt-3 error';
-                    menuMessage.classList.remove('hidden');
-                }
+                const result = await authenticatedFetch(`/api/admin/menu/${itemId}`, { method: 'DELETE' });
+                menuMessage.textContent = result.message;
+                menuMessage.className = 'message mt-3 success';
+                menuMessage.classList.remove('hidden');
+                fetchMenuItems();
             } catch (error) {
                 console.error('Error deleting menu item:', error);
-                menuMessage.textContent = `Network error: ${error.message}`;
+                menuMessage.textContent = `Error: ${error.message}`;
                 menuMessage.className = 'message mt-3 error';
                 menuMessage.classList.remove('hidden');
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
         async function updateOrderStatus(orderId, newStatus) {
             showLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, 'Updating status...', 'info');
             try {
-                const response = await fetch(`/api/admin/orders/${orderId}`, {
+                const result = await authenticatedFetch(`/api/admin/orders/${orderId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: newStatus })
                 });
-                const result = await response.json();
-                if (response.ok) {
-                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, 'Order status updated!');
-                    fetchOrders();
-                    setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
-                } else {
-                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${result.message || 'Failed to update status.'}`);
-                }
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, 'Order status updated!');
+                fetchOrders();
+                setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
             } catch (error) {
                 console.error('Error updating order status:', error);
-                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Network error: ${error.message}`);
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${error.message}`);
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -1199,18 +1247,17 @@
             if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
             showLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, 'Deleting order...', 'info');
             try {
-                const response = await fetch(`/api/admin/orders/${orderId}`, { method: 'DELETE' });
-                const result = await response.json();
-                if (response.ok) {
-                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, result.message);
-                    fetchOrders();
-                    setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
-                } else {
-                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${result.message || 'Failed to delete order.'}`);
-                }
+                const result = await authenticatedFetch(`/api/admin/orders/${orderId}`, { method: 'DELETE' });
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, result.message);
+                fetchOrders();
+                setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
             } catch (error) {
                 console.error('Error deleting order:', error);
-                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Network error: ${error.message}`);
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${error.message}`);
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -1219,23 +1266,20 @@
             customersMessage.classList.add('hidden');
 
             try {
-                const response = await fetch(`/api/admin/customers/${customerId}`, { method: 'DELETE' });
-                const result = await response.json();
-                if (response.ok) {
-                    customersMessage.textContent = result.message;
-                    customersMessage.className = 'message mt-3 success';
-                    customersMessage.classList.remove('hidden');
-                    fetchCustomers();
-                } else {
-                    customersMessage.textContent = `Error: ${result.message || 'Failed to delete customer.'}`;
-                    customersMessage.className = 'message mt-3 error';
-                    customersMessage.classList.remove('hidden');
-                }
+                const result = await authenticatedFetch(`/api/admin/customers/${customerId}`, { method: 'DELETE' });
+                customersMessage.textContent = result.message;
+                customersMessage.className = 'message mt-3 success';
+                customersMessage.classList.remove('hidden');
+                fetchCustomers();
             } catch (error) {
                 console.error('Error deleting customer:', error);
-                customersMessage.textContent = `Network error: ${error.message}`;
+                customersMessage.textContent = `Error: ${error.message}`;
                 customersMessage.className = 'message mt-3 error';
                 customersMessage.classList.remove('hidden');
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -1243,21 +1287,17 @@
             customersMessage.classList.add('hidden');
 
             try {
-                const response = await fetch(`/api/admin/customers/${customerPhone}/latest-order`);
-                const order = await response.json();
-
-                if (response.ok) {
-                    openOrderDetailsModal(order._id);
-                } else {
-                    customersMessage.textContent = `No recent orders found for ${customerPhone}.`;
-                    customersMessage.className = 'message mt-3 info';
-                    customersMessage.classList.remove('hidden');
-                }
+                const order = await authenticatedFetch(`/api/admin/customers/${customerPhone}/latest-order`);
+                openOrderDetailsModal(order._id);
             } catch (error) {
                 console.error(`Error fetching latest order for ${customerPhone}:`, error);
                 customersMessage.textContent = `Error fetching latest order: ${error.message}`;
                 customersMessage.className = 'message mt-3 error';
                 customersMessage.classList.remove('hidden');
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -1284,21 +1324,20 @@
 
             showLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, 'Saving settings...');
             try {
-                const response = await fetch('/api/admin/settings', {
+                const result = await authenticatedFetch('/api/admin/settings', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(settingsData)
                 });
-                const result = await response.json();
-                if (response.ok) {
-                    hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, true, result.message);
-                    fetchSettings();
-                } else {
-                    hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, false, `Error: ${result.message || 'Failed to save settings.'}`);
-                }
+                hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, true, result.message);
+                fetchSettings();
             } catch (error) {
                 console.error('Error saving settings:', error);
-                hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, false, `Network error: ${error.message}`);
+                hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, false, `Error: ${error.message}`);
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             }
         }
 
@@ -1366,13 +1405,8 @@
 
         document.getElementById('logout-btn').addEventListener('click', async () => {
             if (confirm('Are you sure you want to log out?')) {
-                try {
-                    await fetch('/admin/logout');
-                    window.location.href = '/admin/login';
-                } catch (error) {
-                    alert('Failed to log out. Please try again.');
-                    console.error('Logout error:', error);
-                }
+                localStorage.removeItem('jwtToken'); // Clear token
+                window.location.href = '/admin/login';
             }
         });
 
@@ -1385,13 +1419,16 @@
             if (qrTimerInterval) clearInterval(qrTimerInterval);
 
             try {
-                const response = await fetch('/api/public/request-qr', { method: 'POST' });
-                const result = await response.json();
-                if (!response.ok) {
-                    hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error: ${result.message || 'Failed to request new QR.'}`);
-                }
+                // This endpoint is public, so it doesn't strictly need authentication,
+                // but sending the token doesn't hurt and the backend's middleware will ignore it.
+                const result = await authenticatedFetch('/api/public/request-qr', { method: 'POST' });
+                // No specific success message needed here, status updates via socket.io
             } catch (error) {
-                hideLoader(requestQrLoader, requestQrText, botMessage, false, `Network error requesting QR: ${error.message}`);
+                hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error: ${error.message}`);
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             } finally {
                 requestQrBtn.disabled = false;
                 loadSessionBtn.disabled = false;
@@ -1406,13 +1443,14 @@
             if (qrTimerInterval) clearInterval(qrTimerInterval);
 
             try {
-                const response = await fetch('/api/admin/load-session', { method: 'POST' });
-                const result = await response.json();
-                if (!response.ok) {
-                    hideLoader(loadSessionLoader, loadSessionText, botMessage, false, `Error: ${result.message || 'Failed to load session.'}`);
-                }
+                const result = await authenticatedFetch('/api/admin/load-session', { method: 'POST' });
+                // No specific success message needed here, status updates via socket.io
             } catch (error) {
-                hideLoader(loadSessionLoader, loadSessionText, botMessage, false, `Network error loading session: ${error.message}`);
+                hideLoader(loadSessionLoader, loadSessionText, botMessage, false, `Error: ${error.message}`);
+                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    window.location.href = '/admin/login';
+                }
             } finally {
                 loadSessionBtn.disabled = false;
                 requestQrBtn.disabled = false;
@@ -1478,8 +1516,16 @@
             }
         });
 
+        // Initial check for authentication token on page load
         document.addEventListener('DOMContentLoaded', () => {
-            showSection('bot-status-section');
+            const token = localStorage.getItem('jwtToken');
+            if (!token) {
+                // If no token, redirect to login page
+                window.location.href = '/admin/login';
+            } else {
+                // If token exists, show the default section and fetch data
+                showSection('bot-status-section');
+            }
         });
     </script>
 </body>
