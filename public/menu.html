@@ -351,6 +351,14 @@
         #map-modal .btn-primary {
             margin-top: 1rem;
         }
+        /* Hide Leaflet zoom controls and attribution */
+        .leaflet-control-zoom {
+            display: none !important;
+        }
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+
 
         /* Item Details Modal Styles */
         #item-details-modal .modal-content {
@@ -972,6 +980,7 @@
             if (map === null) {
                 // Initialize map only once
                 map = L.map('map').setView([shopLocation.latitude, shopLocation.longitude], 13); // Center on shop location
+                // Use Esri World Imagery for satellite view
                 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
                 }).addTo(map);
