@@ -8,7 +8,6 @@ const path = require('path');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const bcrypt = require('bcryptjs');
-const qrcode = require('qrcode'); // Import the qrcode library
 
 // --- New Puppeteer Imports ---
 const puppeteer = require('puppeteer-extra');
@@ -107,30 +106,47 @@ async function setupAdminUser() {
     const DEFAULT_ADMIN_USERNAME = "admin";
     const DEFAULT_ADMIN_PASSWORD = "adminpassword"; // Consider using a stronger password in production
 
+    // --- New Default Delivery Rates ---
+    const DEFAULT_DELIVERY_RATES = [
+        { kms: 1, amount: 50 },    // Up to 1 km: 50 Rs
+        { kms: 3, amount: 60 },    // Up to 3 km: 60 Rs
+        { kms: 5, amount: 80 },    // Up to 5 km: 80 Rs
+        { kms: 10, amount: 100 },  // Up to 10 km: 100 Rs
+        { kms: 9999, amount: 150 } // Over 10 km (large number for "infinity"): 150 Rs
+    ];
+
     try {
         let settings = await Setting.findOne();
         if (!settings) {
-            console.log('No settings found, creating default admin user...');
+            console.log('No settings found, creating default admin user and delivery rates...');
             const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
             settings = new Setting({
                 shopName: 'Delicious Bites',
-                shopLocation: { latitude: 0, longitude: 0 },
-                deliveryRates: [],
+                shopLocation: { latitude: 0, longitude: 0 }, // Default shop location
+                deliveryRates: DEFAULT_DELIVERY_RATES, // Set new default rates
                 adminUsername: DEFAULT_ADMIN_USERNAME,
                 adminPassword: hashedPassword,
             });
             await settings.save();
-            console.log('Default admin user created with hardcoded credentials.');
+            console.log('Default admin user and delivery rates created with hardcoded credentials.');
         } else {
-            // Optional: If you want to update the password if it's not hashed or if it changes
-            // This logic ensures the password is always hashed.
+            // Optional: If you want to update the password or delivery rates if they change
             if (!bcrypt.getRounds(settings.adminPassword) || settings.adminUsername !== DEFAULT_ADMIN_USERNAME) {
                  const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
                  settings.adminPassword = hashedPassword;
                  settings.adminUsername = DEFAULT_ADMIN_USERNAME; // Ensure username matches
-                 await settings.save();
                  console.log('Admin credentials updated/re-hashed based on hardcoded values.');
             }
+            // Update delivery rates if they are different from default (optional, for existing installations)
+            // This ensures that if you modify DEFAULT_DELIVERY_RATES in code, it propagates on restart
+            // You might want more sophisticated logic for managing settings in production
+            const currentRatesJson = JSON.stringify(settings.deliveryRates.map(r => ({ kms: r.kms, amount: r.amount })));
+            const defaultRatesJson = JSON.stringify(DEFAULT_DELIVERY_RATES);
+            if (currentRatesJson !== defaultRatesJson) {
+                settings.deliveryRates = DEFAULT_DELIVERY_RATES;
+                console.log('Default delivery rates updated in settings.');
+            }
+            await settings.save();
         }
     } catch (err) {
         console.error('Error setting up admin user:', err);
@@ -206,6 +222,9 @@ async function initializeBot() {
         // --- Use puppeteer-extra here ---
         puppeteer: {
             executablePath: process.env.CHROME_BIN || null, // Use CHROME_BIN if available (for some hosting envs)
+            // For Koyeb, often executablePath is not needed if Chromium is pre-installed or handled by buildpack
+            // If you still face issues, you might need to specify the path to Chromium
+            // on your specific hosting environment, e.g., '/usr/bin/chromium-browser'
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -215,8 +234,8 @@ async function initializeBot() {
                 '--no-zygote',
                 '--single-process',
                 '--disable-gpu',
-                '--disable-infobars', // Disable "Chrome is being controlled by automated test software"
-                '--disable-extensions', // Disable browser extensions
+                '--disable-infobars',
+                '--disable-extensions',
                 '--disable-background-networking',
                 '--disable-background-timer-throttling',
                 '--disable-backgrounding-occluded-windows',
@@ -234,7 +253,7 @@ async function initializeBot() {
                 '--disable-prompt-on-repost',
                 '--disable-renderer-backgrounding',
                 '--disable-sync',
-                '--disable-web-security', // May be needed for some cross-origin issues
+                // '--disable-web-security', // Keep commented unless absolutely necessary for specific issues
                 '--hide-scrollbars',
                 '--metrics-recording-only',
                 '--mute-audio',
@@ -245,8 +264,8 @@ async function initializeBot() {
                 '--no-sandbox',
                 '--no-zygote',
                 '--password-store=basic',
-                '--use-gl=swiftshader', // Use software renderer for GL
-                '--window-size=1920,1080' // Set a consistent window size
+                '--use-gl=swiftshader',
+                '--window-size=1920,1080'
             ],
             // headless: false, // Uncomment for debugging browser UI, but keep true for production
         },
@@ -343,6 +362,22 @@ async function initializeBot() {
         // Base URL for web links
         const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
 
+        // --- Helper function to send messages with readiness check ---
+        const safeSendMessage = async (to, messageContent) => {
+            if (client.isReady) { // Check if the client is truly ready
+                try {
+                    await client.sendMessage(to, messageContent);
+                    console.log(`Successfully sent message to ${to}.`);
+                } catch (error) {
+                    console.error(`Error sending message to ${to}:`, error);
+                    // Log the full error for more context
+                    if (error.stack) console.error(error.stack);
+                }
+            } else {
+                console.warn(`Attempted to send message to ${to} but client was not ready. Status: ${botStatus}`);
+            }
+        };
+
         // Handle specific commands (case-insensitive and number-based)
         const lowerCaseBody = msg.body.toLowerCase().trim();
 
@@ -350,12 +385,7 @@ async function initializeBot() {
             case '1':
             case '!profile':
             case 'profile':
-                try {
-                    await client.sendMessage(msg.from, `Aapka profile yahaan hai! (Your profile is here!) Your registered WhatsApp number is: ${senderNumber}. We're working on adding more personalized profile features soon. Stay tuned!`);
-                    console.log(`Replied to ${senderNumber} with profile info.`);
-                } catch (error) {
-                    console.error(`Error sending profile message to ${senderNumber}:`, error);
-                }
+                await safeSendMessage(msg.from, `Your registered WhatsApp number is: ${senderNumber}.`);
                 break;
             case '2':
             case '!orders':
@@ -368,32 +398,18 @@ async function initializeBot() {
                     }).sort({ orderDate: -1 }).limit(5);
 
                     if (customerOrders.length > 0) {
-                        let orderList = 'Aapke active orders:\n'; // Your active orders
+                        let orderList = 'Your active orders:\n';
                         customerOrders.forEach((order, index) => {
-                            const orderLink = `${baseUrl}/menu?orderId=${order._id}`; // Link to tracking
+                            const orderLink = `${baseUrl}/menu?orderId=${order._id}`;
                             orderList += `${index + 1}. Order ID: ${order._id.toString().substring(0, 6)}... - Total: ₹${order.totalAmount.toFixed(2)} - Status: ${order.status} - Track: ${orderLink}\n`;
                         });
-                        try {
-                            await client.sendMessage(msg.from, orderList + '\nFor more details or to view past orders, visit our web menu.');
-                            console.log(`Replied to ${senderNumber} with active orders.`);
-                        } catch (error) {
-                            console.error(`Error sending order list message to ${senderNumber}:`, error);
-                        }
+                        await safeSendMessage(msg.from, orderList + '\nFor more details or to view past orders, visit our web menu.');
                     } else {
-                        try {
-                            await client.sendMessage(msg.from, 'Aapke koi active orders nahi hain. Naya order place karne ke liye, "Menu" type karein ya link par click karein: ' + `${baseUrl}/menu`); // You have no active orders. To place a new order, type "Menu" or click the link.
-                            console.log(`Replied to ${senderNumber} with no active orders message.`);
-                        } catch (error) {
-                            console.error(`Error sending no orders message to ${senderNumber}:`, error);
-                        }
+                        await safeSendMessage(msg.from, 'You have no active orders. To place a new order, type "Menu" or click the link: ' + `${baseUrl}/menu`);
                     }
                 } catch (error) {
                     console.error('Error fetching orders for bot:', error);
-                    try {
-                        await client.sendMessage(msg.from, 'Maaf kijiye, main abhi aapke orders fetch nahi kar paya. Kripya baad mein dobara prayas karein.'); // Sorry, I could not fetch your orders at the moment. Please try again later.
-                    } catch (error) {
-                        console.error(`Error sending generic error message to ${senderNumber}:`, error);
-                    }
+                    await safeSendMessage(msg.from, 'Sorry, I could not fetch your orders at the moment. Please try again later.');
                 }
                 break;
             case '3':
@@ -401,36 +417,21 @@ async function initializeBot() {
             case 'help':
             case '!support':
             case 'support':
-                try {
-                    await client.sendMessage(msg.from, 'Kisi bhi sahayata ke liye, kripya hamari support team se +91-XXXX-XXXXXX par sampark karein ya hamari website par jaayen.'); // For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.
-                    console.log(`Replied to ${senderNumber} with help message.`);
-                } catch (error) {
-                    console.error(`Error sending help message to ${senderNumber}:`, error);
-                }
+                await safeSendMessage(msg.from, 'For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
                 break;
             case 'menu': // Explicitly handle 'menu' as a direct link request
             case '!menu':
-                try {
-                    await client.sendMessage(msg.from, `Hamara swadisht menu yahaan dekhein: ${baseUrl}/menu`); // Check out our delicious menu here
-                    console.log(`Replied to ${senderNumber} with direct menu link.`);
-                } catch (error) {
-                    console.error(`Error sending menu link message to ${senderNumber}:`, error);
-                }
+                await safeSendMessage(msg.from, `Check out our delicious menu here: ${baseUrl}/menu`);
                 break;
             default:
-                // Default response: send the welcome message for any other input
-                const welcomeMessage = `Namaste! Swadisht bhojan ki talash hai? 😋 Delicious Bites mein aapka swagat hai, jahaan har bite ek anand hai!
-                \nKya chahiye aapko? Bas number type karein:
-                \n1. Mera Profile (Apni jaankari dekhein!)
-                \n2. Mere Orders (Pichle orders dekhein!)
-                \n3. Sahayata (Madad chahiye? Hum hain na!)
-                \n\nHumara poora menu dekhne ke liye, "Menu" type karein ya yahaan click karein: ${baseUrl}/menu`; // Hindi translations added
-                try {
-                    await client.sendMessage(msg.from, welcomeMessage);
-                    console.log(`Replied to ${senderNumber} with welcome message (default).`);
-                } catch (error) {
-                    console.error(`Error sending welcome message to ${senderNumber}:`, error);
-                }
+                // Simplified default welcome message
+                const welcomeMessage = `Welcome to Delicious Bites! 😋
+                \nHere are your options:
+                \n1. My Profile
+                \n2. My Active Orders
+                \n3. Help & Support
+                \n\nTo view our full menu, type "Menu" or click here: ${baseUrl}/menu`;
+                await safeSendMessage(msg.from, welcomeMessage);
                 break;
         }
     });
@@ -456,6 +457,10 @@ setInterval(async () => {
 
 // Public Routes (Accessible by customers)
 app.get('/menu', (req, res) => {
+    // --- IMPORTANT: Ensure public/menu.html exists ---
+    // If you see "ENOENT: no such file or directory" errors for menu.html,
+    // please verify that the 'public' folder exists in your project root,
+    // and 'menu.html' is inside it.
     res.sendFile(path.join(__dirname, 'public', 'menu.html'));
 });
 
@@ -579,12 +584,8 @@ app.post('/api/order', async (req, res) => {
             adminOrderSummary += `\n*Subtotal:* ₹${subtotal.toFixed(2)}\n*Transport Tax:* ₹${transportTax.toFixed(2)}\n*Total:* ₹${totalAmount.toFixed(2)}\n\n`;
             adminOrderSummary += `Manage this order: ${baseUrl}/admin/dashboard`;
 
-            try {
-                await client.sendMessage(`${adminNumber}@c.us`, adminOrderSummary);
-                console.log(`Admin notified via WhatsApp for order ${newOrder._id}`);
-            } catch (waError) {
-                console.error('Error sending WhatsApp notification to admin:', waError);
-            }
+            // Use safeSendMessage helper
+            await safeSendMessage(`${adminNumber}@c.us`, adminOrderSummary);
         } else {
             console.warn('WhatsApp bot not ready or ADMIN_NUMBER not set. Admin not notified via WhatsApp.');
         }
@@ -596,12 +597,8 @@ app.post('/api/order', async (req, res) => {
                                                 `*Payment Method:* ${paymentMethod}\n\n` +
                                                 `Hum aapko jaldi hi update denge. Apne order ka status yahaan track karein: ${orderTrackingLink}\n\n` +
                                                 `Dhanyawad, Delicious Bites! 😊`; // Hindi translation
-            try {
-                await client.sendMessage(`${customerPhone}@c.us`, customerConfirmationMessage);
-                console.log(`Customer ${customerPhone} notified of order confirmation.`);
-            } catch (waError) {
-                console.error('Error sending WhatsApp confirmation to customer:', waError);
-            }
+            // Use safeSendMessage helper
+            await safeSendMessage(`${customerPhone}@c.us`, customerConfirmationMessage);
         } else {
             console.warn('WhatsApp bot not ready. Customer not notified of order confirmation.');
         }
@@ -684,7 +681,10 @@ app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
     // though the real-time updates happen via socket.io.
     io.emit('status', botStatus); // Emit current status to all connected clients
     if (botStatus === 'qr_received' && client && client.qr) {
-        io.emit('qrCode', client.qr);
+        // Note: client.qr here is the raw QR string, not the data URL.
+        // The client.on('qr') event handles the conversion and emission.
+        // This line is mostly for initial connection handshake.
+        console.log("Admin bot-status endpoint emitting raw QR string (if available).");
     }
     io.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt }); // Emit session timestamp
     res.json({ status: botStatus, lastAuthenticatedAt: lastAuthenticatedAt });
@@ -784,12 +784,8 @@ app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
                     customerMessage += `Aapke order *${updatedOrder._id.toString().substring(0, 8)}* ka status update ho gaya hai: *${updatedOrder.status}*`; // Your order status has been updated to:
             }
 
-             try {
-                await client.sendMessage(`${updatedOrder.customerPhone}@c.us`, customerMessage);
-                console.log(`Customer ${updatedOrder.customerPhone} notified of status update.`);
-            } catch (waError) {
-                console.error('Error sending WhatsApp notification to customer:', waError);
-            }
+            // Use safeSendMessage helper
+            await safeSendMessage(`${updatedOrder.customerPhone}@c.us`, customerMessage);
         }
         res.json(updatedOrder);
     } catch (err) {
@@ -958,7 +954,12 @@ io.on('connection', (socket) => {
     console.log('A user connected via Socket.IO');
     // Send current status to newly connected client
     socket.emit('status', botStatus);
-    // Removed direct client.qr emit here, it's now handled by the client.on('qr') event after generation
+    if (botStatus === 'qr_received' && client && client.qr) {
+        // Note: client.qr here is the raw QR string, not the data URL.
+        // The client.on('qr') event handles the conversion and emission.
+        // This line is mostly for initial connection handshake.
+        console.log("Admin bot-status endpoint emitting raw QR string (if available).");
+    }
     socket.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt });
 
     socket.on('disconnect', () => {
