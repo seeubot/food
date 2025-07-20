@@ -853,6 +853,15 @@ app.post('/api/order', async (req, res) => {
             return res.status(400).json({ message: 'Missing required order details.' });
         }
 
+        // --- IMPORTANT FIX FOR DUPLICATE KEY ERROR ---
+        // Ensure customerPhone is a non-empty string before using it in a unique index query
+        if (typeof customerPhone !== 'string' || customerPhone.trim() === '') {
+            console.error('Invalid customerPhone received for order:', customerPhone);
+            return res.status(400).json({ message: 'Invalid phone number provided for customer.' });
+        }
+        const cleanedCustomerPhone = customerPhone.trim();
+        // --- END FIX ---
+
         const itemDetails = [];
         for (const item of items) {
             const product = await Item.findById(item.productId);
@@ -870,7 +879,7 @@ app.post('/api/order', async (req, res) => {
         const newOrder = new Order({
             items: itemDetails,
             customerName,
-            customerPhone,
+            customerPhone: cleanedCustomerPhone, // Use cleaned phone number here
             deliveryAddress,
             customerLocation,
             subtotal,
@@ -883,7 +892,7 @@ app.post('/api/order', async (req, res) => {
         await newOrder.save();
 
         await Customer.findOneAndUpdate(
-            { customerPhone: customerPhone },
+            { customerPhone: cleanedCustomerPhone }, // Use cleaned phone number here
             {
                 $set: {
                     customerName: customerName,
@@ -897,14 +906,19 @@ app.post('/api/order', async (req, res) => {
 
         if (whatsappReady) {
             io.emit('new_order', newOrder);
-            await client.sendMessage(customerPhone + '@c.us', `Your order (ID: ${newOrder._id.substring(0, 6)}...) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders".`);
+            await client.sendMessage(cleanedCustomerPhone + '@c.us', `Your order (ID: ${newOrder._id.substring(0, 6)}...) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders".`);
         }
 
         res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder._id, order: newOrder });
 
     } catch (err) {
         console.error('Error placing order:', err);
-        res.status(500).json({ message: 'Failed to place order.' });
+        // Check for duplicate key error specifically and provide a more user-friendly message
+        if (err.code === 11000 && err.keyPattern && err.keyPattern.customerPhone) {
+            res.status(409).json({ message: 'A customer with this phone number already exists or an internal data issue occurred. Please try again with a valid phone number.' });
+        } else {
+            res.status(500).json({ message: 'Failed to place order due to a server error.' });
+        }
     }
 });
 
