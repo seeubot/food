@@ -114,8 +114,8 @@ const Customer = mongoose.model('Customer', CustomerSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
 
-// WhatsApp Client Initialization (unchanged)
-let client;
+// WhatsApp Client Initialization
+let client = null;
 let whatsappReady = false;
 let qrCodeData = null;
 let qrExpiryTimer = null;
@@ -124,208 +124,223 @@ let qrGeneratedTimestamp = null;
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 5000;
 
-const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => {
-    console.log(`Initializing WhatsApp client (Load session: ${loadSession ? 'Yes' : 'No'})... Attempt ${retryCount + 1}/${MAX_RETRIES}`);
+const initializeWhatsappClient = async (forceNewSession = false, retryCount = 0) => {
+    console.log(`Initializing WhatsApp client (Force new session: ${forceNewSession ? 'Yes' : 'No'})... Attempt ${retryCount + 1}/${MAX_RETRIES}`);
 
-    if (client) {
+    // If a client instance exists and is ready, and we are not forcing a new session, do nothing.
+    if (client && whatsappReady && !forceNewSession) {
+        console.log('Client already ready and not forcing new session. Skipping initialization.');
+        return;
+    }
+
+    // If a client instance exists but is not ready, or we are forcing a new session, destroy it.
+    if (client && (forceNewSession || !whatsappReady)) {
         try {
-            console.log('Destroying previous client instance...');
+            console.log('Destroying previous client instance before re-initialization...');
             await client.destroy();
             console.log('Previous client destroyed successfully.');
             client = null;
         } catch (e) {
             console.error('Error destroying old client:', e);
-            client = null;
+            client = null; // Ensure client is null even if destroy fails
         }
     }
 
-    client = new Client({
-        authStrategy: new LocalAuth({
-            clientId: 'admin',
-            dataPath: path.join(__dirname, '.wwebjs_auth')
-        }),
-        puppeteer: {
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            headless: true,
-        },
-        webVersionCache: {
-            type: 'remote',
-            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-        },
-    });
+    // If client is still null, create a new one
+    if (!client) {
+        client = new Client({
+            authStrategy: new LocalAuth({
+                clientId: 'admin',
+                dataPath: path.join(__dirname, '.wwebjs_auth') // This path must be persistent
+            }),
+            puppeteer: {
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+                headless: true,
+            },
+            webVersionCache: {
+                type: 'remote',
+                remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+            },
+        });
 
-    client.on('qr', async (qr) => {
-        console.log('QR RECEIVED');
-        qrCodeData = await qrcode.toDataURL(qr);
-        qrGeneratedTimestamp = Date.now();
-        // Emit QR code immediately for faster display
-        io.emit('qrCode', qrCodeData);
-        await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_received', lastAuthenticatedAt: null }, { upsert: true });
-        io.emit('status', 'qr_received');
+        // Attach event listeners only once when the client is created
+        client.on('qr', async (qr) => {
+            console.log('QR RECEIVED');
+            qrCodeData = await qrcode.toDataURL(qr);
+            qrGeneratedTimestamp = Date.now();
+            io.emit('qrCode', qrCodeData); // Emit QR code immediately for faster display
+            await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_received', lastAuthenticatedAt: null }, { upsert: true });
+            io.emit('status', 'qr_received');
 
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        qrExpiryTimer = setTimeout(async () => {
-            if (whatsappReady === false && qrCodeData !== null) {
-                console.log('QR code expired. Reinitializing...');
-                qrCodeData = null;
-                io.emit('qrCode', null);
-                await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
-                io.emit('status', 'qr_error');
-                initializeWhatsappClient();
+            if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+            qrExpiryTimer = setTimeout(async () => {
+                if (whatsappReady === false && qrCodeData !== null) {
+                    console.log('QR code expired. Reinitializing...');
+                    qrCodeData = null;
+                    io.emit('qrCode', null);
+                    await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
+                    io.emit('status', 'qr_error');
+                    initializeWhatsappClient(true); // Force a new session
+                }
+            }, 60000); // 60 seconds expiry
+        });
+
+        client.on('authenticated', async (session) => {
+            console.log('AUTHENTICATED');
+            await Settings.findOneAndUpdate({}, { whatsappStatus: 'authenticated', lastAuthenticatedAt: new Date() }, { upsert: true });
+            io.emit('status', 'authenticated');
+            io.emit('sessionInfo', { lastAuthenticatedAt: new Date() });
+            qrCodeData = null;
+            io.emit('qrCode', null);
+            if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+        });
+
+        client.on('ready', async () => {
+            console.log('Client is ready!');
+            whatsappReady = true;
+            await Settings.findOneAndUpdate({}, { whatsappStatus: 'ready' }, { upsert: true });
+            io.emit('status', 'ready');
+            io.emit('sessionInfo', { lastAuthenticatedAt: (await Settings.findOne({})).lastAuthenticatedAt });
+        });
+
+        client.on('auth_failure', async msg => {
+            console.error('AUTHENTICATION FAILURE', msg);
+            whatsappReady = false;
+            await Settings.findOneAndUpdate({}, { whatsappStatus: 'auth_failure' }, { upsert: true });
+            io.emit('status', 'auth_failure');
+            qrCodeData = null;
+            io.emit('qrCode', null);
+            if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+            console.log('Reinitializing client due to auth_failure...');
+            initializeWhatsappClient(true); // Force a new session after auth failure
+        });
+
+        client.on('disconnected', async (reason) => {
+            console.log('Client was disconnected', reason);
+            whatsappReady = false;
+            await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
+            io.emit('status', 'disconnected');
+            qrCodeData = null;
+            io.emit('qrCode', null);
+            if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+            // Only reinitialize if it's a critical disconnection reason
+            if (reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNLAUNCHED' || reason === 'UNEXPECTED_LOGOUT') {
+                 console.log('Reinitializing client due to critical disconnection...');
+                 initializeWhatsappClient(true); // Force a new session
+            } else {
+                console.log('Client disconnected for non-critical reason. Not forcing re-initialization immediately.');
             }
-        }, 60000);
-    });
+        });
 
-    client.on('authenticated', async (session) => {
-        console.log('AUTHENTICATED');
-        await Settings.findOneAndUpdate({}, { whatsappStatus: 'authenticated', lastAuthenticatedAt: new Date() }, { upsert: true });
-        io.emit('status', 'authenticated');
-        io.emit('sessionInfo', { lastAuthenticatedAt: new Date() });
-        qrCodeData = null;
-        io.emit('qrCode', null);
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-    });
+        client.on('message', async msg => {
+            const chatId = msg.from;
+            const text = msg.body.toLowerCase().trim();
+            const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
+            const customerName = msg._data.notifyName;
 
-    client.on('ready', async () => {
-        console.log('Client is ready!');
-        whatsappReady = true;
-        await Settings.findOneAndUpdate({}, { whatsappStatus: 'ready' }, { upsert: true });
-        io.emit('status', 'ready');
-        io.emit('sessionInfo', { lastAuthenticatedAt: (await Settings.findOne({})).lastAuthenticatedAt });
-    });
-
-    client.on('auth_failure', async msg => {
-        console.error('AUTHENTICATION FAILURE', msg);
-        whatsappReady = false;
-        await Settings.findOneAndUpdate({}, { whatsappStatus: 'auth_failure' }, { upsert: true });
-        io.emit('status', 'auth_failure');
-        qrCodeData = null;
-        io.emit('qrCode', null);
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-    });
-
-    client.on('disconnected', async (reason) => {
-        console.log('Client was disconnected', reason);
-        whatsappReady = false;
-        await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
-        io.emit('status', 'disconnected');
-        qrCodeData = null;
-        io.emit('qrCode', null);
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        if (reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNLAUNCHED') {
-             console.log('Reinitializing client due to disconnection...');
-             initializeWhatsappClient();
-        }
-    });
-
-    client.on('message', async msg => {
-        const chatId = msg.from;
-        const text = msg.body.toLowerCase().trim();
-        const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
-        const customerName = msg._data.notifyName;
-
-        if (msg.hasMedia && msg.type === 'location' && msg.location) {
-            const { latitude, longitude, address } = msg.location;
-            await Customer.findOneAndUpdate(
-                { customerPhone: customerPhone },
-                {
-                    $set: {
-                        lastKnownLocation: {
-                            latitude: latitude,
-                            longitude: longitude,
-                            address: address || 'Location shared via WhatsApp'
+            if (msg.hasMedia && msg.type === 'location' && msg.location) {
+                const { latitude, longitude, address } = msg.location;
+                await Customer.findOneAndUpdate(
+                    { customerPhone: customerPhone },
+                    {
+                        $set: {
+                            lastKnownLocation: {
+                                latitude: latitude,
+                                longitude: longitude,
+                                address: address || 'Location shared via WhatsApp'
+                            }
                         }
-                    }
-                },
-                { upsert: true, new: true }
-            );
-            await client.sendMessage(chatId, 'Your location has been updated. Thank you!');
-            return;
-        }
-
-        let customer = await Customer.findOne({ customerPhone: customerPhone });
-        if (!customer) {
-            customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
-            await customer.save();
-        } else {
-            if (customer.customerName !== customerName) {
-                customer.customerName = customerName;
-                await customer.save();
+                    },
+                    { upsert: true, new: true }
+                );
+                await client.sendMessage(chatId, 'Your location has been updated. Thank you!');
+                return;
             }
-        }
 
-        switch (text) {
-            case 'hi':
-            case 'hello':
-            case 'namaste':
-            case 'menu':
-                await sendWelcomeMessage(chatId, customerName);
-                break;
-            case '1':
-            case 'view menu':
-                await sendMenu(chatId);
-                break;
-            case '2':
-            case 'shop location':
-                await sendShopLocation(chatId);
-                break;
-            case '4':
-            case 'my orders':
-                await sendCustomerOrders(chatId, customerPhone);
-                break;
-            case '5':
-            case 'help':
-                await sendHelpMessage(chatId);
-                break;
-            case 'cod':
-            case 'cash on delivery':
-                const pendingOrderCod = await Order.findOneAndUpdate(
-                    { customerPhone: customerPhone, status: 'Pending' },
-                    { $set: { paymentMethod: 'Cash on Delivery', status: 'Confirmed' } },
-                    { new: true, sort: { orderDate: -1 } }
-                );
-                if (pendingOrderCod) {
-                    await client.sendMessage(chatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
-                    io.emit('new_order', pendingOrderCod);
-                } else {
-                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
+            let customer = await Customer.findOne({ customerPhone: customerPhone });
+            if (!customer) {
+                customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
+                await customer.save();
+            } else {
+                if (customer.customerName !== customerName) {
+                    customer.customerName = customerName;
+                    await customer.save();
                 }
-                break;
-            case 'op':
-            case 'online payment':
-                const pendingOrderOp = await Order.findOneAndUpdate(
-                    { customerPhone: customerPhone, status: 'Pending' },
-                    { $set: { paymentMethod: 'Online Payment' } },
-                    { new: true, sort: { orderDate: -1 } }
-                );
-                if (pendingOrderOp) {
-                    await client.sendMessage(chatId, 'Thank you for choosing online payment. A payment link will be sent to you shortly. Your Order ID: ' + pendingOrderOp._id.substring(0,6) + '...');
-                    io.emit('new_order', pendingOrderOp);
-                } else {
-                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
-                }
-                break;
-            default:
-                const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
+            }
 
-                if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
-                    if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'Address not yet provided.') {
-                        await Order.findOneAndUpdate(
-                            { _id: lastOrderInteraction._id },
-                            { $set: { deliveryAddress: msg.body } },
-                            { new: true }
-                        );
-                        await client.sendMessage(chatId, 'Your delivery address has been saved. Please choose your payment method: ' +
-                                                  "'Cash on Delivery' (COD) or 'Online Payment' (OP).");
+            switch (text) {
+                case 'hi':
+                case 'hello':
+                case 'namaste':
+                case 'menu':
+                    await sendWelcomeMessage(chatId, customerName);
+                    break;
+                case '1':
+                case 'view menu':
+                    await sendMenu(chatId);
+                    break;
+                case '2':
+                case 'shop location':
+                    await sendShopLocation(chatId);
+                    break;
+                case '4':
+                case 'my orders':
+                    await sendCustomerOrders(chatId, customerPhone);
+                    break;
+                case '5':
+                case 'help':
+                    await sendHelpMessage(chatId);
+                    break;
+                case 'cod':
+                case 'cash on delivery':
+                    const pendingOrderCod = await Order.findOneAndUpdate(
+                        { customerPhone: customerPhone, status: 'Pending' },
+                        { $set: { paymentMethod: 'Cash on Delivery', status: 'Confirmed' } },
+                        { new: true, sort: { orderDate: -1 } }
+                    );
+                    if (pendingOrderCod) {
+                        await client.sendMessage(chatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
+                        io.emit('new_order', pendingOrderCod);
+                    } else {
+                        await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
+                    }
+                    break;
+                case 'op':
+                case 'online payment':
+                    const pendingOrderOp = await Order.findOneAndUpdate(
+                        { customerPhone: customerPhone, status: 'Pending' },
+                        { $set: { paymentMethod: 'Online Payment' } },
+                        { new: true, sort: { orderDate: -1 } }
+                    );
+                    if (pendingOrderOp) {
+                        await client.sendMessage(chatId, 'Thank you for choosing online payment. A payment link will be sent to you shortly. Your Order ID: ' + pendingOrderOp._id.substring(0,6) + '...');
+                        io.emit('new_order', pendingOrderOp);
+                    } else {
+                        await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
+                    }
+                    break;
+                default:
+                    const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
+
+                    if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
+                        if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'Address not yet provided.') {
+                            await Order.findOneAndUpdate(
+                                { _id: lastOrderInteraction._id },
+                                { $set: { deliveryAddress: msg.body } },
+                                { new: true }
+                            );
+                            await client.sendMessage(chatId, 'Your delivery address has been saved. Please choose your payment method: ' +
+                                                      "'Cash on Delivery' (COD) or 'Online Payment' (OP).");
+                        } else {
+                            await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
+                        }
                     } else {
                         await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
                     }
-                } else {
-                    await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
-                }
-                break;
-        }
-    });
+                    break;
+            }
+        });
+    }
 
     try {
         await client.initialize();
@@ -334,7 +349,7 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
         console.error(`Client initialization error: ${err.message}`);
         if (retryCount < MAX_RETRIES) {
             console.log(`Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
-            setTimeout(() => initializeWhatsappClient(loadSession, retryCount + 1), RETRY_DELAY_MS);
+            setTimeout(() => initializeWhatsappClient(forceNewSession, retryCount + 1), RETRY_DELAY_MS);
         } else {
             console.error('Max retries reached. WhatsApp client failed to initialize.');
             whatsappReady = false;
@@ -518,7 +533,8 @@ app.post('/admin/login', async (req, res) => {
     }
 
     if (!admin.totpSecret) {
-        const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
+        // JWT token now expires in 7 days
+        const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' });
         return res.json({ token, twoFactorEnabled: false });
     }
 
@@ -537,7 +553,8 @@ app.post('/admin/login', async (req, res) => {
         return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
     }
 
-    const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
+    // JWT token now expires in 7 days
+    const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, twoFactorEnabled: true });
 });
 
@@ -942,7 +959,7 @@ app.post('/api/public/request-qr', async (req, res) => {
     }
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
-    initializeWhatsappClient();
+    initializeWhatsappClient(true); // Force a new session to get a new QR
     res.status(200).json({ message: 'Requesting new QR code. Check dashboard.' });
 });
 
@@ -991,6 +1008,7 @@ app.get('/', (req, res) => { // Root path now serves status.html
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Catch-all for undefined routes ---
+// This should be the last middleware
 app.use((req, res) => {
     console.log(`Unhandled route: ${req.method} ${req.originalUrl}. Redirecting to /status.`);
     res.redirect('/status');
