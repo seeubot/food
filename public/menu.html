@@ -28,6 +28,10 @@
             width: 100%;
             z-index: 100; /* Ensure it's above other content */
             transition: transform 0.3s ease-out; /* Smooth transition for hiding */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
         }
         .header.header-hidden {
             transform: translateY(-100%); /* Hide header by moving it up */
@@ -36,6 +40,15 @@
             font-size: 2.5rem;
             font-weight: 700;
             color: #ffffff;
+            margin-bottom: 0; /* Reset margin */
+        }
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center; /* Center buttons on wrap */
+            margin-top: 0; /* Reset margin */
         }
         .menu-container {
             padding: 1.5rem;
@@ -243,32 +256,24 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .cart-icon {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
+        /* Removed .cart-icon fixed styles */
+        .header-cart-btn {
             background-color: #0066cc;
             color: #ffffff;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            justify-content: center;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+            display: flex; /* Use flex to align text and count */
             align-items: center;
-            font-size: 1.8rem;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.2s;
-            z-index: 999;
+            gap: 0.5rem;
+            white-space: nowrap; /* Prevent wrapping */
+            position: relative; /* For cart count positioning */
         }
-        .cart-icon:hover {
+        .header-cart-btn:hover {
             background-color: #0077dd;
-            transform: scale(1.05);
         }
         .cart-count {
-            position: absolute;
-            top: -5px;
-            right: -5px;
             background-color: #cc0000;
             color: #ffffff;
             border-radius: 50%;
@@ -277,6 +282,9 @@
             font-weight: 700;
             min-width: 20px;
             text-align: center;
+            position: absolute; /* Position relative to .header-cart-btn */
+            top: -8px;
+            right: -8px;
         }
         .order-tracking-section {
             background-color: #1a1a1a;
@@ -312,7 +320,7 @@
         .status-Delivered { color: #00cc00; } /* Green */
         .status-Cancelled { color: #ff3333; } /* Red */
 
-        /* Map Modal Styles */
+        /* New Map Modal Styles */
         #map-modal .modal-content {
             max-width: 800px;
             height: 90%;
@@ -419,6 +427,15 @@
 
         /* Responsive adjustments */
         @media (max-width: 640px) {
+            .header {
+                flex-direction: column;
+                align-items: center;
+            }
+            .header-actions {
+                margin-top: 1rem;
+                width: 100%;
+                justify-content: space-around;
+            }
             .header h1 {
                 font-size: 2rem;
             }
@@ -428,12 +445,9 @@
             .menu-grid {
                 grid-template-columns: 1fr;
             }
-            .cart-icon {
-                width: 50px;
-                height: 50px;
-                font-size: 1.5rem;
-                bottom: 1rem;
-                right: 1rem;
+            .header-cart-btn, #track-order-header-btn {
+                flex-grow: 1; /* Make buttons expand */
+                justify-content: center;
             }
             .cart-count {
                 font-size: 0.7rem;
@@ -453,8 +467,14 @@
     </style>
 </head>
 <body>
-    <header class="header">
+    <header class="header" id="main-header">
         <h1 id="shop-name-display">Delicious Bites</h1>
+        <div class="header-actions">
+            <button id="track-order-header-btn" class="btn-primary">Track Order</button>
+            <button id="header-cart-btn" class="header-cart-btn">
+                My Cart <span id="cart-count" class="cart-count hidden">0</span>
+            </button>
+        </div>
     </header>
 
     <main class="menu-container">
@@ -484,11 +504,6 @@
             <p class="text-center text-gray-400">Loading menu...</p>
         </div>
     </main>
-
-    <!-- Cart Icon -->
-    <div id="cart-icon" class="cart-icon">
-        🛒 <span id="cart-count" class="cart-count hidden">0</span>
-    </div>
 
     <!-- Cart Modal -->
     <div id="cart-modal" class="cart-modal">
@@ -571,7 +586,7 @@
     <script>
         const shopNameDisplay = document.getElementById('shop-name-display');
         const menuSectionsContainer = document.getElementById('menu-sections');
-        const cartIcon = document.getElementById('cart-icon');
+        const headerCartBtn = document.getElementById('header-cart-btn'); // Renamed from cartIcon
         const cartCountSpan = document.getElementById('cart-count');
         const cartModal = document.getElementById('cart-modal');
         const cartItemsList = document.getElementById('cart-items-list');
@@ -590,7 +605,8 @@
         // Order Tracking Elements
         const orderTrackingSection = document.getElementById('order-tracking-section');
         const trackOrderIdInput = document.getElementById('track-order-id');
-        const trackOrderBtn = document.getElementById('track-order-btn');
+        const trackOrderBtn = document.getElementById('track-order-btn'); // Button inside the section
+        const trackOrderHeaderBtn = document.getElementById('track-order-header-btn'); // Button in the header
         const trackOrderLoader = document.getElementById('track-order-loader');
         const trackOrderText = document.getElementById('track-order-text');
         const orderStatusDisplay = document.getElementById('order-status-display');
@@ -627,13 +643,12 @@
         let map = null;
         let marker = null;
         let selectedDeliveryLocation = null; // { latitude, longitude, address }
-        let isOrderPlacementPending = false; // Flag to indicate if order was paused for map selection
         let currentItemInModal = null; // Stores the menu item object for the currently open item details modal
 
         const PLACEHOLDER_IMAGE = 'https://placehold.co/400x180/333333/ffffff?text=No+Image';
 
         // --- Header Scroll Logic ---
-        const header = document.querySelector('.header');
+        const header = document.getElementById('main-header'); // Get the header element
         let lastScrollTop = 0;
 
         window.addEventListener('scroll', () => {
@@ -766,7 +781,6 @@
                                     <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                                     <p>${item.description || 'No description available.'}</p>
                                     <div class="item-price">₹${item.price.toFixed(2)}</div>
-                                    <!-- Quantity controls and Add to Cart button moved to item details modal -->
                                 </div>
                             </div>
                         `;
@@ -818,7 +832,6 @@
                 return;
             }
 
-
             if (existingItemIndex > -1) {
                 cart[existingItemIndex].quantity = quantity; // Set exact quantity from modal
             } else {
@@ -869,7 +882,7 @@
         }
 
         // Event Listeners for Modals and Cart
-        cartIcon.addEventListener('click', () => {
+        headerCartBtn.addEventListener('click', () => { // Changed from cartIcon
             cartModal.style.display = 'flex';
             updateCartDisplay(); // Refresh cart display when modal opens
         });
@@ -959,20 +972,20 @@
             if (map === null) {
                 // Initialize map only once
                 map = L.map('map').setView([shopLocation.latitude, shopLocation.longitude], 13); // Center on shop location
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
                 }).addTo(map);
 
                 marker = L.marker([shopLocation.latitude, shopLocation.longitude], { draggable: true }).addTo(map); // Initial marker at shop
 
                 marker.on('dragend', function(e) {
                     const latlng = marker.getLatLng();
-                    reverseGeocode(latlng.lat, latlng.lon);
+                    reverseGeocode(latlng.lat, latlng.lng);
                 });
 
                 map.on('click', function(e) {
                     marker.setLatLng(e.latlng);
-                    reverseGeocode(e.latlng.lat, e.latlng.lon);
+                    reverseGeocode(e.latlng.lat, e.latlng.lng);
                 });
 
                 // Set initial selected location to shop location
@@ -1048,11 +1061,7 @@
             if (selectedDeliveryLocation) {
                 deliveryAddressInput.value = selectedDeliveryLocation.address;
                 mapModal.style.display = 'none';
-                // If order placement was pending, re-trigger it
-                if (isOrderPlacementPending) {
-                    isOrderPlacementPending = false; // Reset flag
-                    placeOrder(); // Re-call the order placement function
-                }
+                placeOrder(); // Re-call the order placement function after map selection
             } else {
                 alert('Please select a location on the map first.');
             }
@@ -1088,7 +1097,6 @@
             // Check if delivery location is set via map
             if (!selectedDeliveryLocation || selectedDeliveryLocation.latitude === null || selectedDeliveryLocation.longitude === null) {
                 // If not set, open map modal and pause order
-                isOrderPlacementPending = true;
                 mapModal.style.display = 'flex';
                 initMap(); // Initialize map
                 mapAddressDisplay.textContent = 'Please select your delivery location on the map.';
@@ -1210,7 +1218,17 @@
             }
         }
 
-        trackOrderBtn.addEventListener('click', trackOrder);
+        trackOrderBtn.addEventListener('click', trackOrder); // Button inside the section
+        trackOrderHeaderBtn.addEventListener('click', () => { // Button in the header
+            orderTrackingSection.classList.toggle('hidden'); // Toggle visibility
+            if (!orderTrackingSection.classList.contains('hidden')) {
+                trackOrderIdInput.focus(); // Focus input when shown
+            }
+            trackOrderMessage.classList.add('hidden'); // Clear previous messages
+            orderStatusDisplay.classList.add('hidden'); // Hide previous results
+            trackOrderIdInput.value = ''; // Clear input
+        });
+
         trackOrderIdInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault(); // Prevent form submission
