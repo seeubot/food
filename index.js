@@ -28,7 +28,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey'; // Fallback fo
 // This is for testing purposes ONLY as per user request.
 // NEVER use hardcoded credentials in a production environment.
 // For production, use the /admin/create-initial-admin endpoint and store credentials securely.
-const DEFAULT_ADMIN_USERNAME = 'admin';
+const DEFAULT_ADMIN_USERNAME = 'dashboard_admin'; // Changed username for clarity
 const DEFAULT_ADMIN_PASSWORD = 'password123';
 // --- END WARNING ---
 
@@ -40,7 +40,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('MongoDB connected'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// Mongoose Schemas
+// Mongoose Schemas (unchanged)
 const ItemSchema = new mongoose.Schema({
     name: { type: String, required: true },
     description: String,
@@ -57,12 +57,12 @@ const OrderSchema = new mongoose.Schema({
     customerLocation: {
         latitude: Number,
         longitude: Number,
-        address: String // Store the address string if available
+        address: String
     },
     items: [{
         itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
-        name: String, // Store name at time of order
-        price: Number, // Store price at time of order
+        name: String,
+        price: Number,
         quantity: { type: Number, required: true }
     }],
     totalAmount: { type: Number, required: true },
@@ -71,8 +71,7 @@ const OrderSchema = new mongoose.Schema({
     orderDate: { type: Date, default: Date.now },
     status: { type: String, default: 'Pending', enum: ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'] },
     paymentMethod: { type: String, default: 'Cash on Delivery', enum: ['Cash on Delivery', 'Online Payment'] },
-    deliveryAddress: String, // Storing the full delivery address
-    // Add a field to track latest messages for context
+    deliveryAddress: String,
     lastMessageTimestamp: { type: Date, default: Date.now }
 });
 
@@ -81,24 +80,24 @@ const CustomerSchema = new mongoose.Schema({
     customerName: String,
     totalOrders: { type: Number, default: 0 },
     lastOrderDate: Date,
-    lastKnownLocation: { // Updated to store last known delivery location
+    lastKnownLocation: {
         latitude: Number,
         longitude: Number,
         address: String
     },
-    lastNotificationSent: { type: Date } // New field for 7-day notification
+    lastNotificationSent: { type: Date }
 });
 
 const AdminSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    totpSecret: { type: String, default: null } // New field for TOTP secret
+    totpSecret: { type: String, default: null }
 });
 
 const SettingsSchema = new mongoose.Schema({
     shopName: { type: String, default: 'Delicious Bites' },
     shopLocation: {
-        latitude: { type: Number, default: 17.4399 }, // Default to a central point in Hyderabad
+        latitude: { type: Number, default: 17.4399 },
         longitude: { type: Number, default: 78.4983 }
     },
     deliveryRates: [{
@@ -115,16 +114,15 @@ const Customer = mongoose.model('Customer', CustomerSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
 
-// WhatsApp Client Initialization
+// WhatsApp Client Initialization (unchanged)
 let client;
 let whatsappReady = false;
-let qrCodeData = null; // Store QR code data URL
-let qrExpiryTimer = null; // Timer for QR code expiry
-let qrGeneratedTimestamp = null; // Timestamp when QR was generated
+let qrCodeData = null;
+let qrExpiryTimer = null;
+let qrGeneratedTimestamp = null;
 
-// Retry configuration for WhatsApp client initialization
 const MAX_RETRIES = 5;
-const RETRY_DELAY_MS = 5000; // 5 seconds
+const RETRY_DELAY_MS = 5000;
 
 const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => {
     console.log(`Initializing WhatsApp client (Load session: ${loadSession ? 'Yes' : 'No'})... Attempt ${retryCount + 1}/${MAX_RETRIES}`);
@@ -137,7 +135,6 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
             client = null;
         } catch (e) {
             console.error('Error destroying old client:', e);
-            // If destruction fails, it might be in a bad state, so proceed with new client anyway.
             client = null;
         }
     }
@@ -157,7 +154,6 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
         },
     });
 
-    // --- All client.on() listeners moved inside this function ---
     client.on('qr', async (qr) => {
         console.log('QR RECEIVED');
         qrCodeData = await qrcode.toDataURL(qr);
@@ -174,7 +170,7 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
                 io.emit('qrCode', null);
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
                 io.emit('status', 'qr_error');
-                initializeWhatsappClient(); // Reinitialize to get a new QR
+                initializeWhatsappClient();
             }
         }, 60000);
     });
@@ -215,7 +211,6 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
         qrCodeData = null;
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        // Attempt to re-initialize client after disconnection
         if (reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNLAUNCHED') {
              console.log('Reinitializing client due to disconnection...');
              initializeWhatsappClient();
@@ -273,7 +268,6 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
             case 'shop location':
                 await sendShopLocation(chatId);
                 break;
-            // Removed direct order placement option (case '3' / 'place order')
             case '4':
             case 'my orders':
                 await sendCustomerOrders(chatId, customerPhone);
@@ -311,10 +305,8 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
                 }
                 break;
             default:
-                // Modified default response to guide users to the web menu for ordering
                 const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
 
-                // If there's a recent pending order, still allow address/payment confirmation
                 if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
                     if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'Address not yet provided.') {
                         await Order.findOneAndUpdate(
@@ -353,23 +345,20 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
     }
 };
 
-// Initial WhatsApp client setup (without loading session explicitly on startup)
 (async () => {
     const settings = await Settings.findOne({});
     if (!settings || settings.whatsappStatus === 'disconnected') {
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     }
-    initializeWhatsappClient(); // Call initializeWhatsappClient here to ensure it runs when the server starts
+    initializeWhatsappClient();
 })();
 
 
-// --- Bot Logic ---
-
+// --- Bot Logic Functions (unchanged) ---
 const sendWelcomeMessage = async (chatId, customerName) => {
     const menuOptions = [
         "1. 🍕 View Menu",
         "2. 📍 Shop Location",
-        // Removed option 3: "3. 📞 Place Order"
         "4. 📝 My Orders",
         "5. ℹ️ Help"
     ];
@@ -419,11 +408,6 @@ const sendMenu = async (chatId) => {
     await client.sendMessage(chatId, menuMessage);
 };
 
-// Removed handleOrderRequest and processOrder functions as they are no longer used for direct chat ordering.
-// const handleOrderRequest = async (msg) => { ... }
-// const processOrder = async (msg) => { ... }
-
-
 const sendCustomerOrders = async (chatId, customerPhone) => {
     const orders = await Order.find({ customerPhone: customerPhone }).sort({ orderDate: -1 }).limit(5);
 
@@ -455,7 +439,7 @@ const sendHelpMessage = async (chatId) => {
     await client.sendMessage(chatId, helpMessage);
 };
 
-// --- Fleeting Lines for Re-Order Notifications (in English) ---
+// --- Fleeting Lines for Re-Order Notifications (unchanged) ---
 const reOrderNotificationMessagesTelugu = [
     "Feeling hungry again? 😋 New flavors await on our menu! Order now! 🚀",
     "Missing our delicious dishes? 💖 Order your next meal now! 🍽️",
@@ -469,7 +453,7 @@ const reOrderNotificationMessagesTelugu = [
     "Your last order was great, right? 😉 Get that experience again! 💯"
 ];
 
-// --- Scheduled Notification Function ---
+// --- Scheduled Notification Function (unchanged) ---
 const sendReorderNotification = async () => {
     if (!whatsappReady) {
         console.log('WhatsApp client not ready for scheduled notifications. Skipping job.');
@@ -478,16 +462,16 @@ const sendReorderNotification = async () => {
 
     console.log('Running 7-day re-order notification job...');
     const sevenDaysAgo = moment().subtract(7, 'days').toDate();
-    const twoDaysAgo = moment().subtract(2, 'days').toDate(); // Avoid spamming recent customers
+    const twoDaysAgo = moment().subtract(2, 'days').toDate();
 
     try {
         const customersToNotify = await Customer.find({
-            totalOrders: { $gt: 0 }, // Must have at least one order
+            totalOrders: { $gt: 0 },
             $or: [
-                { lastNotificationSent: { $exists: false } }, // Never notified
-                { lastNotificationSent: { $lt: sevenDaysAgo } } // Notified more than 7 days ago
+                { lastNotificationSent: { $exists: false } },
+                { lastNotificationSent: { $lt: sevenDaysAgo } }
             ],
-            lastOrderDate: { $lt: twoDaysAgo } // Last order was more than 2 days ago
+            lastOrderDate: { $lt: twoDaysAgo }
         });
 
         console.log(`Found ${customersToNotify.length} customers to notify.`);
@@ -498,7 +482,6 @@ const sendReorderNotification = async () => {
             const message = reOrderNotificationMessagesTelugu[randomIndex];
 
             try {
-                // Append web menu URL to the notification message
                 const notificationMessage = `${message}\n\nVisit our web menu to order: ${process.env.WEB_MENU_URL}`;
                 await client.sendMessage(chatId, notificationMessage);
                 await Customer.findByIdAndUpdate(customer._id, { lastNotificationSent: new Date() });
@@ -514,38 +497,30 @@ const sendReorderNotification = async () => {
     }
 };
 
-// --- Schedule the 7-day notification job ---
-cron.schedule('0 9 * * *', () => { // Runs every day at 09:00 AM
+cron.schedule('0 9 * * *', () => {
     sendReorderNotification();
 }, {
     scheduled: true,
-    timezone: "Asia/Kolkata" // Set your desired timezone
+    timezone: "Asia/Kolkata"
 });
 console.log('7-day re-order notification job scheduled to run daily at 9:00 AM IST.');
 
 
-// --- Admin API Routes (authenticateToken middleware applied here) ---
+// --- Admin API Routes ---
 app.post('/admin/login', async (req, res) => {
-    const { totpCode } = req.body; // Only expects totpCode from frontend now
+    const { totpCode } = req.body;
 
-    // Use hardcoded admin credentials for lookup
     const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
 
-    // This check is now simplified as username/password are hardcoded.
-    // In a real app, you'd verify username/password against DB first.
     if (!admin) {
-        // This case should ideally not happen if initial admin creation works
         return res.status(500).json({ message: 'Admin user not found in database. Please restart server.' });
     }
 
-    // If TOTP is NOT enabled for this admin
     if (!admin.totpSecret) {
-        // Allow direct login if TOTP is not set up
         const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
         return res.json({ token, twoFactorEnabled: false });
     }
 
-    // If TOTP IS enabled, require and verify the code
     if (!totpCode) {
         return res.status(401).json({ message: 'Two-Factor Authentication code required.' });
     }
@@ -554,14 +529,13 @@ app.post('/admin/login', async (req, res) => {
         secret: admin.totpSecret,
         encoding: 'base32',
         token: totpCode,
-        window: 1 // Allow for a small time drift (1 step before or after)
+        window: 1
     });
 
     if (!verified) {
         return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
     }
 
-    // If all checks pass, issue JWT token
     const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token, twoFactorEnabled: true });
 });
@@ -570,20 +544,18 @@ app.get('/admin/logout', (req, res) => {
     res.send('Logged out successfully');
 });
 
-// Removed /admin/create-initial-admin route as it's handled on server startup
-
-// Authentication Middleware for Admin APIs
+// Authentication Middleware for Admin APIs (unchanged)
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (token == null) {
-        console.log('Unauthorized: No token provided. (Request to ' + req.path + ')'); // Added path for more context
+        console.log('Unauthorized: No token provided. (Request to ' + req.path + ')');
         return res.status(401).json({ message: 'Unauthorized: No token provided.' });
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
-            console.error('JWT Verification Error:', err.message, '(Token received for ' + req.path + ')'); // Log the specific JWT error and path
+            console.error('JWT Verification Error:', err.message, '(Token received for ' + req.path + ')');
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
         }
         req.user = user;
@@ -591,14 +563,12 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// --- 2FA Specific Endpoints ---
-// These endpoints will now operate on the hardcoded default admin user
+// --- 2FA Specific Endpoints (unchanged, operate on DEFAULT_ADMIN_USERNAME) ---
 app.get('/api/admin/2fa/status', authenticateToken, async (req, res) => {
     try {
-        // Always fetch status for the hardcoded default admin
         const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
         if (!admin) {
-            return res.status(404).json({ message: 'Admin user not found.' }); // Should not happen with initial setup
+            return res.status(404).json({ message: 'Admin user not found.' });
         }
         res.json({ twoFactorEnabled: !!admin.totpSecret });
     } catch (error) {
@@ -668,7 +638,7 @@ app.post('/api/admin/2fa/disable', authenticateToken, async (req, res) => {
         if (!admin) {
             return res.status(404).json({ message: 'Admin user not found.' });
         }
-        admin.totpSecret = null; // Disable 2FA
+        admin.totpSecret = null;
         await admin.save();
         res.json({ message: 'Two-Factor Authentication disabled successfully.' });
     } catch (error) {
@@ -677,7 +647,7 @@ app.post('/api/admin/2fa/disable', authenticateToken, async (req, res) => {
     }
 });
 
-
+// --- Other Admin API Endpoints (unchanged, still require authentication) ---
 app.get('/api/admin/bot-status', authenticateToken, async (req, res) => {
     const settings = await Settings.findOne({});
     res.json({
@@ -828,7 +798,7 @@ app.get('/api/admin/settings', authenticateToken, async (req, res) => {
     try {
         let settings = await Settings.findOne({});
         if (!settings) {
-            settings = new Settings(); // Create default settings if none exist
+            settings = new Settings();
             await settings.save();
         }
         res.json(settings);
@@ -907,7 +877,7 @@ app.post('/api/order', async (req, res) => {
             transportTax,
             totalAmount,
             paymentMethod,
-            status: 'Pending', // Initial status
+            status: 'Pending',
         });
 
         await newOrder.save();
@@ -927,7 +897,6 @@ app.post('/api/order', async (req, res) => {
 
         if (whatsappReady) {
             io.emit('new_order', newOrder);
-            // Send a confirmation message to the user via WhatsApp with a link to track order or next steps
             await client.sendMessage(customerPhone + '@c.us', `Your order (ID: ${newOrder._id.substring(0, 6)}...) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders".`);
         }
 
@@ -964,18 +933,21 @@ app.post('/api/public/request-qr', async (req, res) => {
 
 
 // --- URL Rewriting / Redirection for .html files ---
-app.get('/admin/dashboard.html', (req, res) => res.redirect(301, '/admin/dashboard'));
+// Redirect old .html paths to new clean paths
+app.get('/admin/dashboard.html', (req, res) => res.redirect(301, '/dashboard'));
+app.get('/admin_dashboard.html', (req, res) => res.redirect(301, '/dashboard')); // Handle old name
 app.get('/admin/login.html', (req, res) => res.redirect(301, '/admin/login'));
 app.get('/menu.html', (req, res) => res.redirect(301, '/menu'));
-app.get('/bot_status.html', (req, res) => res.redirect(301, '/'));
+app.get('/bot_status.html', (req, res) => res.redirect(301, '/status')); // Redirect to new status path
 
-// --- HTML Page Routes (Explicitly serve HTML files) ---
+
+// --- HTML Page Routes (Explicitly serve HTML files with new paths) ---
 app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
-app.get('/admin/dashboard', authenticateToken, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin_dashboard.html'));
+app.get('/dashboard', authenticateToken, (req, res) => { // New path for dashboard
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html')); // Serve renamed file
 });
 
 app.get('/menu', (req, res) => {
@@ -985,22 +957,25 @@ app.get('/menu', (req, res) => {
 app.get('/track', (req, res) => {
     const orderId = req.query.orderId;
     if (orderId) {
-        res.redirect(`/menu?orderId=${orderId}`);
+        res.redirect(`/menu?orderId=${orderId}`); // Still redirects to menu with orderId
     } else {
         res.redirect('/menu');
     }
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'bot_status.html'));
+app.get('/status', (req, res) => { // New path for bot status
+    res.sendFile(path.join(__dirname, 'public', 'status.html')); // Serve renamed file
 });
+
+app.get('/', (req, res) => { // Root path now serves status.html
+    res.sendFile(path.join(__dirname, 'public', 'status.html'));
+});
+
 
 // --- Serve other static assets (CSS, JS, images) ---
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Initial Admin User Setup on Server Startup ---
-// This ensures a default admin user exists if the database is empty.
-// This replaces the need for a separate /admin/create-initial-admin endpoint.
+// --- Initial Admin User Setup on Server Startup (unchanged logic) ---
 async function ensureDefaultAdminExists() {
     try {
         let admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
@@ -1009,7 +984,7 @@ async function ensureDefaultAdminExists() {
             admin = new Admin({
                 username: DEFAULT_ADMIN_USERNAME,
                 password: hashedPassword,
-                totpSecret: null // 2FA is disabled by default
+                totpSecret: null
             });
             await admin.save();
             console.log(`Default admin user '${DEFAULT_ADMIN_USERNAME}' created with 2FA disabled.`);
@@ -1021,13 +996,12 @@ async function ensureDefaultAdminExists() {
     }
 }
 
-// Call this function after MongoDB is connected
 mongoose.connection.on('connected', () => {
     ensureDefaultAdminExists();
 });
 
 
-// Socket.io for real-time updates
+// Socket.io for real-time updates (unchanged)
 io.on('connection', (socket) => {
     console.log('Admin dashboard connected');
     Settings.findOne({}).then(settings => {
@@ -1042,11 +1016,14 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start the server
+// Start the server (console logs updated)
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Admin dashboard: http://localhost:${PORT}/admin/login`);
+    console.log(`Admin Login: http://localhost:${PORT}/admin/login`);
+    console.log(`Admin Dashboard: http://localhost:${PORT}/dashboard`);
+    console.log(`Public Menu: http://localhost:${PORT}/menu`);
+    console.log(`Bot Status: http://localhost:${PORT}/status`);
     console.log(`Default Admin Username (for initial setup): ${DEFAULT_ADMIN_USERNAME}`);
     console.log(`Default Admin Password (for initial setup): ${DEFAULT_ADMIN_PASSWORD}`);
     console.log('REMEMBER TO ENABLE 2FA FROM THE DASHBOARD AFTER FIRST LOGIN FOR SECURITY.');
