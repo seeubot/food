@@ -312,7 +312,7 @@
         .remove-rate-btn {
             background-color: #cc0000;
             color: #ffffff;
-            padding: 0.5rem 1rem;
+            padding: 0.5rem 1.2rem; /* Adjusted padding for better look */
             border-radius: 0.5rem;
             transition: background-color 0.2s;
         }
@@ -887,8 +887,9 @@
             try {
                 const settings = await authenticatedFetch('/api/admin/settings');
                 shopNameInput.value = settings.shopName || '';
-                shopLatInput.value = settings.shopLocation ? settings.shopLocation.latitude : '';
-                shopLonInput.value = settings.shopLocation ? settings.shopLocation.longitude : '';
+                // Fix for location: Ensure null is handled correctly to display empty string
+                shopLatInput.value = (settings.shopLocation && settings.shopLocation.latitude !== null && !isNaN(settings.shopLocation.latitude)) ? settings.shopLocation.latitude : '';
+                shopLonInput.value = (settings.shopLocation && settings.shopLocation.longitude !== null && !isNaN(settings.shopLocation.longitude)) ? settings.shopLocation.longitude : '';
                 renderDeliveryRates(settings.deliveryRates || []);
             } catch (error) {
                 console.error('Error fetching settings:', error);
@@ -1065,7 +1066,7 @@
                 const rateDiv = document.createElement('div');
                 rateDiv.className = 'delivery-rate-item';
                 rateDiv.innerHTML = `
-                    <input type="number" step="any" class="kms-input" value="${rate.kms}" placeholder="KMs" data-index="${index}">
+                    <input type="number" step="any" class="kms-input" value="${rate.kms}" placeholder="KMs">
                     <input type="number" step="any" class="amount-input" value="${rate.amount}" placeholder="Amount">
                     <button type="button" class="remove-rate-btn btn-small">Remove</button>
                 `;
@@ -1316,8 +1317,9 @@
             const settingsData = {
                 shopName: shopNameInput.value,
                 shopLocation: {
-                    latitude: parseFloat(shopLatInput.value),
-                    longitude: parseFloat(shopLonInput.value)
+                    // Explicitly send null if the input field is empty
+                    latitude: shopLatInput.value.trim() !== '' ? parseFloat(shopLatInput.value) : null,
+                    longitude: shopLonInput.value.trim() !== '' ? parseFloat(shopLonInput.value) : null
                 },
                 deliveryRates: deliveryRates
             };
@@ -1419,9 +1421,7 @@
             if (qrTimerInterval) clearInterval(qrTimerInterval);
 
             try {
-                // This endpoint is public, but still requires the token for the backend middleware.
-                // The backend's /api/public/request-qr route is not protected by authenticateToken middleware.
-                // So, we use a regular fetch here, without the authenticatedFetch helper, as it doesn't need the token.
+                // This endpoint is public, so it doesn't strictly need authentication.
                 const response = await fetch('/api/public/request-qr', { method: 'POST' });
                 const result = await response.json();
                 if (!response.ok) {
