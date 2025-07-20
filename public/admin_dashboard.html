@@ -8,50 +8,62 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* Base styles for black and white theme */
+        /* Custom styles for the black and white theme */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #000000; /* Pure black background */
             color: #ffffff; /* Pure white text */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 1rem;
-        }
-        header {
+        .header {
             background-color: #1a1a1a; /* Dark gray for header */
             border-bottom: 1px solid #333333;
             padding: 1rem;
             box-shadow: 0 2px 4px rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
         }
-        h1, h2, h3 {
-            color: #ffffff; /* White for headings */
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 0.5rem; /* Space below on wrap */
         }
-        /* Card/Panel backgrounds */
-        .bg-panel {
-            background-color: #1a1a1a; /* Dark gray for main content panels */
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .main-content {
+            flex-grow: 1;
+            padding: 1.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .card {
+            background-color: #1a1a1a; /* Dark gray for cards */
             border-radius: 0.75rem;
             box-shadow: 0 4px 8px rgba(255,255,255,0.08);
             padding: 1.5rem;
+            margin-bottom: 1.5rem;
         }
-        /* Input field styling */
-        input[type="text"],
-        input[type="number"],
-        input[type="url"],
-        textarea,
-        select {
-            background-color: #222222; /* Slightly lighter dark gray for inputs */
-            border: 1px solid #444444;
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .card-header h2 {
+            font-size: 1.75rem;
+            font-weight: 600;
             color: #ffffff;
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.375rem;
-            width: 100%;
         }
-        input::placeholder, textarea::placeholder {
-            color: #888888; /* Lighter gray for placeholders */
-        }
-        /* Button styling */
+        /* Button styles */
         .btn-primary {
             background-color: #ffffff; /* White background */
             color: #000000; /* Black text */
@@ -59,97 +71,116 @@
             border-radius: 0.5rem;
             font-weight: 600;
             transition: background-color 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap; /* Prevent text wrap on small buttons */
         }
         .btn-primary:hover {
             background-color: #e0e0e0;
         }
         .btn-secondary {
-            background-color: #666666; /* Darker gray for utility buttons */
+            background-color: #333333; /* Darker gray */
             color: #ffffff;
             padding: 0.6rem 1.2rem;
             border-radius: 0.5rem;
             font-weight: 600;
             transition: background-color 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
         }
         .btn-secondary:hover {
-            background-color: #888888;
+            background-color: #555555;
         }
         .btn-danger {
-            background-color: #ff6666; /* Light red for danger */
-            color: #000000; /* Black text */
-            padding: 0.6rem 1.2rem;
-            border-radius: 0.5rem;
+            background-color: #cc0000; /* Red */
+            color: #ffffff;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.375rem;
             font-weight: 600;
             transition: background-color 0.2s ease-in-out;
         }
         .btn-danger:hover {
-            background-color: #ee4444;
+            background-color: #ff3333;
         }
-        /* New action buttons for Call/Track */
-        .btn-action {
-            background-color: #66ff66; /* Light green for actions */
-            color: #000000; /* Black text */
+        .btn-success {
+            background-color: #00cc00; /* Green */
+            color: #000000;
             padding: 0.4rem 0.8rem;
-            border-radius: 0.3rem;
+            border-radius: 0.375rem;
             font-weight: 600;
             transition: background-color 0.2s ease-in-out;
-            white-space: nowrap; /* Prevent text wrapping */
-            display: inline-flex; /* Use flex for icon/text alignment if needed */
-            align-items: center;
-            justify-content: center;
         }
-        .btn-action:hover {
-            background-color: #44ee44;
+        .btn-success:hover {
+            background-color: #00ee00;
         }
-        .btn-action.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            background-color: #333333; /* Darker background when disabled */
-            color: #999999; /* Lighter text when disabled */
+        .btn-small {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.875rem;
         }
 
-        /* Alert styling */
-        .alert {
-            padding: 1rem;
-            border-radius: 0.5rem;
+        /* Table styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .data-table th, .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #333333;
+        }
+        .data-table th {
+            background-color: #2a2a2a; /* Slightly lighter dark gray for table headers */
+            font-weight: 700;
+            color: #cccccc;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+        }
+        .data-table tbody tr:hover {
+            background-color: #222222; /* Even lighter dark gray on hover */
+        }
+        .data-table td {
+            color: #ffffff;
+        }
+
+        /* Form input styles */
+        .form-group {
             margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
             font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            color: #cccccc;
         }
-        .alert-red {
-            background-color: #440000;
-            color: #ff6666;
-            border: 1px solid #ff6666;
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group input[type="url"],
+        .form-group textarea,
+        .form-group select {
+            background-color: #222222;
+            border: 1px solid #444444;
+            color: #ffffff;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            width: 100%;
         }
-        .alert-yellow {
-            background-color: #444400;
-            color: #ffff66;
-            border: 1px solid #ffff66;
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: #888888;
         }
-        .alert-green {
-            background-color: #004400;
-            color: #66ff66;
-            border: 1px solid #66ff66;
+        .form-group select option {
+            background-color: #222222;
+            color: #ffffff;
         }
-        /* Loader styling */
-        .loader {
-            border: 4px solid #333333;
-            border-top: 4px solid #66ff66; /* Green loader */
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
+        .form-group input[type="checkbox"] {
+            margin-right: 0.5rem;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* Modal styling */
+
+        /* Modal styles */
         .modal {
             display: none; /* Hidden by default */
             position: fixed; /* Stay in place */
@@ -162,15 +193,16 @@
             background-color: rgba(0,0,0,0.8); /* Darker overlay */
             justify-content: center;
             align-items: center;
+            padding: 1rem; /* Padding for mobile view */
         }
         .modal-content {
-            background-color: #1a1a1a; /* Dark gray for modal content */
+            background-color: #1a1a1a;
             margin: auto;
             padding: 2rem;
             border-radius: 0.75rem;
             box-shadow: 0 5px 15px rgba(255,255,255,0.1);
             width: 90%;
-            max-width: 600px;
+            max-width: 700px; /* Increased max-width for better forms */
             position: relative;
             color: #ffffff;
         }
@@ -189,158 +221,279 @@
             text-decoration: none;
             cursor: pointer;
         }
-        /* Table styling */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 0.75rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid #333333; /* Darker border for table rows */
-        }
-        th {
-            background-color: #333333; /* Darker header background */
-            font-weight: 600;
-            color: #ffffff;
-        }
-        tr:hover {
-            background-color: #2a2a2a; /* Slightly lighter hover for rows */
-        }
-        /* Status Badges */
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px; /* Fully rounded */
-            font-size: 0.75rem;
-            font-weight: 700;
+
+        /* Loader styles */
+        .loader {
+            border: 4px solid #333333;
+            border-top: 4px solid #66ff66;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
             display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
         }
-        .status-pending { background-color: #ffff66; color: #333300; } /* Yellow */
-        .status-confirmed, .status-preparing { background-color: #66ccff; color: #003366; } /* Light Blue */
-        .status-out-for-delivery { background-color: #cc66ff; color: #330066; } /* Light Purple */
-        .status-delivered { background-color: #66ff66; color: #003300; } /* Light Green */
-        .status-cancelled { background-color: #ff6666; color: #330000; } /* Light Red */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .message {
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+        .message.error {
+            color: #ff6666;
+        }
+        .message.success {
+            color: #66ff66;
+        }
+        .message.info {
+            color: #ffff66;
+        }
+
+        /* Specific styles for delivery rates in settings */
+        .delivery-rate-item {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .delivery-rate-item input {
+            flex: 1;
+        }
+        .delivery-rate-item button {
+            flex-shrink: 0;
+        }
+        .add-rate-btn {
+            background-color: #0066cc;
+            color: #ffffff;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        .add-rate-btn:hover {
+            background-color: #0077dd;
+        }
+        .remove-rate-btn {
+            background-color: #cc0000;
+            color: #ffffff;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        .remove-rate-btn:hover {
+            background-color: #ff3333;
+        }
 
         /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .tab-button {
-                flex-grow: 1; /* Make tabs take full width on small screens */
-                text-align: center;
-            }
-            .flex-col-md {
+        @media (max-width: 640px) {
+            .header {
                 flex-direction: column;
+                align-items: flex-start;
             }
-            .w-1/2-md {
+            .header h1 {
+                margin-bottom: 1rem;
+            }
+            .header-actions {
+                width: 100%;
+                justify-content: center;
+            }
+            .header-actions button {
                 width: 100%;
             }
-            /* For tables on small screens, allow horizontal scroll */
-            .table-responsive {
-                overflow-x: auto;
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .card-header h2 {
+                margin-bottom: 0.75rem;
+            }
+            .data-table th, .data-table td {
+                padding: 0.5rem;
+                font-size: 0.8rem;
+            }
+            .data-table th:nth-child(n+4), .data-table td:nth-child(n+4) {
+                display: none; /* Hide less critical columns on small screens */
+            }
+            .modal-content {
+                padding: 1.5rem;
             }
         }
     </style>
 </head>
-<body class="min-h-screen">
-    <div class="container mx-auto p-4">
-        <header class="flex justify-between items-center py-4 border-b border-gray-700 mb-6">
-            <h1 class="text-4xl font-bold text-white">Admin Dashboard</h1>
-            <nav>
-                <a href="/admin/logout" class="btn-danger">Logout</a>
-            </nav>
-        </header>
+<body>
+    <header class="header">
+        <h1 class="text-white">Admin Dashboard</h1>
+        <div class="header-actions">
+            <button id="logout-btn" class="btn-secondary">Logout</button>
+        </div>
+    </header>
 
-        <main class="mt-8">
-            <h2 class="text-3xl font-bold text-white mb-4">WhatsApp Bot Status</h2>
-            <div id="bot-status-alert" class="alert hidden">
-                <span id="alert-message"></span>
-                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                    <button id="load-session-btn" class="btn-secondary hidden">Load Saved Session</button>
-                    <button id="request-qr-btn" class="btn-secondary hidden">Request New QR</button>
+    <main class="main-content">
+        <!-- Bot Status Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>WhatsApp Bot Status</h2>
+                <button id="refresh-bot-status-btn" class="btn-secondary btn-small">Refresh</button>
+            </div>
+            <p class="text-lg">Current Status: <span id="bot-status" class="font-semibold text-yellow-400">Loading...</span></p>
+            <p class="text-gray-400 text-sm mt-1">Last Authenticated: <span id="last-auth-time" class="font-semibold text-white">N/A</span></p>
+            <div id="bot-status-actions" class="mt-4 flex flex-col sm:flex-row gap-3">
+                <button id="request-qr-btn" class="btn-primary">
+                    <span id="request-qr-loader" class="loader hidden"></span>
+                    <span id="request-qr-text">Request New QR</span>
+                </button>
+                <button id="load-session-btn" class="btn-primary">
+                    <span id="load-session-loader" class="loader hidden"></span>
+                    <span id="load-session-text">Load Saved Session</span>
+                </button>
+            </div>
+            <div id="qr-code-section" class="mt-4 hidden">
+                <p class="text-gray-300 mb-2">Scan this QR code with your WhatsApp app:</p>
+                <img id="qr-code-img" src="" alt="QR Code" class="qr-code-img mx-auto">
+                <p class="text-sm text-gray-400 mt-2">QR will expire in <span id="qr-countdown">60</span> seconds.</p>
+            </div>
+            <p id="bot-message" class="message mt-3 text-center"></p>
+        </div>
+
+        <!-- Orders Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Recent Orders</h2>
+                <button id="refresh-orders-btn" class="btn-secondary btn-small">Refresh</button>
+            </div>
+            <div id="orders-list">
+                <p class="text-center text-gray-400">Loading orders...</p>
+            </div>
+            <p id="orders-message" class="message mt-3"></p>
+        </div>
+
+        <!-- Menu Management Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Menu Items</h2>
+                <button id="add-menu-item-btn" class="btn-primary">Add New Item</button>
+            </div>
+            <div id="menu-items-list">
+                <p class="text-center text-gray-400">Loading menu items...</p>
+            </div>
+            <p id="menu-message" class="message mt-3"></p>
+        </div>
+
+        <!-- Customer Management Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Customer Data</h2>
+                <button id="refresh-customers-btn" class="btn-secondary btn-small">Refresh</button>
+            </div>
+            <div id="customers-list">
+                <p class="text-center text-gray-400">Loading customer data...</p>
+            </div>
+            <p id="customers-message" class="message mt-3"></p>
+        </div>
+
+        <!-- Shop Settings Card -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Shop Settings</h2>
+                <button id="save-settings-btn" class="btn-primary">Save Settings</button>
+            </div>
+            <form id="settings-form" class="mt-4">
+                <div class="form-group">
+                    <label for="shop-name">Shop Name:</label>
+                    <input type="text" id="shop-name" name="shopName" placeholder="e.g., Delicious Bites">
                 </div>
-            </div>
-            <p class="text-gray-400 mb-2">Current Status: <span id="bot-status" class="font-semibold text-white">Loading...</span></p>
-            <p class="text-gray-400 mb-6">Last Authenticated: <span id="last-auth-time" class="font-semibold text-white">N/A</span></p>
-
-
-            <!-- Tabs for navigation -->
-            <div class="flex flex-wrap border-b border-gray-700 mb-6">
-                <button class="tab-button px-4 py-2 text-lg font-medium focus:outline-none text-gray-400 hover:text-white transition duration-200" data-tab="orders">Orders</button>
-                <button class="tab-button px-4 py-2 text-lg font-medium focus:outline-none text-gray-400 hover:text-white transition duration-200" data-tab="menu">Menu</button>
-                <button class="tab-button px-4 py-2 text-lg font-medium focus:outline-none text-gray-400 hover:text-white transition duration-200" data-tab="settings">Settings</button>
-                <button class="tab-button px-4 py-2 text-lg font-medium focus:outline-none text-gray-400 hover:text-white transition duration-200" data-tab="customers">Customers</button>
-            </div>
-
-            <!-- Orders Tab Content -->
-            <div id="orders-tab" class="tab-content">
-                <h2 class="text-3xl font-bold text-white mb-6">Recent Orders</h2>
-                <div class="bg-panel p-4 table-responsive">
-                    <div id="orders-list">
-                        <p class="text-gray-400 text-center">Loading orders...</p>
-                    </div>
+                <div class="form-group">
+                    <label for="shop-lat">Shop Location (Latitude):</label>
+                    <input type="number" step="any" id="shop-lat" name="shopLocation.latitude" placeholder="e.g., 17.4">
                 </div>
-            </div>
-
-            <!-- Menu Tab Content -->
-            <div id="menu-tab" class="tab-content hidden">
-                <h2 class="text-3xl font-bold text-white mb-6">Menu Management</h2>
-                <button id="add-menu-item-btn" class="btn-primary mb-4">Add New Menu Item</button>
-                <div class="bg-panel p-4 table-responsive">
-                    <div id="menu-items-list">
-                        <p class="text-gray-400 text-center">Loading menu items...</p>
-                    </div>
+                <div class="form-group">
+                    <label for="shop-lon">Shop Location (Longitude):</label>
+                    <input type="number" step="any" id="shop-lon" name="shopLocation.longitude" placeholder="e.g., 78.5">
                 </div>
-            </div>
 
-            <!-- Settings Tab Content -->
-            <div id="settings-tab" class="tab-content hidden">
-                <h2 class="text-3xl font-bold text-white mb-6">Shop Settings</h2>
-                <form id="settings-form" class="bg-panel p-6 space-y-4">
-                    <div>
-                        <label for="shop-name" class="block text-gray-300 text-sm font-bold mb-2">Shop Name:</label>
-                        <input type="text" id="shop-name" name="shopName" required>
+                <div class="form-group">
+                    <label class="block mb-2">Delivery Rates (KMs - Amount):</label>
+                    <div id="delivery-rates-container">
+                        <!-- Dynamic delivery rate inputs will go here -->
+                        <p class="text-gray-400 text-sm">Add delivery ranges below.</p>
                     </div>
-                    <div>
-                        <label class="block text-gray-300 text-sm font-bold mb-2">Shop Location (Latitude, Longitude):</label>
-                        <input type="number" step="any" id="shop-latitude" name="shopLocation.latitude" placeholder="Latitude" required class="mb-2">
-                        <input type="number" step="any" id="shop-longitude" name="shopLocation.longitude" placeholder="Longitude" required>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-white mb-2">Delivery Rates (KMs, Amount)</h3>
-                        <div id="delivery-rates-container" class="space-y-2">
-                            <!-- Delivery rates will be dynamically added here -->
-                        </div>
-                        <button type="button" id="add-delivery-rate-btn" class="mt-4 btn-secondary">Add Rate</button>
-                    </div>
-                    <button type="submit" class="btn-primary">Save Settings</button>
-                    <p id="settings-message" class="mt-2 text-sm text-center"></p>
-                </form>
-            </div>
-
-            <!-- Customers Tab Content -->
-            <div id="customers-tab" class="tab-content hidden">
-                <h2 class="text-3xl font-bold text-white mb-6">Customer Locations</h2>
-                <div class="bg-panel p-4 table-responsive">
-                    <div id="customers-list">
-                        <p class="text-gray-400 text-center">Loading customer data...</p>
-                    </div>
+                    <button type="button" id="add-delivery-rate-btn" class="add-rate-btn mt-2">Add Rate</button>
                 </div>
-            </div>
-        </main>
+                <p id="settings-message" class="message mt-3"></p>
+            </form>
+        </div>
+    </main>
+
+    <!-- Modals -->
+
+    <!-- Edit/Add Menu Item Modal -->
+    <div id="menu-item-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="menu-item-modal-title" class="text-2xl font-bold mb-4">Add New Menu Item</h2>
+            <form id="menu-item-form">
+                <input type="hidden" id="menu-item-id">
+                <div class="form-group">
+                    <label for="item-name">Name:</label>
+                    <input type="text" id="item-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="item-description">Description:</label>
+                    <textarea id="item-description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="item-price">Price:</label>
+                    <input type="number" step="0.01" id="item-price" required>
+                </div>
+                <div class="form-group">
+                    <label for="item-image-url">Image URL:</label>
+                    <input type="url" id="item-image-url" placeholder="https://example.com/image.jpg">
+                </div>
+                <div class="form-group">
+                    <label for="item-category">Category:</label>
+                    <input type="text" id="item-category" placeholder="e.g., Main Course, Dessert">
+                </div>
+                <div class="form-group flex items-center">
+                    <input type="checkbox" id="item-is-available">
+                    <label for="item-is-available" class="mb-0">Is Available</label>
+                </div>
+                <div class="form-group flex items-center">
+                    <input type="checkbox" id="item-is-trending">
+                    <label for="item-is-trending" class="mb-0">Is Trending</label>
+                </div>
+                <button type="submit" class="btn-primary w-full mt-4">
+                    <span id="menu-item-loader" class="loader hidden"></span>
+                    <span id="menu-item-text">Save Item</span>
+                </button>
+                <p id="menu-item-message" class="message mt-3"></p>
+            </form>
+        </div>
     </div>
-
-    <!-- Modals (Order Details, Menu Item Form) -->
 
     <!-- Order Details Modal -->
     <div id="order-details-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
-            <h2 class="text-2xl font-bold text-white mb-4">Order Details</h2>
-            <div id="order-details-content" class="text-gray-300 mb-4">
-                <!-- Details will be loaded here -->
+            <h2 class="text-2xl font-bold mb-4">Order Details <span id="order-detail-id-display"></span></h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-300">
+                <div><strong>Customer Name:</strong> <span id="order-detail-customer-name"></span></div>
+                <div><strong>Phone:</strong> <span id="order-detail-customer-phone"></span></div>
+                <div class="md:col-span-2"><strong>Address:</strong> <span id="order-detail-delivery-address"></span></div>
+                <div><strong>Order Date:</strong> <span id="order-detail-date"></span></div>
+                <div><strong>Payment Method:</strong> <span id="order-detail-payment-method"></span></div>
+                <div><strong>Subtotal:</strong> ₹<span id="order-detail-subtotal"></span></div>
+                <div><strong>Transport Tax:</strong> ₹<span id="order-detail-transport-tax"></span></div>
+                <div><strong>Total Amount:</strong> ₹<span id="order-detail-total-amount" class="text-green-400 font-bold"></span></div>
             </div>
             <div class="mt-4">
-                <label for="order-status-select" class="block text-gray-300 text-sm font-bold mb-2">Update Status:</label>
-                <select id="order-status-select">
+                <h3 class="text-xl font-bold mb-2">Items:</h3>
+                <ul id="order-detail-items" class="list-disc list-inside text-gray-300"></ul>
+            </div>
+            <div class="mt-4">
+                <label for="order-status-select" class="block font-bold mb-2">Update Status:</label>
+                <select id="order-status-select" class="form-group w-full p-2 rounded-md bg-gray-700 text-white">
                     <option value="Pending">Pending</option>
                     <option value="Confirmed">Confirmed</option>
                     <option value="Preparing">Preparing</option>
@@ -348,92 +501,61 @@
                     <option value="Delivered">Delivered</option>
                     <option value="Cancelled">Cancelled</option>
                 </select>
-                <button id="update-order-status-btn" class="mt-4 btn-secondary">Update Status</button>
-                <p id="order-update-message" class="mt-2 text-sm text-center"></p>
+                <button id="update-order-status-btn" class="btn-primary w-full mt-3">
+                    <span id="update-order-loader" class="loader hidden"></span>
+                    <span id="update-order-text">Update Status</span>
+                </button>
+                <p id="order-update-message" class="message mt-3"></p>
             </div>
+            <button id="delete-order-btn" class="btn-danger w-full mt-4">Delete Order</button>
         </div>
     </div>
-
-    <!-- Menu Item Form Modal -->
-    <div id="menu-item-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2 id="menu-item-modal-title" class="text-2xl font-bold text-white mb-4">Add New Menu Item</h2>
-            <form id="menu-item-form" class="space-y-4">
-                <input type="hidden" id="menu-item-id">
-                <div>
-                    <label for="item-name" class="block text-gray-300 text-sm font-bold mb-2">Name:</label>
-                    <input type="text" id="item-name" name="name" required>
-                </div>
-                <div>
-                    <label for="item-description" class="block text-gray-300 text-sm font-bold mb-2">Description:</label>
-                    <textarea id="item-description" name="description"></textarea>
-                </div>
-                <div>
-                    <label for="item-price" class="block text-gray-300 text-sm font-bold mb-2">Price:</label>
-                    <input type="number" step="0.01" id="item-price" name="price" required min="0">
-                </div>
-                <div>
-                    <label for="item-image-url" class="block text-gray-300 text-sm font-bold mb-2">Image URL:</label>
-                    <input type="url" id="item-image-url" name="imageUrl" placeholder="https://placehold.co/300x200/cccccc/333333?text=Food+Item">
-                </div>
-                <div>
-                    <label for="item-category" class="block text-gray-300 text-sm font-bold mb-2">Category:</label>
-                    <input type="text" id="item-category" name="category" value="Main Course">
-                </div>
-                <div class="flex items-center">
-                    <input type="checkbox" id="item-is-available" name="isAvailable" class="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded bg-gray-700">
-                    <label for="item-is-available" class="text-gray-300 text-sm">Available</label>
-                </div>
-                <div class="flex items-center">
-                    <input type="checkbox" id="item-is-trending" name="isTrending" class="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded bg-gray-700">
-                    <label for="item-is-trending" class="text-gray-300 text-sm">Trending</label>
-                </div>
-                <button type="submit" class="btn-primary">Save Item</button>
-                <p id="menu-item-message" class="mt-2 text-sm text-center"></p>
-            </form>
-        </div>
-    </div>
-
 
     <script>
         const socket = io();
+
+        // Bot Status Elements
         const botStatusSpan = document.getElementById('bot-status');
-        const lastAuthTimeSpan = document.getElementById('last-auth-time'); // New span for last auth time
-        const botStatusAlert = document.getElementById('bot-status-alert');
-        const alertMessage = document.getElementById('alert-message');
+        const lastAuthTimeSpan = document.getElementById('last-auth-time');
+        const refreshBotStatusBtn = document.getElementById('refresh-bot-status-btn');
         const requestQrBtn = document.getElementById('request-qr-btn');
         const loadSessionBtn = document.getElementById('load-session-btn');
+        const requestQrLoader = document.getElementById('request-qr-loader');
+        const requestQrText = document.getElementById('request-qr-text');
+        const loadSessionLoader = document.getElementById('load-session-loader');
+        const loadSessionText = document.getElementById('load-session-text');
+        const botMessage = document.getElementById('bot-message');
+        const qrCodeSection = document.getElementById('qr-code-section');
+        const qrCodeImg = document.getElementById('qr-code-img');
+        const qrCountdownSpan = document.getElementById('qr-countdown');
 
-        const ordersTabBtn = document.querySelector('[data-tab="orders"]');
-        const menuTabBtn = document.querySelector('[data-tab="menu"]');
-        const settingsTabBtn = document.querySelector('[data-tab="settings"]');
-        const customersTabBtn = document.querySelector('[data-tab="customers"]');
+        // Orders Elements
+        const ordersListDiv = document.getElementById('orders-list');
+        const refreshOrdersBtn = document.getElementById('refresh-orders-btn');
+        const ordersMessage = document.getElementById('orders-message');
 
-        const ordersTabContent = document.getElementById('orders-tab');
-        const menuTabContent = document.getElementById('menu-tab');
-        const settingsTabContent = document.getElementById('settings-tab');
-        const customersTabContent = document.getElementById('customers-tab');
-
-        const ordersList = document.getElementById('orders-list');
-        const menuItemsList = document.getElementById('menu-items-list');
+        // Menu Elements
+        const menuItemsListDiv = document.getElementById('menu-items-list');
         const addMenuItemBtn = document.getElementById('add-menu-item-btn');
+        const menuMessage = document.getElementById('menu-message');
+
+        // Customer Elements
+        const customersListDiv = document.getElementById('customers-list');
+        const refreshCustomersBtn = document.getElementById('refresh-customers-btn');
+        const customersMessage = document.getElementById('customers-message');
+
+        // Settings Elements
         const settingsForm = document.getElementById('settings-form');
+        const shopNameInput = document.getElementById('shop-name');
+        const shopLatInput = document.getElementById('shop-lat');
+        const shopLonInput = document.getElementById('shop-lon');
         const deliveryRatesContainer = document.getElementById('delivery-rates-container');
         const addDeliveryRateBtn = document.getElementById('add-delivery-rate-btn');
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
         const settingsMessage = document.getElementById('settings-message');
-        const customersList = document.getElementById('customers-list');
 
-        const orderDetailsModal = document.getElementById('order-details-modal');
-        const closeOrderDetailsModalBtn = orderDetailsModal.querySelector('.close-button');
-        const orderDetailsContent = document.getElementById('order-details-content');
-        const orderStatusSelect = document.getElementById('order-status-select');
-        const updateOrderStatusBtn = document.getElementById('update-order-status-btn');
-        const orderUpdateMessage = document.getElementById('order-update-message');
-        let currentOrderId = null;
-
+        // Modals
         const menuItemModal = document.getElementById('menu-item-modal');
-        const closeMenuItemModalBtn = menuItemModal.querySelector('.close-button');
         const menuItemModalTitle = document.getElementById('menu-item-modal-title');
         const menuItemForm = document.getElementById('menu-item-form');
         const menuItemIdInput = document.getElementById('menu-item-id');
@@ -442,144 +564,658 @@
         const itemPriceInput = document.getElementById('item-price');
         const itemImageUrlInput = document.getElementById('item-image-url');
         const itemCategoryInput = document.getElementById('item-category');
-        const itemIsAvailableInput = document.getElementById('item-is-available');
-        const itemIsTrendingInput = document.getElementById('item-is-trending');
+        const itemIsAvailableCheckbox = document.getElementById('item-is-available');
+        const itemIsTrendingCheckbox = document.getElementById('item-is-trending');
+        const menuItemLoader = document.getElementById('menu-item-loader');
+        const menuItemText = document.getElementById('menu-item-text');
         const menuItemMessage = document.getElementById('menu-item-message');
 
-        let currentActiveTab = 'orders'; // Default active tab
-        let shopLocationData = null; // To store shop location for customer tracking
+        const orderDetailsModal = document.getElementById('order-details-modal');
+        const orderDetailIdDisplay = document.getElementById('order-detail-id-display');
+        const orderDetailCustomerName = document.getElementById('order-detail-customer-name');
+        const orderDetailCustomerPhone = document.getElementById('order-detail-customer-phone');
+        const orderDetailDeliveryAddress = document.getElementById('order-detail-delivery-address');
+        const orderDetailDate = document.getElementById('order-detail-date');
+        const orderDetailPaymentMethod = document.getElementById('order-detail-payment-method');
+        const orderDetailSubtotal = document.getElementById('order-detail-subtotal');
+        const orderDetailTransportTax = document.getElementById('order-detail-transport-tax');
+        const orderDetailTotalAmount = document.getElementById('order-detail-total-amount');
+        const orderDetailItemsList = document.getElementById('order-detail-items');
+        const orderStatusSelect = document.getElementById('order-status-select');
+        const updateOrderStatusBtn = document.getElementById('update-order-status-btn');
+        const updateOrderLoader = document.getElementById('update-order-loader');
+        const updateOrderText = document.getElementById('update-order-text');
+        const orderUpdateMessage = document.getElementById('order-update-message');
+        const deleteOrderBtn = document.getElementById('delete-order-btn');
 
-        // --- Tab Switching Logic ---
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.add('hidden');
-            });
-            document.querySelectorAll('.tab-button').forEach(button => {
-                button.classList.remove('bg-gray-700', 'text-white');
-                button.classList.add('text-gray-400', 'hover:text-white');
-            });
+        // Global variables
+        let qrTimerInterval = null;
+        const QR_EXPIRY_MS = 60000; // 60 seconds
 
-            document.getElementById(`${tabName}-tab`).classList.remove('hidden');
-            document.querySelector(`[data-tab="${tabName}"]`).classList.add('bg-gray-700', 'text-white');
-            document.querySelector(`[data-tab="${tabName}"]`).classList.remove('text-gray-400', 'hover:text-white');
-            currentActiveTab = tabName;
-
-            // Fetch data for the active tab
-            if (tabName === 'orders') fetchOrders();
-            else if (tabName === 'menu') fetchMenuItems();
-            else if (tabName === 'settings') fetchSettings();
-            else if (tabName === 'customers') fetchCustomers();
+        // --- Utility Functions ---
+        function showLoader(loaderElement, textElement, messageElement, message = 'Loading...', type = 'info') {
+            loaderElement.classList.remove('hidden');
+            textElement.classList.add('hidden');
+            messageElement.textContent = message;
+            messageElement.className = `message mt-3 ${type}`;
         }
 
-        ordersTabBtn.addEventListener('click', () => switchTab('orders'));
-        menuTabBtn.addEventListener('click', () => switchTab('menu'));
-        settingsTabBtn.addEventListener('click', () => switchTab('settings'));
-        customersTabBtn.addEventListener('click', () => switchTab('customers'));
+        function hideLoader(loaderElement, textElement, messageElement, success = true, message = '') {
+            loaderElement.classList.add('hidden');
+            textElement.classList.remove('hidden');
+            messageElement.textContent = message;
+            messageElement.className = `message mt-3 ${success ? 'success' : 'error'}`;
+            if (!message) messageElement.classList.add('hidden'); // Hide if no message
+            else messageElement.classList.remove('hidden');
+        }
 
-        // Initialize with the default tab
-        switchTab(currentActiveTab);
-
-
-        // --- WhatsApp Bot Status ---
-        socket.on('status', (status) => {
+        function updateBotStatusDisplay(status) {
             botStatusSpan.textContent = status;
-            botStatusAlert.classList.remove('alert-red', 'alert-yellow', 'alert-green', 'hidden');
-            requestQrBtn.classList.add('hidden'); // Hide by default
-            loadSessionBtn.classList.add('hidden'); // Hide by default
-
-            let message = '';
-            let alertClass = '';
-
+            botStatusSpan.classList.remove('text-green-400', 'text-yellow-400', 'text-red-400');
             switch (status) {
                 case 'ready':
-                    message = 'WhatsApp bot is connected and ready!';
-                    alertClass = 'alert-green';
+                    botStatusSpan.classList.add('text-green-400');
+                    botMessage.textContent = 'WhatsApp bot is connected and ready!';
+                    botMessage.className = 'message mt-3 success';
+                    qrCodeSection.classList.add('hidden');
+                    if (qrTimerInterval) clearInterval(qrTimerInterval);
                     break;
                 case 'authenticated':
-                    message = 'WhatsApp bot authenticated. Waiting for ready state...';
-                    alertClass = 'alert-yellow';
+                    botStatusSpan.classList.add('text-yellow-400');
+                    botMessage.textContent = 'WhatsApp bot authenticated. Waiting for ready state...';
+                    botMessage.className = 'message mt-3 info';
+                    qrCodeSection.classList.add('hidden');
+                    if (qrTimerInterval) clearInterval(qrTimerInterval);
                     break;
                 case 'qr_received':
-                    message = 'QR Code received. Scan it with your WhatsApp app.';
-                    alertClass = 'alert-yellow';
-                    requestQrBtn.classList.remove('hidden'); // Show QR button
-                    break;
-                case 'qr_expired':
-                    message = 'QR Code expired. Please request a new one.';
-                    alertClass = 'alert-red';
-                    requestQrBtn.classList.remove('hidden'); // Show QR button
-                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
+                    botStatusSpan.classList.add('text-yellow-400');
+                    botMessage.textContent = 'QR Code received. Scan it with your WhatsApp app.';
+                    botMessage.className = 'message mt-3 info';
+                    qrCodeSection.classList.remove('hidden');
+                    startQrCountdown();
                     break;
                 case 'auth_failure':
-                    message = 'Authentication failed. Please request a new QR code and re-scan.';
-                    alertClass = 'alert-red';
-                    requestQrBtn.classList.remove('hidden'); // Show QR button
-                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
+                    botStatusSpan.classList.add('text-red-400');
+                    botMessage.textContent = 'Authentication failed. Please request a new QR code and re-scan.';
+                    botMessage.className = 'message mt-3 error';
+                    qrCodeSection.classList.add('hidden');
+                    if (qrTimerInterval) clearInterval(qrTimerInterval);
                     break;
                 case 'disconnected':
-                    message = 'WhatsApp bot disconnected. Attempting to reconnect or waiting for new QR.';
-                    alertClass = 'alert-red';
-                    requestQrBtn.classList.remove('hidden'); // Show QR button
-                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
+                    botStatusSpan.classList.add('text-red-400');
+                    botMessage.textContent = 'WhatsApp bot disconnected. Attempting to reconnect or waiting for new QR.';
+                    botMessage.className = 'message mt-3 error';
+                    qrCodeSection.classList.add('hidden');
+                    if (qrTimerInterval) clearInterval(qrTimerInterval);
                     break;
                 case 'initializing':
-                    message = 'WhatsApp bot is initializing...';
-                    alertClass = 'alert-yellow';
-                    break;
-                case 'reconnecting':
-                    message = 'WhatsApp bot is reconnecting...';
-                    alertClass = 'alert-yellow';
+                    botStatusSpan.classList.add('text-yellow-400');
+                    botMessage.textContent = 'WhatsApp bot is initializing...';
+                    botMessage.className = 'message mt-3 info';
+                    qrCodeSection.classList.add('hidden');
+                    if (qrTimerInterval) clearInterval(qrTimerInterval);
                     break;
                 case 'qr_error':
-                    message = 'Error generating QR code. Check server logs.';
-                    alertClass = 'alert-red';
-                    requestQrBtn.classList.remove('hidden'); // Show QR button
-                    loadSessionBtn.classList.remove('hidden'); // Show Load Session button
+                    botStatusSpan.classList.add('text-red-400');
+                    botMessage.textContent = 'Error generating QR code. Check server logs.';
+                    botMessage.className = 'message mt-3 error';
+                    qrCodeSection.classList.add('hidden');
+                    if (qrTimerInterval) clearInterval(qrTimerInterval);
                     break;
                 default:
-                    message = `Unknown status: ${status}`;
-                    alertClass = 'alert-yellow';
+                    botStatusSpan.classList.add('text-gray-400');
+                    botMessage.textContent = `Unknown status: ${status}`;
+                    botMessage.className = 'message mt-3 info';
+                    qrCodeSection.classList.add('hidden');
+                    if (qrTimerInterval) clearInterval(qrTimerInterval);
             }
+        }
 
-            alertMessage.textContent = message;
-            botStatusAlert.classList.add(alertClass);
-            botStatusAlert.classList.remove('hidden');
-        });
+        function startQrCountdown() {
+            if (qrTimerInterval) clearInterval(qrTimerInterval);
+            let timeLeft = QR_EXPIRY_MS / 1000;
+            qrCountdownSpan.textContent = timeLeft;
 
-        // New: Listen for sessionInfo to update last authenticated time
-        socket.on('sessionInfo', (data) => {
-            if (data.lastAuthenticatedAt) {
-                lastAuthTimeSpan.textContent = new Date(data.lastAuthenticatedAt).toLocaleString();
+            qrTimerInterval = setInterval(() => {
+                timeLeft--;
+                qrCountdownSpan.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(qrTimerInterval);
+                    qrCodeSection.classList.add('hidden');
+                    updateBotStatusDisplay('qr_expired'); // Update status to expired
+                }
+            }, 1000);
+        }
+
+        // --- Fetch Data Functions ---
+
+        async function fetchBotStatus() {
+            showLoader(requestQrLoader, requestQrText, botMessage, 'Fetching bot status...', 'info');
+            try {
+                const response = await fetch('/api/admin/bot-status');
+                const data = await response.json();
+                updateBotStatusDisplay(data.status);
+                if (data.lastAuthenticatedAt) {
+                    lastAuthTimeSpan.textContent = new Date(data.lastAuthenticatedAt).toLocaleString();
+                } else {
+                    lastAuthTimeSpan.textContent = 'N/A';
+                }
+                hideLoader(requestQrLoader, requestQrText, botMessage, true, 'Status updated.');
+            } catch (error) {
+                console.error('Error fetching bot status:', error);
+                hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error fetching status: ${error.message}`);
+                botStatusSpan.textContent = 'Error';
+                botStatusSpan.classList.add('text-red-400');
+            }
+        }
+
+        async function fetchOrders() {
+            ordersListDiv.innerHTML = '<p class="text-center text-gray-400">Loading orders...</p>';
+            ordersMessage.classList.add('hidden');
+            try {
+                const response = await fetch('/api/admin/orders');
+                const orders = await response.json();
+                renderOrders(orders);
+            } catch (error) {
+                console.error('Error fetching orders:', error);
+                ordersListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load orders.</p>';
+                ordersMessage.textContent = `Error: ${error.message}`;
+                ordersMessage.className = 'message mt-3 error';
+                ordersMessage.classList.remove('hidden');
+            }
+        }
+
+        async function fetchMenuItems() {
+            menuItemsListDiv.innerHTML = '<p class="text-center text-gray-400">Loading menu items...</p>';
+            menuMessage.classList.add('hidden');
+            try {
+                const response = await fetch('/api/admin/menu');
+                const items = await response.json();
+                renderMenuItems(items);
+            } catch (error) {
+                console.error('Error fetching menu items:', error);
+                menuItemsListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load menu items.</p>';
+                menuMessage.textContent = `Error: ${error.message}`;
+                menuMessage.className = 'message mt-3 error';
+                menuMessage.classList.remove('hidden');
+            }
+        }
+
+        async function fetchCustomers() {
+            customersListDiv.innerHTML = '<p class="text-center text-gray-400">Loading customer data...</p>';
+            customersMessage.classList.add('hidden');
+            try {
+                const response = await fetch('/api/admin/customers');
+                const customers = await response.json();
+                renderCustomers(customers);
+            } catch (error) {
+                console.error('Error fetching customers:', error);
+                customersListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load customer data.</p>';
+                customersMessage.textContent = `Error: ${error.message}`;
+                customersMessage.className = 'message mt-3 error';
+                customersMessage.classList.remove('hidden');
+            }
+        }
+
+        async function fetchSettings() {
+            try {
+                const response = await fetch('/api/admin/settings');
+                const settings = await response.json();
+                shopNameInput.value = settings.shopName || '';
+                shopLatInput.value = settings.shopLocation ? settings.shopLocation.latitude : '';
+                shopLonInput.value = settings.shopLocation ? settings.shopLocation.longitude : '';
+                renderDeliveryRates(settings.deliveryRates || []);
+            } catch (error) {
+                console.error('Error fetching settings:', error);
+                settingsMessage.textContent = `Error loading settings: ${error.message}`;
+                settingsMessage.className = 'message mt-3 error';
+                settingsMessage.classList.remove('hidden');
+            }
+        }
+
+        // --- Render Functions ---
+
+        function renderOrders(orders) {
+            if (orders.length === 0) {
+                ordersListDiv.innerHTML = '<p class="text-center text-gray-400">No orders found.</p>';
+                return;
+            }
+            let tableHtml = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            orders.forEach(order => {
+                const orderIdShort = order._id.substring(0, 6);
+                const orderDate = new Date(order.orderDate).toLocaleString();
+                let statusClass = 'text-white';
+                switch(order.status) {
+                    case 'Pending': statusClass = 'text-yellow-400'; break;
+                    case 'Confirmed':
+                    case 'Preparing': statusClass = 'text-blue-400'; break;
+                    case 'Out for Delivery': statusClass = 'text-purple-400'; break;
+                    case 'Delivered': statusClass = 'text-green-400'; break;
+                    case 'Cancelled': statusClass = 'text-red-400'; break;
+                }
+
+                tableHtml += `
+                    <tr>
+                        <td>${orderIdShort}...</td>
+                        <td>${order.customerName}</td>
+                        <td>₹${order.totalAmount.toFixed(2)}</td>
+                        <td class="${statusClass}">${order.status}</td>
+                        <td>${orderDate}</td>
+                        <td>
+                            <button class="btn-secondary btn-small view-order-btn" data-id="${order._id}">View</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tableHtml += `</tbody></table>`;
+            ordersListDiv.innerHTML = tableHtml;
+
+            // Add event listeners for view buttons
+            document.querySelectorAll('.view-order-btn').forEach(button => {
+                button.addEventListener('click', () => openOrderDetailsModal(button.dataset.id));
+            });
+        }
+
+        function renderMenuItems(items) {
+            if (items.length === 0) {
+                menuItemsListDiv.innerHTML = '<p class="text-center text-gray-400">No menu items found. Add some!</p>';
+                return;
+            }
+            let tableHtml = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Available</th>
+                            <th>Trending</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            items.forEach(item => {
+                tableHtml += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>₹${item.price.toFixed(2)}</td>
+                        <td class="${item.isAvailable ? 'text-green-400' : 'text-red-400'}">${item.isAvailable ? 'Yes' : 'No'}</td>
+                        <td class="${item.isTrending ? 'text-green-400' : 'text-red-400'}">${item.isTrending ? 'Yes' : 'No'}</td>
+                        <td>
+                            <button class="btn-secondary btn-small edit-menu-item-btn" data-id="${item._id}">Edit</button>
+                            <button class="btn-danger btn-small delete-menu-item-btn" data-id="${item._id}">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tableHtml += `</tbody></table>`;
+            menuItemsListDiv.innerHTML = tableHtml;
+
+            // Add event listeners for edit/delete buttons
+            document.querySelectorAll('.edit-menu-item-btn').forEach(button => {
+                button.addEventListener('click', () => openMenuItemModal(button.dataset.id));
+            });
+            document.querySelectorAll('.delete-menu-item-btn').forEach(button => {
+                button.addEventListener('click', () => deleteMenuItem(button.dataset.id));
+            });
+        }
+
+        function renderCustomers(customers) {
+            if (customers.length === 0) {
+                customersListDiv.innerHTML = '<p class="text-center text-gray-400">No customer data found.</p>';
+                return;
+            }
+            let tableHtml = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Phone</th>
+                            <th>Name</th>
+                            <th>Total Orders</th>
+                            <th>Last Order</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            customers.forEach(customer => {
+                const lastOrderDate = customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleString() : 'N/A';
+                tableHtml += `
+                    <tr>
+                        <td>${customer.customerPhone}</td>
+                        <td>${customer.customerName || 'N/A'}</td>
+                        <td>${customer.totalOrders}</td>
+                        <td>${lastOrderDate}</td>
+                        <td>
+                            <button class="btn-danger btn-small delete-customer-btn" data-id="${customer._id}">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tableHtml += `</tbody></table>`;
+            customersListDiv.innerHTML = tableHtml;
+
+            // Add event listeners for delete buttons
+            document.querySelectorAll('.delete-customer-btn').forEach(button => {
+                button.addEventListener('click', () => deleteCustomer(button.dataset.id));
+            });
+        }
+
+        function renderDeliveryRates(rates) {
+            deliveryRatesContainer.innerHTML = ''; // Clear existing
+            rates.sort((a, b) => a.kms - b.kms); // Ensure they are sorted for display
+            rates.forEach((rate, index) => {
+                const rateDiv = document.createElement('div');
+                rateDiv.className = 'delivery-rate-item';
+                rateDiv.innerHTML = `
+                    <input type="number" step="any" class="kms-input" value="${rate.kms}" placeholder="KMs" data-index="${index}">
+                    <input type="number" step="any" class="amount-input" value="${rate.amount}" placeholder="Amount" data-index="${index}">
+                    <button type="button" class="remove-rate-btn btn-small" data-index="${index}">Remove</button>
+                `;
+                deliveryRatesContainer.appendChild(rateDiv);
+            });
+
+            // Add event listeners for dynamically added remove buttons
+            document.querySelectorAll('.remove-rate-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.target.closest('.delivery-rate-item').remove();
+                });
+            });
+        }
+
+        // --- Modal Functions ---
+
+        function openMenuItemModal(itemId = null) {
+            menuItemForm.reset(); // Clear previous form data
+            menuItemIdInput.value = '';
+            menuItemMessage.classList.add('hidden');
+            menuItemText.textContent = 'Save Item'; // Reset button text
+
+            if (itemId) {
+                menuItemModalTitle.textContent = 'Edit Menu Item';
+                menuItemText.textContent = 'Update Item';
+                fetch(`/api/admin/menu/${itemId}`)
+                    .then(res => res.json())
+                    .then(item => {
+                        menuItemIdInput.value = item._id;
+                        itemNameInput.value = item.name;
+                        itemDescriptionInput.value = item.description || '';
+                        itemPriceInput.value = item.price;
+                        itemImageUrlInput.value = item.imageUrl || '';
+                        itemCategoryInput.value = item.category || '';
+                        itemIsAvailableCheckbox.checked = item.isAvailable;
+                        itemIsTrendingCheckbox.checked = item.isTrending;
+                    })
+                    .catch(error => {
+                        console.error('Error fetching menu item for edit:', error);
+                        menuItemMessage.textContent = `Error loading item: ${error.message}`;
+                        menuItemMessage.className = 'message mt-3 error';
+                        menuItemMessage.classList.remove('hidden');
+                    });
             } else {
-                lastAuthTimeSpan.textContent = 'N/A';
+                menuItemModalTitle.textContent = 'Add New Menu Item';
+                itemIsAvailableCheckbox.checked = true; // Default new items to available
+                itemIsTrendingCheckbox.checked = false;
             }
-        });
+            menuItemModal.style.display = 'flex';
+        }
 
-        requestQrBtn.addEventListener('click', async () => {
-            requestQrBtn.disabled = true;
-            loadSessionBtn.disabled = true;
-            alertMessage.textContent = 'Requesting new QR...';
-            botStatusAlert.classList.remove('alert-red', 'alert-yellow', 'alert-green');
-            botStatusAlert.classList.add('alert-yellow');
+        async function openOrderDetailsModal(orderId) {
+            orderUpdateMessage.classList.add('hidden'); // Clear previous messages
+            showLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, 'Loading order details...', 'info');
 
             try {
-                const response = await fetch('/api/public/request-qr', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                const response = await fetch(`/api/admin/orders/${orderId}`);
+                const order = await response.json();
+
+                orderDetailIdDisplay.textContent = order._id.substring(0, 8);
+                orderDetailCustomerName.textContent = order.customerName;
+                orderDetailCustomerPhone.textContent = order.customerPhone;
+                orderDetailDeliveryAddress.textContent = order.deliveryAddress;
+                orderDetailDate.textContent = new Date(order.orderDate).toLocaleString();
+                orderDetailPaymentMethod.textContent = order.paymentMethod;
+                orderDetailSubtotal.textContent = order.subtotal.toFixed(2);
+                orderDetailTransportTax.textContent = order.transportTax.toFixed(2);
+                orderDetailTotalAmount.textContent = order.totalAmount.toFixed(2);
+
+                orderDetailItemsList.innerHTML = '';
+                order.items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = `${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)`;
+                    orderDetailItemsList.appendChild(li);
+                });
+
+                orderStatusSelect.value = order.status;
+                updateOrderStatusBtn.dataset.id = order._id; // Set order ID for update button
+                deleteOrderBtn.dataset.id = order._id; // Set order ID for delete button
+
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, ''); // Hide loader, no message
+                orderDetailsModal.style.display = 'flex';
+            } catch (error) {
+                console.error('Error fetching order details:', error);
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error loading order: ${error.message}`);
+            }
+        }
+
+        // --- Action Functions ---
+
+        async function saveMenuItem() {
+            const itemId = menuItemIdInput.value;
+            const method = itemId ? 'PUT' : 'POST';
+            const url = itemId ? `/api/admin/menu/${itemId}` : '/api/admin/menu';
+
+            const itemData = {
+                name: itemNameInput.value,
+                description: itemDescriptionInput.value,
+                price: parseFloat(itemPriceInput.value),
+                imageUrl: itemImageUrlInput.value,
+                category: itemCategoryInput.value,
+                isAvailable: itemIsAvailableCheckbox.checked,
+                isTrending: itemIsTrendingCheckbox.checked
+            };
+
+            showLoader(menuItemLoader, menuItemText, menuItemMessage, 'Saving item...');
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(itemData)
                 });
                 const result = await response.json();
                 if (response.ok) {
-                    alertMessage.textContent = result.message;
-                    // Status update will come via socket.io
+                    hideLoader(menuItemLoader, menuItemText, menuItemMessage, true, `Item ${itemId ? 'updated' : 'added'} successfully!`);
+                    fetchMenuItems(); // Refresh list
+                    setTimeout(() => menuItemModal.style.display = 'none', 1500); // Close after a delay
                 } else {
-                    alertMessage.textContent = `Error: ${result.message || 'Failed to request new QR.'}`;
-                    botStatusAlert.classList.remove('alert-yellow');
-                    botStatusAlert.classList.add('alert-red');
+                    hideLoader(menuItemLoader, menuItemText, menuItemMessage, false, `Error: ${result.message || 'Failed to save item.'}`);
                 }
             } catch (error) {
-                alertMessage.textContent = `Network error requesting QR: ${error.message}`;
-                botStatusAlert.classList.remove('alert-yellow');
-                botStatusAlert.classList.add('alert-red');
+                console.error('Error saving menu item:', error);
+                hideLoader(menuItemLoader, menuItemText, menuItemMessage, false, `Network error: ${error.message}`);
+            }
+        }
+
+        async function deleteMenuItem(itemId) {
+            if (!confirm('Are you sure you want to delete this menu item?')) return;
+            menuMessage.classList.add('hidden'); // Hide previous messages
+
+            try {
+                const response = await fetch(`/api/admin/menu/${itemId}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (response.ok) {
+                    menuMessage.textContent = result.message;
+                    menuMessage.className = 'message mt-3 success';
+                    menuMessage.classList.remove('hidden');
+                    fetchMenuItems(); // Refresh list
+                } else {
+                    menuMessage.textContent = `Error: ${result.message || 'Failed to delete item.'}`;
+                    menuMessage.className = 'message mt-3 error';
+                    menuMessage.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error deleting menu item:', error);
+                menuMessage.textContent = `Network error: ${error.message}`;
+                menuMessage.className = 'message mt-3 error';
+                menuMessage.classList.remove('hidden');
+            }
+        }
+
+        async function updateOrderStatus(orderId, newStatus) {
+            showLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, 'Updating status...', 'info');
+            try {
+                const response = await fetch(`/api/admin/orders/${orderId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, 'Order status updated!');
+                    fetchOrders(); // Refresh orders list in background
+                    // Update modal display immediately
+                    orderStatusSelect.value = result.status;
+                    let statusClass = 'text-white';
+                    switch(result.status) {
+                        case 'Pending': statusClass = 'text-yellow-400'; break;
+                        case 'Confirmed':
+                        case 'Preparing': statusClass = 'text-blue-400'; break;
+                        case 'Out for Delivery': statusClass = 'text-purple-400'; break;
+                        case 'Delivered': statusClass = 'text-green-400'; break;
+                        case 'Cancelled': statusClass = 'text-red-400'; break;
+                    }
+                    orderDetailIdDisplay.closest('.modal-content').querySelector('.grid div:nth-child(4) span').className = statusClass; // Update status text color
+                    setTimeout(() => orderDetailsModal.style.display = 'none', 1500); // Close after a delay
+                } else {
+                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${result.message || 'Failed to update status.'}`);
+                }
+            } catch (error) {
+                console.error('Error updating order status:', error);
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Network error: ${error.message}`);
+            }
+        }
+
+        async function deleteOrder(orderId) {
+            if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
+            showLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, 'Deleting order...', 'info');
+            try {
+                const response = await fetch(`/api/admin/orders/${orderId}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (response.ok) {
+                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, result.message);
+                    fetchOrders(); // Refresh list
+                    setTimeout(() => orderDetailsModal.style.display = 'none', 1500); // Close after a delay
+                } else {
+                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${result.message || 'Failed to delete order.'}`);
+                }
+            } catch (error) {
+                console.error('Error deleting order:', error);
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Network error: ${error.message}`);
+            }
+        }
+
+        async function saveSettings() {
+            const deliveryRates = [];
+            document.querySelectorAll('#delivery-rates-container .delivery-rate-item').forEach(itemDiv => {
+                const kms = parseFloat(itemDiv.querySelector('.kms-input').value);
+                const amount = parseFloat(itemDiv.querySelector('.amount-input').value);
+                if (!isNaN(kms) && !isNaN(amount)) {
+                    deliveryRates.push({ kms, amount });
+                }
+            });
+
+            // Sort rates by kms before sending to backend
+            deliveryRates.sort((a, b) => a.kms - b.kms);
+
+            const settingsData = {
+                shopName: shopNameInput.value,
+                shopLocation: {
+                    latitude: parseFloat(shopLatInput.value),
+                    longitude: parseFloat(shopLonInput.value)
+                },
+                deliveryRates: deliveryRates
+            };
+
+            showLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, 'Saving settings...');
+            try {
+                const response = await fetch('/api/admin/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settingsData)
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, true, result.message);
+                    fetchSettings(); // Re-fetch to ensure UI is consistent
+                } else {
+                    hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, false, `Error: ${result.message || 'Failed to save settings.'}`);
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, false, `Network error: ${error.message}`);
+            }
+        }
+
+        function addDeliveryRateInput() {
+            const rateDiv = document.createElement('div');
+            rateDiv.className = 'delivery-rate-item';
+            rateDiv.innerHTML = `
+                <input type="number" step="any" class="kms-input" placeholder="KMs">
+                <input type="number" step="any" class="amount-input" placeholder="Amount">
+                <button type="button" class="remove-rate-btn btn-small">Remove</button>
+            `;
+            deliveryRatesContainer.appendChild(rateDiv);
+            rateDiv.querySelector('.remove-rate-btn').addEventListener('click', (e) => {
+                e.target.closest('.delivery-rate-item').remove();
+            });
+        }
+
+
+        // --- Event Listeners ---
+
+        // Header Logout
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to log out?')) {
+                try {
+                    await fetch('/admin/logout');
+                    window.location.href = '/admin/login';
+                } catch (error) {
+                    alert('Failed to log out. Please try again.');
+                    console.error('Logout error:', error);
+                }
+            }
+        });
+
+        // Bot Status Actions
+        refreshBotStatusBtn.addEventListener('click', fetchBotStatus);
+        requestQrBtn.addEventListener('click', async () => {
+            requestQrBtn.disabled = true;
+            loadSessionBtn.disabled = true;
+            showLoader(requestQrLoader, requestQrText, botMessage, 'Requesting new QR...', 'info');
+            qrCodeSection.classList.add('hidden'); // Hide old QR immediately
+            if (qrTimerInterval) clearInterval(qrTimerInterval);
+
+            try {
+                const response = await fetch('/api/public/request-qr', { method: 'POST' });
+                const result = await response.json();
+                if (!response.ok) {
+                    hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error: ${result.message || 'Failed to request new QR.'}`);
+                }
+                // Status and QR updates will come via socket.io
+            } catch (error) {
+                hideLoader(requestQrLoader, requestQrText, botMessage, false, `Network error requesting QR: ${error.message}`);
             } finally {
                 requestQrBtn.disabled = false;
                 loadSessionBtn.disabled = false;
@@ -589,659 +1225,101 @@
         loadSessionBtn.addEventListener('click', async () => {
             loadSessionBtn.disabled = true;
             requestQrBtn.disabled = true;
-            alertMessage.textContent = 'Attempting to load saved session...';
-            botStatusAlert.classList.remove('alert-red', 'alert-yellow', 'alert-green');
-            botStatusAlert.classList.add('alert-yellow');
+            showLoader(loadSessionLoader, loadSessionText, botMessage, 'Attempting to load saved session...', 'info');
+            qrCodeSection.classList.add('hidden'); // Hide QR immediately
+            if (qrTimerInterval) clearInterval(qrTimerInterval);
 
             try {
-                const response = await fetch('/api/admin/load-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
+                const response = await fetch('/api/admin/load-session', { method: 'POST' });
                 const result = await response.json();
-                if (response.ok) {
-                    alertMessage.textContent = result.message;
-                    // Status update will come via socket.io
-                } else {
-                    alertMessage.textContent = `Error: ${result.message || 'Failed to load session.'}`;
-                    botStatusAlert.classList.remove('alert-yellow');
-                    botStatusAlert.classList.add('alert-red');
+                if (!response.ok) {
+                    hideLoader(loadSessionLoader, loadSessionText, botMessage, false, `Error: ${result.message || 'Failed to load session.'}`);
                 }
+                // Status updates will come via socket.io
             } catch (error) {
-                alertMessage.textContent = `Network error loading session: ${error.message}`;
-                botStatusAlert.classList.remove('alert-yellow');
-                botStatusAlert.classList.add('alert-red');
+                hideLoader(loadSessionLoader, loadSessionText, botMessage, false, `Network error loading session: ${error.message}`);
             } finally {
                 loadSessionBtn.disabled = false;
                 requestQrBtn.disabled = false;
             }
         });
 
+        // Orders Actions
+        refreshOrdersBtn.addEventListener('click', fetchOrders);
 
-        // --- Orders Tab Functions ---
-        async function fetchOrders() {
-            ordersList.innerHTML = '<p class="text-gray-400 text-center py-4">Loading orders...</p>';
-            try {
-                const response = await fetch('/api/admin/orders');
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login'; // Redirect to login if unauthorized
-                        return;
-                    }
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const orders = await response.json();
-                displayOrders(orders);
-            } catch (error) {
-                console.error('Error fetching orders:', error);
-                ordersList.innerHTML = `<p class="text-red-500 text-center py-4">Failed to load orders: ${error.message}</p>`;
-            }
-        }
-
-        function displayOrders(orders) {
-            ordersList.innerHTML = '';
-            if (orders.length === 0) {
-                ordersList.innerHTML = '<p class="text-gray-400 text-center py-4">No orders found.</p>';
-                return;
-            }
-
-            const table = document.createElement('table');
-            table.className = 'min-w-full'; // Tailwind's default table styles are applied via global CSS
-            table.innerHTML = `
-                <thead>
-                    <tr>
-                        <th>Order ID</th>
-                        <th>Customer</th>
-                        <th>Phone</th>
-                        <th>Total</th>
-                        <th>Payment</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="orders-table-body"></tbody>
-            `;
-            ordersList.appendChild(table);
-            const tbody = document.getElementById('orders-table-body');
-
-            orders.forEach(order => {
-                const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td>${order._id.substring(0, 8)}...</td>
-                    <td>${order.customerName}</td>
-                    <td>${order.customerPhone}</td>
-                    <td>₹${order.totalAmount.toFixed(2)}</td>
-                    <td>${order.paymentMethod || 'N/A'}</td>
-                    <td>
-                        <span class="status-badge
-                            ${order.status === 'Pending' ? 'status-pending' : ''}
-                            ${order.status === 'Confirmed' ? 'status-confirmed' : ''}
-                            ${order.status === 'Preparing' ? 'status-preparing' : ''}
-                            ${order.status === 'Out for Delivery' ? 'status-out-for-delivery' : ''}
-                            ${order.status === 'Delivered' ? 'status-delivered' : ''}
-                            ${order.status === 'Cancelled' ? 'status-cancelled' : ''}
-                        ">${order.status}</span>
-                    </td>
-                    <td>${new Date(order.orderDate).toLocaleString()}</td>
-                    <td>
-                        <button data-id="${order._id}" class="view-order-btn btn-secondary text-sm py-1 px-3 mr-2">View</button>
-                        <button data-id="${order._id}" class="delete-order-btn btn-danger text-sm py-1 px-3">Remove</button>
-                    </td>
-                `;
-            });
-
-            ordersList.querySelectorAll('.view-order-btn').forEach(button => {
-                button.addEventListener('click', (e) => openOrderDetailsModal(e.target.dataset.id));
-            });
-            ordersList.querySelectorAll('.delete-order-btn').forEach(button => {
-                button.addEventListener('click', (e) => deleteOrder(e.target.dataset.id));
-            });
-        }
-
-        async function openOrderDetailsModal(orderId) {
-            currentOrderId = orderId;
-            orderDetailsContent.innerHTML = '<p class="text-gray-400">Loading order details...</p>';
-            orderDetailsModal.style.display = 'flex';
-            orderUpdateMessage.textContent = ''; // Clear previous messages
-
-            try {
-                const response = await fetch(`/api/admin/orders/${orderId}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const order = await response.json();
-
-                orderDetailsContent.innerHTML = `
-                    <p><strong>Order ID:</strong> ${order._id}</p>
-                    <p><strong>Customer Name:</strong> ${order.customerName}</p>
-                    <p><strong>Phone:</strong> ${order.customerPhone}</p>
-                    <p><strong>Delivery Address:</strong> ${order.deliveryAddress}</p>
-                    <p><strong>Customer Location:</strong> ${order.customerLocation && order.customerLocation.latitude ? `Lat: ${order.customerLocation.latitude.toFixed(4)}, Lon: ${order.customerLocation.longitude.toFixed(4)}` : 'N/A'}</p>
-                    <p><strong>Payment Method:</strong> ${order.paymentMethod || 'COD'}</p>
-                    <p><strong>Subtotal:</strong> ₹${order.subtotal.toFixed(2)}</p>
-                    <p><strong>Transport Tax:</strong> ₹${order.transportTax.toFixed(2)}</p>
-                    <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
-                    <p><strong>Order Date:</strong> ${new Date(order.orderDate).toLocaleString()}</p>
-                    <h4 class="text-xl font-bold mt-4 mb-2">Items:</h4>
-                    <ul class="list-disc pl-5">
-                        ${order.items.map(item => `<li>${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)</li>`).join('')}
-                    </ul>
-                `;
-                orderStatusSelect.value = order.status; // Set current status in dropdown
-            } catch (error) {
-                console.error('Error fetching order details:', error);
-                orderDetailsContent.innerHTML = `<p class="text-red-500">Failed to load order details: ${error.message}</p>`;
-            }
-        }
-
-        closeOrderDetailsModalBtn.addEventListener('click', () => {
-            orderDetailsModal.style.display = 'none';
-            currentOrderId = null;
+        // Menu Actions
+        addMenuItemBtn.addEventListener('click', () => openMenuItemModal());
+        menuItemForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveMenuItem();
         });
 
-        updateOrderStatusBtn.addEventListener('click', async () => {
-            if (!currentOrderId) return;
+        // Customer Actions
+        refreshCustomersBtn.addEventListener('click', fetchCustomers);
 
+        // Settings Actions
+        saveSettingsBtn.addEventListener('click', saveSettings);
+        addDeliveryRateBtn.addEventListener('click', addDeliveryRateInput);
+
+        // Modal Close Buttons
+        document.querySelectorAll('.modal .close-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.target.closest('.modal').style.display = 'none';
+            });
+        });
+        window.addEventListener('click', (event) => {
+            if (event.target === menuItemModal) {
+                menuItemModal.style.display = 'none';
+            }
+            if (event.target === orderDetailsModal) {
+                orderDetailsModal.style.display = 'none';
+            }
+        });
+
+        // Order Details Modal Actions
+        updateOrderStatusBtn.addEventListener('click', () => {
+            const orderId = updateOrderStatusBtn.dataset.id;
             const newStatus = orderStatusSelect.value;
-            updateOrderStatusBtn.disabled = true;
-            orderUpdateMessage.textContent = 'Updating status...';
-            orderUpdateMessage.className = 'mt-2 text-sm text-yellow-500';
+            updateOrderStatus(orderId, newStatus);
+        });
+        deleteOrderBtn.addEventListener('click', () => {
+            const orderId = deleteOrderBtn.dataset.id;
+            deleteOrder(orderId);
+        });
 
-            try {
-                const response = await fetch(`/api/admin/orders/${currentOrderId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
-                });
+        // --- Socket.IO Listeners ---
+        socket.on('status', (status) => {
+            updateBotStatusDisplay(status);
+        });
 
-                const result = await response.json();
-                if (response.ok) {
-                    orderUpdateMessage.textContent = `Status updated to ${result.status}!`;
-                    orderUpdateMessage.className = 'mt-2 text-sm text-green-500';
-                    fetchOrders(); // Refresh orders list
-                } else {
-                    orderUpdateMessage.textContent = `Error updating status: ${result.message || response.statusText}`;
-                    orderUpdateMessage.className = 'mt-2 text-sm text-red-500';
-                }
-            } catch (error) {
-                console.error('Error updating order status:', error);
-                orderUpdateMessage.textContent = `Network error: ${error.message}`;
-                orderUpdateMessage.className = 'mt-2 text-sm text-red-500';
-            } finally {
-                updateOrderStatusBtn.disabled = false;
+        socket.on('qrCode', (qrDataURL) => {
+            if (qrDataURL) {
+                qrCodeImg.src = qrDataURL;
+                qrCodeSection.classList.remove('hidden');
+                startQrCountdown();
+            } else {
+                qrCodeImg.src = '';
+                qrCodeSection.classList.add('hidden');
+                if (qrTimerInterval) clearInterval(qrTimerInterval);
             }
         });
 
-        async function deleteOrder(orderId) {
-            if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/admin/orders/${orderId}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    alert('Order deleted successfully!');
-                    fetchOrders(); // Refresh the list
-                } else {
-                    const result = await response.json();
-                    alert(`Error deleting order: ${result.message || response.statusText}`);
-                }
-            } catch (error) {
-                console.error('Error deleting order:', error);
-                alert(`Network error deleting order: ${error.message}`);
-            }
-        }
-
-
-        // --- Menu Tab Functions ---
-        async function fetchMenuItems() {
-            menuItemsList.innerHTML = '<p class="text-gray-400 text-center py-4">Loading menu items...</p>';
-            try {
-                const response = await fetch('/api/admin/menu');
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login';
-                        return;
-                    }
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const items = await response.json();
-                displayMenuItems(items);
-            } catch (error) {
-                console.error('Error fetching menu items:', error);
-                menuItemsList.innerHTML = `<p class="text-red-500 text-center py-4">Failed to load menu items: ${error.message}</p>`;
-            }
-        }
-
-        function displayMenuItems(items) {
-            menuItemsList.innerHTML = '';
-            if (items.length === 0) {
-                menuItemsList.innerHTML = '<p class="text-gray-400 text-center py-4">No menu items added yet.</p>';
-                return;
-            }
-
-            const table = document.createElement('table');
-            table.className = 'min-w-full';
-            table.innerHTML = `
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Price</th>
-                        <th>Category</th>
-                        <th>Available</th>
-                        <th>Trending</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="menu-items-table-body"></tbody>
-            `;
-            menuItemsList.appendChild(table);
-            const tbody = document.getElementById('menu-items-table-body');
-
-            items.forEach(item => {
-                const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td>${item.name}</td>
-                    <td>₹${item.price.toFixed(2)}</td>
-                    <td>${item.category}</td>
-                    <td>${item.isAvailable ? 'Yes' : 'No'}</td>
-                    <td>${item.isTrending ? 'Yes' : 'No'}</td>
-                    <td>
-                        <button data-id="${item._id}" class="edit-menu-item-btn btn-secondary text-sm py-1 px-3 mr-2">Edit</button>
-                        <button data-id="${item._id}" class="delete-menu-item-btn btn-danger text-sm py-1 px-3">Delete</button>
-                    </td>
-                `;
-            });
-
-            menuItemsList.querySelectorAll('.edit-menu-item-btn').forEach(button => {
-                button.addEventListener('click', (e) => openMenuItemModalForEdit(e.target.dataset.id));
-            });
-            menuItemsList.querySelectorAll('.delete-menu-item-btn').forEach(button => {
-                button.addEventListener('click', (e) => deleteMenuItem(e.target.dataset.id));
-            });
-        }
-
-        addMenuItemBtn.addEventListener('click', () => {
-            menuItemModalTitle.textContent = 'Add New Menu Item';
-            menuItemForm.reset(); // Clear form for new entry
-            menuItemIdInput.value = ''; // Ensure ID is empty for new item
-            menuItemModal.style.display = 'flex';
-            menuItemMessage.textContent = '';
-        });
-
-        closeMenuItemModalBtn.addEventListener('click', () => {
-            menuItemModal.style.display = 'none';
-        });
-
-        async function openMenuItemModalForEdit(itemId) {
-            menuItemModalTitle.textContent = 'Edit Menu Item';
-            menuItemForm.reset();
-            menuItemMessage.textContent = 'Loading item details...';
-            menuItemMessage.className = 'mt-2 text-sm text-yellow-500';
-            menuItemModal.style.display = 'flex';
-
-            try {
-                const response = await fetch(`/api/admin/menu/${itemId}`);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const item = await response.json();
-
-                menuItemIdInput.value = item._id;
-                itemNameInput.value = item.name;
-                itemDescriptionInput.value = item.description;
-                itemPriceInput.value = item.price;
-                itemImageUrlInput.value = item.imageUrl;
-                itemCategoryInput.value = item.category;
-                itemIsAvailableInput.checked = item.isAvailable;
-                itemIsTrendingInput.checked = item.isTrending;
-
-                menuItemMessage.textContent = '';
-            } catch (error) {
-                console.error('Error fetching menu item for edit:', error);
-                menuItemMessage.textContent = `Failed to load item for edit: ${error.message}`;
-                menuItemMessage.className = 'mt-2 text-sm text-red-500';
-            }
-        }
-
-        menuItemForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const itemId = menuItemIdInput.value;
-            const method = itemId ? 'PUT' : 'POST';
-            const url = itemId ? `/api/admin/menu/${itemId}` : '/api/admin/menu';
-
-            const formData = {
-                name: itemNameInput.value,
-                description: itemDescriptionInput.value,
-                price: parseFloat(itemPriceInput.value),
-                imageUrl: itemImageUrlInput.value,
-                category: itemCategoryInput.value,
-                isAvailable: itemIsAvailableInput.checked,
-                isTrending: itemIsTrendingInput.checked
-            };
-
-            menuItemMessage.textContent = 'Saving item...';
-            menuItemMessage.className = 'mt-2 text-sm text-yellow-500';
-            menuItemForm.querySelector('button[type="submit"]').disabled = true;
-
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    menuItemMessage.textContent = `Item saved successfully!`;
-                    menuItemMessage.className = 'mt-2 text-sm text-green-500';
-                    fetchMenuItems(); // Refresh list
-                    setTimeout(() => menuItemModal.style.display = 'none', 1500);
-                } else {
-                    menuItemMessage.textContent = `Error saving item: ${result.message || response.statusText}`;
-                    menuItemMessage.className = 'mt-2 text-sm text-red-500';
-                }
-            } catch (error) {
-                console.error('Error saving menu item:', error);
-                menuItemMessage.textContent = `Network error: ${error.message}`;
-                menuItemMessage.className = 'mt-2 text-sm text-red-500';
-            } finally {
-                menuItemForm.querySelector('button[type="submit"]').disabled = false;
+        socket.on('sessionInfo', (data) => {
+            if (data.lastAuthenticatedAt) {
+                lastAuthTimeSpan.textContent = new Date(data.lastAuthenticatedAt).toLocaleString();
+            } else {
+                lastAuthTimeSpan.textContent = 'N/A';
             }
         });
 
-        async function deleteMenuItem(itemId) {
-            // Using browser's native confirm for simplicity as per previous turns,
-            // but a custom modal would be better for consistent UI.
-            if (!confirm('Are you sure you want to delete this menu item?')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/admin/menu/${itemId}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    alert('Menu item deleted successfully!');
-                    fetchMenuItems(); // Refresh list
-                } else {
-                    const result = await response.json();
-                    alert(`Error deleting item: ${result.message || response.statusText}`);
-                }
-            } catch (error) {
-                console.error('Error deleting menu item:', error);
-                alert(`Network error deleting item: ${error.message}`);
-            }
-        }
-
-        // --- Settings Tab Functions ---
-        async function fetchSettings() {
-            settingsMessage.textContent = 'Loading settings...';
-            settingsMessage.className = 'mt-2 text-sm text-yellow-500 text-center';
-            try {
-                const response = await fetch('/api/admin/settings');
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login';
-                        return;
-                    }
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const settings = await response.json();
-                document.getElementById('shop-name').value = settings.shopName || '';
-                document.getElementById('shop-latitude').value = settings.shopLocation ? settings.shopLocation.latitude : 0;
-                document.getElementById('shop-longitude').value = settings.shopLocation ? settings.shopLocation.longitude : 0;
-                displayDeliveryRates(settings.deliveryRates || []);
-                settingsMessage.textContent = '';
-                shopLocationData = settings.shopLocation; // Store shop location for customer tracking
-            } catch (error) {
-                console.error('Error fetching settings:', error);
-                settingsMessage.textContent = `Failed to load settings: ${error.message}`;
-                settingsMessage.className = 'mt-2 text-sm text-red-500 text-center';
-            }
-        }
-
-        function displayDeliveryRates(rates) {
-            deliveryRatesContainer.innerHTML = '';
-            rates.forEach((rate, index) => {
-                const rateDiv = document.createElement('div');
-                rateDiv.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center';
-                rateDiv.innerHTML = `
-                    <input type="number" step="any" class="delivery-kms w-full sm:w-1/2" placeholder="KMs" value="${rate.kms}" required>
-                    <input type="number" step="0.01" class="delivery-amount w-full sm:w-1/2" placeholder="Amount" value="${rate.amount}" required>
-                    <button type="button" class="remove-delivery-rate-btn btn-danger text-sm py-1 px-2 mt-2 sm:mt-0">Remove</button>
-                `;
-                deliveryRatesContainer.appendChild(rateDiv);
-            });
-            addRemoveRateListeners();
-        }
-
-        function addRemoveRateListeners() {
-            deliveryRatesContainer.querySelectorAll('.remove-delivery-rate-btn').forEach(button => {
-                button.onclick = (e) => e.target.closest('.flex').remove();
-            });
-        }
-
-        addDeliveryRateBtn.addEventListener('click', () => {
-            const rateDiv = document.createElement('div');
-            rateDiv.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center';
-            rateDiv.innerHTML = `
-                <input type="number" step="any" class="delivery-kms w-full sm:w-1/2" placeholder="KMs" required>
-                <input type="number" step="0.01" class="delivery-amount w-full sm:w-1/2" placeholder="Amount" required>
-                <button type="button" class="remove-delivery-rate-btn btn-danger text-sm py-1 px-2 mt-2 sm:mt-0">Remove</button>
-            `;
-            deliveryRatesContainer.appendChild(rateDiv);
-            addRemoveRateListeners();
+        // Initial data loads on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchBotStatus();
+            fetchOrders();
+            fetchMenuItems();
+            fetchCustomers();
+            fetchSettings();
         });
-
-        settingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const shopName = document.getElementById('shop-name').value;
-            const shopLatitude = parseFloat(document.getElementById('shop-latitude').value);
-            const shopLongitude = parseFloat(document.getElementById('shop-longitude').value);
-
-            const deliveryRates = [];
-            deliveryRatesContainer.querySelectorAll('.flex').forEach(rateDiv => {
-                const kms = parseFloat(rateDiv.querySelector('.delivery-kms').value);
-                const amount = parseFloat(rateDiv.querySelector('.delivery-amount').value);
-                if (!isNaN(kms) && !isNaN(amount)) {
-                    deliveryRates.push({ kms, amount });
-                }
-            });
-
-            const settingsData = {
-                shopName,
-                shopLocation: { latitude: shopLatitude, longitude: shopLongitude },
-                deliveryRates
-            };
-
-            settingsMessage.textContent = 'Saving settings...';
-            settingsMessage.className = 'mt-2 text-sm text-yellow-500 text-center';
-            settingsForm.querySelector('button[type="submit"]').disabled = true;
-
-            try {
-                const response = await fetch('/api/admin/settings', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(settingsData)
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    settingsMessage.textContent = 'Settings saved successfully!';
-                    settingsMessage.className = 'mt-2 text-sm text-green-500 text-center';
-                    shopLocationData = result.shopLocation; // Update shop location data after saving
-                } else {
-                    settingsMessage.textContent = `Error saving settings: ${result.message || response.statusText}`;
-                    settingsMessage.className = 'mt-2 text-sm text-red-500 text-center';
-                }
-            } catch (error) {
-                console.error('Error saving settings:', error);
-                settingsMessage.textContent = `Network error: ${error.message}`;
-                settingsMessage.className = 'mt-2 text-sm text-red-500 text-center';
-            } finally {
-                settingsForm.querySelector('button[type="submit"]').disabled = false;
-            }
-        });
-
-        // --- Customer Tab Functions ---
-        async function fetchCustomers() {
-            customersList.innerHTML = '<p class="text-gray-400 text-center py-4">Loading customer data...</p>';
-            try {
-                const response = await fetch('/api/admin/customers');
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        window.location.href = '/admin/login';
-                        return;
-                    }
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const customers = await response.json();
-                displayCustomers(customers);
-            } catch (error) {
-                console.error('Error fetching customers:', error);
-                customersList.innerHTML = `<p class="text-red-500 text-center py-4">Failed to load customer data: ${error.message}</p>`;
-            }
-        }
-
-        function displayCustomers(customers) {
-            customersList.innerHTML = '';
-            if (customers.length === 0) {
-                customersList.innerHTML = '<p class="text-gray-400 text-center py-4">No customer data found.</p>';
-                return;
-            }
-
-            const table = document.createElement('table');
-            table.className = 'min-w-full';
-            table.innerHTML = `
-                <thead>
-                    <tr>
-                        <th>Customer Name</th>
-                        <th>Phone</th>
-                        <th>Last Known Location</th>
-                        <th>Distance from Shop (km)</th>
-                        <th>Total Orders</th>
-                        <th>Last Order Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="customers-table-body"></tbody>
-            `;
-            customersList.appendChild(table);
-            const tbody = document.getElementById('customers-table-body');
-
-            customers.forEach(customer => {
-                const row = tbody.insertRow();
-                const customerPhoneNumber = customer.customerPhone;
-
-                let locationText = 'N/A';
-                let distanceFromShop = 'N/A';
-                let trackButtonHtml = `<button class="btn-action disabled text-sm py-1 px-3">Track</button>`; // Disabled by default
-
-                if (customer.lastKnownLocation && customer.lastKnownLocation.latitude && customer.lastKnownLocation.longitude) {
-                    locationText = `Lat: ${customer.lastKnownLocation.latitude.toFixed(4)}, Lon: ${customer.lastKnownLocation.longitude.toFixed(4)}`;
-                    if (shopLocationData && shopLocationData.latitude && shopLocationData.longitude) {
-                        const dist = haversineDistance(
-                            shopLocationData.latitude,
-                            shopLocationData.longitude,
-                            customer.lastKnownLocation.latitude,
-                            customer.lastKnownLocation.longitude
-                        );
-                        distanceFromShop = dist.toFixed(2);
-                        // Enable track button if shop and customer locations are available
-                        const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${shopLocationData.latitude},${shopLocationData.longitude}&destination=${customer.lastKnownLocation.latitude},${customer.lastKnownLocation.longitude}&travelmode=driving`;
-                        trackButtonHtml = `<a href="${googleMapsUrl}" target="_blank" class="btn-action text-sm py-1 px-3">Track</a>`;
-                    }
-                }
-
-                row.innerHTML = `
-                    <td>${customer.customerName || 'N/A'}</td>
-                    <td>${customer.customerPhone}</td>
-                    <td>${locationText}</td>
-                    <td>${distanceFromShop}</td>
-                    <td>${customer.totalOrders || 0}</td>
-                    <td>${customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleString() : 'N/A'}</td>
-                    <td>
-                        <a href="tel:${customerPhoneNumber}" class="btn-action text-sm py-1 px-3 mr-2">Call</a>
-                        ${trackButtonHtml}
-                        <button data-id="${customer._id}" class="delete-customer-btn btn-danger text-sm py-1 px-3 mt-2 sm:mt-0">Remove</button>
-                    </td>
-                `;
-            });
-            customersList.querySelectorAll('.delete-customer-btn').forEach(button => {
-                button.addEventListener('click', (e) => deleteCustomer(e.target.dataset.id));
-            });
-        }
-
-        async function deleteCustomer(customerId) {
-            if (!confirm('Are you sure you want to delete this customer record? This will not affect existing orders but will remove their customer profile.')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/admin/customers/${customerId}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    alert('Customer record deleted successfully!');
-                    fetchCustomers(); // Refresh the list
-                } else {
-                    const result = await response.json();
-                    alert(`Error deleting customer: ${result.message || response.statusText}`);
-                }
-            } catch (error) {
-                console.error('Error deleting customer:', error);
-                alert(`Network error deleting customer: ${error.message}`);
-            }
-        }
-
-
-        // Haversine distance function (duplicated from menu_panel for self-containment)
-        function haversineDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Radius of Earth in kilometers
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c; // Distance in km
-        }
-
-        // Initial fetch for the default tab
-        switchTab(currentActiveTab);
-
-        // Periodically fetch bot status to keep the dashboard updated
-        setInterval(() => {
-            fetch('/api/admin/bot-status')
-                .then(response => {
-                    if (response.status === 401) {
-                        // If session expired, redirect to login
-                        window.location.href = '/admin/login';
-                        return Promise.reject('Unauthorized');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    // Status and sessionInfo updates are handled by the socket.io listener now
-                    // This fetch is primarily for initial load or if socket.io fails
-                })
-                .catch(error => {
-                    console.error('Error fetching bot status:', error);
-                    // Handle network errors or server issues
-                    botStatusSpan.textContent = 'Error: Could not connect to server.';
-                    alertMessage.textContent = 'Could not connect to bot server. Please check server logs.';
-                    botStatusAlert.classList.remove('alert-yellow', 'alert-green');
-                    botStatusAlert.classList.add('alert-red');
-                    requestQrBtn.classList.remove('hidden');
-                    loadSessionBtn.classList.remove('hidden'); // Also show load session button on error
-                });
-        }, 5000); // Poll every 5 seconds
     </script>
 </body>
 </html>
