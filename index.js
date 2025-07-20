@@ -21,7 +21,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // JWT Secret (ensure this is in your .env file in production)
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey';
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey'; // Fallback for safety, but should be set in .env
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -553,11 +553,14 @@ app.post('/admin/create-initial-admin', async (req, res) => {
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    if (token == null) return res.status(401).json({ message: 'Unauthorized: No token provided.' });
+    if (token == null) {
+        console.log('Unauthorized: No token provided.'); // Log for debugging
+        return res.status(401).json({ message: 'Unauthorized: No token provided.' });
+    }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
-            console.error('JWT Verification Error:', err.message);
+            console.error('JWT Verification Error:', err.message); // Log the specific JWT error
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
         }
         req.user = user;
