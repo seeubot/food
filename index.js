@@ -1,4 +1,4 @@
-const express = require('express'); // Corrected 'Const' to 'const'
+const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
@@ -287,6 +287,116 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         }
     });
 
+    // --- Message Listener (MOVED HERE) ---
+    client.on('message', async msg => {
+        const chatId = msg.from;
+        const text = msg.body.toLowerCase().trim();
+        const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
+        const customerName = msg._data.notifyName;
+
+        if (msg.hasMedia && msg.type === 'location' && msg.location) {
+            const { latitude, longitude, address } = msg.location;
+            await Customer.findOneAndUpdate(
+                { customerPhone: customerPhone },
+                {
+                    $set: {
+                        lastKnownLocation: {
+                            latitude: latitude,
+                            longitude: longitude,
+                            address: address || 'Location shared via WhatsApp'
+                        }
+                    }
+                },
+                { upsert: true, new: true }
+            );
+            await client.sendMessage(chatId, 'Your location has been updated. Thank you!');
+            return;
+        }
+
+        let customer = await Customer.findOne({ customerPhone: customerPhone });
+        if (!customer) {
+            customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
+            await customer.save();
+        } else {
+            if (customer.customerName !== customerName) {
+                customer.customerName = customerName;
+                await customer.save();
+            }
+        }
+
+        switch (text) {
+            case 'hi':
+            case 'hello':
+            case 'namaste':
+            case 'menu':
+                await sendWelcomeMessage(chatId, customerName);
+                break;
+            case '1':
+            case 'view menu':
+                await sendMenu(chatId);
+                break;
+            case '2':
+            case 'shop location':
+                await sendShopLocation(chatId);
+                break;
+            case '4':
+            case 'my orders':
+                await sendCustomerOrders(chatId, customerPhone);
+                break;
+            case '5':
+            case 'help':
+                await sendHelpMessage(chatId);
+                break;
+            case 'cod':
+            case 'cash on delivery':
+                const pendingOrderCod = await Order.findOneAndUpdate(
+                    { customerPhone: customerPhone, status: 'Pending' },
+                    { $set: { paymentMethod: 'Cash on Delivery', status: 'Confirmed' } },
+                    { new: true, sort: { orderDate: -1 } }
+                );
+                if (pendingOrderCod) {
+                    await client.sendMessage(chatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
+                    io.emit('new_order', pendingOrderCod);
+                } else {
+                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
+                }
+                break;
+            case 'op':
+            case 'online payment':
+                const pendingOrderOp = await Order.findOneAndUpdate(
+                    { customerPhone: customerPhone, status: 'Pending' },
+                    { $set: { paymentMethod: 'Online Payment' } },
+                    { new: true, sort: { orderDate: -1 } }
+                );
+                if (pendingOrderOp) {
+                    await client.sendMessage(chatId, 'Thank you for choosing online payment. A payment link will be sent to you shortly. Your Order ID: ' + pendingOrderOp._id.substring(0,6) + '...');
+                    io.emit('new_order', pendingOrderOp);
+                } else {
+                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
+                }
+                break;
+            default:
+                const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
+
+                if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
+                    if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'Address not yet provided.') {
+                        await Order.findOneAndUpdate(
+                            { _id: lastOrderInteraction._id },
+                            { $set: { deliveryAddress: msg.body } },
+                            { new: true }
+                        );
+                        await client.sendMessage(chatId, 'Your delivery address has been saved. Please choose your payment method: ' +
+                                                  "'Cash on Delivery' (COD) or 'Online Payment' (OP).");
+                    } else {
+                        await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
+                    }
+                } else {
+                    await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
+                }
+                break;
+        }
+    });
+
     // --- Attempt to initialize the client ---
     try {
         await client.initialize();
@@ -328,116 +438,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 })();
 
 
-// --- Bot Logic Functions ---
-client.on('message', async msg => {
-    const chatId = msg.from;
-    const text = msg.body.toLowerCase().trim();
-    const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
-    const customerName = msg._data.notifyName;
-
-    if (msg.hasMedia && msg.type === 'location' && msg.location) {
-        const { latitude, longitude, address } = msg.location;
-        await Customer.findOneAndUpdate(
-            { customerPhone: customerPhone },
-            {
-                $set: {
-                    lastKnownLocation: {
-                        latitude: latitude,
-                        longitude: longitude,
-                        address: address || 'Location shared via WhatsApp'
-                    }
-                }
-            },
-            { upsert: true, new: true }
-        );
-        await client.sendMessage(chatId, 'Your location has been updated. Thank you!');
-        return;
-    }
-
-    let customer = await Customer.findOne({ customerPhone: customerPhone });
-    if (!customer) {
-        customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
-        await customer.save();
-    } else {
-        if (customer.customerName !== customerName) {
-            customer.customerName = customerName;
-            await customer.save();
-        }
-    }
-
-    switch (text) {
-        case 'hi':
-        case 'hello':
-        case 'namaste':
-        case 'menu':
-            await sendWelcomeMessage(chatId, customerName);
-            break;
-        case '1':
-        case 'view menu':
-            await sendMenu(chatId);
-            break;
-        case '2':
-        case 'shop location':
-            await sendShopLocation(chatId);
-            break;
-        case '4':
-        case 'my orders':
-            await sendCustomerOrders(chatId, customerPhone);
-            break;
-        case '5':
-        case 'help':
-            await sendHelpMessage(chatId);
-            break;
-        case 'cod':
-        case 'cash on delivery':
-            const pendingOrderCod = await Order.findOneAndUpdate(
-                { customerPhone: customerPhone, status: 'Pending' },
-                { $set: { paymentMethod: 'Cash on Delivery', status: 'Confirmed' } },
-                { new: true, sort: { orderDate: -1 } }
-            );
-            if (pendingOrderCod) {
-                await client.sendMessage(chatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
-                io.emit('new_order', pendingOrderCod);
-            } else {
-                await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
-            }
-            break;
-        case 'op':
-        case 'online payment':
-            const pendingOrderOp = await Order.findOneAndUpdate(
-                { customerPhone: customerPhone, status: 'Pending' },
-                { $set: { paymentMethod: 'Online Payment' } },
-                { new: true, sort: { orderDate: -1 } }
-            );
-            if (pendingOrderOp) {
-                await client.sendMessage(chatId, 'Thank you for choosing online payment. A payment link will be sent to you shortly. Your Order ID: ' + pendingOrderOp._id.substring(0,6) + '...');
-                io.emit('new_order', pendingOrderOp);
-            } else {
-                await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
-            }
-            break;
-        default:
-            const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
-
-            if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
-                if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'Address not yet provided.') {
-                    await Order.findOneAndUpdate(
-                        { _id: lastOrderInteraction._id },
-                        { $set: { deliveryAddress: msg.body } },
-                        { new: true }
-                    );
-                    await client.sendMessage(chatId, 'Your delivery address has been saved. Please choose your payment method: ' +
-                                              "'Cash on Delivery' (COD) or 'Online Payment' (OP).");
-                } else {
-                    await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
-                }
-            } else {
-                await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
-            }
-            break;
-    }
-});
-
+// --- Bot Logic Functions (kept separate for clarity, but called from message listener) ---
 const sendWelcomeMessage = async (chatId, customerName) => {
     const menuOptions = [
         "1. 🍕 View Menu",
