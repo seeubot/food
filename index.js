@@ -24,6 +24,14 @@ app.use(express.urlencoded({ extended: true }));
 // JWT Secret (ensure this is in your .env file in production)
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey'; // Fallback for safety, but should be set in .env
 
+// --- WARNING: HARDCODED ADMIN CREDENTIALS ---
+// This is for testing purposes ONLY as per user request.
+// NEVER use hardcoded credentials in a production environment.
+// For production, use the /admin/create-initial-admin endpoint and store credentials securely.
+const DEFAULT_ADMIN_USERNAME = 'admin';
+const DEFAULT_ADMIN_PASSWORD = 'password123';
+// --- END WARNING ---
+
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true, // This is a deprecated option, but keeping it for compatibility if needed.
@@ -518,67 +526,51 @@ console.log('7-day re-order notification job scheduled to run daily at 9:00 AM I
 
 // --- Admin API Routes (authenticateToken middleware applied here) ---
 app.post('/admin/login', async (req, res) => {
-    const { username, password, totpCode } = req.body; // Now expects totpCode
+    const { totpCode } = req.body; // Only expects totpCode from frontend now
 
-    const admin = await Admin.findOne({ username });
+    // Use hardcoded admin credentials for lookup
+    const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
 
-    if (!admin || !await bcrypt.compare(password, admin.password)) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+    // This check is now simplified as username/password are hardcoded.
+    // In a real app, you'd verify username/password against DB first.
+    if (!admin) {
+        // This case should ideally not happen if initial admin creation works
+        return res.status(500).json({ message: 'Admin user not found in database. Please restart server.' });
     }
 
-    // Check if TOTP is enabled for this admin
-    if (admin.totpSecret) {
-        if (!totpCode) {
-            // If TOTP is required but not provided, send a specific error
-            return res.status(401).json({ message: 'Two-Factor Authentication code required.' });
-        }
+    // If TOTP is NOT enabled for this admin
+    if (!admin.totpSecret) {
+        // Allow direct login if TOTP is not set up
+        const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
+        return res.json({ token, twoFactorEnabled: false });
+    }
 
-        // Verify TOTP code
-        const verified = speakeasy.totp.verify({
-            secret: admin.totpSecret,
-            encoding: 'base32',
-            token: totpCode,
-            window: 1 // Allow for a small time drift (1 step before or after)
-        });
+    // If TOTP IS enabled, require and verify the code
+    if (!totpCode) {
+        return res.status(401).json({ message: 'Two-Factor Authentication code required.' });
+    }
 
-        if (!verified) {
-            return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
-        }
-    } else {
-        // If TOTP is not enabled, but a code was sent, it's suspicious or unnecessary
-        if (totpCode) {
-            console.warn(`TOTP code provided for user ${username} but 2FA is not enabled.`);
-            // You might choose to reject here or just ignore it. For now, we'll ignore.
-        }
+    const verified = speakeasy.totp.verify({
+        secret: admin.totpSecret,
+        encoding: 'base32',
+        token: totpCode,
+        window: 1 // Allow for a small time drift (1 step before or after)
+    });
+
+    if (!verified) {
+        return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
     }
 
     // If all checks pass, issue JWT token
     const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token, twoFactorEnabled: !!admin.totpSecret }); // Inform client if 2FA is enabled
+    res.json({ token, twoFactorEnabled: true });
 });
 
 app.get('/admin/logout', (req, res) => {
     res.send('Logged out successfully');
 });
 
-app.post('/admin/create-initial-admin', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const existingAdmin = await Admin.findOne({ username });
-        if (existingAdmin) {
-            return res.status(409).json({ message: 'Admin user already exists.' });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        // Do NOT generate TOTP secret here. It will be set up via the dashboard.
-        const newAdmin = new Admin({ username, password: hashedPassword, totpSecret: null });
-        await newAdmin.save();
-        res.status(201).json({ message: 'Initial admin user created.' });
-    } catch (error) {
-        console.error('Error creating initial admin:', error);
-        res.status(500).json({ message: 'Error creating initial admin.' });
-    }
-});
+// Removed /admin/create-initial-admin route as it's handled on server startup
 
 // Authentication Middleware for Admin APIs
 const authenticateToken = (req, res, next) => {
@@ -600,11 +592,13 @@ const authenticateToken = (req, res, next) => {
 };
 
 // --- 2FA Specific Endpoints ---
+// These endpoints will now operate on the hardcoded default admin user
 app.get('/api/admin/2fa/status', authenticateToken, async (req, res) => {
     try {
-        const admin = await Admin.findOne({ username: req.user.username });
+        // Always fetch status for the hardcoded default admin
+        const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
         if (!admin) {
-            return res.status(404).json({ message: 'Admin user not found.' });
+            return res.status(404).json({ message: 'Admin user not found.' }); // Should not happen with initial setup
         }
         res.json({ twoFactorEnabled: !!admin.totpSecret });
     } catch (error) {
@@ -615,33 +609,19 @@ app.get('/api/admin/2fa/status', authenticateToken, async (req, res) => {
 
 app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
     try {
-        const admin = await Admin.findOne({ username: req.user.username });
+        const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
         if (!admin) {
             return res.status(404).json({ message: 'Admin user not found.' });
         }
 
-        // Generate a new secret if one doesn't exist or if forced (e.g., reset)
-        let secret;
-        if (admin.totpSecret) {
-            secret = speakeasy.generateSecret({
-                name: `DeliciousBites Admin (${admin.username})`,
-                length: 20 // Standard length
-            });
-            admin.totpSecret = secret.base32;
-            await admin.save();
-            console.log(`New TOTP secret generated and saved for admin: ${admin.username}`);
-        } else {
-            secret = speakeasy.generateSecret({
-                name: `DeliciousBites Admin (${admin.username})`,
-                length: 20
-            });
-            admin.totpSecret = secret.base32;
-            await admin.save();
-            console.log(`TOTP secret generated and saved for admin: ${admin.username}`);
-        }
+        const secret = speakeasy.generateSecret({
+            name: `DeliciousBites Admin (${admin.username})`,
+            length: 20
+        });
+        admin.totpSecret = secret.base32;
+        await admin.save();
+        console.log(`New TOTP secret generated and saved for admin: ${admin.username}`);
 
-
-        // Generate QR code URL
         qrcode.toDataURL(secret.otpauth_url, (err, data_url) => {
             if (err) {
                 console.error('Error generating QR code:', err);
@@ -659,7 +639,7 @@ app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
 app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
     const { totpCode } = req.body;
     try {
-        const admin = await Admin.findOne({ username: req.user.username });
+        const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
         if (!admin || !admin.totpSecret) {
             return res.status(400).json({ message: '2FA not set up for this user.' });
         }
@@ -684,7 +664,7 @@ app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
 
 app.post('/api/admin/2fa/disable', authenticateToken, async (req, res) => {
     try {
-        const admin = await Admin.findOne({ username: req.user.username });
+        const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
         if (!admin) {
             return res.status(404).json({ message: 'Admin user not found.' });
         }
@@ -1018,6 +998,34 @@ app.get('/', (req, res) => {
 // --- Serve other static assets (CSS, JS, images) ---
 app.use(express.static(path.join(__dirname, 'public')));
 
+// --- Initial Admin User Setup on Server Startup ---
+// This ensures a default admin user exists if the database is empty.
+// This replaces the need for a separate /admin/create-initial-admin endpoint.
+async function ensureDefaultAdminExists() {
+    try {
+        let admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
+        if (!admin) {
+            const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
+            admin = new Admin({
+                username: DEFAULT_ADMIN_USERNAME,
+                password: hashedPassword,
+                totpSecret: null // 2FA is disabled by default
+            });
+            await admin.save();
+            console.log(`Default admin user '${DEFAULT_ADMIN_USERNAME}' created with 2FA disabled.`);
+        } else {
+            console.log(`Default admin user '${DEFAULT_ADMIN_USERNAME}' already exists.`);
+        }
+    } catch (error) {
+        console.error('Error ensuring default admin exists:', error);
+    }
+}
+
+// Call this function after MongoDB is connected
+mongoose.connection.on('connected', () => {
+    ensureDefaultAdminExists();
+});
+
 
 // Socket.io for real-time updates
 io.on('connection', (socket) => {
@@ -1039,5 +1047,8 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Admin dashboard: http://localhost:${PORT}/admin/login`);
+    console.log(`Default Admin Username (for initial setup): ${DEFAULT_ADMIN_USERNAME}`);
+    console.log(`Default Admin Password (for initial setup): ${DEFAULT_ADMIN_PASSWORD}`);
+    console.log('REMEMBER TO ENABLE 2FA FROM THE DASHBOARD AFTER FIRST LOGIN FOR SECURITY.');
 });
 
