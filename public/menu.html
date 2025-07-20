@@ -348,8 +348,13 @@
             justify-content: center;
             text-align: center;
         }
-        #map-modal .btn-primary {
+        #map-modal .map-action-buttons {
+            display: flex;
+            gap: 1rem;
             margin-top: 1rem;
+        }
+        #map-modal .map-action-buttons button {
+            flex-grow: 1;
         }
         /* Hide Leaflet zoom controls and attribution */
         .leaflet-control-zoom {
@@ -564,7 +569,10 @@
             <h2 class="text-2xl font-bold mb-4">Select Delivery Location</h2>
             <div id="map"></div>
             <div id="map-address-display" class="text-center">Drag marker or click map to select location</div>
-            <button id="confirm-location-btn" class="btn-primary w-full mt-4">Confirm Location</button>
+            <div class="map-action-buttons">
+                <button id="center-live-location-btn" class="btn-primary">Center to Live Location</button>
+                <button id="confirm-location-btn" class="btn-primary">Confirm Location</button>
+            </div>
         </div>
     </div>
 
@@ -629,6 +637,7 @@
         const mapDiv = document.getElementById('map');
         const mapAddressDisplay = document.getElementById('map-address-display');
         const confirmLocationBtn = document.getElementById('confirm-location-btn');
+        const centerLiveLocationBtn = document.getElementById('center-live-location-btn'); // New button
 
         // Item Details Modal Elements
         const itemDetailsModal = document.getElementById('item-details-modal');
@@ -978,8 +987,8 @@
         // Map Functions
         function initMap() {
             if (map === null) {
-                // Initialize map only once
-                map = L.map('map', { zoomControl: false }).setView([shopLocation.latitude, shopLocation.longitude], 13); // Center on shop location, hide zoom
+                // Initialize map only once, hide zoom controls
+                map = L.map('map', { zoomControl: false }).setView([shopLocation.latitude, shopLocation.longitude], 13);
                 // Use Esri World Imagery for satellite view
                 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
@@ -997,28 +1006,16 @@
                     reverseGeocode(e.latlng.lat, e.latlng.lng);
                 });
 
-                // Set initial selected location to shop location
-                selectedDeliveryLocation = {
-                    latitude: shopLocation.latitude,
-                    longitude: shopLocation.longitude,
-                    address: 'Shop Location (Default)'
-                };
-                mapAddressDisplay.textContent = selectedDeliveryLocation.address;
-
             } else {
-                // If map already exists, just invalidate size and center it
+                // If map already exists, just invalidate size
                 map.invalidateSize();
-                map.setView([shopLocation.latitude, shopLocation.longitude], 13);
-                marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
-                selectedDeliveryLocation = {
-                    latitude: shopLocation.latitude,
-                    longitude: shopLocation.longitude,
-                    address: 'Shop Location (Default)'
-                };
-                mapAddressDisplay.textContent = selectedDeliveryLocation.address;
             }
 
-            // Try to get user's current location to set initial map view
+            // Attempt to get user's current location to set initial map view
+            centerMapToLiveLocation();
+        }
+
+        function centerMapToLiveLocation() {
             if (navigator.geolocation) {
                 mapAddressDisplay.textContent = 'Getting your current location...';
                 navigator.geolocation.getCurrentPosition((position) => {
@@ -1083,6 +1080,8 @@
             }
         });
 
+        centerLiveLocationBtn.addEventListener('click', centerMapToLiveLocation); // New event listener
+
 
         // Checkout Form Submission (modified)
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
@@ -1114,7 +1113,7 @@
             if (!selectedDeliveryLocation || selectedDeliveryLocation.latitude === null || selectedDeliveryLocation.longitude === null) {
                 // If not set, open map modal and pause order
                 mapModal.style.display = 'flex';
-                initMap(); // Initialize map
+                initMap(); // Initialize map and try to get live location
                 mapAddressDisplay.textContent = 'Please select your delivery location on the map.';
                 checkoutMessage.textContent = 'Please select your delivery location on the map.';
                 checkoutMessage.className = 'message mt-3 info';
