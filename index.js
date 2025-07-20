@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment-timezone'); // For time zone handling
 const cron = require('node-cron'); // Import node-cron
+const speakeasy = require('speakeasy'); // Import speakeasy for TOTP
 
 require('dotenv').config();
 
@@ -82,7 +83,8 @@ const CustomerSchema = new mongoose.Schema({
 
 const AdminSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
-    password: { type: String, required: true }
+    password: { type: String, required: true },
+    totpSecret: { type: String, default: null } // New field for TOTP secret
 });
 
 const SettingsSchema = new mongoose.Schema({
@@ -516,15 +518,43 @@ console.log('7-day re-order notification job scheduled to run daily at 9:00 AM I
 
 // --- Admin API Routes (authenticateToken middleware applied here) ---
 app.post('/admin/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, totpCode } = req.body; // Now expects totpCode
+
     const admin = await Admin.findOne({ username });
 
-    if (admin && await bcrypt.compare(password, admin.password)) {
-        const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token });
-    } else {
-        res.status(401).json({ message: 'Invalid credentials' });
+    if (!admin || !await bcrypt.compare(password, admin.password)) {
+        return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    // Check if TOTP is enabled for this admin
+    if (admin.totpSecret) {
+        if (!totpCode) {
+            // If TOTP is required but not provided, send a specific error
+            return res.status(401).json({ message: 'Two-Factor Authentication code required.' });
+        }
+
+        // Verify TOTP code
+        const verified = speakeasy.totp.verify({
+            secret: admin.totpSecret,
+            encoding: 'base32',
+            token: totpCode,
+            window: 1 // Allow for a small time drift (1 step before or after)
+        });
+
+        if (!verified) {
+            return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
+        }
+    } else {
+        // If TOTP is not enabled, but a code was sent, it's suspicious or unnecessary
+        if (totpCode) {
+            console.warn(`TOTP code provided for user ${username} but 2FA is not enabled.`);
+            // You might choose to reject here or just ignore it. For now, we'll ignore.
+        }
+    }
+
+    // If all checks pass, issue JWT token
+    const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token, twoFactorEnabled: !!admin.totpSecret }); // Inform client if 2FA is enabled
 });
 
 app.get('/admin/logout', (req, res) => {
@@ -540,7 +570,8 @@ app.post('/admin/create-initial-admin', async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newAdmin = new Admin({ username, password: hashedPassword });
+        // Do NOT generate TOTP secret here. It will be set up via the dashboard.
+        const newAdmin = new Admin({ username, password: hashedPassword, totpSecret: null });
         await newAdmin.save();
         res.status(201).json({ message: 'Initial admin user created.' });
     } catch (error) {
@@ -567,6 +598,105 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
+
+// --- 2FA Specific Endpoints ---
+app.get('/api/admin/2fa/status', authenticateToken, async (req, res) => {
+    try {
+        const admin = await Admin.findOne({ username: req.user.username });
+        if (!admin) {
+            return res.status(404).json({ message: 'Admin user not found.' });
+        }
+        res.json({ twoFactorEnabled: !!admin.totpSecret });
+    } catch (error) {
+        console.error('Error fetching 2FA status:', error);
+        res.status(500).json({ message: 'Error fetching 2FA status.' });
+    }
+});
+
+app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
+    try {
+        const admin = await Admin.findOne({ username: req.user.username });
+        if (!admin) {
+            return res.status(404).json({ message: 'Admin user not found.' });
+        }
+
+        // Generate a new secret if one doesn't exist or if forced (e.g., reset)
+        let secret;
+        if (admin.totpSecret) {
+            secret = speakeasy.generateSecret({
+                name: `DeliciousBites Admin (${admin.username})`,
+                length: 20 // Standard length
+            });
+            admin.totpSecret = secret.base32;
+            await admin.save();
+            console.log(`New TOTP secret generated and saved for admin: ${admin.username}`);
+        } else {
+            secret = speakeasy.generateSecret({
+                name: `DeliciousBites Admin (${admin.username})`,
+                length: 20
+            });
+            admin.totpSecret = secret.base32;
+            await admin.save();
+            console.log(`TOTP secret generated and saved for admin: ${admin.username}`);
+        }
+
+
+        // Generate QR code URL
+        qrcode.toDataURL(secret.otpauth_url, (err, data_url) => {
+            if (err) {
+                console.error('Error generating QR code:', err);
+                return res.status(500).json({ message: 'Error generating QR code.' });
+            }
+            res.json({ qrCodeUrl: data_url, secret: secret.base32 });
+        });
+
+    } catch (error) {
+        console.error('Error generating 2FA secret:', error);
+        res.status(500).json({ message: 'Error generating 2FA secret.' });
+    }
+});
+
+app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
+    const { totpCode } = req.body;
+    try {
+        const admin = await Admin.findOne({ username: req.user.username });
+        if (!admin || !admin.totpSecret) {
+            return res.status(400).json({ message: '2FA not set up for this user.' });
+        }
+
+        const verified = speakeasy.totp.verify({
+            secret: admin.totpSecret,
+            encoding: 'base32',
+            token: totpCode,
+            window: 1
+        });
+
+        if (verified) {
+            res.json({ verified: true, message: '2FA code verified successfully.' });
+        } else {
+            res.status(401).json({ verified: false, message: 'Invalid 2FA code.' });
+        }
+    } catch (error) {
+        console.error('Error verifying 2FA code:', error);
+        res.status(500).json({ message: 'Error verifying 2FA code.' });
+    }
+});
+
+app.post('/api/admin/2fa/disable', authenticateToken, async (req, res) => {
+    try {
+        const admin = await Admin.findOne({ username: req.user.username });
+        if (!admin) {
+            return res.status(404).json({ message: 'Admin user not found.' });
+        }
+        admin.totpSecret = null; // Disable 2FA
+        await admin.save();
+        res.json({ message: 'Two-Factor Authentication disabled successfully.' });
+    } catch (error) {
+        console.error('Error disabling 2FA:', error);
+        res.status(500).json({ message: 'Error disabling 2FA.' });
+    }
+});
+
 
 app.get('/api/admin/bot-status', authenticateToken, async (req, res) => {
     const settings = await Settings.findOne({});
