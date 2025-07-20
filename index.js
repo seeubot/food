@@ -8,6 +8,7 @@ const path = require('path');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const bcrypt = require('bcryptjs');
+const qrcode = require('qrcode'); // Import the qrcode library
 
 // --- New Puppeteer Imports ---
 const puppeteer = require('puppeteer-extra');
@@ -83,13 +84,14 @@ const CustomerSchema = new mongoose.Schema({
     lastOrderDate: { type: Date }
 });
 
-// New Session Schema
+// --- MODIFIED: WhatsappSession Schema for simpler tracking ---
 const WhatsappSessionSchema = new mongoose.Schema({
-    sessionData: Object, // The session object from whatsapp-web.js
+    sessionId: { type: String, unique: true, required: true, default: 'default_bot_session' }, // A simple identifier for the session
     lastAuthenticatedAt: { type: Date, default: Date.now }, // Timestamp of last successful authentication
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 });
+// --- END MODIFIED ---
 
 const Order = mongoose.model('Order', OrderSchema);
 const MenuItem = mongoose.model('MenuItem', MenuItemSchema);
@@ -106,7 +108,7 @@ async function setupAdminUser() {
     const DEFAULT_ADMIN_USERNAME = "admin";
     const DEFAULT_ADMIN_PASSWORD = "adminpassword"; // Consider using a stronger password in production
 
-    // --- New Default Delivery Rates ---
+    // --- Default Delivery Rates ---
     const DEFAULT_DELIVERY_RATES = [
         { kms: 1, amount: 50 },    // Up to 1 km: 50 Rs
         { kms: 3, amount: 60 },    // Up to 3 km: 60 Rs
@@ -131,6 +133,7 @@ async function setupAdminUser() {
             console.log('Default admin user and delivery rates created with hardcoded credentials.');
         } else {
             // Optional: If you want to update the password or delivery rates if they change
+            // This logic ensures the password is always hashed.
             if (!bcrypt.getRounds(settings.adminPassword) || settings.adminUsername !== DEFAULT_ADMIN_USERNAME) {
                  const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
                  settings.adminPassword = hashedPassword;
@@ -199,32 +202,32 @@ async function initializeBot() {
     io.emit('status', 'initializing');
     botStatus = 'initializing';
 
-    let loadedSession;
+    // --- MODIFIED: Load session data from LocalAuth's disk storage, not directly from DB ---
+    // The WhatsappSession model now primarily tracks metadata like lastAuthenticatedAt
+    // LocalAuth handles the complex session object persistence to disk.
+    let loadedSessionData = null; // LocalAuth will load from disk if available
     try {
-        const latestSession = await WhatsappSession.findOne().sort({ updatedAt: -1 });
-        if (latestSession && latestSession.sessionData) {
-            loadedSession = latestSession.sessionData;
-            console.log('Loaded session from database.');
+        const sessionRecord = await WhatsappSession.findOne({ sessionId: 'default_bot_session' });
+        if (sessionRecord && sessionRecord.lastAuthenticatedAt) {
+            console.log('Found previous session record in DB. Bot will attempt to load local session.');
+            lastAuthenticatedAt = sessionRecord.lastAuthenticatedAt;
+            // No need to pass sessionData to Client if using LocalAuth
         } else {
-            console.log('No saved session found in database. Starting fresh.');
+            console.log('No previous session record in DB. Starting fresh or LocalAuth will create new.');
         }
     } catch (dbErr) {
-        console.error('Error loading session from DB:', dbErr);
-        console.warn('Proceeding without loading a saved session.');
+        console.error('Error checking for previous session record in DB:', dbErr);
     }
+    // --- END MODIFIED ---
 
-    // Initialize client with loaded session if available
+
     client = new Client({
         authStrategy: new LocalAuth({
-            clientId: "bot-client", // LocalAuth persists session to disk, but we also save to DB
+            clientId: "bot-client", // LocalAuth persists session to disk
             dataPath: './.wwebjs_auth/' // Path to store local session files
         }),
-        // --- Use puppeteer-extra here ---
         puppeteer: {
-            executablePath: process.env.CHROME_BIN || null, // Use CHROME_BIN if available (for some hosting envs)
-            // For Koyeb, often executablePath is not needed if Chromium is pre-installed or handled by buildpack
-            // If you still face issues, you might need to specify the path to Chromium
-            // on your specific hosting environment, e.g., '/usr/bin/chromium-browser'
+            executablePath: process.env.CHROME_BIN || null,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -253,7 +256,6 @@ async function initializeBot() {
                 '--disable-prompt-on-repost',
                 '--disable-renderer-backgrounding',
                 '--disable-sync',
-                // '--disable-web-security', // Keep commented unless absolutely necessary for specific issues
                 '--hide-scrollbars',
                 '--metrics-recording-only',
                 '--mute-audio',
@@ -267,21 +269,19 @@ async function initializeBot() {
                 '--use-gl=swiftshader',
                 '--window-size=1920,1080'
             ],
-            // headless: false, // Uncomment for debugging browser UI, but keep true for production
         },
-        session: loadedSession // Pass the loaded session object if available
+        // session: loadedSessionData // REMOVED: LocalAuth handles this internally
     });
 
-    client.on('qr', async (qrString) => { // Renamed 'qr' to 'qrString' for clarity
+    client.on('qr', async (qrString) => {
         console.log('QR STRING RECEIVED:', qrString);
         try {
-            // Generate data URL from QR string
             const qrDataURL = await qrcode.toDataURL(qrString);
             console.log('QR DATA URL GENERATED.');
-            io.emit('qrCode', qrDataURL); // Emit the data URL to the frontend
+            io.emit('qrCode', qrDataURL);
             io.emit('status', 'qr_received');
             botStatus = 'qr_received';
-            lastAuthenticatedAt = null; // Reset on new QR
+            lastAuthenticatedAt = null;
         } catch (err) {
             console.error('Error generating QR code data URL:', err);
             io.emit('status', 'qr_error');
@@ -290,52 +290,54 @@ async function initializeBot() {
     });
 
     client.on('authenticated', async (session) => {
-        console.log('AUTHENTICATED', session);
+        console.log('AUTHENTICATED'); // No longer logging the full session object
         io.emit('status', 'authenticated');
         botStatus = 'authenticated';
-        lastAuthenticatedAt = new Date(); // Set timestamp on authentication
+        lastAuthenticatedAt = new Date();
 
-        // Save/Update session data in MongoDB
+        // --- MODIFIED: Save/Update simplified session data in MongoDB ---
         try {
             await WhatsappSession.findOneAndUpdate(
-                {}, // Find any existing session (assuming one bot instance)
-                { sessionData: session, lastAuthenticatedAt: lastAuthenticatedAt, updatedAt: new Date() },
-                { upsert: true, new: true } // Create if not exists, return new doc
+                { sessionId: 'default_bot_session' }, // Find the specific session record
+                { lastAuthenticatedAt: lastAuthenticatedAt, updatedAt: new Date() },
+                { upsert: true, new: true }
             );
-            console.log('Session data saved to MongoDB.');
+            console.log('Session authentication timestamp updated in MongoDB.');
         } catch (dbErr) {
-            console.error('Error saving session to MongoDB:', dbErr);
+            console.error('Error updating session timestamp to MongoDB:', dbErr);
         }
+        // --- END MODIFIED ---
     });
 
     client.on('auth_failure', async msg => {
         console.error('AUTHENTICATION FAILURE', msg);
         io.emit('status', 'auth_failure');
         botStatus = 'auth_failure';
-        lastAuthenticatedAt = null; // Reset on failure
-        // Optionally, delete the stored session if it's permanently invalid
+        lastAuthenticatedAt = null;
+        // --- MODIFIED: Clear session record from MongoDB on auth failure ---
         try {
-            await WhatsappSession.deleteMany({}); // Or find and delete specific one
-            console.log('Authentication failed, cleared session data from MongoDB.');
+            await WhatsappSession.deleteOne({ sessionId: 'default_bot_session' });
+            console.log('Authentication failed, cleared session record from MongoDB.');
         } catch (dbErr) {
-            console.error('Error clearing session from MongoDB on auth failure:', dbErr);
+            console.error('Error clearing session record from MongoDB on auth failure:', dbErr);
         }
+        // --- END MODIFIED ---
     });
 
     client.on('ready', () => {
         console.log('WhatsApp Client is ready!');
         io.emit('status', 'ready');
         botStatus = 'ready';
-        lastAuthenticatedAt = new Date(); // Update timestamp on ready
+        lastAuthenticatedAt = new Date();
 
-        // Update lastUsedAt in DB for the active session
+        // --- MODIFIED: Update lastAuthenticatedAt on ready state as well ---
         WhatsappSession.findOneAndUpdate(
-            { sessionData: { $ne: null } }, // Find an existing session
+            { sessionId: 'default_bot_session' },
             { lastAuthenticatedAt: lastAuthenticatedAt, updatedAt: new Date() },
-            { new: true }
-        ).catch(dbErr => console.error('Error updating session lastUsedAt:', dbErr));
+            { upsert: true, new: true }
+        ).catch(dbErr => console.error('Error updating session lastUsedAt on ready:', dbErr));
+        // --- END MODIFIED ---
 
-        // Initial fetch of settings to get shopLocation for distance calculation
         Setting.findOne().then(settings => {
             if (settings && settings.shopLocation) {
                 shopLocationData = settings.shopLocation;
@@ -347,30 +349,31 @@ async function initializeBot() {
         console.log('WhatsApp Client was disconnected:', reason);
         io.emit('status', 'disconnected');
         botStatus = 'disconnected';
-        lastAuthenticatedAt = null; // Reset on disconnect
-        // Optionally, handle specific reasons to clear session or attempt reconnect
-        // For now, if disconnected, client will try to initialize again on next request or server restart
-        // client.destroy(); // Destroy current client instance
-        // initializeBot(); // Attempt to re-initialize
+        lastAuthenticatedAt = null;
+        // --- MODIFIED: Clear session record from MongoDB on disconnect ---
+        try {
+            await WhatsappSession.deleteOne({ sessionId: 'default_bot_session' });
+            console.log('WhatsApp Client disconnected, cleared session record from MongoDB.');
+        } catch (dbErr) {
+            console.error('Error clearing session record from MongoDB on disconnect:', dbErr);
+        }
+        // --- END MODIFIED ---
     });
 
     client.on('message', async msg => {
         console.log('MESSAGE RECEIVED', msg.body);
 
-        const senderNumber = msg.from.split('@')[0]; // Extract just the number
+        const senderNumber = msg.from.split('@')[0];
 
-        // Base URL for web links
         const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
 
-        // --- Helper function to send messages with readiness check ---
         const safeSendMessage = async (to, messageContent) => {
-            if (client.isReady) { // Check if the client is truly ready
+            if (client.isReady) {
                 try {
                     await client.sendMessage(to, messageContent);
                     console.log(`Successfully sent message to ${to}.`);
                 } catch (error) {
                     console.error(`Error sending message to ${to}:`, error);
-                    // Log the full error for more context
                     if (error.stack) console.error(error.stack);
                 }
             } else {
@@ -378,7 +381,6 @@ async function initializeBot() {
             }
         };
 
-        // Handle specific commands (case-insensitive and number-based)
         const lowerCaseBody = msg.body.toLowerCase().trim();
 
         switch (lowerCaseBody) {
@@ -391,7 +393,6 @@ async function initializeBot() {
             case '!orders':
             case 'orders':
                 try {
-                    // Fetch only active orders (not Delivered or Cancelled)
                     const customerOrders = await Order.find({
                         customerPhone: senderNumber,
                         status: { $nin: ['Delivered', 'Cancelled'] }
@@ -419,12 +420,11 @@ async function initializeBot() {
             case 'support':
                 await safeSendMessage(msg.from, 'For any assistance, please contact our support team at +91-XXXX-XXXXXX or visit our website.');
                 break;
-            case 'menu': // Explicitly handle 'menu' as a direct link request
+            case 'menu':
             case '!menu':
                 await safeSendMessage(msg.from, `Check out our delicious menu here: ${baseUrl}/menu`);
                 break;
             default:
-                // Simplified default welcome message
                 const welcomeMessage = `Welcome to Delicious Bites! 😋
                 \nHere are your options:
                 \n1. My Profile
@@ -457,26 +457,18 @@ setInterval(async () => {
 
 // Public Routes (Accessible by customers)
 app.get('/menu', (req, res) => {
-    // --- IMPORTANT: Ensure public/menu.html exists ---
-    // If you see "ENOENT: no such file or directory" errors for menu.html,
-    // please verify that the 'public' folder exists in your project root,
-    // and 'menu.html' is inside it.
     res.sendFile(path.join(__dirname, 'public', 'menu.html'));
 });
 
-// New route for order tracking links
 app.get('/track', (req, res) => {
-    // Redirect to the menu page, passing the orderId as a query parameter
-    // The menu.html JavaScript will then read this parameter and open the tracking modal
     const orderId = req.query.orderId;
     if (orderId) {
         res.redirect(`/menu?orderId=${orderId}`);
     } else {
-        res.redirect('/menu'); // Redirect to menu if no orderId provided
+        res.redirect('/menu');
     }
 });
 
-// Serve the bot status page at the root
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'bot_status.html'));
 });
@@ -519,7 +511,6 @@ app.post('/api/order', async (req, res) => {
             return res.status(400).json({ message: 'Missing required order details.' });
         }
 
-        // Validate items and retrieve full product details for storing
         const itemDetails = [];
         for (const item of items) {
             const product = await MenuItem.findById(item.productId);
@@ -539,7 +530,7 @@ app.post('/api/order', async (req, res) => {
             customerName,
             customerPhone,
             deliveryAddress,
-            customerLocation, // Save customer's location
+            customerLocation,
             subtotal,
             transportTax,
             totalAmount,
@@ -549,7 +540,6 @@ app.post('/api/order', async (req, res) => {
 
         await newOrder.save();
 
-        // Update/Create Customer record
         await Customer.findOneAndUpdate(
             { customerPhone: customerPhone },
             {
@@ -560,15 +550,14 @@ app.post('/api/order', async (req, res) => {
                 },
                 $inc: { totalOrders: 1 }
             },
-            { upsert: true, new: true } // Create if not exists, return new doc
+            { upsert: true, new: true }
         );
 
         const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
         const orderTrackingLink = `${baseUrl}/track?orderId=${newOrder._id}`;
 
-        // Notify Admin via WhatsApp (if bot is ready)
         if (botStatus === 'ready' && process.env.ADMIN_NUMBER) {
-            const adminNumber = process.env.ADMIN_NUMBER; // Ensure this is a valid WhatsApp number
+            const adminNumber = process.env.ADMIN_NUMBER;
             let adminOrderSummary = `*New Order Received!* 🎉\n\n` +
                                  `*Order ID:* ${newOrder._id.toString().substring(0, 8)}\n` +
                                  `*Customer:* ${customerName}\n` +
@@ -584,20 +573,17 @@ app.post('/api/order', async (req, res) => {
             adminOrderSummary += `\n*Subtotal:* ₹${subtotal.toFixed(2)}\n*Transport Tax:* ₹${transportTax.toFixed(2)}\n*Total:* ₹${totalAmount.toFixed(2)}\n\n`;
             adminOrderSummary += `Manage this order: ${baseUrl}/admin/dashboard`;
 
-            // Use safeSendMessage helper
             await safeSendMessage(`${adminNumber}@c.us`, adminOrderSummary);
         } else {
             console.warn('WhatsApp bot not ready or ADMIN_NUMBER not set. Admin not notified via WhatsApp.');
         }
 
-        // Notify Customer via WhatsApp (Order Confirmation)
         if (botStatus === 'ready') {
             const customerConfirmationMessage = `Namaste ${customerName}!\n\nAapka order *${newOrder._id.toString().substring(0, 8)}* successfully place ho gaya hai! 🎉\n\n` +
                                                 `*Total Amount:* ₹${totalAmount.toFixed(2)}\n` +
                                                 `*Payment Method:* ${paymentMethod}\n\n` +
                                                 `Hum aapko jaldi hi update denge. Apne order ka status yahaan track karein: ${orderTrackingLink}\n\n` +
-                                                `Dhanyawad, Delicious Bites! 😊`; // Hindi translation
-            // Use safeSendMessage helper
+                                                `Dhanyawad, Delicious Bites! 😊`;
             await safeSendMessage(`${customerPhone}@c.us`, customerConfirmationMessage);
         } else {
             console.warn('WhatsApp bot not ready. Customer not notified of order confirmation.');
@@ -611,7 +597,6 @@ app.post('/api/order', async (req, res) => {
     }
 });
 
-// API to get single order status (public for tracking)
 app.get('/api/order/:id', async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
@@ -623,7 +608,6 @@ app.get('/api/order/:id', async (req, res) => {
             status: order.status,
             orderDate: order.orderDate,
             totalAmount: order.totalAmount,
-            // Include other details necessary for public tracking if desired
         });
     } catch (err) {
         console.error('Error fetching order status:', err);
@@ -631,7 +615,6 @@ app.get('/api/order/:id', async (req, res) => {
     }
 });
 
-// Admin Routes
 app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
@@ -644,9 +627,8 @@ app.post('/admin/login', async (req, res) => {
             return res.status(500).json({ message: 'Admin settings not configured.' });
         }
 
-        // --- Use hardcoded admin credentials for validation ---
         const DEFAULT_ADMIN_USERNAME = "admin";
-        const DEFAULT_ADMIN_PASSWORD = "adminpassword"; // This will be hashed in DB after first run
+        const DEFAULT_ADMIN_PASSWORD = "adminpassword";
 
         const isPasswordValid = await bcrypt.compare(password, settings.adminPassword);
 
@@ -675,29 +657,22 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_dashboard.html'));
 });
 
-// Admin API for bot status (emits to Socket.IO, frontend consumes)
 app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
-    // This endpoint primarily serves to allow the frontend to trigger a status update fetch,
-    // though the real-time updates happen via socket.io.
-    io.emit('status', botStatus); // Emit current status to all connected clients
+    io.emit('status', botStatus);
     if (botStatus === 'qr_received' && client && client.qr) {
-        // Note: client.qr here is the raw QR string, not the data URL.
-        // The client.on('qr') event handles the conversion and emission.
-        // This line is mostly for initial connection handshake.
         console.log("Admin bot-status endpoint emitting raw QR string (if available).");
     }
-    io.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt }); // Emit session timestamp
+    socket.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt });
     res.json({ status: botStatus, lastAuthenticatedAt: lastAuthenticatedAt });
 });
 
-// Admin API to request new QR (via backend trigger)
 app.post('/api/public/request-qr', async (req, res) => {
     try {
         if (client) {
-            await client.destroy(); // Destroy existing session
+            await client.destroy();
             console.log('Client destroyed. Requesting new QR.');
         }
-        initializeBot(); // Re-initialize to get a new QR
+        initializeBot();
         res.json({ message: 'New QR request initiated. Check status panel for QR.' });
     } catch (error) {
         console.error('Error requesting new QR:', error);
@@ -705,13 +680,12 @@ app.post('/api/public/request-qr', async (req, res) => {
     }
 });
 
-// Admin API to load saved session
 app.post('/api/admin/load-session', isAuthenticated, async (req, res) => {
     try {
         if (client) {
-            await client.destroy(); // Destroy current client to allow new session load
+            await client.destroy();
         }
-        await initializeBot(); // Re-initialize, which will attempt to load from DB
+        initializeBot(); // This will attempt to load the local session
         res.json({ message: 'Attempting to load saved session. Check status panel.' });
     } catch (error) {
         console.error('Error loading saved session:', error);
@@ -720,7 +694,6 @@ app.post('/api/admin/load-session', isAuthenticated, async (req, res) => {
 });
 
 
-// Admin API for Orders
 app.get('/api/admin/orders', isAuthenticated, async (req, res) => {
     try {
         const orders = await Order.find().sort({ orderDate: -1 });
@@ -759,32 +732,30 @@ app.put('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
         const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
         const orderTrackingLink = `${baseUrl}/track?orderId=${updatedOrder._id}`;
 
-        // Notify customer (if bot is ready and order status changes significantly)
         if (botStatus === 'ready' && updatedOrder.customerPhone) {
             let customerMessage = `Namaste ${updatedOrder.customerName || 'customer'}!\n\n`;
 
             switch (updatedOrder.status) {
                 case 'Confirmed':
-                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* confirm ho gaya hai! Humne ise taiyaar karna shuru kar diya hai.`; // Your order is confirmed! We've started preparing it.
+                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* confirm ho gaya hai! Humne ise taiyaar karna shuru kar diya hai.`;
                     break;
                 case 'Preparing':
-                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* abhi taiyaar ho raha hai. Jaldi hi aapke paas hoga!`; // Your order is currently being prepared. It will be with you soon!
+                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* abhi taiyaar ho raha hai. Jaldi hi aapke paas hoga!`;
                     break;
                 case 'Out for Delivery':
-                    customerMessage += `Khushkhabri! Aapka order *${updatedOrder._id.toString().substring(0, 8)}* delivery ke liye nikal chuka hai! 🛵💨\n\n`; // Good news! Your order is out for delivery!
-                    customerMessage += `Apne order ko yahaan track karein: ${orderTrackingLink}`; // Track your order here
+                    customerMessage += `Khushkhabri! Aapka order *${updatedOrder._id.toString().substring(0, 8)}* delivery ke liye nikal chuka hai! 🛵💨\n\n`;
+                    customerMessage += `Apne order ko yahaan track karein: ${orderTrackingLink}`;
                     break;
                 case 'Delivered':
-                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* deliver ho gaya hai! Apne bhojan ka anand lein. 😊`; // Your order has been delivered! Enjoy your meal.
+                    customerMessage += `Aapka order *${updatedOrder._id.toString().substring(0, 8)}* deliver ho gaya hai! Apne bhojan ka anand lein. 😊`;
                     break;
                 case 'Cancelled':
-                    customerMessage += `Maaf kijiye, aapka order *${updatedOrder._id.toString().substring(0, 8)}* cancel kar diya gaya hai. Kripya adhik jaankari ke liye humse sampark karein.`; // Sorry, your order has been cancelled. Please contact us for more details.
+                    customerMessage += `Maaf kijiye, aapka order *${updatedOrder._id.toString().substring(0, 8)}* cancel kar diya gaya hai. Kripya adhik jaankari ke liye humse sampark karein.`;
                     break;
                 default:
-                    customerMessage += `Aapke order *${updatedOrder._id.toString().substring(0, 8)}* ka status update ho gaya hai: *${updatedOrder.status}*`; // Your order status has been updated to:
+                    customerMessage += `Aapke order *${updatedOrder._id.toString().substring(0, 8)}* ka status update ho gaya hai: *${updatedOrder.status}*`;
             }
 
-            // Use safeSendMessage helper
             await safeSendMessage(`${updatedOrder.customerPhone}@c.us`, customerMessage);
         }
         res.json(updatedOrder);
@@ -807,7 +778,6 @@ app.delete('/api/admin/orders/:id', isAuthenticated, async (req, res) => {
     }
 });
 
-// Admin API for Menu Items
 app.get('/api/admin/menu', isAuthenticated, async (req, res) => {
     try {
         const menuItems = await MenuItem.find();
@@ -873,14 +843,12 @@ app.delete('/api/admin/menu/:id', isAuthenticated, async (req, res) => {
     }
 });
 
-// Admin API for Shop Settings
 app.get('/api/admin/settings', isAuthenticated, async (req, res) => {
     try {
         const settings = await Setting.findOne();
         if (!settings) {
             return res.status(404).json({ message: 'Settings not found.' });
         }
-        // Exclude password hash from response
         const { adminPassword, ...safeSettings } = settings.toObject();
         res.json(safeSettings);
     } catch (err) {
@@ -902,20 +870,16 @@ app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
         settings.shopLocation = shopLocation || settings.shopLocation;
         settings.deliveryRates = deliveryRates || settings.deliveryRates;
 
-        // If adminUsername or adminPassword are provided in the request body, update them.
-        // For this specific request, we are hardcoding, so this part might be less relevant
-        // if the frontend doesn't send these fields.
         if (adminUsername && adminUsername !== settings.adminUsername) {
             settings.adminUsername = adminUsername;
         }
-        if (adminPassword) { // Only update password if provided
+        if (adminPassword) {
             settings.adminPassword = await bcrypt.hash(adminPassword, 10);
         }
 
         await settings.save();
-        // Update the global shopLocationData immediately
         shopLocationData = settings.shopLocation;
-        const { adminPassword: _, ...safeSettings } = settings.toObject(); // Exclude password hash
+        const { adminPassword: _, ...safeSettings } = settings.toObject();
         res.json({ message: 'Settings updated successfully!', ...safeSettings });
     } catch (err) {
         console.error('Error updating settings:', err);
@@ -924,7 +888,6 @@ app.put('/api/admin/settings', isAuthenticated, async (req, res) => {
 });
 
 
-// Admin API for Customers (including last known location)
 app.get('/api/admin/customers', isAuthenticated, async (req, res) => {
     try {
         const customers = await Customer.find().sort({ lastOrderDate: -1 });
@@ -952,20 +915,30 @@ app.delete('/api/admin/customers/:id', isAuthenticated, async (req, res) => {
 // Socket.IO connection
 io.on('connection', (socket) => {
     console.log('A user connected via Socket.IO');
-    // Send current status to newly connected client
     socket.emit('status', botStatus);
-    if (botStatus === 'qr_received' && client && client.qr) {
-        // Note: client.qr here is the raw QR string, not the data URL.
-        // The client.on('qr') event handles the conversion and emission.
-        // This line is mostly for initial connection handshake.
-        console.log("Admin bot-status endpoint emitting raw QR string (if available).");
-    }
     socket.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt });
 
     socket.on('disconnect', () => {
         console.log('User disconnected from Socket.IO');
     });
 });
+
+// Helper function to send messages with readiness check
+// Defined globally to be accessible by order placement/update logic
+const safeSendMessage = async (to, messageContent) => {
+    if (client && client.isReady) { // Ensure client object exists and is ready
+        try {
+            await client.sendMessage(to, messageContent);
+            console.log(`Successfully sent message to ${to}.`);
+        } catch (error) {
+            console.error(`Error sending message to ${to}:`, error);
+            if (error.stack) console.error(error.stack);
+        }
+    } else {
+        console.warn(`Attempted to send message to ${to} but client was not ready. Status: ${botStatus}`);
+    }
+};
+
 
 // Start the bot client on server start
 initializeBot();
