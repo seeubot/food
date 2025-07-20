@@ -118,17 +118,11 @@
     <div class="login-container">
         <h1>Admin Login</h1>
         <form id="login-form">
+            <!-- Username and Password fields are removed as per request.
+                 The backend now uses hardcoded default admin. -->
             <div class="form-group">
-                <label for="username">Username:</label>
-                <input type="text" id="username" placeholder="Enter your username" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" placeholder="Enter your password" required>
-            </div>
-            <div id="totp-field" class="form-group hidden">
                 <label for="totp-code">Authenticator Code:</label>
-                <input type="text" id="totp-code" placeholder="Enter 6-digit code" maxlength="6">
+                <input type="text" id="totp-code" placeholder="Enter 6-digit code (optional for first login)" maxlength="6">
             </div>
             <button type="submit" class="btn-primary">
                 <span id="login-loader" class="loader hidden"></span>
@@ -138,28 +132,20 @@
         </form>
 
         <div class="create-admin-info">
-            <p>If this is your first time, you might need to create an admin user.</p>
-            <p>Use a tool like Postman/Insomnia or <code>curl</code> to send a POST request to:</p>
-            <p><code>http://localhost:3000/admin/create-initial-admin</code></p>
-            <p>with a JSON body like: <code>{"username": "your_username", "password": "your_password"}</code></p>
+            <p>For initial login, you can leave the Authenticator Code blank.</p>
+            <p>After logging in, go to the "Security" section in the dashboard to enable Two-Factor Authentication.</p>
+            <p class="mt-2 text-yellow-400"><strong>Warning:</strong> This setup uses hardcoded admin credentials in the backend for simplified testing. This is NOT secure for production environments.</p>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const loginForm = document.getElementById('login-form');
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
-            const totpField = document.getElementById('totp-field');
             const totpCodeInput = document.getElementById('totp-code');
             const loginButton = loginForm.querySelector('button');
             const loginLoader = document.getElementById('login-loader');
             const loginText = document.getElementById('login-text');
             const loginMessage = document.getElementById('login-message');
-
-            // Store username and password temporarily if 2FA is required
-            let tempUsername = '';
-            let tempPassword = '';
 
             // Check if a token already exists (e.g., if user navigated back)
             // If so, redirect to dashboard immediately.
@@ -171,9 +157,7 @@
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault(); // Prevent default form submission
 
-                const username = usernameInput.value;
-                const password = passwordInput.value;
-                const totpCode = totpCodeInput.value;
+                const totpCode = totpCodeInput.value.trim(); // Get the TOTP code
 
                 // Show loader and hide previous messages
                 loginLoader.classList.remove('hidden');
@@ -182,11 +166,7 @@
                 loginMessage.classList.add('hidden');
 
                 try {
-                    const payload = { username, password };
-                    // Only include totpCode if the field is visible (meaning 2FA is expected)
-                    if (!totpField.classList.contains('hidden')) {
-                        payload.totpCode = totpCode;
-                    }
+                    const payload = { totpCode: totpCode }; // Always send totpCode, even if empty
 
                     const response = await fetch('/admin/login', {
                         method: 'POST',
@@ -206,29 +186,16 @@
                         loginMessage.classList.remove('hidden');
                         window.location.href = '/admin/dashboard'; // Redirect to dashboard
                     } else {
-                        // Handle specific 2FA required message
-                        if (data.message === 'Two-Factor Authentication code required.') {
-                            tempUsername = username; // Store for re-submission
-                            tempPassword = password; // Store for re-submission
-                            totpField.classList.remove('hidden'); // Show TOTP input
-                            totpCodeInput.focus(); // Focus on TOTP input
-                            loginMessage.textContent = 'Please enter your authenticator code.';
-                            loginMessage.className = 'message mt-3 info'; // Use info style for this prompt
-                            loginMessage.classList.remove('hidden');
-                        } else {
-                            // Display other error messages from the backend (e.g., Invalid credentials, Invalid 2FA code)
-                            loginMessage.textContent = data.message || 'Login failed. Please try again.';
-                            loginMessage.classList.remove('hidden');
-                            loginMessage.className = 'message mt-3 error';
-                            totpField.classList.add('hidden'); // Hide TOTP field on general errors
-                        }
+                        // Display error message from the backend
+                        loginMessage.textContent = data.message || 'Login failed. Please try again.';
+                        loginMessage.classList.remove('hidden');
+                        loginMessage.className = 'message mt-3 error';
                     }
                 } catch (error) {
                     console.error('Login error:', error);
                     loginMessage.textContent = 'An error occurred. Please try again later.';
                     loginMessage.classList.remove('hidden');
                     loginMessage.className = 'message mt-3 error';
-                    totpField.classList.add('hidden'); // Hide TOTP field on network errors
                 } finally {
                     // Hide loader and re-enable button
                     loginLoader.classList.add('hidden');
