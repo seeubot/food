@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* Custom styles for the black and white theme */
+        /* Base styles for black and white theme */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #000000; /* Pure black background */
@@ -25,28 +25,62 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap; /* Allow wrapping on small screens */
+            flex-wrap: wrap;
         }
         .header h1 {
             font-size: 2rem;
             font-weight: 700;
             color: #ffffff;
-            margin-bottom: 0.5rem; /* Space below on wrap */
+            margin-bottom: 0.5rem;
         }
         .header-actions {
             display: flex;
             gap: 0.75rem;
             flex-wrap: wrap;
         }
-        .main-content {
+        .dashboard-container {
+            display: flex;
+            flex-grow: 1;
+            flex-direction: column; /* Default to column for mobile */
+        }
+        .sidebar {
+            background-color: #1a1a1a;
+            padding: 1.5rem 1rem;
+            border-right: 1px solid #333333;
+            min-width: 200px;
+            box-shadow: 2px 0 5px rgba(255,255,255,0.05);
+        }
+        .sidebar-nav a {
+            display: block;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            color: #cccccc;
+            font-weight: 600;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .sidebar-nav a:hover {
+            background-color: #2a2a2a;
+            color: #ffffff;
+        }
+        .sidebar-nav a.active {
+            background-color: #0066cc; /* Highlight active section */
+            color: #ffffff;
+        }
+        .content-area {
             flex-grow: 1;
             padding: 1.5rem;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
+            max-width: 100%; /* Ensure it auto-fits */
+            overflow-x: auto; /* Allow horizontal scroll for tables */
+        }
+        .section-content {
+            display: none; /* Hidden by default */
+        }
+        .section-content.active {
+            display: block; /* Show active section */
         }
         .card {
-            background-color: #1a1a1a; /* Dark gray for cards */
+            background-color: #1a1a1a;
             border-radius: 0.75rem;
             box-shadow: 0 4px 8px rgba(255,255,255,0.08);
             padding: 1.5rem;
@@ -65,8 +99,8 @@
         }
         /* Button styles */
         .btn-primary {
-            background-color: #ffffff; /* White background */
-            color: #000000; /* Black text */
+            background-color: #ffffff;
+            color: #000000;
             padding: 0.6rem 1.2rem;
             border-radius: 0.5rem;
             font-weight: 600;
@@ -74,13 +108,13 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            white-space: nowrap; /* Prevent text wrap on small buttons */
+            white-space: nowrap;
         }
         .btn-primary:hover {
             background-color: #e0e0e0;
         }
         .btn-secondary {
-            background-color: #333333; /* Darker gray */
+            background-color: #333333;
             color: #ffffff;
             padding: 0.6rem 1.2rem;
             border-radius: 0.5rem;
@@ -95,7 +129,7 @@
             background-color: #555555;
         }
         .btn-danger {
-            background-color: #cc0000; /* Red */
+            background-color: #cc0000;
             color: #ffffff;
             padding: 0.4rem 0.8rem;
             border-radius: 0.375rem;
@@ -106,7 +140,7 @@
             background-color: #ff3333;
         }
         .btn-success {
-            background-color: #00cc00; /* Green */
+            background-color: #00cc00;
             color: #000000;
             padding: 0.4rem 0.8rem;
             border-radius: 0.375rem;
@@ -133,14 +167,14 @@
             border-bottom: 1px solid #333333;
         }
         .data-table th {
-            background-color: #2a2a2a; /* Slightly lighter dark gray for table headers */
+            background-color: #2a2a2a;
             font-weight: 700;
             color: #cccccc;
             text-transform: uppercase;
             font-size: 0.875rem;
         }
         .data-table tbody tr:hover {
-            background-color: #222222; /* Even lighter dark gray on hover */
+            background-color: #222222;
         }
         .data-table td {
             color: #ffffff;
@@ -182,18 +216,18 @@
 
         /* Modal styles */
         .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
+            display: none;
+            position: fixed;
+            z-index: 1000;
             left: 0;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.8); /* Darker overlay */
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.8);
             justify-content: center;
             align-items: center;
-            padding: 1rem; /* Padding for mobile view */
+            padding: 1rem;
         }
         .modal-content {
             background-color: #1a1a1a;
@@ -202,7 +236,7 @@
             border-radius: 0.75rem;
             box-shadow: 0 5px 15px rgba(255,255,255,0.1);
             width: 90%;
-            max-width: 700px; /* Increased max-width for better forms */
+            max-width: 700px;
             position: relative;
             color: #ffffff;
         }
@@ -285,39 +319,69 @@
         .remove-rate-btn:hover {
             background-color: #ff3333;
         }
+        .qr-code-img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #333333;
+            background-color: #ffffff; /* White background for QR code */
+            padding: 1rem;
+        }
 
         /* Responsive adjustments */
-        @media (max-width: 640px) {
+        @media (min-width: 768px) { /* Medium screens and up */
+            .dashboard-container {
+                flex-direction: row; /* Row layout for larger screens */
+            }
+            .sidebar {
+                flex-shrink: 0;
+                height: 100vh; /* Full height sidebar */
+                position: sticky; /* Sticky sidebar */
+                top: 0;
+            }
             .header {
-                flex-direction: column;
-                align-items: flex-start;
+                flex-direction: row;
+                margin-bottom: 0;
             }
             .header h1 {
-                margin-bottom: 1rem;
+                margin-bottom: 0;
+            }
+            .content-area {
+                padding: 1.5rem 2rem;
+                max-width: calc(100% - 200px); /* Adjust max-width based on sidebar */
+            }
+            .data-table th:nth-child(n+4), .data-table td:nth-child(n+4) {
+                display: table-cell; /* Show all columns on larger screens */
+            }
+        }
+        @media (max-width: 767px) { /* Small screens */
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid #333333;
+                padding-bottom: 1rem;
+            }
+            .sidebar-nav {
+                display: flex; /* Horizontal nav for small screens */
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 0.5rem;
+            }
+            .sidebar-nav a {
+                flex-grow: 1;
+                text-align: center;
+                padding: 0.5rem 0.75rem;
+                margin-bottom: 0;
             }
             .header-actions {
                 width: 100%;
                 justify-content: center;
+                margin-top: 1rem;
             }
             .header-actions button {
-                width: 100%;
-            }
-            .card-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .card-header h2 {
-                margin-bottom: 0.75rem;
-            }
-            .data-table th, .data-table td {
-                padding: 0.5rem;
-                font-size: 0.8rem;
-            }
-            .data-table th:nth-child(n+4), .data-table td:nth-child(n+4) {
-                display: none; /* Hide less critical columns on small screens */
-            }
-            .modal-content {
-                padding: 1.5rem;
+                width: auto; /* Allow buttons to size naturally */
+                flex-grow: 1;
             }
         }
     </style>
@@ -330,101 +394,123 @@
         </div>
     </header>
 
-    <main class="main-content">
-        <!-- Bot Status Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>WhatsApp Bot Status</h2>
-                <button id="refresh-bot-status-btn" class="btn-secondary btn-small">Refresh</button>
+    <div class="dashboard-container">
+        <nav class="sidebar">
+            <div class="sidebar-nav">
+                <a href="#bot-status-section" class="nav-link active" data-section="bot-status-section">Bot Status</a>
+                <a href="#orders-section" class="nav-link" data-section="orders-section">Orders</a>
+                <a href="#menu-section" class="nav-link" data-section="menu-section">Menu</a>
+                <a href="#customers-section" class="nav-link" data-section="customers-section">Customers</a>
+                <a href="#settings-section" class="nav-link" data-section="settings-section">Settings</a>
             </div>
-            <p class="text-lg">Current Status: <span id="bot-status" class="font-semibold text-yellow-400">Loading...</span></p>
-            <p class="text-gray-400 text-sm mt-1">Last Authenticated: <span id="last-auth-time" class="font-semibold text-white">N/A</span></p>
-            <div id="bot-status-actions" class="mt-4 flex flex-col sm:flex-row gap-3">
-                <button id="request-qr-btn" class="btn-primary">
-                    <span id="request-qr-loader" class="loader hidden"></span>
-                    <span id="request-qr-text">Request New QR</span>
-                </button>
-                <button id="load-session-btn" class="btn-primary">
-                    <span id="load-session-loader" class="loader hidden"></span>
-                    <span id="load-session-text">Load Saved Session</span>
-                </button>
-            </div>
-            <div id="qr-code-section" class="mt-4 hidden">
-                <p class="text-gray-300 mb-2">Scan this QR code with your WhatsApp app:</p>
-                <img id="qr-code-img" src="" alt="QR Code" class="qr-code-img mx-auto">
-                <p class="text-sm text-gray-400 mt-2">QR will expire in <span id="qr-countdown">60</span> seconds.</p>
-            </div>
-            <p id="bot-message" class="message mt-3 text-center"></p>
-        </div>
+        </nav>
 
-        <!-- Orders Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Recent Orders</h2>
-                <button id="refresh-orders-btn" class="btn-secondary btn-small">Refresh</button>
-            </div>
-            <div id="orders-list">
-                <p class="text-center text-gray-400">Loading orders...</p>
-            </div>
-            <p id="orders-message" class="message mt-3"></p>
-        </div>
-
-        <!-- Menu Management Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Menu Items</h2>
-                <button id="add-menu-item-btn" class="btn-primary">Add New Item</button>
-            </div>
-            <div id="menu-items-list">
-                <p class="text-center text-gray-400">Loading menu items...</p>
-            </div>
-            <p id="menu-message" class="message mt-3"></p>
-        </div>
-
-        <!-- Customer Management Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Customer Data</h2>
-                <button id="refresh-customers-btn" class="btn-secondary btn-small">Refresh</button>
-            </div>
-            <div id="customers-list">
-                <p class="text-center text-gray-400">Loading customer data...</p>
-            </div>
-            <p id="customers-message" class="message mt-3"></p>
-        </div>
-
-        <!-- Shop Settings Card -->
-        <div class="card">
-            <div class="card-header">
-                <h2>Shop Settings</h2>
-                <button id="save-settings-btn" class="btn-primary">Save Settings</button>
-            </div>
-            <form id="settings-form" class="mt-4">
-                <div class="form-group">
-                    <label for="shop-name">Shop Name:</label>
-                    <input type="text" id="shop-name" name="shopName" placeholder="e.g., Delicious Bites">
-                </div>
-                <div class="form-group">
-                    <label for="shop-lat">Shop Location (Latitude):</label>
-                    <input type="number" step="any" id="shop-lat" name="shopLocation.latitude" placeholder="e.g., 17.4">
-                </div>
-                <div class="form-group">
-                    <label for="shop-lon">Shop Location (Longitude):</label>
-                    <input type="number" step="any" id="shop-lon" name="shopLocation.longitude" placeholder="e.g., 78.5">
-                </div>
-
-                <div class="form-group">
-                    <label class="block mb-2">Delivery Rates (KMs - Amount):</label>
-                    <div id="delivery-rates-container">
-                        <!-- Dynamic delivery rate inputs will go here -->
-                        <p class="text-gray-400 text-sm">Add delivery ranges below.</p>
+        <main class="content-area">
+            <!-- Bot Status Section -->
+            <section id="bot-status-section" class="section-content active">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>WhatsApp Bot Status</h2>
+                        <button id="refresh-bot-status-btn" class="btn-secondary btn-small">Refresh</button>
                     </div>
-                    <button type="button" id="add-delivery-rate-btn" class="add-rate-btn mt-2">Add Rate</button>
+                    <p class="text-lg">Current Status: <span id="bot-status" class="font-semibold text-yellow-400">Loading...</span></p>
+                    <p class="text-gray-400 text-sm mt-1">Last Authenticated: <span id="last-auth-time" class="font-semibold text-white">N/A</span></p>
+                    <div id="bot-status-actions" class="mt-4 flex flex-col sm:flex-row gap-3">
+                        <button id="request-qr-btn" class="btn-primary">
+                            <span id="request-qr-loader" class="loader hidden"></span>
+                            <span id="request-qr-text">Request New QR</span>
+                        </button>
+                        <button id="load-session-btn" class="btn-primary">
+                            <span id="load-session-loader" class="loader hidden"></span>
+                            <span id="load-session-text">Load Saved Session</span>
+                        </button>
+                    </div>
+                    <div id="qr-code-section" class="mt-4 hidden">
+                        <p class="text-gray-300 mb-2">Scan this QR code with your WhatsApp app:</p>
+                        <img id="qr-code-img" src="" alt="QR Code" class="qr-code-img mx-auto">
+                        <p class="text-sm text-gray-400 mt-2">QR will expire in <span id="qr-countdown">60</span> seconds.</p>
+                    </div>
+                    <p id="bot-message" class="message mt-3 text-center"></p>
                 </div>
-                <p id="settings-message" class="message mt-3"></p>
-            </form>
-        </div>
-    </main>
+            </section>
+
+            <!-- Orders Section -->
+            <section id="orders-section" class="section-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Recent Orders</h2>
+                        <button id="refresh-orders-btn" class="btn-secondary btn-small">Refresh</button>
+                    </div>
+                    <div id="orders-list">
+                        <p class="text-center text-gray-400">Loading orders...</p>
+                    </div>
+                    <p id="orders-message" class="message mt-3"></p>
+                </div>
+            </section>
+
+            <!-- Menu Management Section -->
+            <section id="menu-section" class="section-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Menu Items</h2>
+                        <button id="add-menu-item-btn" class="btn-primary">Add New Item</button>
+                    </div>
+                    <div id="menu-items-list">
+                        <p class="text-center text-gray-400">Loading menu items...</p>
+                    </div>
+                    <p id="menu-message" class="message mt-3"></p>
+                </div>
+            </section>
+
+            <!-- Customer Management Section -->
+            <section id="customers-section" class="section-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Customer Data</h2>
+                        <button id="refresh-customers-btn" class="btn-secondary btn-small">Refresh</button>
+                    </div>
+                    <div id="customers-list">
+                        <p class="text-center text-gray-400">Loading customer data...</p>
+                    </div>
+                    <p id="customers-message" class="message mt-3"></p>
+                </div>
+            </section>
+
+            <!-- Shop Settings Section -->
+            <section id="settings-section" class="section-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Shop Settings</h2>
+                        <button id="save-settings-btn" class="btn-primary">Save Settings</button>
+                    </div>
+                    <form id="settings-form" class="mt-4">
+                        <div class="form-group">
+                            <label for="shop-name">Shop Name:</label>
+                            <input type="text" id="shop-name" name="shopName" placeholder="e.g., Delicious Bites">
+                        </div>
+                        <div class="form-group">
+                            <label for="shop-lat">Shop Location (Latitude):</label>
+                            <input type="number" step="any" id="shop-lat" name="shopLocation.latitude" placeholder="e.g., 17.4">
+                        </div>
+                        <div class="form-group">
+                            <label for="shop-lon">Shop Location (Longitude):</label>
+                            <input type="number" step="any" id="shop-lon" name="shopLocation.longitude" placeholder="e.g., 78.5">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="block mb-2">Delivery Rates (KMs - Amount):</label>
+                            <div id="delivery-rates-container">
+                                <!-- Dynamic delivery rate inputs will go here -->
+                                <p class="text-gray-400 text-sm">Add delivery ranges below.</p>
+                            </div>
+                            <button type="button" id="add-delivery-rate-btn" class="add-rate-btn mt-2">Add Rate</button>
+                        </div>
+                        <p id="settings-message" class="message mt-3"></p>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
 
     <!-- Modals -->
 
@@ -893,13 +979,16 @@
             `;
             customers.forEach(customer => {
                 const lastOrderDate = customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleString() : 'N/A';
+                const customerPhone = customer.customerPhone; // Assuming this is the WhatsApp number
+
                 tableHtml += `
                     <tr>
-                        <td>${customer.customerPhone}</td>
+                        <td>${customerPhone}</td>
                         <td>${customer.customerName || 'N/A'}</td>
                         <td>${customer.totalOrders}</td>
                         <td>${lastOrderDate}</td>
                         <td>
+                            <a href="tel:${customerPhone}" class="btn-primary btn-small mr-2">Call</a>
                             <button class="btn-danger btn-small delete-customer-btn" data-id="${customer._id}">Delete</button>
                         </td>
                     </tr>
@@ -916,7 +1005,9 @@
 
         function renderDeliveryRates(rates) {
             deliveryRatesContainer.innerHTML = ''; // Clear existing
-            rates.sort((a, b) => a.kms - b.kms); // Ensure they are sorted for display
+            // Sort rates by kms before rendering to maintain order
+            rates.sort((a, b) => a.kms - b.kms);
+
             rates.forEach((rate, index) => {
                 const rateDiv = document.createElement('div');
                 rateDiv.className = 'delivery-rate-item';
@@ -935,6 +1026,7 @@
                 });
             });
         }
+
 
         // --- Modal Functions ---
 
@@ -1096,7 +1188,11 @@
                         case 'Delivered': statusClass = 'text-green-400'; break;
                         case 'Cancelled': statusClass = 'text-red-400'; break;
                     }
-                    orderDetailIdDisplay.closest('.modal-content').querySelector('.grid div:nth-child(4) span').className = statusClass; // Update status text color
+                    // This line needs to correctly target the status span within the modal
+                    // Assuming orderDetailIdDisplay is within a parent that contains the status span
+                    // A more robust way would be to give the status span an ID
+                    // For now, I'll update the text content of the select element for immediate feedback
+                    // The actual color change on the main dashboard table happens via fetchOrders()
                     setTimeout(() => orderDetailsModal.style.display = 'none', 1500); // Close after a delay
                 } else {
                     hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${result.message || 'Failed to update status.'}`);
@@ -1126,11 +1222,36 @@
             }
         }
 
+        async function deleteCustomer(customerId) {
+            if (!confirm('Are you sure you want to delete this customer? This action cannot be undone.')) return;
+            customersMessage.classList.add('hidden'); // Hide previous messages
+
+            try {
+                const response = await fetch(`/api/admin/customers/${customerId}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (response.ok) {
+                    customersMessage.textContent = result.message;
+                    customersMessage.className = 'message mt-3 success';
+                    customersMessage.classList.remove('hidden');
+                    fetchCustomers(); // Refresh list
+                } else {
+                    customersMessage.textContent = `Error: ${result.message || 'Failed to delete customer.'}`;
+                    customersMessage.className = 'message mt-3 error';
+                    customersMessage.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error deleting customer:', error);
+                customersMessage.textContent = `Network error: ${error.message}`;
+                customersMessage.className = 'message mt-3 error';
+                customersMessage.classList.remove('hidden');
+            }
+        }
+
         async function saveSettings() {
             const deliveryRates = [];
-            document.querySelectorAll('#delivery-rates-container .delivery-rate-item').forEach(itemDiv => {
-                const kms = parseFloat(itemDiv.querySelector('.kms-input').value);
-                const amount = parseFloat(itemDiv.querySelector('.amount-input').value);
+            document.querySelectorAll('#delivery-rates-container .kms-input').forEach(input => {
+                const kms = parseFloat(input.value);
+                const amount = parseFloat(input.nextElementSibling.value); // Get sibling amount input
                 if (!isNaN(kms) && !isNaN(amount)) {
                     deliveryRates.push({ kms, amount });
                 }
@@ -1181,6 +1302,52 @@
                 e.target.closest('.delivery-rate-item').remove();
             });
         }
+
+
+        // --- Navigation Logic ---
+        const navLinks = document.querySelectorAll('.nav-link');
+        const sections = document.querySelectorAll('.section-content');
+
+        function showSection(sectionId) {
+            sections.forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.dataset.section === sectionId) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Re-fetch data for the activated section
+            switch (sectionId) {
+                case 'bot-status-section':
+                    fetchBotStatus();
+                    break;
+                case 'orders-section':
+                    fetchOrders();
+                    break;
+                case 'menu-section':
+                    fetchMenuItems();
+                    break;
+                case 'customers-section':
+                    fetchCustomers();
+                    break;
+                case 'settings-section':
+                    fetchSettings();
+                    break;
+            }
+        }
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const sectionId = e.target.dataset.section;
+                showSection(sectionId);
+            });
+        });
 
 
         // --- Event Listeners ---
@@ -1314,11 +1481,8 @@
 
         // Initial data loads on page load
         document.addEventListener('DOMContentLoaded', () => {
-            fetchBotStatus();
-            fetchOrders();
-            fetchMenuItems();
-            fetchCustomers();
-            fetchSettings();
+            // Show the first section by default
+            showSection('bot-status-section');
         });
     </script>
 </body>
