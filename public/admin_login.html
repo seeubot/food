@@ -82,6 +82,9 @@
         .message.success {
             color: #66ff66;
         }
+        .message.info {
+            color: #ffff66;
+        }
         .loader {
             border: 4px solid #333333;
             border-top: 4px solid #66ff66;
@@ -123,6 +126,10 @@
                 <label for="password">Password:</label>
                 <input type="password" id="password" placeholder="Enter your password" required>
             </div>
+            <div id="totp-field" class="form-group hidden">
+                <label for="totp-code">Authenticator Code:</label>
+                <input type="text" id="totp-code" placeholder="Enter 6-digit code" maxlength="6">
+            </div>
             <button type="submit" class="btn-primary">
                 <span id="login-loader" class="loader hidden"></span>
                 <span id="login-text">Login</span>
@@ -143,10 +150,16 @@
             const loginForm = document.getElementById('login-form');
             const usernameInput = document.getElementById('username');
             const passwordInput = document.getElementById('password');
+            const totpField = document.getElementById('totp-field');
+            const totpCodeInput = document.getElementById('totp-code');
             const loginButton = loginForm.querySelector('button');
             const loginLoader = document.getElementById('login-loader');
             const loginText = document.getElementById('login-text');
             const loginMessage = document.getElementById('login-message');
+
+            // Store username and password temporarily if 2FA is required
+            let tempUsername = '';
+            let tempPassword = '';
 
             // Check if a token already exists (e.g., if user navigated back)
             // If so, redirect to dashboard immediately.
@@ -160,6 +173,7 @@
 
                 const username = usernameInput.value;
                 const password = passwordInput.value;
+                const totpCode = totpCodeInput.value;
 
                 // Show loader and hide previous messages
                 loginLoader.classList.remove('hidden');
@@ -168,12 +182,18 @@
                 loginMessage.classList.add('hidden');
 
                 try {
+                    const payload = { username, password };
+                    // Only include totpCode if the field is visible (meaning 2FA is expected)
+                    if (!totpField.classList.contains('hidden')) {
+                        payload.totpCode = totpCode;
+                    }
+
                     const response = await fetch('/admin/login', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ username, password })
+                        body: JSON.stringify(payload)
                     });
 
                     const data = await response.json();
@@ -186,14 +206,29 @@
                         loginMessage.classList.remove('hidden');
                         window.location.href = '/admin/dashboard'; // Redirect to dashboard
                     } else {
-                        // Display error message from the backend
-                        loginMessage.textContent = data.message || 'Login failed. Please try again.';
-                        loginMessage.classList.remove('hidden');
+                        // Handle specific 2FA required message
+                        if (data.message === 'Two-Factor Authentication code required.') {
+                            tempUsername = username; // Store for re-submission
+                            tempPassword = password; // Store for re-submission
+                            totpField.classList.remove('hidden'); // Show TOTP input
+                            totpCodeInput.focus(); // Focus on TOTP input
+                            loginMessage.textContent = 'Please enter your authenticator code.';
+                            loginMessage.className = 'message mt-3 info'; // Use info style for this prompt
+                            loginMessage.classList.remove('hidden');
+                        } else {
+                            // Display other error messages from the backend (e.g., Invalid credentials, Invalid 2FA code)
+                            loginMessage.textContent = data.message || 'Login failed. Please try again.';
+                            loginMessage.classList.remove('hidden');
+                            loginMessage.className = 'message mt-3 error';
+                            totpField.classList.add('hidden'); // Hide TOTP field on general errors
+                        }
                     }
                 } catch (error) {
                     console.error('Login error:', error);
                     loginMessage.textContent = 'An error occurred. Please try again later.';
                     loginMessage.classList.remove('hidden');
+                    loginMessage.className = 'message mt-3 error';
+                    totpField.classList.add('hidden'); // Hide TOTP field on network errors
                 } finally {
                     // Hide loader and re-enable button
                     loginLoader.classList.add('hidden');
