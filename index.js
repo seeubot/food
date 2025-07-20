@@ -25,7 +25,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey';
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
+    useNewUrlParser: true, // This is a deprecated option, but keeping it for compatibility if needed.
     useUnifiedTopology: true,
 })
 .then(() => console.log('MongoDB connected'))
@@ -112,23 +112,34 @@ let qrCodeData = null; // Store QR code data URL
 let qrExpiryTimer = null; // Timer for QR code expiry
 let qrGeneratedTimestamp = null; // Timestamp when QR was generated
 
-const initializeWhatsappClient = (loadSession = false) => {
-    console.log(`Initializing WhatsApp client (Load session: ${loadSession ? 'Yes' : 'No'})...`);
+// Retry configuration for WhatsApp client initialization
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 5000; // 5 seconds
+
+const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => {
+    console.log(`Initializing WhatsApp client (Load session: ${loadSession ? 'Yes' : 'No'})... Attempt ${retryCount + 1}/${MAX_RETRIES}`);
+
     if (client) {
-        client.destroy().then(() => {
-            console.log('Previous client destroyed.');
+        try {
+            console.log('Destroying previous client instance...');
+            await client.destroy();
+            console.log('Previous client destroyed successfully.');
             client = null;
-        }).catch(e => console.error('Error destroying old client:', e));
+        } catch (e) {
+            console.error('Error destroying old client:', e);
+            // If destruction fails, it might be in a bad state, so proceed with new client anyway.
+            client = null;
+        }
     }
 
     client = new Client({
         authStrategy: new LocalAuth({
-            clientId: 'admin', // Use a consistent client ID
-            dataPath: path.join(__dirname, '.wwebjs_auth') // Custom path for session data
+            clientId: 'admin',
+            dataPath: path.join(__dirname, '.wwebjs_auth')
         }),
         puppeteer: {
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            headless: true, // Keep headless for production
+            headless: true,
         },
         webVersionCache: {
             type: 'remote',
@@ -136,6 +147,7 @@ const initializeWhatsappClient = (loadSession = false) => {
         },
     });
 
+    // --- All client.on() listeners moved inside this function ---
     client.on('qr', async (qr) => {
         console.log('QR RECEIVED');
         qrCodeData = await qrcode.toDataURL(qr);
@@ -152,7 +164,7 @@ const initializeWhatsappClient = (loadSession = false) => {
                 io.emit('qrCode', null);
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
                 io.emit('status', 'qr_error');
-                initializeWhatsappClient();
+                initializeWhatsappClient(); // Reinitialize to get a new QR
             }
         }, 60000);
     });
@@ -193,6 +205,7 @@ const initializeWhatsappClient = (loadSession = false) => {
         qrCodeData = null;
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+        // Attempt to re-initialize client after disconnection
         if (reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNLAUNCHED') {
              console.log('Reinitializing client due to disconnection...');
              initializeWhatsappClient();
@@ -272,7 +285,7 @@ const initializeWhatsappClient = (loadSession = false) => {
                     { new: true, sort: { orderDate: -1 } }
                 );
                 if (pendingOrderCod) {
-                    await client.sendMessage(chatId, 'మీ ఆర్డర్ క్యాష్ ఆన్ డెలివరీ కోసం నిర్ధారించబడింది. ధన్యవాదాలు! మీ ఆర్డర్ త్వరలో ప్రాసెస్ చేయబడుతుంది. 😊');
+                    await client.sendMessage(chatId, 'మీ ఆర్డర్ క్యాష్ ఆన్ డెలివరీ కోసం నిర్ధారించబడింది. ధన్యవాసాలు! మీ ఆర్డర్ త్వరలో ప్రాసెస్ చేయబడుతుంది. 😊');
                     io.emit('new_order', pendingOrderCod);
                 } else {
                     await client.sendMessage(chatId, 'మీకు పెండింగ్ ఆర్డర్లు ఏమీ లేవు. దయచేసి ముందుగా ఒక ఆర్డర్ చేయండి.');
@@ -317,8 +330,24 @@ const initializeWhatsappClient = (loadSession = false) => {
                 break;
         }
     });
-    client.initialize()
-        .catch(err => console.error('Client initialization error:', err));
+
+    try {
+        await client.initialize();
+        console.log('WhatsApp client initialized successfully.');
+    } catch (err) {
+        console.error(`Client initialization error: ${err.message}`);
+        if (retryCount < MAX_RETRIES) {
+            console.log(`Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
+            setTimeout(() => initializeWhatsappClient(loadSession, retryCount + 1), RETRY_DELAY_MS);
+        } else {
+            console.error('Max retries reached. WhatsApp client failed to initialize.');
+            whatsappReady = false;
+            await Settings.findOneAndUpdate({}, { whatsappStatus: 'auth_failure' }, { upsert: true });
+            io.emit('status', 'auth_failure');
+            qrCodeData = null;
+            io.emit('qrCode', null);
+        }
+    }
 };
 
 // Initial WhatsApp client setup (without loading session explicitly on startup)
@@ -530,7 +559,7 @@ const reOrderNotificationMessagesTelugu = [
 // --- New: Scheduled Notification Function ---
 const sendReorderNotification = async () => {
     if (!whatsappReady) {
-        console.log('WhatsApp client not ready for scheduled notifications.');
+        console.log('WhatsApp client not ready for scheduled notifications. Skipping job.');
         return;
     }
 
@@ -539,10 +568,6 @@ const sendReorderNotification = async () => {
     const twoDaysAgo = moment().subtract(2, 'days').toDate(); // Avoid spamming recent customers
 
     try {
-        // Find customers who have ordered at least once,
-        // and either haven't received a notification yet OR
-        // their last notification was sent more than 7 days ago,
-        // AND their last order was NOT within the last 2 days.
         const customersToNotify = await Customer.find({
             totalOrders: { $gt: 0 }, // Must have at least one order
             $or: [
@@ -567,7 +592,7 @@ const sendReorderNotification = async () => {
                 console.error(`Failed to send re-order notification to ${customer.customerPhone}:`, msgSendError);
             }
         }
-        console('7-day re-order notification job finished.');
+        console.log('7-day re-order notification job finished.'); // Changed from console to console.log
 
     } catch (dbError) {
         console.error('Error in 7-day re-order notification job (DB query):', dbError);
@@ -575,10 +600,7 @@ const sendReorderNotification = async () => {
 };
 
 // --- Schedule the 7-day notification job ---
-// This cron job will run every day at 09:00 AM (9 AM)
-// You can adjust the cron schedule string as needed.
-// For testing, you might use '*/1 * * * *' to run every minute.
-cron.schedule('0 9 * * *', () => {
+cron.schedule('0 9 * * *', () => { // Runs every day at 09:00 AM
     sendReorderNotification();
 }, {
     scheduled: true,
