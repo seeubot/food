@@ -6,6 +6,8 @@
     <title>Delicious Bites - Online Menu</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS for map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -21,6 +23,14 @@
             padding: 1rem;
             box-shadow: 0 2px 4px rgba(255,255,255,0.05);
             text-align: center;
+            position: sticky; /* Make header sticky */
+            top: 0;
+            width: 100%;
+            z-index: 100; /* Ensure it's above other content */
+            transition: transform 0.3s ease-out; /* Smooth transition for hiding */
+        }
+        .header.header-hidden {
+            transform: translateY(-100%); /* Hide header by moving it up */
         }
         .header h1 {
             font-size: 2.5rem;
@@ -57,6 +67,7 @@
             display: flex;
             flex-direction: column;
             transition: transform 0.2s ease-in-out;
+            cursor: pointer; /* Indicate clickable */
         }
         .menu-item-card:hover {
             transform: translateY(-5px);
@@ -91,47 +102,7 @@
             color: #00cc00; /* Green for price */
             margin-bottom: 1rem;
         }
-        .item-actions {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-top: auto; /* Push to bottom */
-        }
-        .quantity-control {
-            display: flex;
-            align-items: center;
-            background-color: #2a2a2a;
-            border-radius: 0.5rem;
-            overflow: hidden;
-        }
-        .quantity-control button {
-            background-color: #333333;
-            color: #ffffff;
-            padding: 0.5rem 0.75rem;
-            font-size: 1.1rem;
-            font-weight: 700;
-            transition: background-color 0.2s;
-        }
-        .quantity-control button:hover {
-            background-color: #555555;
-        }
-        .quantity-control span {
-            padding: 0.5rem 0.75rem;
-            color: #ffffff;
-            font-weight: 600;
-        }
-        .add-to-cart-btn {
-            background-color: #0066cc; /* Blue for add to cart */
-            color: #ffffff;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            transition: background-color 0.2s;
-            white-space: nowrap;
-        }
-        .add-to-cart-btn:hover {
-            background-color: #0077dd;
-        }
+        /* Removed quantity controls and add to cart from main grid */
 
         /* Cart Modal */
         .cart-modal {
@@ -158,6 +129,8 @@
             max-width: 600px;
             position: relative;
             color: #ffffff;
+            max-height: 90vh; /* Limit height to prevent overflow */
+            overflow-y: auto; /* Enable scrolling for content */
         }
         .close-button {
             color: #aaaaaa;
@@ -215,7 +188,8 @@
         }
         .form-group input[type="text"],
         .form-group input[type="tel"],
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
             background-color: #222222;
             border: 1px solid #444444;
             color: #ffffff;
@@ -338,6 +312,111 @@
         .status-Delivered { color: #00cc00; } /* Green */
         .status-Cancelled { color: #ff3333; } /* Red */
 
+        /* Map Modal Styles */
+        #map-modal .modal-content {
+            max-width: 800px;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+        }
+        #map {
+            height: 400px; /* Fixed height for the map */
+            width: 100%;
+            background-color: #222222;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            flex-grow: 1; /* Allow map to take available space */
+        }
+        #map-address-display {
+            background-color: #2a2a2a;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            color: #ffffff;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            min-height: 3rem; /* Ensure it has some height even when empty */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        #map-modal .btn-primary {
+            margin-top: 1rem;
+        }
+
+        /* Item Details Modal Styles */
+        #item-details-modal .modal-content {
+            max-width: 500px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        #item-details-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        #item-details-name {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        #item-details-description {
+            font-size: 1rem;
+            color: #cccccc;
+            margin-bottom: 1rem;
+        }
+        #item-details-price {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #00cc00;
+            margin-bottom: 1.5rem;
+        }
+        #item-details-quantity-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        #item-details-quantity-controls .quantity-control {
+            background-color: #2a2a2a;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            display: flex;
+        }
+        #item-details-quantity-controls .quantity-control button {
+            background-color: #333333;
+            color: #ffffff;
+            padding: 0.5rem 0.75rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            transition: background-color 0.2s;
+        }
+        #item-details-quantity-controls .quantity-control button:hover {
+            background-color: #555555;
+        }
+        #item-details-quantity-controls .quantity-control span {
+            padding: 0.5rem 0.75rem;
+            color: #ffffff;
+            font-weight: 600;
+        }
+        #item-details-add-to-cart-btn {
+            background-color: #0066cc;
+            color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            font-size: 1.125rem;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        #item-details-add-to-cart-btn:hover {
+            background-color: #0077dd;
+        }
+
+
         /* Responsive adjustments */
         @media (max-width: 640px) {
             .header h1 {
@@ -363,6 +442,12 @@
             }
             .cart-modal-content {
                 padding: 1.5rem;
+            }
+            #map {
+                height: 300px; /* Smaller map height on small screens */
+            }
+            #item-details-modal .modal-content {
+                padding: 1rem;
             }
         }
     </style>
@@ -449,6 +534,40 @@
         </div>
     </div>
 
+    <!-- Map Modal -->
+    <div id="map-modal" class="cart-modal"> <!-- Reusing cart-modal styles -->
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">Select Delivery Location</h2>
+            <div id="map"></div>
+            <div id="map-address-display" class="text-center">Drag marker or click map to select location</div>
+            <button id="confirm-location-btn" class="btn-primary w-full mt-4">Confirm Location</button>
+        </div>
+    </div>
+
+    <!-- Item Details Modal (New) -->
+    <div id="item-details-modal" class="cart-modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <img id="item-details-image" src="" alt="Item Image" class="mx-auto">
+            <h2 id="item-details-name" class="mb-2"></h2>
+            <p id="item-details-description" class="mb-3"></p>
+            <div id="item-details-price" class="mb-4"></div>
+
+            <div id="item-details-quantity-controls" class="flex justify-center items-center gap-4 mb-4">
+                <div class="quantity-control">
+                    <button id="item-details-decrease-btn">-</button>
+                    <span id="item-details-quantity">0</span>
+                    <button id="item-details-increase-btn">+</button>
+                </div>
+            </div>
+            <button id="item-details-add-to-cart-btn" class="btn-primary w-full">Add to Cart</button>
+            <p id="item-details-message" class="message mt-3"></p>
+        </div>
+    </div>
+
+    <!-- Leaflet JS for map -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         const shopNameDisplay = document.getElementById('shop-name-display');
         const menuSectionsContainer = document.getElementById('menu-sections');
@@ -481,12 +600,55 @@
         const trackedOrderItemsList = document.getElementById('tracked-order-items');
         const trackOrderMessage = document.getElementById('track-order-message');
 
+        // Map Elements
+        const mapModal = document.getElementById('map-modal');
+        const mapDiv = document.getElementById('map');
+        const mapAddressDisplay = document.getElementById('map-address-display');
+        const confirmLocationBtn = document.getElementById('confirm-location-btn');
+
+        // Item Details Modal Elements
+        const itemDetailsModal = document.getElementById('item-details-modal');
+        const itemDetailsImage = document.getElementById('item-details-image');
+        const itemDetailsName = document.getElementById('item-details-name');
+        const itemDetailsDescription = document.getElementById('item-details-description');
+        const itemDetailsPrice = document.getElementById('item-details-price');
+        const itemDetailsQuantitySpan = document.getElementById('item-details-quantity');
+        const itemDetailsDecreaseBtn = document.getElementById('item-details-decrease-btn');
+        const itemDetailsIncreaseBtn = document.getElementById('item-details-increase-btn');
+        const itemDetailsAddToCartBtn = document.getElementById('item-details-add-to-cart-btn');
+        const itemDetailsMessage = document.getElementById('item-details-message');
+
         let cart = [];
         let menuItems = [];
         let deliveryRates = [];
-        let shopLocation = null;
+        let shopLocation = null; // { latitude, longitude }
+
+        // Map related variables
+        let map = null;
+        let marker = null;
+        let selectedDeliveryLocation = null; // { latitude, longitude, address }
+        let isOrderPlacementPending = false; // Flag to indicate if order was paused for map selection
+        let currentItemInModal = null; // Stores the menu item object for the currently open item details modal
 
         const PLACEHOLDER_IMAGE = 'https://placehold.co/400x180/333333/ffffff?text=No+Image';
+
+        // --- Header Scroll Logic ---
+        const header = document.querySelector('.header');
+        let lastScrollTop = 0;
+
+        window.addEventListener('scroll', () => {
+            const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+            if (currentScrollTop > lastScrollTop && currentScrollTop > header.offsetHeight) {
+                // Scrolling down, hide header
+                header.classList.add('header-hidden');
+            } else {
+                // Scrolling up, show header
+                header.classList.remove('header-hidden');
+            }
+            lastScrollTop = currentScrollTop <= 0 ? 0 : currentScrollTop; // For Mobile or negative scrolling
+        });
+
 
         // Utility Functions
         function showLoader(loaderElement, textElement, messageElement, message = 'Loading...', type = 'info') {
@@ -565,7 +727,7 @@
                 const settings = await response.json();
                 shopNameDisplay.textContent = settings.shopName || 'Delicious Bites';
                 deliveryRates = settings.deliveryRates || [];
-                shopLocation = settings.shopLocation;
+                shopLocation = settings.shopLocation; // { latitude, longitude }
             } catch (error) {
                 console.error('Error fetching public settings:', error);
                 shopNameDisplay.textContent = 'Delicious Bites (Error)';
@@ -598,20 +760,13 @@
                 categories[category].forEach(item => {
                     if (item.isAvailable) {
                         menuHtml += `
-                            <div class="menu-item-card">
+                            <div class="menu-item-card" data-item-id="${item._id}">
                                 <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
                                 <div class="item-details">
                                     <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                                     <p>${item.description || 'No description available.'}</p>
                                     <div class="item-price">₹${item.price.toFixed(2)}</div>
-                                    <div class="item-actions">
-                                        <div class="quantity-control">
-                                            <button data-id="${item._id}" data-action="decrease">-</button>
-                                            <span id="quantity-${item._id}">0</span>
-                                            <button data-id="${item._id}" data-action="increase">+</button>
-                                        </div>
-                                        <button class="add-to-cart-btn" data-id="${item._id}">Add to Cart</button>
-                                    </div>
+                                    <!-- Quantity controls and Add to Cart button moved to item details modal -->
                                 </div>
                             </div>
                         `;
@@ -624,41 +779,25 @@
             }
             menuSectionsContainer.innerHTML = menuHtml;
 
-            // Add event listeners for quantity controls and add to cart buttons
-            document.querySelectorAll('.quantity-control button').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.id;
-                    const action = e.target.dataset.action;
-                    updateQuantity(itemId, action);
+            // Add event listeners for clicking on menu item cards
+            document.querySelectorAll('.menu-item-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    const itemId = e.currentTarget.dataset.itemId; // Use currentTarget to get the card itself
+                    openItemDetailsModal(itemId);
                 });
             });
 
-            document.querySelectorAll('.add-to-cart-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const itemId = e.target.dataset.id;
-                    const quantitySpan = document.getElementById(`quantity-${itemId}`);
-                    const quantity = parseInt(quantitySpan.textContent);
-                    if (quantity > 0) {
-                        addToCart(itemId, quantity);
-                        quantitySpan.textContent = '0'; // Reset quantity display after adding to cart
-                    } else {
-                        alert('Please select a quantity greater than zero.');
-                    }
-                });
-            });
             updateCartDisplay(); // Initial display of cart quantities
         }
 
-        function updateQuantity(itemId, action) {
-            const quantitySpan = document.getElementById(`quantity-${itemId}`);
-            let currentQuantity = parseInt(quantitySpan.textContent);
-
+        function updateQuantityInModal(action) {
+            let currentQuantity = parseInt(itemDetailsQuantitySpan.textContent);
             if (action === 'increase') {
                 currentQuantity++;
             } else if (action === 'decrease' && currentQuantity > 0) {
                 currentQuantity--;
             }
-            quantitySpan.textContent = currentQuantity;
+            itemDetailsQuantitySpan.textContent = currentQuantity;
         }
 
         function addToCart(itemId, quantity) {
@@ -670,8 +809,18 @@
                 return;
             }
 
+            if (quantity <= 0) {
+                if (existingItemIndex > -1) {
+                    // If quantity is 0, remove from cart
+                    cart.splice(existingItemIndex, 1);
+                }
+                updateCartDisplay();
+                return;
+            }
+
+
             if (existingItemIndex > -1) {
-                cart[existingItemIndex].quantity += quantity;
+                cart[existingItemIndex].quantity = quantity; // Set exact quantity from modal
             } else {
                 cart.push({
                     productId: itemId,
@@ -719,23 +868,38 @@
             updateCartDisplay();
         }
 
-        // Event Listeners
+        // Event Listeners for Modals and Cart
         cartIcon.addEventListener('click', () => {
             cartModal.style.display = 'flex';
             updateCartDisplay(); // Refresh cart display when modal opens
         });
 
         document.querySelectorAll('.close-button').forEach(button => {
-            button.addEventListener('click', () => {
-                button.closest('.modal').style.display = 'none';
-                checkoutMessage.classList.add('hidden'); // Clear messages on close
+            button.addEventListener('click', (e) => {
+                e.target.closest('.modal').style.display = 'none';
+                // Clear messages and reset states based on which modal is closing
+                if (e.target.closest('#cart-modal')) {
+                    checkoutMessage.classList.add('hidden');
+                } else if (e.target.closest('#map-modal')) {
+                    mapAddressDisplay.textContent = 'Drag marker or click map to select location';
+                } else if (e.target.closest('#item-details-modal')) {
+                    itemDetailsMessage.classList.add('hidden');
+                }
             });
         });
 
         window.addEventListener('click', (event) => {
             if (event.target === cartModal) {
                 cartModal.style.display = 'none';
-                checkoutMessage.classList.add('hidden'); // Clear messages on close
+                checkoutMessage.classList.add('hidden');
+            }
+            if (event.target === mapModal) {
+                mapModal.style.display = 'none';
+                mapAddressDisplay.textContent = 'Drag marker or click map to select location';
+            }
+            if (event.target === itemDetailsModal) {
+                itemDetailsModal.style.display = 'none';
+                itemDetailsMessage.classList.add('hidden');
             }
         });
 
@@ -746,10 +910,162 @@
             }
         });
 
-        // Checkout Form Submission
+        // Item Details Modal Functions
+        function openItemDetailsModal(itemId) {
+            currentItemInModal = menuItems.find(item => item._id === itemId);
+            if (!currentItemInModal) {
+                console.error('Item not found for modal:', itemId);
+                return;
+            }
+
+            itemDetailsImage.src = currentItemInModal.imageUrl || PLACEHOLDER_IMAGE;
+            itemDetailsImage.onerror = () => { this.onerror=null; this.src=PLACEHOLDER_IMAGE; };
+            itemDetailsName.textContent = currentItemInModal.name;
+            itemDetailsDescription.textContent = currentItemInModal.description || 'No description available.';
+            itemDetailsPrice.textContent = `₹${currentItemInModal.price.toFixed(2)}`;
+
+            // Set initial quantity in modal based on what's already in the cart
+            const itemInCart = cart.find(item => item.productId === itemId);
+            itemDetailsQuantitySpan.textContent = itemInCart ? itemInCart.quantity : 0;
+
+            itemDetailsMessage.classList.add('hidden'); // Clear any previous messages
+            itemDetailsModal.style.display = 'flex';
+        }
+
+        itemDetailsDecreaseBtn.addEventListener('click', () => updateQuantityInModal('decrease'));
+        itemDetailsIncreaseBtn.addEventListener('click', () => updateQuantityInModal('increase'));
+        itemDetailsAddToCartBtn.addEventListener('click', () => {
+            const quantity = parseInt(itemDetailsQuantitySpan.textContent);
+            if (quantity > 0 || cart.some(item => item.productId === currentItemInModal._id)) { // Allow 0 to remove from cart
+                addToCart(currentItemInModal._id, quantity);
+                itemDetailsMessage.textContent = `${currentItemInModal.name} quantity updated in cart!`;
+                itemDetailsMessage.className = 'message mt-3 success';
+                itemDetailsMessage.classList.remove('hidden');
+                // Optionally close modal after adding
+                setTimeout(() => {
+                    itemDetailsModal.style.display = 'none';
+                    itemDetailsMessage.classList.add('hidden');
+                }, 1000);
+            } else {
+                itemDetailsMessage.textContent = 'Please select a quantity greater than zero.';
+                itemDetailsMessage.className = 'message mt-3 error';
+                itemDetailsMessage.classList.remove('hidden');
+            }
+        });
+
+
+        // Map Functions
+        function initMap() {
+            if (map === null) {
+                // Initialize map only once
+                map = L.map('map').setView([shopLocation.latitude, shopLocation.longitude], 13); // Center on shop location
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+
+                marker = L.marker([shopLocation.latitude, shopLocation.longitude], { draggable: true }).addTo(map); // Initial marker at shop
+
+                marker.on('dragend', function(e) {
+                    const latlng = marker.getLatLng();
+                    reverseGeocode(latlng.lat, latlng.lon);
+                });
+
+                map.on('click', function(e) {
+                    marker.setLatLng(e.latlng);
+                    reverseGeocode(e.latlng.lat, e.latlng.lon);
+                });
+
+                // Set initial selected location to shop location
+                selectedDeliveryLocation = {
+                    latitude: shopLocation.latitude,
+                    longitude: shopLocation.longitude,
+                    address: 'Shop Location (Default)'
+                };
+                mapAddressDisplay.textContent = selectedDeliveryLocation.address;
+
+            } else {
+                // If map already exists, just invalidate size and center it
+                map.invalidateSize();
+                map.setView([shopLocation.latitude, shopLocation.longitude], 13);
+                marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
+                selectedDeliveryLocation = {
+                    latitude: shopLocation.latitude,
+                    longitude: shopLocation.longitude,
+                    address: 'Shop Location (Default)'
+                };
+                mapAddressDisplay.textContent = selectedDeliveryLocation.address;
+            }
+            // Try to get user's current location to set initial map view
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
+                    map.setView([userLat, userLon], 15); // Zoom closer to user
+                    marker.setLatLng([userLat, userLon]);
+                    reverseGeocode(userLat, userLon);
+                }, (error) => {
+                    console.warn('Geolocation failed for initial map view:', error.message);
+                    // Fallback to shop location if user denies or error
+                    map.setView([shopLocation.latitude, shopLocation.longitude], 13);
+                    marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
+                    reverseGeocode(shopLocation.latitude, shopLocation.longitude); // Get address for shop location
+                }, { timeout: 5000, enableHighAccuracy: false });
+            }
+        }
+
+        async function reverseGeocode(lat, lon) {
+            mapAddressDisplay.textContent = 'Fetching address...';
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
+                const data = await response.json();
+                if (data.display_name) {
+                    mapAddressDisplay.textContent = data.display_name;
+                    selectedDeliveryLocation = {
+                        latitude: lat,
+                        longitude: lon,
+                        address: data.display_name
+                    };
+                } else {
+                    mapAddressDisplay.textContent = `Address not found for ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                    selectedDeliveryLocation = {
+                        latitude: lat,
+                        longitude: lon,
+                        address: `Coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)}`
+                    };
+                }
+            } catch (error) {
+                console.error('Error during reverse geocoding:', error);
+                mapAddressDisplay.textContent = 'Error fetching address. Please try again.';
+                selectedDeliveryLocation = {
+                    latitude: lat,
+                    longitude: lon,
+                    address: `Coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)} (Address lookup failed)`
+                };
+            }
+        }
+
+        confirmLocationBtn.addEventListener('click', () => {
+            if (selectedDeliveryLocation) {
+                deliveryAddressInput.value = selectedDeliveryLocation.address;
+                mapModal.style.display = 'none';
+                // If order placement was pending, re-trigger it
+                if (isOrderPlacementPending) {
+                    isOrderPlacementPending = false; // Reset flag
+                    placeOrder(); // Re-call the order placement function
+                }
+            } else {
+                alert('Please select a location on the map first.');
+            }
+        });
+
+
+        // Checkout Form Submission (modified)
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            placeOrder(); // Call the dedicated function
+        });
 
+        async function placeOrder() {
             if (cart.length === 0) {
                 checkoutMessage.textContent = 'Your cart is empty!';
                 checkoutMessage.className = 'message mt-3 error';
@@ -757,55 +1073,43 @@
                 return;
             }
 
-            showLoader(placeOrderLoader, placeOrderText, checkoutMessage, 'Placing order...', 'info');
-            placeOrderBtn.disabled = true;
-
             const customerName = customerNameInput.value.trim();
             const customerPhone = customerPhoneInput.value.trim();
             const deliveryAddress = deliveryAddressInput.value.trim();
             const paymentMethod = paymentMethodSelect.value;
 
             if (!customerName || !customerPhone || !deliveryAddress) {
-                hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'Please fill in all delivery details.');
-                placeOrderBtn.disabled = false;
+                checkoutMessage.textContent = 'Please fill in all delivery details.';
+                checkoutMessage.className = 'message mt-3 error';
+                checkoutMessage.classList.remove('hidden');
                 return;
             }
 
-            // Attempt to get current location for delivery fee calculation
-            let customerLocation = null;
-            let deliveryFee = 0;
-            let currentLat = null;
-            let currentLon = null;
+            // Check if delivery location is set via map
+            if (!selectedDeliveryLocation || selectedDeliveryLocation.latitude === null || selectedDeliveryLocation.longitude === null) {
+                // If not set, open map modal and pause order
+                isOrderPlacementPending = true;
+                mapModal.style.display = 'flex';
+                initMap(); // Initialize map
+                mapAddressDisplay.textContent = 'Please select your delivery location on the map.';
+                checkoutMessage.textContent = 'Please select your delivery location on the map.';
+                checkoutMessage.className = 'message mt-3 info';
+                checkoutMessage.classList.remove('hidden');
+                return; // Stop current order placement
+            }
 
-            if (navigator.geolocation && shopLocation) {
-                try {
-                    const position = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, enableHighAccuracy: false });
-                    });
-                    currentLat = position.coords.latitude;
-                    currentLon = position.coords.longitude;
-                    customerLocation = {
-                        latitude: currentLat,
-                        longitude: currentLon,
-                        address: deliveryAddress // Use provided address
-                    };
-                    const distance = calculateDistance(shopLocation.latitude, shopLocation.longitude, currentLat, currentLon);
-                    deliveryFee = getDeliveryFee(distance);
-                    cartDeliveryFeeSpan.textContent = deliveryFee.toFixed(2); // Update fee display in modal
-                } catch (geoError) {
-                    console.warn('Geolocation failed or timed out:', geoError.message);
-                    // Fallback: If geolocation fails, assume 0 delivery fee or a default if your business logic requires it
-                    deliveryFee = 0;
-                    cartDeliveryFeeSpan.textContent = '0.00';
-                    checkoutMessage.textContent = 'Could not get your location for precise delivery fee. Proceeding with standard fee.';
-                    checkoutMessage.className = 'message mt-3 info';
-                    checkoutMessage.classList.remove('hidden');
-                }
-            } else if (shopLocation) {
-                // If geolocation not supported or shop location not set, delivery fee might be fixed or 0
-                deliveryFee = getDeliveryFee(0); // Assume 0km distance if no location, or a default base fee
-                cartDeliveryFeeSpan.textContent = deliveryFee.toFixed(2);
-                checkoutMessage.textContent = 'Location services not available. Proceeding with standard delivery fee.';
+            showLoader(placeOrderLoader, placeOrderText, checkoutMessage, 'Placing order...', 'info');
+            placeOrderBtn.disabled = true;
+
+            let finalCustomerLocation = selectedDeliveryLocation; // Prioritize map-selected location
+            let deliveryFee = 0;
+
+            if (shopLocation && finalCustomerLocation && finalCustomerLocation.latitude !== null && finalCustomerLocation.longitude !== null) {
+                const distance = calculateDistance(shopLocation.latitude, shopLocation.longitude, finalCustomerLocation.latitude, finalCustomerLocation.longitude);
+                deliveryFee = getDeliveryFee(distance);
+            } else {
+                deliveryFee = getDeliveryFee(0); // Fallback to base fee if no valid location
+                checkoutMessage.textContent = 'Could not get precise location for delivery fee. Proceeding with standard fee.';
                 checkoutMessage.className = 'message mt-3 info';
                 checkoutMessage.classList.remove('hidden');
             }
@@ -813,6 +1117,7 @@
 
             const subtotal = parseFloat(cartSubtotalSpan.textContent);
             const totalAmount = subtotal + deliveryFee;
+            cartDeliveryFeeSpan.textContent = deliveryFee.toFixed(2); // Update fee display in modal
             cartTotalSpan.textContent = totalAmount.toFixed(2); // Final total for display
 
             const orderData = {
@@ -820,7 +1125,7 @@
                 customerName,
                 customerPhone,
                 deliveryAddress,
-                customerLocation, // Send location if obtained
+                customerLocation: finalCustomerLocation, // Send the final determined location
                 subtotal: subtotal,
                 transportTax: deliveryFee,
                 totalAmount: totalAmount,
@@ -841,10 +1146,11 @@
                 if (response.ok) {
                     hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Order placed successfully! Order ID: ' + result.orderId.substring(0, 6) + '...');
                     cart = []; // Clear cart
+                    selectedDeliveryLocation = null; // Clear selected delivery location
+                    deliveryAddressInput.value = ''; // Clear address input
                     updateCartDisplay();
                     setTimeout(() => {
                         cartModal.style.display = 'none';
-                        // Optionally redirect to track page or show confirmation
                         window.location.href = `/track?orderId=${result.orderId}`;
                     }, 2000);
                 } else {
@@ -856,7 +1162,7 @@
             } finally {
                 placeOrderBtn.disabled = false;
             }
-        });
+        }
 
         // Order Tracking Logic
         async function trackOrder() {
