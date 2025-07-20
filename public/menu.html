@@ -979,7 +979,7 @@
         function initMap() {
             if (map === null) {
                 // Initialize map only once
-                map = L.map('map').setView([shopLocation.latitude, shopLocation.longitude], 13); // Center on shop location
+                map = L.map('map', { zoomControl: false }).setView([shopLocation.latitude, shopLocation.longitude], 13); // Center on shop location, hide zoom
                 // Use Esri World Imagery for satellite view
                 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
@@ -1017,8 +1017,10 @@
                 };
                 mapAddressDisplay.textContent = selectedDeliveryLocation.address;
             }
+
             // Try to get user's current location to set initial map view
             if (navigator.geolocation) {
+                mapAddressDisplay.textContent = 'Getting your current location...';
                 navigator.geolocation.getCurrentPosition((position) => {
                     const userLat = position.coords.latitude;
                     const userLon = position.coords.longitude;
@@ -1032,6 +1034,11 @@
                     marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
                     reverseGeocode(shopLocation.latitude, shopLocation.longitude); // Get address for shop location
                 }, { timeout: 5000, enableHighAccuracy: false });
+            } else {
+                // If geolocation not supported, immediately fall back to shop location
+                map.setView([shopLocation.latitude, shopLocation.longitude], 13);
+                marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
+                reverseGeocode(shopLocation.latitude, shopLocation.longitude); // Get address for shop location
             }
         }
 
