@@ -368,7 +368,7 @@ async function initializeBot() {
         const baseUrl = process.env.YOUR_KOYEB_URL || 'http://localhost:8080';
 
         const safeSendMessage = async (to, messageContent) => {
-            if (client.isReady) {
+            if (client && client.isReady) { // Added check for 'client' existence
                 try {
                     await client.sendMessage(to, messageContent);
                     console.log(`Successfully sent message to ${to}.`);
@@ -658,11 +658,17 @@ app.get('/admin/dashboard', isAuthenticated, (req, res) => {
 });
 
 app.get('/api/admin/bot-status', isAuthenticated, (req, res) => {
-    io.emit('status', botStatus);
+    // This endpoint primarily serves to allow the frontend to trigger a status update fetch,
+    // though the real-time updates happen via socket.io.
+    io.emit('status', botStatus); // Emit current status to all connected clients
     if (botStatus === 'qr_received' && client && client.qr) {
+        // Note: client.qr here is the raw QR string, not the data URL.
+        // The client.on('qr') event handles the conversion and emission.
+        // This line is mostly for initial connection handshake.
         console.log("Admin bot-status endpoint emitting raw QR string (if available).");
     }
-    socket.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt });
+    // --- FIXED: Use io.emit instead of socket.emit here ---
+    io.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt }); // Emit session timestamp to all clients
     res.json({ status: botStatus, lastAuthenticatedAt: lastAuthenticatedAt });
 });
 
@@ -916,6 +922,7 @@ app.delete('/api/admin/customers/:id', isAuthenticated, async (req, res) => {
 io.on('connection', (socket) => {
     console.log('A user connected via Socket.IO');
     socket.emit('status', botStatus);
+    // This emit is for the newly connected client only, so it's fine here.
     socket.emit('sessionInfo', { lastAuthenticatedAt: lastAuthenticatedAt });
 
     socket.on('disconnect', () => {
@@ -926,7 +933,7 @@ io.on('connection', (socket) => {
 // Helper function to send messages with readiness check
 // Defined globally to be accessible by order placement/update logic
 const safeSendMessage = async (to, messageContent) => {
-    if (client && client.isReady) { // Ensure client object exists and is ready
+    if (client && client.isReady) { // Added check for 'client' existence
         try {
             await client.sendMessage(to, messageContent);
             console.log(`Successfully sent message to ${to}.`);
