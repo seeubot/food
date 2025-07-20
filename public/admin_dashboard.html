@@ -1066,7 +1066,7 @@
                 rateDiv.className = 'delivery-rate-item';
                 rateDiv.innerHTML = `
                     <input type="number" step="any" class="kms-input" value="${rate.kms}" placeholder="KMs" data-index="${index}">
-                    <input type="number" step="any" class="amount-input" value="${rate.amount}" placeholder="Amount" data-index="${index}">
+                    <input type="number" step="any" class="amount-input" value="${rate.amount}" placeholder="Amount">
                     <button type="button" class="remove-rate-btn btn-small">Remove</button>
                 `;
                 deliveryRatesContainer.appendChild(rateDiv);
@@ -1419,16 +1419,18 @@
             if (qrTimerInterval) clearInterval(qrTimerInterval);
 
             try {
-                // This endpoint is public, so it doesn't strictly need authentication,
-                // but sending the token doesn't hurt and the backend's middleware will ignore it.
-                const result = await authenticatedFetch('/api/public/request-qr', { method: 'POST' });
+                // This endpoint is public, but still requires the token for the backend middleware.
+                // The backend's /api/public/request-qr route is not protected by authenticateToken middleware.
+                // So, we use a regular fetch here, without the authenticatedFetch helper, as it doesn't need the token.
+                const response = await fetch('/api/public/request-qr', { method: 'POST' });
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.message || 'Failed to request new QR.');
+                }
                 // No specific success message needed here, status updates via socket.io
             } catch (error) {
                 hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error: ${error.message}`);
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
-                }
+                // No redirect to login here, as this is a public endpoint for QR
             } finally {
                 requestQrBtn.disabled = false;
                 loadSessionBtn.disabled = false;
