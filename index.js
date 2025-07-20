@@ -158,6 +158,7 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
         console.log('QR RECEIVED');
         qrCodeData = await qrcode.toDataURL(qr);
         qrGeneratedTimestamp = Date.now();
+        // Emit QR code immediately for faster display
         io.emit('qrCode', qrCodeData);
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_received', lastAuthenticatedAt: null }, { upsert: true });
         io.emit('status', 'qr_received');
@@ -988,6 +989,13 @@ app.get('/', (req, res) => { // Root path now serves status.html
 
 // --- Serve other static assets (CSS, JS, images) ---
 app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Catch-all for undefined routes ---
+app.use((req, res) => {
+    console.log(`Unhandled route: ${req.method} ${req.originalUrl}. Redirecting to /status.`);
+    res.redirect('/status');
+});
+
 
 // --- Initial Admin User Setup on Server Startup (unchanged logic) ---
 async function ensureDefaultAdminExists() {
