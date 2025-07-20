@@ -329,8 +329,7 @@ const initializeWhatsappClient = (loadSession = false) => {
     if (!settings || settings.whatsappStatus === 'disconnected') {
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     }
-    // Call initializeWhatsappClient here to ensure it runs when the server starts
-    initializeWhatsappClient();
+    initializeWhatsappClient(); // Call initializeWhatsappClient here to ensure it runs when the server starts
 })();
 
 
@@ -340,10 +339,13 @@ const initializeWhatsappClient = (loadSession = false) => {
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    if (token == null) return res.sendStatus(401);
+    if (token == null) return res.status(401).json({ message: 'Unauthorized: No token provided.' }); // Send JSON
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403);
+        if (err) {
+            console.error('JWT Verification Error:', err.message);
+            return res.status(403).json({ message: 'Forbidden: Invalid token.' }); // Send JSON
+        }
         req.user = user;
         next();
     });
@@ -358,7 +360,7 @@ app.post('/admin/login', async (req, res) => {
         const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '1h' });
         res.json({ token });
     } else {
-        res.status(401).send('Invalid credentials');
+        res.status(401).json({ message: 'Invalid credentials' }); // Send JSON
     }
 });
 
@@ -383,16 +385,16 @@ app.post('/admin/create-initial-admin', async (req, res) => {
         const { username, password } = req.body;
         const existingAdmin = await Admin.findOne({ username });
         if (existingAdmin) {
-            return res.status(409).send('Admin user already exists.');
+            return res.status(409).json({ message: 'Admin user already exists.' }); // Send JSON
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newAdmin = new Admin({ username, password: hashedPassword });
         await newAdmin.save();
-        res.status(201).send('Initial admin user created.');
+        res.status(201).json({ message: 'Initial admin user created.' }); // Send JSON
     } catch (error) {
         console.error('Error creating initial admin:', error);
-        res.status(500).send('Error creating initial admin.');
+        res.status(500).json({ message: 'Error creating initial admin.' }); // Send JSON
     }
 });
 
