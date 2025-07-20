@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Base styles for black and white theme */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #000000; /* Pure black background */
@@ -19,70 +18,76 @@
             padding: 1rem;
         }
         .login-container {
-            background-color: #1a1a1a; /* Dark gray for the login panel */
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 8px rgba(255,255,255,0.08);
+            background-color: #1a1a1a; /* Dark gray for login card */
             padding: 2.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 5px 15px rgba(255,255,255,0.15);
             width: 100%;
             max-width: 400px;
             text-align: center;
         }
-        h1 {
-            color: #ffffff;
-            font-size: 2.25rem;
+        .login-container h1 {
+            font-size: 2.5rem;
             font-weight: 700;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
+            color: #ffffff;
         }
-        /* Input field styling */
-        input[type="text"],
-        input[type="password"] {
-            background-color: #222222; /* Slightly lighter dark gray for inputs */
+        .form-group {
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #cccccc;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="password"] {
+            background-color: #222222;
             border: 1px solid #444444;
             color: #ffffff;
             padding: 0.75rem 1rem;
             border-radius: 0.375rem;
             width: 100%;
-            margin-bottom: 1.25rem;
+            font-size: 1rem;
         }
-        input::placeholder {
-            color: #888888; /* Lighter gray for placeholders */
+        .form-group input::placeholder {
+            color: #888888;
         }
-        /* Button styling */
         .btn-primary {
-            background-color: #ffffff; /* White background */
-            color: #000000; /* Black text */
+            background-color: #ffffff;
+            color: #000000;
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
-            font-weight: 600;
-            transition: background-color 0.2s ease-in-out;
+            font-weight: 700;
+            font-size: 1.125rem;
             width: 100%;
-            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
         }
         .btn-primary:hover {
             background-color: #e0e0e0;
         }
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            background-color: #333333;
-            color: #999999;
-        }
         .message {
-            margin-top: 1.5rem;
+            margin-top: 1rem;
             font-weight: 600;
         }
         .message.error {
-            color: #ff6666; /* Light red for error */
+            color: #ff6666;
         }
         .message.success {
-            color: #66ff66; /* Light green for success */
+            color: #66ff66;
         }
         .loader {
             border: 4px solid #333333;
-            border-top: 4px solid #66ff66; /* Green loader */
+            border-top: 4px solid #66ff66;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             animation: spin 1s linear infinite;
             display: inline-block;
             vertical-align: middle;
@@ -92,78 +97,110 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .create-admin-info {
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: #cccccc;
+        }
+        .create-admin-info code {
+            background-color: #2a2a2a;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.3rem;
+            font-family: monospace;
+            color: #66ff66;
+        }
     </style>
 </head>
 <body>
     <div class="login-container">
         <h1>Admin Login</h1>
         <form id="login-form">
-            <div>
-                <input type="text" id="username" name="username" placeholder="Username" required autocomplete="username">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" placeholder="Enter your username" required>
             </div>
-            <div>
-                <input type="password" id="password" name="password" placeholder="Password" required autocomplete="current-password">
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" placeholder="Enter your password" required>
             </div>
-            <button type="submit" class="btn-primary flex items-center justify-center">
+            <button type="submit" class="btn-primary">
                 <span id="login-loader" class="loader hidden"></span>
                 <span id="login-text">Login</span>
             </button>
-            <p id="login-message" class="message"></p>
+            <p id="login-message" class="message error hidden"></p>
         </form>
+
+        <div class="create-admin-info">
+            <p>If this is your first time, you might need to create an admin user.</p>
+            <p>Use a tool like Postman/Insomnia or <code>curl</code> to send a POST request to:</p>
+            <p><code>http://localhost:3000/admin/create-initial-admin</code></p>
+            <p>with a JSON body like: <code>{"username": "your_username", "password": "your_password"}</code></p>
+        </div>
     </div>
 
     <script>
-        const loginForm = document.getElementById('login-form');
-        const usernameInput = document.getElementById('username');
-        const passwordInput = document.getElementById('password');
-        const loginButton = loginForm.querySelector('button[type="submit"]');
-        const loginLoader = document.getElementById('login-loader');
-        const loginText = document.getElementById('login-text');
-        const loginMessage = document.getElementById('login-message');
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginForm = document.getElementById('login-form');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const loginButton = loginForm.querySelector('button');
+            const loginLoader = document.getElementById('login-loader');
+            const loginText = document.getElementById('login-text');
+            const loginMessage = document.getElementById('login-message');
 
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Prevent default form submission
-
-            const username = usernameInput.value;
-            const password = passwordInput.value;
-
-            // Disable button and show loader
-            loginButton.disabled = true;
-            loginLoader.classList.remove('hidden');
-            loginText.classList.add('hidden');
-            loginMessage.textContent = ''; // Clear previous messages
-            loginMessage.classList.remove('error', 'success');
-
-            try {
-                const response = await fetch('/admin/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ username, password })
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    loginMessage.textContent = result.message;
-                    loginMessage.classList.add('success');
-                    // Redirect to dashboard on successful login
-                    window.location.href = '/admin/dashboard';
-                } else {
-                    loginMessage.textContent = result.message || 'Login failed. Please try again.';
-                    loginMessage.classList.add('error');
-                }
-            } catch (error) {
-                console.error('Network error during login:', error);
-                loginMessage.textContent = 'Network error. Please check your connection.';
-                loginMessage.classList.add('error');
-            } finally {
-                // Re-enable button and hide loader
-                loginButton.disabled = false;
-                loginLoader.classList.add('hidden');
-                loginText.classList.remove('hidden');
+            // Check if a token already exists (e.g., if user navigated back)
+            // If so, redirect to dashboard immediately.
+            if (localStorage.getItem('jwtToken')) {
+                window.location.href = '/admin/dashboard';
+                return; // Stop script execution
             }
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault(); // Prevent default form submission
+
+                const username = usernameInput.value;
+                const password = passwordInput.value;
+
+                // Show loader and hide previous messages
+                loginLoader.classList.remove('hidden');
+                loginText.classList.add('hidden');
+                loginButton.disabled = true;
+                loginMessage.classList.add('hidden');
+
+                try {
+                    const response = await fetch('/admin/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        localStorage.setItem('jwtToken', data.token); // Store the JWT token
+                        loginMessage.textContent = 'Login successful! Redirecting...';
+                        loginMessage.classList.remove('error');
+                        loginMessage.classList.add('success');
+                        loginMessage.classList.remove('hidden');
+                        window.location.href = '/admin/dashboard'; // Redirect to dashboard
+                    } else {
+                        // Display error message from the backend
+                        loginMessage.textContent = data.message || 'Login failed. Please try again.';
+                        loginMessage.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    loginMessage.textContent = 'An error occurred. Please try again later.';
+                    loginMessage.classList.remove('hidden');
+                } finally {
+                    // Hide loader and re-enable button
+                    loginLoader.classList.add('hidden');
+                    loginText.classList.remove('hidden');
+                    loginButton.disabled = false;
+                }
+            });
         });
     </script>
 </body>
