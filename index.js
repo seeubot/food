@@ -135,6 +135,7 @@ const initializeWhatsappClient = (loadSession = false) => {
         },
     });
 
+    // --- All client.on() listeners moved inside this function ---
     client.on('qr', async (qr) => {
         console.log('QR RECEIVED');
         qrCodeData = await qrcode.toDataURL(qr);
@@ -143,18 +144,17 @@ const initializeWhatsappClient = (loadSession = false) => {
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_received', lastAuthenticatedAt: null }, { upsert: true });
         io.emit('status', 'qr_received');
 
-        // Set a timer for QR expiry (e.g., 60 seconds)
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
         qrExpiryTimer = setTimeout(async () => {
             if (whatsappReady === false && qrCodeData !== null) {
                 console.log('QR code expired. Reinitializing...');
-                qrCodeData = null; // Clear QR data
-                io.emit('qrCode', null); // Notify dashboard QR expired
+                qrCodeData = null;
+                io.emit('qrCode', null);
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
                 io.emit('status', 'qr_error');
-                initializeWhatsappClient(); // Reinitialize to get a new QR
+                initializeWhatsappClient();
             }
-        }, 60000); // 60 seconds
+        }, 60000);
     });
 
     client.on('authenticated', async (session) => {
@@ -162,8 +162,8 @@ const initializeWhatsappClient = (loadSession = false) => {
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'authenticated', lastAuthenticatedAt: new Date() }, { upsert: true });
         io.emit('status', 'authenticated');
         io.emit('sessionInfo', { lastAuthenticatedAt: new Date() });
-        qrCodeData = null; // Clear QR data once authenticated
-        io.emit('qrCode', null); // Clear QR on dashboard
+        qrCodeData = null;
+        io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
     });
 
@@ -176,13 +176,12 @@ const initializeWhatsappClient = (loadSession = false) => {
     });
 
     client.on('auth_failure', async msg => {
-        // Fired if session restore failed
         console.error('AUTHENTICATION FAILURE', msg);
         whatsappReady = false;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'auth_failure' }, { upsert: true });
         io.emit('status', 'auth_failure');
-        qrCodeData = null; // Clear QR data on auth failure
-        io.emit('qrCode', null); // Clear QR on dashboard
+        qrCodeData = null;
+        io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
     });
 
@@ -191,385 +190,148 @@ const initializeWhatsappClient = (loadSession = false) => {
         whatsappReady = false;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
         io.emit('status', 'disconnected');
-        qrCodeData = null; // Clear QR data on disconnect
-        io.emit('qrCode', null); // Clear QR on dashboard
+        qrCodeData = null;
+        io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        // Attempt to re-initialize client after disconnection
-        // If the reason is 'PRIMARY_UNAVAILABLE', it means the phone is offline or WhatsApp is not open.
-        // We can choose to re-initialize here or wait for user intervention from admin panel.
-        // For now, let's re-initialize to try and get back online.
         if (reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNLAUNCHED') {
              console.log('Reinitializing client due to disconnection...');
              initializeWhatsappClient();
         }
     });
 
+    client.on('message', async msg => {
+        const chatId = msg.from;
+        const text = msg.body.toLowerCase().trim();
+        const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
+        const customerName = msg._data.notifyName;
+
+        if (msg.hasMedia && msg.type === 'location' && msg.location) {
+            const { latitude, longitude, address } = msg.location;
+            await Customer.findOneAndUpdate(
+                { customerPhone: customerPhone },
+                {
+                    $set: {
+                        lastKnownLocation: {
+                            latitude: latitude,
+                            longitude: longitude,
+                            address: address || 'Location shared via WhatsApp'
+                        }
+                    }
+                },
+                { upsert: true, new: true }
+            );
+            await client.sendMessage(chatId, 'మీ లొకేషన్ అప్‌డేట్ చేయబడింది. ధన్యవాదాలు!');
+            return;
+        }
+
+        let customer = await Customer.findOne({ customerPhone: customerPhone });
+        if (!customer) {
+            customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
+            await customer.save();
+        } else {
+            if (customer.customerName !== customerName) {
+                customer.customerName = customerName;
+                await customer.save();
+            }
+        }
+
+        switch (text) {
+            case 'hi':
+            case 'hello':
+            case 'నమస్తే':
+            case 'హాయ్':
+            case 'menu':
+            case 'మెనూ':
+                await sendWelcomeMessage(chatId, customerName);
+                break;
+            case '1':
+            case 'మెనూ చూడండి':
+                await sendMenu(chatId);
+                break;
+            case '2':
+            case 'షాప్ లొకేషన్':
+                await sendShopLocation(chatId);
+                break;
+            case '3':
+            case 'ఆర్డర్ చేయండి':
+                await handleOrderRequest(msg);
+                break;
+            case '4':
+            case 'నా ఆర్డర్స్':
+                await sendCustomerOrders(chatId, customerPhone);
+                break;
+            case '5':
+            case 'సహాయం':
+                await sendHelpMessage(chatId);
+                break;
+            case 'cod':
+            case 'cash on delivery':
+                const pendingOrderCod = await Order.findOneAndUpdate(
+                    { customerPhone: customerPhone, status: 'Pending' },
+                    { $set: { paymentMethod: 'Cash on Delivery', status: 'Confirmed' } },
+                    { new: true, sort: { orderDate: -1 } }
+                );
+                if (pendingOrderCod) {
+                    await client.sendMessage(chatId, 'మీ ఆర్డర్ క్యాష్ ఆన్ డెలివరీ కోసం నిర్ధారించబడింది. ధన్యవాదాలు! మీ ఆర్డర్ త్వరలో ప్రాసెస్ చేయబడుతుంది. 😊');
+                    io.emit('new_order', pendingOrderCod);
+                } else {
+                    await client.sendMessage(chatId, 'మీకు పెండింగ్ ఆర్డర్లు ఏమీ లేవు. దయచేసి ముందుగా ఒక ఆర్డర్ చేయండి.');
+                }
+                break;
+            case 'op':
+            case 'online payment':
+                const pendingOrderOp = await Order.findOneAndUpdate(
+                    { customerPhone: customerPhone, status: 'Pending' },
+                    { $set: { paymentMethod: 'Online Payment' } },
+                    { new: true, sort: { orderDate: -1 } }
+                );
+                if (pendingOrderOp) {
+                    await client.sendMessage(chatId, 'ఆన్‌లైన్ పేమెంట్ ఎంపికను ఎంచుకున్నందుకు ధన్యవాదాలు. పేమెంట్ లింక్ త్వరలో మీకు పంపబడుతుంది. మీ ఆర్డర్ ID: ' + pendingOrderOp._id.substring(0,6) + '...');
+                    io.emit('new_order', pendingOrderOp);
+                } else {
+                    await client.sendMessage(chatId, 'మీకు పెండింగ్ ఆర్డర్లు ఏమీ లేవు. దయచేసి ముందుగా ఒక ఆర్డర్ చేయండి.');
+                }
+                break;
+            default:
+                const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
+
+                if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
+                     const hasNumbers = /\d/.test(msg.body);
+                     const hasItemNames = /(pizza|burger|coke|dosa|idli|మిర్చి|పెరుగు|దోస|ఇడ్లీ)/i.test(msg.body);
+                     if (hasNumbers && hasItemNames) {
+                        await processOrder(msg);
+                     } else if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'చిరునామా ఇంకా అందలేదు.') {
+                        await Order.findOneAndUpdate(
+                            { _id: lastOrderInteraction._id },
+                            { $set: { deliveryAddress: msg.body } },
+                            { new: true }
+                        );
+                        await client.sendMessage(chatId, 'మీ డెలివరీ చిరునామా సేవ్ చేయబడింది. దయచేసి మీ పేమెంట్ పద్ధతిని ఎంచుకోండి: ' +
+                                                  "'క్యాష్ ఆన్ డెలివరీ' (COD) లేదా 'ఆన్‌లైన్ పేమెంట్' (OP).");
+                     } else {
+                         await client.sendMessage(chatId, 'మీరు అడిగినది నాకు అర్థం కాలేదు. దయచేసి మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి "హాయ్" అని టైప్ చేయండి లేదా "సహాయం" కోసం అడగండి.');
+                     }
+                } else {
+                     await client.sendMessage(chatId, 'మీరు అడిగినది నాకు అర్థం కాలేదు. దయచేసి మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి "హాయ్" అని టైప్ చేయండి లేదా "సహాయం" కోసం అడగండి.');
+                }
+                break;
+        }
+    });
+    // --- End of client.on() listeners ---
+
     client.initialize()
         .catch(err => console.error('Client initialization error:', err));
 };
 
 // Initial WhatsApp client setup (without loading session explicitly on startup)
-// The admin panel will trigger loading session or requesting QR.
-// Let's set initial status to 'initializing' on startup if no status is found
 (async () => {
     const settings = await Settings.findOne({});
     if (!settings || settings.whatsappStatus === 'disconnected') {
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     }
+    // Call initializeWhatsappClient here to ensure it runs when the server starts
+    initializeWhatsappClient();
 })();
-
-
-// --- Bot Logic ---
-
-// REMOVED: dryFruitDialoguesTelugu array
-
-const sendWelcomeMessage = async (chatId, customerName) => {
-    const menuOptions = [
-        "1. 🍕 మెనూ చూడండి",
-        "2. 📍 షాప్ లొకేషన్",
-        "3. 📞 ఆర్డర్ చేయండి",
-        "4. 📝 నా ఆర్డర్స్",
-        "5. ℹ️ సహాయం" // Re-numbered
-    ];
-    const welcomeText = `👋 నమస్తే ${customerName || 'కస్టమర్'}! డెలిషియస్ బైట్స్ కు స్వాగతం! 🌟\n\nమీరు ఎలా సహాయం చేయగలను?\n\n${menuOptions.join('\n')}\n\nపై ఎంపికలలో ఒకదాన్ని ఎంచుకోండి లేదా మీ ఆర్డర్ వివరాలను పంపండి.`;
-    await client.sendMessage(chatId, welcomeText);
-};
-
-const sendShopLocation = async (chatId) => {
-    const settings = await Settings.findOne({});
-    if (settings && settings.shopLocation && settings.shopLocation.latitude && settings.shopLocation.longitude) {
-        const { latitude, longitude } = settings.shopLocation;
-        const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-        await client.sendMessage(chatId, `📍 మా షాప్ లొకేషన్ ఇక్కడ ఉంది:\n${googleMapsLink}\n\nత్వరలో మిమ్మల్ని కలవాలని ఆశిస్తున్నాము!`);
-    } else {
-        await client.sendMessage(chatId, 'క్షమించండి, ప్రస్తుతం షాప్ లొకేషన్ అందుబాటులో లేదు. దయచేసి అడ్మిన్‌ను సంప్రదించండి.');
-    }
-};
-
-// REMOVED: sendDryFruitTip function
-
-const sendMenu = async (chatId) => {
-    const items = await Item.find({ isAvailable: true });
-    if (items.length === 0) {
-        await client.sendMessage(chatId, 'మెనూలో ప్రస్తుతం ఎటువంటి వస్తువులు లేవు. దయచేసి తర్వాత ప్రయత్నించండి.');
-        return;
-    }
-
-    let menuMessage = "📜 మా మెనూ:\n\n";
-    const categories = {};
-    items.forEach(item => {
-        const category = item.category || 'ఇతరాలు';
-        if (!categories[category]) {
-            categories[category] = [];
-        }
-        categories[category].push(item);
-    });
-
-    for (const category in categories) {
-        menuMessage += `*${category}*\n`;
-        categories[category].forEach((item, index) => {
-            menuMessage += `${index + 1}. ${item.name} - ₹${item.price.toFixed(2)}${item.isTrending ? ' ✨' : ''}\n`;
-            if (item.description) {
-                menuMessage += `   _(${item.description})_\n`;
-            }
-        });
-        menuMessage += '\n';
-    }
-    menuMessage += "మీరు ఆర్డర్ చేయడానికి 'ఆర్డర్ చేయండి' అని టైప్ చేయవచ్చు లేదా మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి 'హాయ్' అని టైప్ చేయవచ్చు.";
-    await client.sendMessage(chatId, menuMessage);
-};
-
-const handleOrderRequest = async (msg) => {
-    const chatId = msg.from;
-    const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
-
-    await client.sendMessage(chatId, 'మీరు ఆర్డర్ చేయాలనుకుంటున్న వస్తువులు మరియు వాటి పరిమాణం (ఉదా: పిజ్జా 1, కోక్ 2) తెలపండి.');
-    // Set a flag or context for the customer to indicate they are in ordering mode
-    // For simplicity, we'll assume the next message containing item details is the order.
-    // In a more complex bot, you'd use session management.
-};
-
-const processOrder = async (msg) => {
-    const chatId = msg.from;
-    const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
-    const text = msg.body.toLowerCase();
-
-    // Try to parse items from the message
-    const availableItems = await Item.find({ isAvailable: true });
-    let orderItems = [];
-    let subtotal = 0;
-
-    // Simple regex to find "item_name quantity" or "quantity item_name"
-    // This is a very basic parser and needs improvement for robustness
-    const itemRegex = /(\d+)\s*([a-zA-Z\s]+)|([a-zA-Z\s]+)\s*(\d+)/g;
-    let match;
-
-    while ((match = itemRegex.exec(text)) !== null) {
-        let quantity, itemNameRaw;
-        if (match[1] && match[2]) { // e.g., "2 pizza"
-            quantity = parseInt(match[1]);
-            itemNameRaw = match[2].trim();
-        } else if (match[3] && match[4]) { // e.g., "pizza 2"
-            itemNameRaw = match[3].trim();
-            quantity = parseInt(match[4]);
-        } else {
-            continue;
-        }
-
-        const foundItem = availableItems.find(item =>
-            item.name.toLowerCase().includes(itemNameRaw) ||
-            itemNameRaw.includes(item.name.toLowerCase())
-        );
-
-        if (foundItem && quantity > 0) {
-            orderItems.push({
-                itemId: foundItem._id,
-                name: foundItem.name,
-                price: foundItem.price,
-                quantity: quantity
-            });
-            subtotal += foundItem.price * quantity;
-        }
-    }
-
-    if (orderItems.length === 0) {
-        await client.sendMessage(chatId, 'మీ ఆర్డర్‌లో ఏ వస్తువులను గుర్తించలేకపోయాను. దయచేసి సరైన ఫార్మాట్‌లో మళ్లీ ప్రయత్నించండి (ఉదా: పిజ్జా 1, కోక్ 2).');
-        return;
-    }
-
-    // --- Delivery Address and Location Prompt ---
-    await client.sendMessage(chatId, 'మీ డెలివరీ చిరునామాను (పూర్తి చిరునామా) పంపండి.');
-    // Set a temporary flag or context to wait for the address
-    // This part requires proper session/context management in a real bot.
-    // For this example, we'll simulate by assuming the *next message* is the address.
-    // In a real scenario, you'd need a robust state machine or conversation flow.
-    await client.sendMessage(chatId, 'డెలివరీ ఖచ్చితంగా ఉండటానికి మీ ప్రస్తుత లొకేషన్‌ను (Google Maps లొకేషన్) కూడా పంపగలరా? ఇది ఐచ్ఛికం కానీ సిఫార్సు చేయబడింది.');
-
-    // Store order items temporarily or in a pending state with customer's phone
-    // For now, let's just proceed with a dummy address/location if not received,
-    // or assume the next message captures it.
-    // **Important:** In a production bot, implement robust state management (e.g., using a database field for 'conversation_state' on the Customer model).
-    // For this demonstration, we'll simplify and show the final order confirmation logic.
-    // The delivery address and location should ideally be captured in subsequent messages.
-
-    // Calculate transport tax (this would typically happen AFTER location is confirmed)
-    let transportTax = 0;
-    const settings = await Settings.findOne({});
-    if (settings && settings.deliveryRates && settings.deliveryRates.length > 0 && settings.shopLocation) {
-        // This is where distance calculation would happen using customerLocation.
-        // For now, let's use a placeholder or simplified logic.
-        // A robust solution would involve getting the location from the user.
-        transportTax = settings.deliveryRates[0] ? settings.deliveryRates[0].amount : 0; // Just use first rate for now
-    }
-    const totalAmount = subtotal + transportTax;
-
-    // Simulate getting delivery address and location (in a real bot, these would be separate steps)
-    const dummyDeliveryAddress = 'చిరునామా ఇంకా అందలేదు.';
-    let customerLat = null;
-    let customerLon = null;
-
-    // Create a new order object, saving it as "pending_address" or similar
-    // This is simplified. In a real app, you'd save a "draft" order and update it.
-    const newOrder = new Order({
-        customerPhone: customerPhone,
-        customerName: msg._data.notifyName || 'Guest', // Get name from WhatsApp
-        items: orderItems,
-        subtotal: subtotal,
-        transportTax: transportTax,
-        totalAmount: totalAmount,
-        status: 'Pending',
-        deliveryAddress: dummyDeliveryAddress, // Will be updated
-        customerLocation: {
-            latitude: customerLat,
-            longitude: customerLon
-        }
-    });
-    await newOrder.save();
-
-    // Confirm order details and ask for payment method
-    let confirmationMessage = `మీ ఆర్డర్ వివరాలు:\n\n`;
-    orderItems.forEach(item => {
-        confirmationMessage += `${item.name} x ${item.quantity} - ₹${(item.price * item.quantity).toFixed(2)}\n`;
-    });
-    confirmationMessage += `\nఉపమొత్తం: ₹${subtotal.toFixed(2)}\n`;
-    confirmationMessage += `డెలివరీ ఛార్జీలు: ₹${transportTax.toFixed(2)}\n`;
-    confirmationMessage += `*మొత్తం: ₹${totalAmount.toFixed(2)}*\n\n`;
-    confirmationMessage += `మీరు 'క్యాష్ ఆన్ డెలివరీ' (COD) లేదా 'ఆన్‌లైన్ పేమెంట్' (OP) ద్వారా చెల్లించాలనుకుంటున్నారా?`;
-
-    await client.sendMessage(chatId, confirmationMessage);
-
-    // After this, bot would wait for "COD" or "OP" to finalize the order.
-    // This also requires state management.
-};
-
-const sendCustomerOrders = async (chatId, customerPhone) => {
-    const orders = await Order.find({ customerPhone: customerPhone }).sort({ orderDate: -1 }).limit(5); // Last 5 orders
-
-    if (orders.length === 0) {
-        await client.sendMessage(chatId, 'మీరు గతంలో ఎటువంటి ఆర్డర్లు చేయలేదు.');
-        return;
-    }
-
-    let orderListMessage = 'మీ గత ఆర్డర్లు:\n\n';
-    orders.forEach((order, index) => {
-        orderListMessage += `*ఆర్డర్ ${index + 1} (ID: ${order._id.substring(0, 6)}...)*\n`;
-        order.items.forEach(item => {
-            orderListMessage += `  - ${item.name} x ${item.quantity}\n`;
-        });
-        orderListMessage += `  మొత్తం: ₹${order.totalAmount.toFixed(2)}\n`;
-        orderListMessage += `  స్థితి: ${order.status}\n`;
-        orderListMessage += `  తేదీ: ${new Date(order.orderDate).toLocaleDateString('te-IN', { timeZone: 'Asia/Kolkata' })}\n\n`;
-    });
-    await client.sendMessage(chatId, orderListMessage);
-};
-
-const sendHelpMessage = async (chatId) => {
-    const helpMessage = `ఎలా సహాయం చేయగలను? మీరు ఈ క్రిందివాటిని ప్రయత్నించవచ్చు:\n
-*హాయ్* - మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి
-*మెనూ చూడండి* - మా అందుబాటులో ఉన్న వస్తువులను చూడటానికి
-*ఆర్డర్ చేయండి* - ఆర్డర్ ప్రక్రియను ప్రారంభించడానికి
-*నా ఆర్డర్స్* - మీ గత ఆర్డర్‌లను చూడటానికి
-*షాప్ లొకేషన్* - మా షాప్ స్థానాన్ని పొందడానికి
-*సహాయం* - ఈ సహాయ సందేశాన్ని మళ్లీ చూడటానికి`; // Re-numbered
-    await client.sendMessage(chatId, helpMessage);
-};
-
-
-client.on('message', async msg => {
-    const chatId = msg.from;
-    const text = msg.body.toLowerCase().trim();
-    const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
-    const customerName = msg._data.notifyName;
-
-    // Update customer last known location from message if available
-    if (msg.hasMedia && msg.type === 'location' && msg.location) {
-        const { latitude, longitude, address } = msg.location;
-        await Customer.findOneAndUpdate(
-            { customerPhone: customerPhone },
-            {
-                $set: {
-                    lastKnownLocation: {
-                        latitude: latitude,
-                        longitude: longitude,
-                        address: address || 'Location shared via WhatsApp'
-                    }
-                }
-            },
-            { upsert: true, new: true }
-        );
-        // If an order is pending, associate this location with it
-        // (Requires more sophisticated state management for pending orders)
-        await client.sendMessage(chatId, 'మీ లొకేషన్ అప్‌డేట్ చేయబడింది. ధన్యవాదాలు!');
-        return;
-    }
-
-
-    let customer = await Customer.findOne({ customerPhone: customerPhone });
-    if (!customer) {
-        customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
-        await customer.save();
-    } else {
-        // Update customer name if it changed (WhatsApp notifyName)
-        if (customer.customerName !== customerName) {
-            customer.customerName = customerName;
-            await customer.save();
-        }
-    }
-
-
-    switch (text) {
-        case 'hi':
-        case 'hello':
-        case 'నమస్తే':
-        case 'హాయ్':
-        case 'menu':
-        case 'మెనూ': // Main menu trigger
-            await sendWelcomeMessage(chatId, customerName);
-            break;
-        case '1':
-        case 'మెనూ చూడండి':
-            await sendMenu(chatId);
-            break;
-        case '2':
-        case 'షాప్ లొకేషన్':
-            await sendShopLocation(chatId);
-            break;
-        case '3':
-        case 'ఆర్డర్ చేయండి':
-            await handleOrderRequest(msg);
-            break;
-        case '4':
-        case 'నా ఆర్డర్స్':
-            await sendCustomerOrders(chatId, customerPhone);
-            break;
-        case '5': // Re-numbered
-        case 'సహాయం': // Re-numbered
-            await sendHelpMessage(chatId);
-            break;
-        case 'cod':
-        case 'cash on delivery':
-            // Logic to finalize order with COD
-            // This needs to be tied to a pending order
-            const pendingOrderCod = await Order.findOneAndUpdate(
-                { customerPhone: customerPhone, status: 'Pending' }, // Assuming 'Pending' means awaiting payment confirmation
-                { $set: { paymentMethod: 'Cash on Delivery', status: 'Confirmed' } },
-                { new: true, sort: { orderDate: -1 } } // Get the most recent pending order
-            );
-            if (pendingOrderCod) {
-                await client.sendMessage(chatId, 'మీ ఆర్డర్ క్యాష్ ఆన్ డెలివరీ కోసం నిర్ధారించబడింది. ధన్యవాదాలు! మీ ఆర్డర్ త్వరలో ప్రాసెస్ చేయబడుతుంది. 😊');
-                // Notify admin via socket
-                io.emit('new_order', pendingOrderCod);
-            } else {
-                await client.sendMessage(chatId, 'మీకు పెండింగ్ ఆర్డర్లు ఏమీ లేవు. దయచేసి ముందుగా ఒక ఆర్డర్ చేయండి.');
-            }
-            break;
-        case 'op':
-        case 'online payment':
-            // Logic to finalize order with Online Payment
-            // For now, it's just a placeholder message
-            const pendingOrderOp = await Order.findOneAndUpdate(
-                { customerPhone: customerPhone, status: 'Pending' },
-                { $set: { paymentMethod: 'Online Payment' } }, // Keep status as pending if payment gateway integration is needed
-                { new: true, sort: { orderDate: -1 } }
-            );
-            if (pendingOrderOp) {
-                await client.sendMessage(chatId, 'ఆన్‌లైన్ పేమెంట్ ఎంపికను ఎంచుకున్నందుకు ధన్యవాదాలు. పేమెంట్ లింక్ త్వరలో మీకు పంపబడుతుంది. మీ ఆర్డర్ ID: ' + pendingOrderOp._id.substring(0,6) + '...');
-                // In a real app, generate and send a payment link here
-                io.emit('new_order', pendingOrderOp); // Still notify admin, but payment is pending
-            } else {
-                await client.sendMessage(chatId, 'మీకు పెండింగ్ ఆర్డర్లు ఏమీ లేవు. దయచేసి ముందుగా ఒక ఆర్డర్ చేయండి.');
-            }
-            break;
-        default:
-            // If it's not a recognized command, try to process as an order detail
-            // This is a simplified approach. A more robust bot would use context/state.
-            // If the user is currently in the "ordering" flow, process this as order items.
-            // This needs to be guarded by a proper state machine in production.
-
-            const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
-
-            if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
-                 const hasNumbers = /\d/.test(msg.body);
-                 const hasItemNames = /(pizza|burger|coke|dosa|idli|మిర్చి|పెరుగు|దోస|ఇడ్లీ)/i.test(msg.body); // Updated keywords
-                 if (hasNumbers && hasItemNames) {
-                    await processOrder(msg); // Attempt to process as an order
-                 } else if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'చిరునామా ఇంకా అందలేదు.') {
-                    await Order.findOneAndUpdate(
-                        { _id: lastOrderInteraction._id },
-                        { $set: { deliveryAddress: msg.body } },
-                        { new: true }
-                    );
-                    await client.sendMessage(chatId, 'మీ డెలివరీ చిరునామా సేవ్ చేయబడింది. దయచేసి మీ పేమెంట్ పద్ధతిని ఎంచుకోండి: ' +
-                                              "'క్యాష్ ఆన్ డెలివరీ' (COD) లేదా 'ఆన్‌లైన్ పేమెంట్' (OP).");
-                 } else {
-                     await client.sendMessage(chatId, 'మీరు అడిగినది నాకు అర్థం కాలేదు. దయచేసి మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి "హాయ్" అని టైప్ చేయండి లేదా "సహాయం" కోసం అడగండి.');
-                 }
-            } else {
-                 await client.sendMessage(chatId, 'మీరు అడిగినది నాకు అర్థం కాలేదు. దయచేసి మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి "హాయ్" అని టైప్ చేయండి లేదా "సహాయం" కోసం అడగండి.');
-            }
-            break;
-    }
-});
 
 
 // --- Admin API Routes ---
@@ -648,10 +410,9 @@ app.post('/api/public/request-qr', async (req, res) => {
     if (client && (whatsappReady || qrCodeData)) {
         return res.status(400).json({ message: 'WhatsApp client is already connected or QR is active. Please restart if new QR is needed.' });
     }
-    // Set status to initializing before requesting QR
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
-    initializeWhatsappClient(); // This will trigger QR event
+    initializeWhatsappClient();
     res.status(200).json({ message: 'Requesting new QR code. Check dashboard.' });
 });
 
@@ -661,7 +422,7 @@ app.post('/api/admin/load-session', authenticateToken, async (req, res) => {
     }
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
-    initializeWhatsappClient(true); // Attempt to load saved session
+    initializeWhatsappClient(true);
     res.status(200).json({ message: 'Attempting to load saved session.' });
 });
 
@@ -742,7 +503,6 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
         const updatedOrder = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true, runValidators: true });
         if (!updatedOrder) return res.status(404).json({ message: 'Order not found' });
 
-        // Notify customer about status update (optional, but good practice)
         if (whatsappReady) {
             await client.sendMessage(updatedOrder.customerPhone + '@c.us', `మీ ఆర్డర్ (ID: ${updatedOrder._id.substring(0, 6)}...) స్థితి '${status}' కు అప్‌డేట్ చేయబడింది.`);
         }
@@ -823,7 +583,6 @@ app.put('/api/admin/settings', authenticateToken, async (req, res) => {
 // Socket.io for real-time updates
 io.on('connection', (socket) => {
     console.log('Admin dashboard connected');
-    // Send current bot status on connection
     Settings.findOne({}).then(settings => {
         if (settings) {
             socket.emit('status', settings.whatsappStatus);
