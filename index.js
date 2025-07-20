@@ -554,13 +554,13 @@ const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (token == null) {
-        console.log('Unauthorized: No token provided.'); // Log for debugging
+        console.log('Unauthorized: No token provided. (Request to ' + req.path + ')'); // Added path for more context
         return res.status(401).json({ message: 'Unauthorized: No token provided.' });
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
-            console.error('JWT Verification Error:', err.message); // Log the specific JWT error
+            console.error('JWT Verification Error:', err.message, '(Token received for ' + req.path + ')'); // Log the specific JWT error and path
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
         }
         req.user = user;
