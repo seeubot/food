@@ -233,7 +233,7 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
                 },
                 { upsert: true, new: true }
             );
-            await client.sendMessage(chatId, 'మీ లొకేషన్ అప్‌డేట్ చేయబడింది. ధన్యవాదాలు!');
+            await client.sendMessage(chatId, 'Your location has been updated. Thank you!');
             return;
         }
 
@@ -251,30 +251,25 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
         switch (text) {
             case 'hi':
             case 'hello':
-            case 'నమస్తే':
-            case 'హాయ్':
+            case 'namaste':
             case 'menu':
-            case 'మెనూ':
                 await sendWelcomeMessage(chatId, customerName);
                 break;
             case '1':
-            case 'మెనూ చూడండి':
+            case 'view menu':
                 await sendMenu(chatId);
                 break;
             case '2':
-            case 'షాప్ లొకేషన్':
+            case 'shop location':
                 await sendShopLocation(chatId);
                 break;
-            case '3':
-            case 'ఆర్డర్ చేయండి':
-                await handleOrderRequest(msg);
-                break;
+            // Removed direct order placement option (case '3' / 'place order')
             case '4':
-            case 'నా ఆర్డర్స్':
+            case 'my orders':
                 await sendCustomerOrders(chatId, customerPhone);
                 break;
             case '5':
-            case 'సహాయం':
+            case 'help':
                 await sendHelpMessage(chatId);
                 break;
             case 'cod':
@@ -285,10 +280,10 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
                     { new: true, sort: { orderDate: -1 } }
                 );
                 if (pendingOrderCod) {
-                    await client.sendMessage(chatId, 'మీ ఆర్డర్ క్యాష్ ఆన్ డెలివరీ కోసం నిర్ధారించబడింది. ధన్యవాసాలు! మీ ఆర్డర్ త్వరలో ప్రాసెస్ చేయబడుతుంది. 😊');
+                    await client.sendMessage(chatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
                     io.emit('new_order', pendingOrderCod);
                 } else {
-                    await client.sendMessage(chatId, 'మీకు పెండింగ్ ఆర్డర్లు ఏమీ లేవు. దయచేసి ముందుగా ఒక ఆర్డర్ చేయండి.');
+                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
                 }
                 break;
             case 'op':
@@ -299,33 +294,31 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
                     { new: true, sort: { orderDate: -1 } }
                 );
                 if (pendingOrderOp) {
-                    await client.sendMessage(chatId, 'ఆన్‌లైన్ పేమెంట్ ఎంపికను ఎంచుకున్నందుకు ధన్యవాదాలు. పేమెంట్ లింక్ త్వరలో మీకు పంపబడుతుంది. మీ ఆర్డర్ ID: ' + pendingOrderOp._id.substring(0,6) + '...');
+                    await client.sendMessage(chatId, 'Thank you for choosing online payment. A payment link will be sent to you shortly. Your Order ID: ' + pendingOrderOp._id.substring(0,6) + '...');
                     io.emit('new_order', pendingOrderOp);
                 } else {
-                    await client.sendMessage(chatId, 'మీకు పెండింగ్ ఆర్డర్లు ఏమీ లేవు. దయచేసి ముందుగా ఒక ఆర్డర్ చేయండి.');
+                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
                 }
                 break;
             default:
+                // Modified default response to guide users to the web menu for ordering
                 const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
 
+                // If there's a recent pending order, still allow address/payment confirmation
                 if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
-                     const hasNumbers = /\d/.test(msg.body);
-                     const hasItemNames = /(pizza|burger|coke|dosa|idli|మిర్చి|పెరుగు|దోస|ఇడ్లీ)/i.test(msg.body);
-                     if (hasNumbers && hasItemNames) {
-                        await processOrder(msg);
-                     } else if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'చిరునామా ఇంకా అందలేదు.') {
+                    if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'Address not yet provided.') {
                         await Order.findOneAndUpdate(
                             { _id: lastOrderInteraction._id },
                             { $set: { deliveryAddress: msg.body } },
                             { new: true }
                         );
-                        await client.sendMessage(chatId, 'మీ డెలివరీ చిరునామా సేవ్ చేయబడింది. దయచేసి మీ పేమెంట్ పద్ధతిని ఎంచుకోండి: ' +
-                                                  "'క్యాష్ ఆన్ డెలివరీ' (COD) లేదా 'ఆన్‌లైన్ పేమెంట్' (OP).");
-                     } else {
-                         await client.sendMessage(chatId, 'మీరు అడిగినది నాకు అర్థం కాలేదు. దయచేసి మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి "హాయ్" అని టైప్ చేయండి లేదా "సహాయం" కోసం అడగండి.');
-                     }
+                        await client.sendMessage(chatId, 'Your delivery address has been saved. Please choose your payment method: ' +
+                                                  "'Cash on Delivery' (COD) or 'Online Payment' (OP).");
+                    } else {
+                        await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
+                    }
                 } else {
-                     await client.sendMessage(chatId, 'మీరు అడిగినది నాకు అర్థం కాలేదు. దయచేసి మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి "హాయ్" అని టైప్ చేయండి లేదా "సహాయం" కోసం అడగండి.');
+                    await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
                 }
                 break;
         }
@@ -364,13 +357,13 @@ const initializeWhatsappClient = async (loadSession = false, retryCount = 0) => 
 
 const sendWelcomeMessage = async (chatId, customerName) => {
     const menuOptions = [
-        "1. 🍕 మెనూ చూడండి",
-        "2. 📍 షాప్ లొకేషన్",
-        "3. 📞 ఆర్డర్ చేయండి",
-        "4. 📝 నా ఆర్డర్స్",
-        "5. ℹ️ సహాయం"
+        "1. 🍕 View Menu",
+        "2. 📍 Shop Location",
+        // Removed option 3: "3. 📞 Place Order"
+        "4. 📝 My Orders",
+        "5. ℹ️ Help"
     ];
-    const welcomeText = `👋 నమస్తే ${customerName || 'కస్టమర్'}! డెలిషియస్ బైట్స్ కు స్వాగతం! 🌟\n\nమీరు ఎలా సహాయం చేయగలను?\n\n${menuOptions.join('\n')}\n\nపై ఎంపికలలో ఒకదాన్ని ఎంచుకోండి లేదా మీ ఆర్డర్ వివరాలను పంపండి.`;
+    const welcomeText = `👋 Hello ${customerName || 'customer'}! Welcome to Delicious Bites! 🌟\n\nTo place an order, please visit our web menu: ${process.env.WEB_MENU_URL}\n\nHow can I help you otherwise?\n\n${menuOptions.join('\n')}\n\nChoose an option above.`;
     await client.sendMessage(chatId, welcomeText);
 };
 
@@ -379,23 +372,23 @@ const sendShopLocation = async (chatId) => {
     if (settings && settings.shopLocation && settings.shopLocation.latitude && settings.shopLocation.longitude) {
         const { latitude, longitude } = settings.shopLocation;
         const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-        await client.sendMessage(chatId, `📍 మా షాప్ లొకేషన్ ఇక్కడ ఉంది:\n${googleMapsLink}\n\nత్వరలో మిమ్మల్ని కలవాలని ఆశిస్తున్నాము!`);
+        await client.sendMessage(chatId, `📍 Our shop location is here:\n${googleMapsLink}\n\nWe hope to see you soon!`);
     } else {
-        await client.sendMessage(chatId, 'క్షమించండి, ప్రస్తుతం షాప్ లొకేషన్ అందుబాటులో లేదు. దయచేసి అడ్మిన్‌ను సంప్రదించండి.');
+        await client.sendMessage(chatId, 'Sorry, shop location is currently unavailable. Please contact the admin.');
     }
 };
 
 const sendMenu = async (chatId) => {
     const items = await Item.find({ isAvailable: true });
     if (items.length === 0) {
-        await client.sendMessage(chatId, 'మెనూలో ప్రస్తుతం ఎటువంటి వస్తువులు లేవు. దయచేసి తర్వాత ప్రయత్నించండి.');
+        await client.sendMessage(chatId, 'There are currently no items on the menu. Please try again later.');
         return;
     }
 
-    let menuMessage = "📜 మా మెనూ:\n\n";
+    let menuMessage = "📜 Our Menu:\n\n";
     const categories = {};
     items.forEach(item => {
-        const category = item.category || 'ఇతరాలు';
+        const category = item.category || 'Other';
         if (!categories[category]) {
             categories[category] = [];
         }
@@ -412,151 +405,61 @@ const sendMenu = async (chatId) => {
         });
         menuMessage += '\n';
     }
-    menuMessage += "మీరు ఆర్డర్ చేయడానికి 'ఆర్డర్ చేయండి' అని టైప్ చేయవచ్చు లేదా మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి 'హాయ్' అని టైప్ చేయవచ్చు.";
+    menuMessage += "To place an order, please visit our web menu: " + process.env.WEB_MENU_URL + "\n\nYou can also type 'Hi' to return to the main menu.";
     await client.sendMessage(chatId, menuMessage);
 };
 
-const handleOrderRequest = async (msg) => {
-    const chatId = msg.from;
-    const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
+// Removed handleOrderRequest and processOrder functions as they are no longer used for direct chat ordering.
+// const handleOrderRequest = async (msg) => { ... }
+// const processOrder = async (msg) => { ... }
 
-    await client.sendMessage(chatId, 'మీరు ఆర్డర్ చేయాలనుకుంటున్న వస్తువులు మరియు వాటి పరిమాణం (ఉదా: పిజ్జా 1, కోక్ 2) తెలపండి.');
-};
-
-const processOrder = async (msg) => {
-    const chatId = msg.from;
-    const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
-    const text = msg.body.toLowerCase();
-
-    const availableItems = await Item.find({ isAvailable: true });
-    let orderItems = [];
-    let subtotal = 0;
-
-    const itemRegex = /(\d+)\s*([a-zA-Z\s]+)|([a-zA-Z\s]+)\s*(\d+)/g;
-    let match;
-
-    while ((match = itemRegex.exec(text)) !== null) {
-        let quantity, itemNameRaw;
-        if (match[1] && match[2]) {
-            quantity = parseInt(match[1]);
-            itemNameRaw = match[2].trim();
-        } else if (match[3] && match[4]) {
-            itemNameRaw = match[3].trim();
-            quantity = parseInt(match[4]);
-        } else {
-            continue;
-        }
-
-        const foundItem = availableItems.find(item =>
-            item.name.toLowerCase().includes(itemNameRaw) ||
-            itemNameRaw.includes(item.name.toLowerCase())
-        );
-
-        if (foundItem && quantity > 0) {
-            orderItems.push({
-                itemId: foundItem._id,
-                name: foundItem.name,
-                price: foundItem.price,
-                quantity: quantity
-            });
-            subtotal += foundItem.price * quantity;
-        }
-    }
-
-    if (orderItems.length === 0) {
-        await client.sendMessage(chatId, 'మీ ఆర్డర్‌లో ఏ వస్తువులను గుర్తించలేకపోయాను. దయచేసి సరైన ఫార్మాట్‌లో మళ్లీ ప్రయత్నించండి (ఉదా: పిజ్జా 1, కోక్ 2).');
-        return;
-    }
-
-    await client.sendMessage(chatId, 'మీ డెలివరీ చిరునామాను (పూర్తి చిరునామా) పంపండి.');
-    await client.sendMessage(chatId, 'డెలివరీ ఖచ్చితంగా ఉండటానికి మీ ప్రస్తుత లొకేషన్‌ను (Google Maps లొకేషన్) కూడా పంపగలరా? ఇది ఐచ్ఛికం కానీ సిఫార్సు చేయబడింది.');
-
-    let transportTax = 0;
-    const settings = await Settings.findOne({});
-    if (settings && settings.deliveryRates && settings.deliveryRates.length > 0 && settings.shopLocation) {
-        transportTax = settings.deliveryRates[0] ? settings.deliveryRates[0].amount : 0;
-    }
-    const totalAmount = subtotal + transportTax;
-
-    const dummyDeliveryAddress = 'చిరునామా ఇంకా అందలేదు.';
-    let customerLat = null;
-    let customerLon = null;
-
-    const newOrder = new Order({
-        customerPhone: customerPhone,
-        customerName: msg._data.notifyName || 'Guest',
-        items: orderItems,
-        subtotal: subtotal,
-        transportTax: transportTax,
-        totalAmount: totalAmount,
-        status: 'Pending',
-        deliveryAddress: dummyDeliveryAddress,
-        customerLocation: {
-            latitude: customerLat,
-            longitude: customerLon
-        }
-    });
-    await newOrder.save();
-
-    let confirmationMessage = `మీ ఆర్డర్ వివరాలు:\n\n`;
-    orderItems.forEach(item => {
-        confirmationMessage += `${item.name} x ${item.quantity} - ₹${(item.price * item.quantity).toFixed(2)}\n`;
-    });
-    confirmationMessage += `\nఉపమొత్తం: ₹${subtotal.toFixed(2)}\n`;
-    confirmationMessage += `డెలివరీ ఛార్జీలు: ₹${transportTax.toFixed(2)}\n`;
-    confirmationMessage += `*మొత్తం: ₹${totalAmount.toFixed(2)}*\n\n`;
-    confirmationMessage += `మీరు 'క్యాష్ ఆన్ డెలివరీ' (COD) లేదా 'ఆన్‌లైన్ పేమెంట్' (OP) ద్వారా చెల్లించాలనుకుంటున్నారా?`;
-
-    await client.sendMessage(chatId, confirmationMessage);
-};
 
 const sendCustomerOrders = async (chatId, customerPhone) => {
     const orders = await Order.find({ customerPhone: customerPhone }).sort({ orderDate: -1 }).limit(5);
 
     if (orders.length === 0) {
-        await client.sendMessage(chatId, 'మీరు గతంలో ఎటువంటి ఆర్డర్లు చేయలేదు.');
+        await client.sendMessage(chatId, 'You have not placed any orders yet.');
         return;
     }
 
-    let orderListMessage = 'మీ గత ఆర్డర్లు:\n\n';
+    let orderListMessage = 'Your Past Orders:\n\n';
     orders.forEach((order, index) => {
-        orderListMessage += `*ఆర్డర్ ${index + 1} (ID: ${order._id.substring(0, 6)}...)*\n`;
+        orderListMessage += `*Order ${index + 1} (ID: ${order._id.substring(0, 6)}...)*\n`;
         order.items.forEach(item => {
             orderListMessage += `  - ${item.name} x ${item.quantity}\n`;
         });
-        orderListMessage += `  మొత్తం: ₹${order.totalAmount.toFixed(2)}\n`;
-        orderListMessage += `  స్థితి: ${order.status}\n`;
-        orderListMessage += `  తేదీ: ${new Date(order.orderDate).toLocaleDateString('te-IN', { timeZone: 'Asia/Kolkata' })}\n\n`;
+        orderListMessage += `  Total: ₹${order.totalAmount.toFixed(2)}\n`;
+        orderListMessage += `  Status: ${order.status}\n`;
+        orderListMessage += `  Date: ${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n`;
     });
     await client.sendMessage(chatId, orderListMessage);
 };
 
 const sendHelpMessage = async (chatId) => {
-    const helpMessage = `ఎలా సహాయం చేయగలను? మీరు ఈ క్రిందివాటిని ప్రయత్నించవచ్చు:\n
-*హాయ్* - మెయిన్ మెనూకి తిరిగి వెళ్ళడానికి
-*మెనూ చూడండి* - మా అందుబాటులో ఉన్న వస్తువులను చూడటానికి
-*ఆర్డర్ చేయండి* - ఆర్డర్ ప్రక్రియను ప్రారంభించడానికి
-*నా ఆర్డర్స్* - మీ గత ఆర్డర్‌లను చూడటానికి
-*షాప్ లొకేషన్* - మా షాప్ స్థానాన్ని పొందడానికి
-*సహాయం* - ఈ సహాయ సందేశాన్ని మళ్లీ చూడటానికి`;
+    const helpMessage = `How can I help you? You can try the following:\n
+*Hi* - To return to the main menu
+*View Menu* - To see our available items
+*My Orders* - To view your past orders
+*Shop Location* - To get our shop's location
+*Help* - To see this help message again\n\nTo place an order, please visit our web menu: ${process.env.WEB_MENU_URL}`;
     await client.sendMessage(chatId, helpMessage);
 };
 
-// --- New: Fleeting Lines for Re-Order Notifications ---
+// --- Fleeting Lines for Re-Order Notifications (in English) ---
 const reOrderNotificationMessagesTelugu = [
-    "మీకు మళ్లీ ఆకలిగా ఉందా? 😋 మా మెనూలో కొత్త రుచులు వేచి ఉన్నాయి! ఇప్పుడే ఆర్డర్ చేయండి! 🚀",
-    "మీరు మా రుచికరమైన వంటకాలను కోల్పోతున్నారా? 💖 ఇప్పుడే మీ తదుపరి భోజనాన్ని ఆర్డర్ చేయండి! 🍽️",
-    "7 రోజులు గడిచిపోయాయి! ⏳ మళ్లీ ఆర్డర్ చేయడానికి ఇది సరైన సమయం. మీ అభిమాన వంటకాలు సిద్ధంగా ఉన్నాయి! ✨",
-    "ప్రత్యేక ఆఫర్! 🎉 ఈ వారం మీ తదుపరి ఆర్డర్‌పై డిస్కౌంట్ పొందండి. మెనూ చూడండి! 📜",
-    "మీరు చివరిసారిగా మా నుండి ఆర్డర్ చేసి 7 రోజులు అయ్యింది. మీకు ఇష్టమైనవి మళ్లీ ఆర్డర్ చేయండి! 🧡",
-    "ఆకలిగా ఉందా? 🤤 మా డెలిషియస్ బైట్స్ నుండి మీకు ఇష్టమైన భోజనాన్ని ఇప్పుడే ఆర్డర్ చేయండి! 💨",
-    "మా మెనూలో కొత్తగా ఏముందో చూడాలనుకుంటున్నారా? 👀 ఇప్పుడే ఆర్డర్ చేసి ప్రయత్నించండి! 🌟",
-    "మీరు మా రుచిని మర్చిపోయారా? 😋 మళ్లీ ఆర్డర్ చేయడానికి ఇది సరైన సమయం! 🥳",
-    "మీరు ఆర్డర్ చేయాలని ఆలోచిస్తున్నారా? 🤔 ఇది సరైన సూచన! ఇప్పుడే ఆర్డర్ చేయండి! 👇",
-    "మీరు చివరిసారిగా ఆర్డర్ చేసినప్పుడు చాలా బాగుంది కదా? 😉 మళ్లీ ఆ అనుభూతిని పొందండి! 💯"
+    "Feeling hungry again? 😋 New flavors await on our menu! Order now! 🚀",
+    "Missing our delicious dishes? 💖 Order your next meal now! 🍽️",
+    "7 days have passed! ⏳ It's the perfect time to re-order. Your favorite dishes are ready! ✨",
+    "Special offer! 🎉 Get a discount on your next order this week. Check out the menu! 📜",
+    "It's been 7 days since your last order from us. Re-order your favorites! 🧡",
+    "Hungry? 🤤 Order your favorite meal from Delicious Bites now! 💨",
+    "Want to see what's new on our menu? 👀 Order now and try it out! 🌟",
+    "Have you forgotten our taste? 😋 It's the perfect time to re-order! 🥳",
+    "Thinking of ordering? 🤔 This is the right hint! Order now! 👇",
+    "Your last order was great, right? 😉 Get that experience again! 💯"
 ];
 
-// --- New: Scheduled Notification Function ---
+// --- Scheduled Notification Function ---
 const sendReorderNotification = async () => {
     if (!whatsappReady) {
         console.log('WhatsApp client not ready for scheduled notifications. Skipping job.');
@@ -585,14 +488,16 @@ const sendReorderNotification = async () => {
             const message = reOrderNotificationMessagesTelugu[randomIndex];
 
             try {
-                await client.sendMessage(chatId, message);
+                // Append web menu URL to the notification message
+                const notificationMessage = `${message}\n\nVisit our web menu to order: ${process.env.WEB_MENU_URL}`;
+                await client.sendMessage(chatId, notificationMessage);
                 await Customer.findByIdAndUpdate(customer._id, { lastNotificationSent: new Date() });
                 console.log(`Sent re-order notification to ${customer.customerPhone}`);
             } catch (msgSendError) {
                 console.error(`Failed to send re-order notification to ${customer.customerPhone}:`, msgSendError);
             }
         }
-        console.log('7-day re-order notification job finished.'); // Changed from console to console.log
+        console.log('7-day re-order notification job finished.');
 
     } catch (dbError) {
         console.error('Error in 7-day re-order notification job (DB query):', dbError);
@@ -713,7 +618,8 @@ app.put('/api/admin/menu/:id', authenticateToken, async (req, res) => {
         const updatedItem = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
         if (!updatedItem) return res.status(404).json({ message: 'Item not found' });
         res.json({ message: 'Menu item updated successfully', item: updatedItem });
-    } catch (error) {
+    }
+    catch (error) {
         res.status(400).json({ message: 'Error updating menu item', error: error.message });
     }
 });
@@ -754,7 +660,7 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
         if (!updatedOrder) return res.status(404).json({ message: 'Order not found' });
 
         if (whatsappReady) {
-            await client.sendMessage(updatedOrder.customerPhone + '@c.us', `మీ ఆర్డర్ (ID: ${updatedOrder._id.substring(0, 6)}...) స్థితి '${status}' కు అప్‌డేట్ చేయబడింది.`);
+            await client.sendMessage(updatedOrder.customerPhone + '@c.us', `Your order (ID: ${updatedOrder._id.substring(0, 6)}...) status has been updated to '${status}'.`);
         }
 
         res.json({ message: 'Order status updated successfully', order: updatedOrder });
@@ -822,11 +728,11 @@ app.put('/api/admin/settings', authenticateToken, async (req, res) => {
     try {
         const updatedSettings = await Settings.findOneAndUpdate({}, req.body, { new: true, upsert: true, runValidators: true });
         res.json({ message: 'Settings updated successfully', settings: updatedSettings });
-    } catch (error) {
+    }
+    catch (error) {
         res.status(400).json({ message: 'Error updating settings', error: error.message });
     }
-}
-);
+});
 
 // --- Public API Routes (no authentication needed) ---
 app.get('/api/menu', async (req, res) => {
@@ -908,6 +814,8 @@ app.post('/api/order', async (req, res) => {
 
         if (whatsappReady) {
             io.emit('new_order', newOrder);
+            // Send a confirmation message to the user via WhatsApp with a link to track order or next steps
+            await client.sendMessage(customerPhone + '@c.us', `Your order (ID: ${newOrder._id.substring(0, 6)}...) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders".`);
         }
 
         res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder._id, order: newOrder });
