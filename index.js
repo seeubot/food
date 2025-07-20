@@ -1,4 +1,4 @@
-const express = require('express');
+Const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
@@ -7,10 +7,10 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const moment = require('moment-timezone'); // For time zone handling
-const cron = require('node-cron'); // Import node-cron
-const speakeasy = require('speakeasy'); // Import speakeasy for TOTP
-const fs = require('fs'); // For file system operations (deleting session)
+const moment = require('moment-timezone');
+const cron = require('node-cron');
+const speakeasy = require('speakeasy');
+const fs = require('fs');
 
 require('dotenv').config();
 
@@ -23,7 +23,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // JWT Secret (ensure this is in your .env file in production)
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey'; // Fallback for safety, but should be set in .env
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey';
 
 // --- WARNING: HARDCODED ADMIN CREDENTIALS ---
 // This is for testing purposes ONLY as per user request.
@@ -41,7 +41,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 .then(() => console.log('MongoDB connected'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// Mongoose Schemas (unchanged)
+// Mongoose Schemas
 const ItemSchema = new mongoose.Schema({
     name: { type: String, required: true },
     description: String,
@@ -115,75 +115,76 @@ const Customer = mongoose.model('Customer', CustomerSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
 
-// WhatsApp Client Initialization
+// --- WhatsApp Client Initialization & State Management ---
 let client = null;
-let whatsappReady = false;
-let qrCodeData = null;
-let qrExpiryTimer = null;
-let currentRetryCount = 0; // Track retries for the current initialization attempt
-const MAX_RETRIES = 5;
-const RETRY_DELAY_MS = 5000;
+let whatsappReady = false; // True when client.on('ready') fires
+let qrCodeData = null; // Stores the base64 QR image
+let qrExpiryTimer = null; // Timer for QR code expiry
+let isInitializing = false; // Flag to prevent multiple concurrent initializations
+let currentInitializationAttempt = 0; // Tracks attempts for current client.initialize() call
+const MAX_INITIALIZATION_ATTEMPTS = 3; // Max retries for client.initialize()
+const RETRY_DELAY_MS = 5000; // Delay before retrying initialization
+
 const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
 
+/**
+ * Deletes WhatsApp session files.
+ */
 const deleteSessionFiles = async () => {
-    console.log('Attempting to delete WhatsApp session files...');
+    console.log('[WhatsApp] Attempting to delete WhatsApp session files...');
     try {
         if (fs.existsSync(SESSION_PATH)) {
             await fs.promises.rm(SESSION_PATH, { recursive: true, force: true });
-            console.log('WhatsApp session files deleted successfully.');
+            console.log('[WhatsApp] WhatsApp session files deleted successfully.');
         } else {
-            console.log('No WhatsApp session files found to delete.');
+            console.log('[WhatsApp] No WhatsApp session files found to delete.');
         }
     } catch (err) {
-        console.error('Error deleting WhatsApp session files:', err);
+        console.error('[WhatsApp] Error deleting WhatsApp session files:', err);
     }
 };
 
-const initializeWhatsappClient = async (resetSession = false) => {
-    currentRetryCount++; // Increment retry count for this specific call
-    console.log(`Initializing WhatsApp client (Reset session: ${resetSession ? 'Yes' : 'No'})... Attempt ${currentRetryCount}/${MAX_RETRIES}`);
-
-    if (currentRetryCount > MAX_RETRIES) {
-        console.error('Max retries reached for WhatsApp client initialization. Giving up for now.');
-        whatsappReady = false;
-        await Settings.findOneAndUpdate({}, { whatsappStatus: 'auth_failure' }, { upsert: true });
-        io.emit('status', 'auth_failure');
-        qrCodeData = null;
-        io.emit('qrCode', null);
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        currentRetryCount = 0; // Reset for next manual attempt
+/**
+ * Initializes the WhatsApp client.
+ * @param {boolean} forceNewSession - If true, deletes existing session files and forces a new QR.
+ */
+const initializeWhatsappClient = async (forceNewSession = false) => {
+    if (isInitializing) {
+        console.log('[WhatsApp] Initialization already in progress. Skipping call.');
         return;
     }
 
-    // If a client instance exists and is ready, and we are not forcing a new session, do nothing.
-    if (client && whatsappReady && !resetSession) {
-        console.log('Client already ready and not forcing new session. Skipping initialization.');
-        currentRetryCount = 0; // Reset as we are stable
-        return;
-    }
+    isInitializing = true;
+    currentInitializationAttempt++;
+    console.log(`[WhatsApp] Starting initialization (Force new session: ${forceNewSession}). Attempt ${currentInitializationAttempt}/${MAX_INITIALIZATION_ATTEMPTS}`);
 
-    // If resetSession is true, or client exists but is not ready, destroy it first.
-    if (client && (resetSession || !whatsappReady)) {
+    // Update status in DB and emit to dashboard
+    await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
+    io.emit('status', 'initializing');
+
+    // If client instance exists, destroy it first to ensure a clean slate
+    if (client) {
         try {
-            console.log('Destroying previous client instance before re-initialization...');
+            console.log('[WhatsApp] Destroying previous client instance...');
             await client.destroy();
-            console.log('Previous client destroyed successfully.');
             client = null;
+            whatsappReady = false; // Reset ready state
         } catch (e) {
-            console.error('Error destroying old client:', e);
-            client = null; // Ensure client is null even if destroy fails
+            console.error('[WhatsApp] Error destroying old client:', e);
+            client = null;
+            whatsappReady = false;
         }
     }
 
-    if (resetSession) {
+    // Delete session files if forcing a new session
+    if (forceNewSession) {
         await deleteSessionFiles();
     }
 
-    // Create a new client instance
     client = new Client({
         authStrategy: new LocalAuth({
             clientId: 'admin',
-            dataPath: SESSION_PATH // This path must be persistent
+            dataPath: SESSION_PATH
         }),
         puppeteer: {
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -195,63 +196,70 @@ const initializeWhatsappClient = async (resetSession = false) => {
         },
     });
 
-    // Attach event listeners
+    // --- WhatsApp Client Event Listeners ---
     client.on('qr', async (qr) => {
-        console.log('QR RECEIVED');
+        console.log('[WhatsApp] QR RECEIVED');
         qrCodeData = await qrcode.toDataURL(qr);
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_received', lastAuthenticatedAt: null }, { upsert: true });
         io.emit('status', 'qr_received');
-        io.emit('qrCode', qrCodeData); // Emit QR code immediately for faster display
+        io.emit('qrCode', qrCodeData); // Emit QR code immediately
 
+        // Clear any existing QR expiry timer
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
         qrExpiryTimer = setTimeout(async () => {
             // Only reinitialize if QR is still active and client is not ready/authenticated
-            if (whatsappReady === false && qrCodeData !== null) {
-                console.log('QR code expired. Reinitializing...');
+            if (!whatsappReady && qrCodeData !== null) {
+                console.log('[WhatsApp] QR code expired. Reinitializing with new session...');
                 qrCodeData = null;
                 io.emit('qrCode', null);
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
                 io.emit('status', 'qr_error');
+                isInitializing = false; // Allow re-initialization
                 initializeWhatsappClient(true); // Force a new session
             }
         }, 60000); // 60 seconds expiry
-        currentRetryCount = 0; // Reset retry count upon successful QR generation
+        currentInitializationAttempt = 0; // Reset retry count upon successful QR generation
     });
 
     client.on('authenticated', async (session) => {
-        console.log('AUTHENTICATED');
+        console.log('[WhatsApp] AUTHENTICATED');
+        whatsappReady = false; // Not yet ready, but authenticated
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'authenticated', lastAuthenticatedAt: new Date() }, { upsert: true });
         io.emit('status', 'authenticated');
         io.emit('sessionInfo', { lastAuthenticatedAt: new Date() });
-        qrCodeData = null;
+        qrCodeData = null; // Clear QR data
         io.emit('qrCode', null);
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        currentRetryCount = 0; // Reset retry count upon authentication
+        if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
+        currentInitializationAttempt = 0; // Reset retry count upon authentication
     });
 
     client.on('ready', async () => {
-        console.log('Client is ready!');
+        console.log('[WhatsApp] Client is ready!');
         whatsappReady = true;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'ready' }, { upsert: true });
         io.emit('status', 'ready');
-        io.emit('sessionInfo', { lastAuthenticatedAt: (await Settings.findOne({})).lastAuthenticatedAt });
-        currentRetryCount = 0; // Reset retry count when ready
+        // Ensure lastAuthenticatedAt is up-to-date, fetch from DB if needed
+        const settings = await Settings.findOne({});
+        io.emit('sessionInfo', { lastAuthenticatedAt: settings ? settings.lastAuthenticatedAt : null });
+        isInitializing = false; // Initialization complete
+        currentInitializationAttempt = 0; // Reset retry count when ready
     });
 
     client.on('auth_failure', async msg => {
-        console.error('AUTHENTICATION FAILURE', msg);
+        console.error('[WhatsApp] AUTHENTICATION FAILURE', msg);
         whatsappReady = false;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'auth_failure' }, { upsert: true });
         io.emit('status', 'auth_failure');
         qrCodeData = null;
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        console.log('Reinitializing client due to auth_failure (forcing new session)...');
+        console.log('[WhatsApp] Reinitializing client due to auth_failure (forcing new session)...');
+        isInitializing = false; // Allow re-initialization
         initializeWhatsappClient(true); // Force a new session after auth failure
     });
 
     client.on('disconnected', async (reason) => {
-        console.log('Client was disconnected', reason);
+        console.log('[WhatsApp] Client was disconnected', reason);
         whatsappReady = false;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
         io.emit('status', 'disconnected');
@@ -259,158 +267,68 @@ const initializeWhatsappClient = async (resetSession = false) => {
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
+        isInitializing = false; // Allow re-initialization
+
         // Decide whether to force a new session or try to reconnect with existing one
         if (reason === 'LOGOUT' || reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNEXPECTED_LOGOUT') {
-             console.log('Reinitializing client due to critical disconnection (forcing new session)...');
+             console.log('[WhatsApp] Reinitializing client due to critical disconnection (forcing new session)...');
              initializeWhatsappClient(true); // Force a new session
         } else {
-            console.log(`Client disconnected for reason: ${reason}. Attempting to reconnect with existing session...`);
-            setTimeout(() => initializeWhatsappClient(false), RETRY_DELAY_MS); // Try to reconnect without resetting session
-        }
-    });
-
-    client.on('message', async msg => {
-        const chatId = msg.from;
-        const text = msg.body.toLowerCase().trim();
-        const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
-        const customerName = msg._data.notifyName;
-
-        if (msg.hasMedia && msg.type === 'location' && msg.location) {
-            const { latitude, longitude, address } = msg.location;
-            await Customer.findOneAndUpdate(
-                { customerPhone: customerPhone },
-                {
-                    $set: {
-                        lastKnownLocation: {
-                            latitude: latitude,
-                            longitude: longitude,
-                            address: address || 'Location shared via WhatsApp'
-                        }
-                    }
-                },
-                { upsert: true, new: true }
-            );
-            await client.sendMessage(chatId, 'Your location has been updated. Thank you!');
-            return;
-        }
-
-        let customer = await Customer.findOne({ customerPhone: customerPhone });
-        if (!customer) {
-            customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
-            await customer.save();
-        } else {
-            if (customer.customerName !== customerName) {
-                customer.customerName = customerName;
-                await customer.save();
+            console.log(`[WhatsApp] Client disconnected for reason: ${reason}. Attempting to reconnect with existing session...`);
+            // Only retry if we haven't reached max attempts for this specific client.initialize() call
+            if (currentInitializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
+                setTimeout(() => initializeWhatsappClient(false), RETRY_DELAY_MS);
+            } else {
+                console.error('[WhatsApp] Max reconnection attempts reached after disconnection. Manual intervention might be needed.');
+                await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
+                io.emit('status', 'disconnected');
+                currentInitializationAttempt = 0; // Reset for next manual attempt
             }
         }
-
-        switch (text) {
-            case 'hi':
-            case 'hello':
-            case 'namaste':
-            case 'menu':
-                await sendWelcomeMessage(chatId, customerName);
-                break;
-            case '1':
-            case 'view menu':
-                await sendMenu(chatId);
-                break;
-            case '2':
-            case 'shop location':
-                await sendShopLocation(chatId);
-                break;
-            case '4':
-            case 'my orders':
-                await sendCustomerOrders(chatId, customerPhone);
-                break;
-            case '5':
-            case 'help':
-                await sendHelpMessage(chatId);
-                break;
-            case 'cod':
-            case 'cash on delivery':
-                const pendingOrderCod = await Order.findOneAndUpdate(
-                    { customerPhone: customerPhone, status: 'Pending' },
-                    { $set: { paymentMethod: 'Cash on Delivery', status: 'Confirmed' } },
-                    { new: true, sort: { orderDate: -1 } }
-                );
-                if (pendingOrderCod) {
-                    await client.sendMessage(chatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
-                    io.emit('new_order', pendingOrderCod);
-                } else {
-                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
-                }
-                break;
-            case 'op':
-            case 'online payment':
-                const pendingOrderOp = await Order.findOneAndUpdate(
-                    { customerPhone: customerPhone, status: 'Pending' },
-                    { $set: { paymentMethod: 'Online Payment' } },
-                    { new: true, sort: { orderDate: -1 } }
-                );
-                if (pendingOrderOp) {
-                    await client.sendMessage(chatId, 'Thank you for choosing online payment. A payment link will be sent to you shortly. Your Order ID: ' + pendingOrderOp._id.substring(0,6) + '...');
-                    io.emit('new_order', pendingOrderOp);
-                } else {
-                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
-                }
-                break;
-            default:
-                const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
-
-                if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
-                    if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'Address not yet provided.') {
-                        await Order.findOneAndUpdate(
-                            { _id: lastOrderInteraction._id },
-                            { $set: { deliveryAddress: msg.body } },
-                            { new: true }
-                        );
-                        await client.sendMessage(chatId, 'Your delivery address has been saved. Please choose your payment method: ' +
-                                                  "'Cash on Delivery' (COD) or 'Online Payment' (OP).");
-                    } else {
-                        await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
-                    }
-                } else {
-                    await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
-                }
-                break;
-        }
     });
 
+    // --- Attempt to initialize the client ---
     try {
         await client.initialize();
-        console.log('WhatsApp client initialized successfully.');
-        currentRetryCount = 0; // Reset retry count on successful initialization
+        console.log('[WhatsApp] client.initialize() called successfully.');
+        // The 'ready' event will set isInitializing to false and reset currentInitializationAttempt
     } catch (err) {
-        console.error(`Client initialization error: ${err.message}`);
-        // If initialization fails, retry if max retries not reached
-        if (currentRetryCount < MAX_RETRIES) {
-            console.log(`Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
-            setTimeout(() => initializeWhatsappClient(resetSession), RETRY_DELAY_MS);
+        console.error(`[WhatsApp] client.initialize() error: ${err.message}`);
+        whatsappReady = false;
+        qrCodeData = null;
+        io.emit('qrCode', null);
+        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+
+        // If initialization fails, retry if max attempts not reached
+        if (currentInitializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
+            console.log(`[WhatsApp] Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
+            isInitializing = false; // Allow retry
+            setTimeout(() => initializeWhatsappClient(forceNewSession), RETRY_DELAY_MS);
         } else {
-            console.error('Max retries reached. WhatsApp client failed to initialize.');
-            whatsappReady = false;
-            await Settings.findOneAndUpdate({}, { whatsappStatus: 'auth_failure' }, { upsert: true });
-            io.emit('status', 'auth_failure');
-            qrCodeData = null;
-            io.emit('qrCode', null);
-            if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-            currentRetryCount = 0; // Reset for next manual attempt
+            console.error('[WhatsApp] Max initialization attempts reached. WhatsApp client failed to initialize.');
+            await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
+            io.emit('status', 'qr_error');
+            isInitializing = false; // Allow future manual initialization
+            currentInitializationAttempt = 0; // Reset for next manual attempt
         }
     }
 };
 
+// Initial call to start WhatsApp client on server startup
 (async () => {
     const settings = await Settings.findOne({});
     if (!settings || settings.whatsappStatus === 'disconnected') {
+        // If no settings or explicitly disconnected, start fresh
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
+        initializeWhatsappClient(true); // Force new session on initial startup if disconnected
+    } else {
+        // Otherwise, try to load existing session
+        initializeWhatsappClient(false);
     }
-    initializeWhatsappClient(false); // Initial call, try to load existing session
 })();
 
 
-// --- Bot Logic Functions (unchanged) ---
+// --- Bot Logic Functions ---
 const sendWelcomeMessage = async (chatId, customerName) => {
     const menuOptions = [
         "1. 🍕 View Menu",
@@ -495,7 +413,7 @@ const sendHelpMessage = async (chatId) => {
     await client.sendMessage(chatId, helpMessage);
 };
 
-// --- Fleeting Lines for Re-Order Notifications (unchanged) ---
+// --- Fleeting Lines for Re-Order Notifications ---
 const reOrderNotificationMessagesTelugu = [
     "Feeling hungry again? 😋 New flavors await on our menu! Order now! 🚀",
     "Missing our delicious dishes? 💖 Order your next meal now! 🍽️",
@@ -509,14 +427,14 @@ const reOrderNotificationMessagesTelugu = [
     "Your last order was great, right? 😉 Get that experience again! 💯"
 ];
 
-// --- Scheduled Notification Function (unchanged) ---
+// --- Scheduled Notification Function ---
 const sendReorderNotification = async () => {
     if (!whatsappReady) {
-        console.log('WhatsApp client not ready for scheduled notifications. Skipping job.');
+        console.log('[Scheduler] WhatsApp client not ready for scheduled notifications. Skipping job.');
         return;
     }
 
-    console.log('Running 7-day re-order notification job...');
+    console.log('[Scheduler] Running 7-day re-order notification job...');
     const sevenDaysAgo = moment().subtract(7, 'days').toDate();
     const twoDaysAgo = moment().subtract(2, 'days').toDate();
 
@@ -530,7 +448,7 @@ const sendReorderNotification = async () => {
             lastOrderDate: { $lt: twoDaysAgo }
         });
 
-        console.log(`Found ${customersToNotify.length} customers to notify.`);
+        console.log(`[Scheduler] Found ${customersToNotify.length} customers to notify.`);
 
         for (const customer of customersToNotify) {
             const chatId = customer.customerPhone + '@c.us';
@@ -541,15 +459,15 @@ const sendReorderNotification = async () => {
                 const notificationMessage = `${message}\n\nVisit our web menu to order: ${process.env.WEB_MENU_URL}`;
                 await client.sendMessage(chatId, notificationMessage);
                 await Customer.findByIdAndUpdate(customer._id, { lastNotificationSent: new Date() });
-                console.log(`Sent re-order notification to ${customer.customerPhone}`);
+                console.log(`[Scheduler] Sent re-order notification to ${customer.customerPhone}`);
             } catch (msgSendError) {
-                console.error(`Failed to send re-order notification to ${customer.customerPhone}:`, msgSendError);
+                console.error(`[Scheduler] Failed to send re-order notification to ${customer.customerPhone}:`, msgSendError);
             }
         }
-        console.log('7-day re-order notification job finished.');
+        console.log('[Scheduler] 7-day re-order notification job finished.');
 
     } catch (dbError) {
-        console.error('Error in 7-day re-order notification job (DB query):', dbError);
+        console.error('[Scheduler] Error in 7-day re-order notification job (DB query):', dbError);
     }
 };
 
@@ -564,16 +482,21 @@ console.log('7-day re-order notification job scheduled to run daily at 9:00 AM I
 
 // --- Admin API Routes ---
 app.post('/admin/login', async (req, res) => {
-    const { totpCode } = req.body;
+    const { username, password, totpCode } = req.body; // Added username and password to request body
 
-    const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
+    const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME }); // Always check for default admin
 
     if (!admin) {
         return res.status(500).json({ message: 'Admin user not found in database. Please restart server.' });
     }
 
+    // Verify password first
+    const isPasswordValid = await bcrypt.compare(password, admin.password);
+    if (!isPasswordValid) {
+        return res.status(401).json({ message: 'Invalid username or password.' });
+    }
+
     if (!admin.totpSecret) {
-        // JWT token now expires in 7 days
         const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' });
         return res.json({ token, twoFactorEnabled: false });
     }
@@ -593,7 +516,6 @@ app.post('/admin/login', async (req, res) => {
         return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
     }
 
-    // JWT token now expires in 7 days
     const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, twoFactorEnabled: true });
 });
@@ -602,7 +524,7 @@ app.get('/admin/logout', (req, res) => {
     res.send('Logged out successfully');
 });
 
-// Authentication Middleware for Admin APIs (unchanged)
+// Authentication Middleware for Admin APIs
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -614,6 +536,10 @@ const authenticateToken = (req, res, next) => {
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
             console.error('JWT Verification Error:', err.message, '(Token received for ' + req.path + ')');
+            // Check if token is expired
+            if (err.name === 'TokenExpiredError') {
+                return res.status(401).json({ message: 'Unauthorized: Session expired. Please log in again.' });
+            }
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
         }
         req.user = user;
@@ -621,7 +547,7 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// --- 2FA Specific Endpoints (unchanged, operate on DEFAULT_ADMIN_USERNAME) ---
+// --- 2FA Specific Endpoints (operate on DEFAULT_ADMIN_USERNAME) ---
 app.get('/api/admin/2fa/status', authenticateToken, async (req, res) => {
     try {
         const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
@@ -646,9 +572,14 @@ app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
             name: `DeliciousBites Admin (${admin.username})`,
             length: 20
         });
-        admin.totpSecret = secret.base32;
-        await admin.save();
-        console.log(`New TOTP secret generated and saved for admin: ${admin.username}`);
+        // Do NOT save the secret to DB here. Only save after successful verification.
+        // This prevents generating a new secret every time the modal is opened.
+        // Instead, we'll return the secret and QR, and the client will verify it.
+        // The secret will be temporarily stored on the client side or derived from the QR.
+
+        // For simplicity, we'll temporarily store it on the admin object in memory
+        // This is not ideal for multi-instance deployments, but fine for a single server.
+        admin.currentTotpSecret = secret.base32; // Temporary in-memory storage
 
         qrcode.toDataURL(secret.otpauth_url, (err, data_url) => {
             if (err) {
@@ -665,22 +596,28 @@ app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
-    const { totpCode } = req.body;
+    const { totpCode, secret } = req.body; // Expect secret from frontend
     try {
         const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
-        if (!admin || !admin.totpSecret) {
-            return res.status(400).json({ message: '2FA not set up for this user.' });
+        if (!admin) {
+            return res.status(404).json({ message: 'Admin user not found.' });
+        }
+
+        if (!secret) {
+            return res.status(400).json({ message: 'TOTP secret is missing for verification.' });
         }
 
         const verified = speakeasy.totp.verify({
-            secret: admin.totpSecret,
+            secret: secret, // Use the secret sent from the frontend
             encoding: 'base32',
             token: totpCode,
             window: 1
         });
 
         if (verified) {
-            res.json({ verified: true, message: '2FA code verified successfully.' });
+            admin.totpSecret = secret; // Save the secret to DB only upon successful verification
+            await admin.save();
+            res.json({ verified: true, message: '2FA successfully enabled.' });
         } else {
             res.status(401).json({ verified: false, message: 'Invalid 2FA code.' });
         }
@@ -705,13 +642,13 @@ app.post('/api/admin/2fa/disable', authenticateToken, async (req, res) => {
     }
 });
 
-// --- Other Admin API Endpoints (unchanged, still require authentication) ---
+// --- Other Admin API Endpoints (still require authentication) ---
 app.get('/api/admin/bot-status', authenticateToken, async (req, res) => {
     const settings = await Settings.findOne({});
     res.json({
         status: settings ? settings.whatsappStatus : 'disconnected',
         lastAuthenticatedAt: settings ? settings.lastAuthenticatedAt : null,
-        qrCodeAvailable: qrCodeData !== null
+        qrCodeAvailable: qrCodeData !== null // Indicate if QR is currently available
     });
 });
 
@@ -719,8 +656,10 @@ app.post('/api/admin/load-session', authenticateToken, async (req, res) => {
     // This endpoint is primarily for admin to force a re-initialization,
     // potentially with a new QR if the current session is problematic.
     // It should always trigger a reset.
+    console.log('[API] Admin requested to load/re-initialize session.');
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
+    isInitializing = false; // Allow the call to proceed
     initializeWhatsappClient(true); // Force a new session
     res.status(200).json({ message: 'Attempting to load new session or generate QR.' });
 });
@@ -801,7 +740,9 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
         if (!updatedOrder) return res.status(404).json({ message: 'Order not found' });
 
         if (whatsappReady) {
-            await client.sendMessage(updatedOrder.customerPhone + '@c.us', `Your order (ID: ${updatedOrder._id.substring(0, 6)}...) status has been updated to '${status}'.`);
+            // Ensure customerPhone is in the correct format for whatsapp-web.js
+            const customerChatId = updatedOrder.customerPhone.includes('@c.us') ? updatedOrder.customerPhone : updatedOrder.customerPhone + '@c.us';
+            await client.sendMessage(customerChatId, `Your order (ID: ${updatedOrder._id.substring(0, 6)}...) status has been updated to '${status}'.`);
         }
 
         res.json({ message: 'Order status updated successfully', order: updatedOrder });
@@ -911,14 +852,11 @@ app.post('/api/order', async (req, res) => {
             return res.status(400).json({ message: 'Missing required order details.' });
         }
 
-        // --- IMPORTANT FIX FOR DUPLICATE KEY ERROR ---
-        // Ensure customerPhone is a non-empty string before using it in a unique index query
-        if (typeof customerPhone !== 'string' || customerPhone.trim() === '') {
+        const cleanedCustomerPhone = customerPhone.trim();
+        if (typeof cleanedCustomerPhone !== 'string' || cleanedCustomerPhone === '') {
             console.error('Invalid customerPhone received for order:', customerPhone);
             return res.status(400).json({ message: 'Invalid phone number provided for customer.' });
         }
-        const cleanedCustomerPhone = customerPhone.trim();
-        // --- END FIX ---
 
         const itemDetails = [];
         for (const item of items) {
@@ -937,7 +875,7 @@ app.post('/api/order', async (req, res) => {
         const newOrder = new Order({
             items: itemDetails,
             customerName,
-            customerPhone: cleanedCustomerPhone, // Use cleaned phone number here
+            customerPhone: cleanedCustomerPhone,
             deliveryAddress,
             customerLocation,
             subtotal,
@@ -950,7 +888,7 @@ app.post('/api/order', async (req, res) => {
         await newOrder.save();
 
         await Customer.findOneAndUpdate(
-            { customerPhone: cleanedCustomerPhone }, // Use cleaned phone number here
+            { customerPhone: cleanedCustomerPhone },
             {
                 $set: {
                     customerName: customerName,
@@ -964,14 +902,15 @@ app.post('/api/order', async (req, res) => {
 
         if (whatsappReady) {
             io.emit('new_order', newOrder);
-            await client.sendMessage(cleanedCustomerPhone + '@c.us', `Your order (ID: ${newOrder._id.substring(0, 6)}...) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders".`);
+            // Ensure customerPhone is in the correct format for whatsapp-web.js
+            const customerChatId = cleanedCustomerPhone.includes('@c.us') ? cleanedCustomerPhone : cleanedCustomerPhone + '@c.us';
+            await client.sendMessage(customerChatId, `Your order (ID: ${newOrder._id.substring(0, 6)}...) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders".`);
         }
 
         res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder._id, order: newOrder });
 
     } catch (err) {
         console.error('Error placing order:', err);
-        // Check for duplicate key error specifically and provide a more user-friendly message
         if (err.code === 11000 && err.keyPattern && err.keyPattern.customerPhone) {
             res.status(409).json({ message: 'A customer with this phone number already exists or an internal data issue occurred. Please try again with a valid phone number.' });
         } else {
@@ -999,20 +938,19 @@ app.post('/api/public/request-qr', async (req, res) => {
     if (whatsappReady) {
         return res.status(400).json({ message: 'WhatsApp client is already connected. No new QR needed.' });
     }
-    await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
-    io.emit('status', 'initializing');
+    console.log('[API] Public QR request received. Forcing new session initialization.');
+    isInitializing = false; // Allow the call to proceed
     initializeWhatsappClient(true); // Force a new session to get a new QR
     res.status(200).json({ message: 'Requesting new QR code. Check status page.' });
 });
 
 
 // --- URL Rewriting / Redirection for .html files ---
-// Redirect old .html paths to new clean paths
 app.get('/admin/dashboard.html', (req, res) => res.redirect(301, '/dashboard'));
-app.get('/admin_dashboard.html', (req, res) => res.redirect(301, '/dashboard')); // Handle old name
+app.get('/admin_dashboard.html', (req, res) => res.redirect(301, '/dashboard'));
 app.get('/admin/login.html', (req, res) => res.redirect(301, '/admin/login'));
 app.get('/menu.html', (req, res) => res.redirect(301, '/menu'));
-app.get('/bot_status.html', (req, res) => res.redirect(301, '/status')); // Redirect to new status path
+app.get('/bot_status.html', (req, res) => res.redirect(301, '/status'));
 
 
 // --- HTML Page Routes (Explicitly serve HTML files with new paths) ---
@@ -1020,8 +958,8 @@ app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
-app.get('/dashboard', authenticateToken, (req, res) => { // New path for dashboard
-    res.sendFile(path.join(__dirname, 'public', 'dashboard.html')); // Serve renamed file
+app.get('/dashboard', authenticateToken, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 app.get('/menu', (req, res) => {
@@ -1031,17 +969,17 @@ app.get('/menu', (req, res) => {
 app.get('/track', (req, res) => {
     const orderId = req.query.orderId;
     if (orderId) {
-        res.redirect(`/menu?orderId=${orderId}`); // Still redirects to menu with orderId
+        res.redirect(`/menu?orderId=${orderId}`);
     } else {
         res.redirect('/menu');
     }
 });
 
-app.get('/status', (req, res) => { // New path for bot status
-    res.sendFile(path.join(__dirname, 'public', 'status.html')); // Serve renamed file
+app.get('/status', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'status.html'));
 });
 
-app.get('/', (req, res) => { // Root path now serves status.html
+app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'status.html'));
 });
 
@@ -1050,14 +988,13 @@ app.get('/', (req, res) => { // Root path now serves status.html
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Catch-all for undefined routes ---
-// This should be the last middleware
 app.use((req, res) => {
     console.log(`Unhandled route: ${req.method} ${req.originalUrl}. Redirecting to /status.`);
     res.redirect('/status');
 });
 
 
-// --- Initial Admin User Setup on Server Startup (unchanged logic) ---
+// --- Initial Admin User Setup on Server Startup ---
 async function ensureDefaultAdminExists() {
     try {
         let admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
@@ -1083,26 +1020,25 @@ mongoose.connection.on('connected', () => {
 });
 
 
-// Socket.io for real-time updates (unchanged)
+// Socket.io for real-time updates
 io.on('connection', (socket) => {
-    console.log('Admin dashboard connected');
+    console.log('Admin dashboard connected via Socket.io');
     Settings.findOne({}).then(settings => {
         if (settings) {
             socket.emit('status', settings.whatsappStatus);
             socket.emit('sessionInfo', { lastAuthenticatedAt: settings.lastAuthenticatedAt });
-            // If QR is already available, send it to newly connected client
-            if (qrCodeData) {
+            if (qrCodeData) { // If QR is already available, send it to newly connected client
                 socket.emit('qrCode', qrCodeData);
             }
         }
     });
 
     socket.on('disconnect', () => {
-        console.log('Admin dashboard disconnected');
+        console.log('Admin dashboard disconnected from Socket.io');
     });
 });
 
-// Start the server (console logs updated)
+// Start the server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
