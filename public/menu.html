@@ -580,7 +580,7 @@
 
         <!-- Menu Items will be rendered here dynamically -->
         <div id="menu-sections">
-            <p class="text-center text-gray-400">Loading menu...</p>
+            <p class="text-center text-gray-400">Loading menu items...</p>
         </div>
     </main>
 
@@ -616,6 +616,7 @@
                     <label for="payment-method">Payment Method:</label>
                     <select id="payment-method" class="form-group w-full p-2 rounded-md bg-gray-700 text-white">
                         <option value="Cash on Delivery">Cash on Delivery</option>
+                        <!-- Online Payment option is disabled for now -->
                         <!-- <option value="Online Payment">Online Payment</option> -->
                     </select>
                 </div>
@@ -884,7 +885,7 @@
                     if (item.isAvailable) {
                         menuHtml += `
                             <div class="menu-item-card" data-item-id="${item._id}">
-                                <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDE R_IMAGE}';">
+                                <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
                                 <div class="item-details">
                                     <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                                     <p>${item.description || 'No description available.'}</p>
@@ -1309,7 +1310,7 @@
             if (!orderId) {
                 trackOrderMessage.textContent = 'Please enter an Order ID.';
                 trackOrderMessage.className = 'message mt-3 error';
-                trackOrderMessage.classList.remove('hidden');
+                trackOrderMessage.classList.add('hidden');
                 orderStatusDisplay.classList.add('hidden');
                 return;
             }
