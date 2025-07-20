@@ -691,7 +691,7 @@
             textElement.classList.remove('hidden');
             messageElement.textContent = message;
             messageElement.className = `message mt-3 ${success ? 'success' : 'error'}`;
-            if (!message) messageElement.classList.add('hidden'); // Hide if no message
+            if (!message) messageElement.classList.add('hidden');
             else messageElement.classList.remove('hidden');
         }
 
@@ -768,7 +768,7 @@
                 if (timeLeft <= 0) {
                     clearInterval(qrTimerInterval);
                     qrCodeSection.classList.add('hidden');
-                    updateBotStatusDisplay('qr_expired'); // Update status to expired
+                    updateBotStatusDisplay('qr_expired');
                 }
             }, 1000);
         }
@@ -979,7 +979,12 @@
             `;
             customers.forEach(customer => {
                 const lastOrderDate = customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleString() : 'N/A';
-                const customerPhone = customer.customerPhone; // Assuming this is the WhatsApp number
+                const customerPhone = customer.customerPhone;
+                const customerLat = customer.lastKnownLocation ? customer.lastKnownLocation.latitude : null;
+                const customerLon = customer.lastKnownLocation ? customer.lastKnownLocation.longitude : null;
+                const trackButtonHtml = (customerLat && customerLon) ?
+                    `<a href="https://www.google.com/maps/search/?api=1&query=${customerLat},${customerLon}" target="_blank" class="btn-secondary btn-small">Track Location</a>` :
+                    `<button class="btn-secondary btn-small" disabled title="Location not available">Track Location</button>`;
 
                 tableHtml += `
                     <tr>
@@ -987,8 +992,10 @@
                         <td>${customer.customerName || 'N/A'}</td>
                         <td>${customer.totalOrders}</td>
                         <td>${lastOrderDate}</td>
-                        <td>
-                            <a href="tel:${customerPhone}" class="btn-primary btn-small mr-2">Call</a>
+                        <td class="flex flex-wrap gap-2">
+                            <a href="tel:${customerPhone}" class="btn-primary btn-small">Call</a>
+                            ${trackButtonHtml}
+                            <button class="btn-secondary btn-small view-latest-order-btn" data-phone="${customerPhone}">View Latest Order</button>
                             <button class="btn-danger btn-small delete-customer-btn" data-id="${customer._id}">Delete</button>
                         </td>
                     </tr>
@@ -997,15 +1004,17 @@
             tableHtml += `</tbody></table>`;
             customersListDiv.innerHTML = tableHtml;
 
-            // Add event listeners for delete buttons
+            // Add event listeners for new buttons
+            document.querySelectorAll('.view-latest-order-btn').forEach(button => {
+                button.addEventListener('click', () => viewLatestCustomerOrder(button.dataset.phone));
+            });
             document.querySelectorAll('.delete-customer-btn').forEach(button => {
                 button.addEventListener('click', () => deleteCustomer(button.dataset.id));
             });
         }
 
         function renderDeliveryRates(rates) {
-            deliveryRatesContainer.innerHTML = ''; // Clear existing
-            // Sort rates by kms before rendering to maintain order
+            deliveryRatesContainer.innerHTML = '';
             rates.sort((a, b) => a.kms - b.kms);
 
             rates.forEach((rate, index) => {
@@ -1014,12 +1023,11 @@
                 rateDiv.innerHTML = `
                     <input type="number" step="any" class="kms-input" value="${rate.kms}" placeholder="KMs" data-index="${index}">
                     <input type="number" step="any" class="amount-input" value="${rate.amount}" placeholder="Amount" data-index="${index}">
-                    <button type="button" class="remove-rate-btn btn-small" data-index="${index}">Remove</button>
+                    <button type="button" class="remove-rate-btn btn-small">Remove</button>
                 `;
                 deliveryRatesContainer.appendChild(rateDiv);
             });
 
-            // Add event listeners for dynamically added remove buttons
             document.querySelectorAll('.remove-rate-btn').forEach(button => {
                 button.addEventListener('click', (e) => {
                     e.target.closest('.delivery-rate-item').remove();
@@ -1031,10 +1039,10 @@
         // --- Modal Functions ---
 
         function openMenuItemModal(itemId = null) {
-            menuItemForm.reset(); // Clear previous form data
+            menuItemForm.reset();
             menuItemIdInput.value = '';
             menuItemMessage.classList.add('hidden');
-            menuItemText.textContent = 'Save Item'; // Reset button text
+            menuItemText.textContent = 'Save Item';
 
             if (itemId) {
                 menuItemModalTitle.textContent = 'Edit Menu Item';
@@ -1059,14 +1067,14 @@
                     });
             } else {
                 menuItemModalTitle.textContent = 'Add New Menu Item';
-                itemIsAvailableCheckbox.checked = true; // Default new items to available
+                itemIsAvailableCheckbox.checked = true;
                 itemIsTrendingCheckbox.checked = false;
             }
             menuItemModal.style.display = 'flex';
         }
 
         async function openOrderDetailsModal(orderId) {
-            orderUpdateMessage.classList.add('hidden'); // Clear previous messages
+            orderUpdateMessage.classList.add('hidden');
             showLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, 'Loading order details...', 'info');
 
             try {
@@ -1091,10 +1099,10 @@
                 });
 
                 orderStatusSelect.value = order.status;
-                updateOrderStatusBtn.dataset.id = order._id; // Set order ID for update button
-                deleteOrderBtn.dataset.id = order._id; // Set order ID for delete button
+                updateOrderStatusBtn.dataset.id = order._id;
+                deleteOrderBtn.dataset.id = order._id;
 
-                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, ''); // Hide loader, no message
+                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, '');
                 orderDetailsModal.style.display = 'flex';
             } catch (error) {
                 console.error('Error fetching order details:', error);
@@ -1129,8 +1137,8 @@
                 const result = await response.json();
                 if (response.ok) {
                     hideLoader(menuItemLoader, menuItemText, menuItemMessage, true, `Item ${itemId ? 'updated' : 'added'} successfully!`);
-                    fetchMenuItems(); // Refresh list
-                    setTimeout(() => menuItemModal.style.display = 'none', 1500); // Close after a delay
+                    fetchMenuItems();
+                    setTimeout(() => menuItemModal.style.display = 'none', 1500);
                 } else {
                     hideLoader(menuItemLoader, menuItemText, menuItemMessage, false, `Error: ${result.message || 'Failed to save item.'}`);
                 }
@@ -1142,7 +1150,7 @@
 
         async function deleteMenuItem(itemId) {
             if (!confirm('Are you sure you want to delete this menu item?')) return;
-            menuMessage.classList.add('hidden'); // Hide previous messages
+            menuMessage.classList.add('hidden');
 
             try {
                 const response = await fetch(`/api/admin/menu/${itemId}`, { method: 'DELETE' });
@@ -1151,7 +1159,7 @@
                     menuMessage.textContent = result.message;
                     menuMessage.className = 'message mt-3 success';
                     menuMessage.classList.remove('hidden');
-                    fetchMenuItems(); // Refresh list
+                    fetchMenuItems();
                 } else {
                     menuMessage.textContent = `Error: ${result.message || 'Failed to delete item.'}`;
                     menuMessage.className = 'message mt-3 error';
@@ -1176,24 +1184,8 @@
                 const result = await response.json();
                 if (response.ok) {
                     hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, 'Order status updated!');
-                    fetchOrders(); // Refresh orders list in background
-                    // Update modal display immediately
-                    orderStatusSelect.value = result.status;
-                    let statusClass = 'text-white';
-                    switch(result.status) {
-                        case 'Pending': statusClass = 'text-yellow-400'; break;
-                        case 'Confirmed':
-                        case 'Preparing': statusClass = 'text-blue-400'; break;
-                        case 'Out for Delivery': statusClass = 'text-purple-400'; break;
-                        case 'Delivered': statusClass = 'text-green-400'; break;
-                        case 'Cancelled': statusClass = 'text-red-400'; break;
-                    }
-                    // This line needs to correctly target the status span within the modal
-                    // Assuming orderDetailIdDisplay is within a parent that contains the status span
-                    // A more robust way would be to give the status span an ID
-                    // For now, I'll update the text content of the select element for immediate feedback
-                    // The actual color change on the main dashboard table happens via fetchOrders()
-                    setTimeout(() => orderDetailsModal.style.display = 'none', 1500); // Close after a delay
+                    fetchOrders();
+                    setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
                 } else {
                     hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${result.message || 'Failed to update status.'}`);
                 }
@@ -1211,8 +1203,8 @@
                 const result = await response.json();
                 if (response.ok) {
                     hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, result.message);
-                    fetchOrders(); // Refresh list
-                    setTimeout(() => orderDetailsModal.style.display = 'none', 1500); // Close after a delay
+                    fetchOrders();
+                    setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
                 } else {
                     hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${result.message || 'Failed to delete order.'}`);
                 }
@@ -1224,7 +1216,7 @@
 
         async function deleteCustomer(customerId) {
             if (!confirm('Are you sure you want to delete this customer? This action cannot be undone.')) return;
-            customersMessage.classList.add('hidden'); // Hide previous messages
+            customersMessage.classList.add('hidden');
 
             try {
                 const response = await fetch(`/api/admin/customers/${customerId}`, { method: 'DELETE' });
@@ -1233,7 +1225,7 @@
                     customersMessage.textContent = result.message;
                     customersMessage.className = 'message mt-3 success';
                     customersMessage.classList.remove('hidden');
-                    fetchCustomers(); // Refresh list
+                    fetchCustomers();
                 } else {
                     customersMessage.textContent = `Error: ${result.message || 'Failed to delete customer.'}`;
                     customersMessage.className = 'message mt-3 error';
@@ -1247,17 +1239,38 @@
             }
         }
 
+        async function viewLatestCustomerOrder(customerPhone) {
+            customersMessage.classList.add('hidden');
+
+            try {
+                const response = await fetch(`/api/admin/customers/${customerPhone}/latest-order`);
+                const order = await response.json();
+
+                if (response.ok) {
+                    openOrderDetailsModal(order._id);
+                } else {
+                    customersMessage.textContent = `No recent orders found for ${customerPhone}.`;
+                    customersMessage.className = 'message mt-3 info';
+                    customersMessage.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error(`Error fetching latest order for ${customerPhone}:`, error);
+                customersMessage.textContent = `Error fetching latest order: ${error.message}`;
+                customersMessage.className = 'message mt-3 error';
+                customersMessage.classList.remove('hidden');
+            }
+        }
+
         async function saveSettings() {
             const deliveryRates = [];
             document.querySelectorAll('#delivery-rates-container .kms-input').forEach(input => {
                 const kms = parseFloat(input.value);
-                const amount = parseFloat(input.nextElementSibling.value); // Get sibling amount input
+                const amount = parseFloat(input.nextElementSibling.value);
                 if (!isNaN(kms) && !isNaN(amount)) {
                     deliveryRates.push({ kms, amount });
                 }
             });
 
-            // Sort rates by kms before sending to backend
             deliveryRates.sort((a, b) => a.kms - b.kms);
 
             const settingsData = {
@@ -1279,7 +1292,7 @@
                 const result = await response.json();
                 if (response.ok) {
                     hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, true, result.message);
-                    fetchSettings(); // Re-fetch to ensure UI is consistent
+                    fetchSettings();
                 } else {
                     hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, false, `Error: ${result.message || 'Failed to save settings.'}`);
                 }
@@ -1321,7 +1334,6 @@
                 }
             });
 
-            // Re-fetch data for the activated section
             switch (sectionId) {
                 case 'bot-status-section':
                     fetchBotStatus();
@@ -1352,7 +1364,6 @@
 
         // --- Event Listeners ---
 
-        // Header Logout
         document.getElementById('logout-btn').addEventListener('click', async () => {
             if (confirm('Are you sure you want to log out?')) {
                 try {
@@ -1365,13 +1376,12 @@
             }
         });
 
-        // Bot Status Actions
         refreshBotStatusBtn.addEventListener('click', fetchBotStatus);
         requestQrBtn.addEventListener('click', async () => {
             requestQrBtn.disabled = true;
             loadSessionBtn.disabled = true;
             showLoader(requestQrLoader, requestQrText, botMessage, 'Requesting new QR...', 'info');
-            qrCodeSection.classList.add('hidden'); // Hide old QR immediately
+            qrCodeSection.classList.add('hidden');
             if (qrTimerInterval) clearInterval(qrTimerInterval);
 
             try {
@@ -1380,7 +1390,6 @@
                 if (!response.ok) {
                     hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error: ${result.message || 'Failed to request new QR.'}`);
                 }
-                // Status and QR updates will come via socket.io
             } catch (error) {
                 hideLoader(requestQrLoader, requestQrText, botMessage, false, `Network error requesting QR: ${error.message}`);
             } finally {
@@ -1393,7 +1402,7 @@
             loadSessionBtn.disabled = true;
             requestQrBtn.disabled = true;
             showLoader(loadSessionLoader, loadSessionText, botMessage, 'Attempting to load saved session...', 'info');
-            qrCodeSection.classList.add('hidden'); // Hide QR immediately
+            qrCodeSection.classList.add('hidden');
             if (qrTimerInterval) clearInterval(qrTimerInterval);
 
             try {
@@ -1402,7 +1411,6 @@
                 if (!response.ok) {
                     hideLoader(loadSessionLoader, loadSessionText, botMessage, false, `Error: ${result.message || 'Failed to load session.'}`);
                 }
-                // Status updates will come via socket.io
             } catch (error) {
                 hideLoader(loadSessionLoader, loadSessionText, botMessage, false, `Network error loading session: ${error.message}`);
             } finally {
@@ -1411,24 +1419,17 @@
             }
         });
 
-        // Orders Actions
         refreshOrdersBtn.addEventListener('click', fetchOrders);
-
-        // Menu Actions
         addMenuItemBtn.addEventListener('click', () => openMenuItemModal());
         menuItemForm.addEventListener('submit', (e) => {
             e.preventDefault();
             saveMenuItem();
         });
 
-        // Customer Actions
         refreshCustomersBtn.addEventListener('click', fetchCustomers);
-
-        // Settings Actions
         saveSettingsBtn.addEventListener('click', saveSettings);
         addDeliveryRateBtn.addEventListener('click', addDeliveryRateInput);
 
-        // Modal Close Buttons
         document.querySelectorAll('.modal .close-button').forEach(button => {
             button.addEventListener('click', (e) => {
                 e.target.closest('.modal').style.display = 'none';
@@ -1443,7 +1444,6 @@
             }
         });
 
-        // Order Details Modal Actions
         updateOrderStatusBtn.addEventListener('click', () => {
             const orderId = updateOrderStatusBtn.dataset.id;
             const newStatus = orderStatusSelect.value;
@@ -1454,7 +1454,6 @@
             deleteOrder(orderId);
         });
 
-        // --- Socket.IO Listeners ---
         socket.on('status', (status) => {
             updateBotStatusDisplay(status);
         });
@@ -1479,9 +1478,7 @@
             }
         });
 
-        // Initial data loads on page load
         document.addEventListener('DOMContentLoaded', () => {
-            // Show the first section by default
             showSection('bot-status-section');
         });
     </script>
