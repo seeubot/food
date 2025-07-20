@@ -401,7 +401,8 @@
                 <a href="#orders-section" class="nav-link" data-section="orders-section">Orders</a>
                 <a href="#menu-section" class="nav-link" data-section="menu-section">Menu</a>
                 <a href="#customers-section" class="nav-link" data-section="customers-section">Customers</a>
-                <a href="#settings-section" class="nav-link" data-section="settings-section">Settings</a>
+                <a href="#settings-section" class="nav-link" data-section="settings-section">Shop Settings</a>
+                <a href="#security-section" class="nav-link" data-section="security-section">Security</a>
             </div>
         </nav>
 
@@ -509,6 +510,28 @@
                     </form>
                 </div>
             </section>
+
+            <!-- Security Section (New) -->
+            <section id="security-section" class="section-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Two-Factor Authentication (2FA)</h2>
+                        <button id="refresh-2fa-status-btn" class="btn-secondary btn-small">Refresh Status</button>
+                    </div>
+                    <p class="text-lg">2FA Status: <span id="2fa-status" class="font-semibold text-yellow-400">Loading...</span></p>
+                    <div class="mt-4 flex flex-col sm:flex-row gap-3">
+                        <button id="manage-2fa-btn" class="btn-primary">
+                            <span id="manage-2fa-loader" class="loader hidden"></span>
+                            <span id="manage-2fa-text">Manage 2FA</span>
+                        </button>
+                        <button id="disable-2fa-btn" class="btn-danger hidden">
+                            <span id="disable-2fa-loader" class="loader hidden"></span>
+                            <span id="disable-2fa-text">Disable 2FA</span>
+                        </button>
+                    </div>
+                    <p id="security-message" class="message mt-3"></p>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -597,6 +620,38 @@
         </div>
     </div>
 
+    <!-- Two-Factor Authentication Setup Modal (New) -->
+    <div id="two-factor-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">Two-Factor Authentication Setup</h2>
+            <div id="2fa-setup-content">
+                <p class="text-gray-300 mb-4">Scan the QR code below with your authenticator app (e.g., Google Authenticator, Authy). If you cannot scan, manually enter the secret key.</p>
+                <div class="flex justify-center items-center my-4">
+                    <img id="2fa-qr-code-img" src="" alt="2FA QR Code" class="qr-code-img border-2 border-gray-600 p-2 hidden">
+                </div>
+                <div id="2fa-secret-display" class="bg-gray-700 p-3 rounded-md text-sm text-center break-all hidden">
+                    <p class="text-gray-400">Secret Key:</p>
+                    <code id="2fa-secret-key" class="font-mono text-white select-all"></code>
+                </div>
+                <button id="generate-2fa-secret-btn" class="btn-primary w-full mt-4">
+                    <span id="generate-2fa-loader" class="loader hidden"></span>
+                    <span id="generate-2fa-text">Generate New 2FA Secret</span>
+                </button>
+
+                <div class="form-group mt-6">
+                    <label for="2fa-verify-code">Enter Code from Authenticator App:</label>
+                    <input type="text" id="2fa-verify-code" placeholder="6-digit code" maxlength="6">
+                </div>
+                <button id="verify-2fa-code-btn" class="btn-primary w-full mt-4">
+                    <span id="verify-2fa-loader" class="loader hidden"></span>
+                    <span id="verify-2fa-text">Verify Code & Enable 2FA</span>
+                </button>
+                <p id="2fa-modal-message" class="message mt-3"></p>
+            </div>
+        </div>
+    </div>
+
     <script>
         const socket = io();
 
@@ -640,6 +695,17 @@
         const saveSettingsBtn = document.getElementById('save-settings-btn');
         const settingsMessage = document.getElementById('settings-message');
 
+        // Security Elements (New)
+        const twoFactorStatusSpan = document.getElementById('2fa-status');
+        const refresh2FAStatusBtn = document.getElementById('refresh-2fa-status-btn');
+        const manage2FABtn = document.getElementById('manage-2fa-btn');
+        const disable2FABtn = document.getElementById('disable-2fa-btn');
+        const manage2FALoader = document.getElementById('manage-2fa-loader');
+        const manage2FAText = document.getElementById('manage-2fa-text');
+        const disable2FALoader = document.getElementById('disable-2fa-loader');
+        const disable2FAText = document.getElementById('disable-2fa-text');
+        const securityMessage = document.getElementById('security-message');
+
         // Modals
         const menuItemModal = document.getElementById('menu-item-modal');
         const menuItemModalTitle = document.getElementById('menu-item-modal-title');
@@ -674,6 +740,21 @@
         const orderUpdateMessage = document.getElementById('order-update-message');
         const deleteOrderBtn = document.getElementById('delete-order-btn');
 
+        // 2FA Modal Elements (New)
+        const twoFactorModal = document.getElementById('two-factor-modal');
+        const twoFactorQrCodeImg = document.getElementById('2fa-qr-code-img');
+        const twoFactorSecretDisplay = document.getElementById('2fa-secret-display');
+        const twoFactorSecretKey = document.getElementById('2fa-secret-key');
+        const generate2FASecretBtn = document.getElementById('generate-2fa-secret-btn');
+        const twoFactorVerifyCodeInput = document.getElementById('2fa-verify-code');
+        const verify2FACodeBtn = document.getElementById('verify-2fa-code-btn');
+        const generate2FALoader = document.getElementById('generate-2fa-loader');
+        const generate2FAText = document.getElementById('generate-2fa-text');
+        const verify2FALoader = document.getElementById('verify-2fa-loader');
+        const verify2FAText = document.getElementById('verify-2fa-text');
+        const twoFactorModalMessage = document.getElementById('2fa-modal-message');
+
+
         // Global variables
         let qrTimerInterval = null;
         const QR_EXPIRY_MS = 60000; // 60 seconds
@@ -684,6 +765,7 @@
             textElement.classList.add('hidden');
             messageElement.textContent = message;
             messageElement.className = `message mt-3 ${type}`;
+            messageElement.classList.remove('hidden');
         }
 
         function hideLoader(loaderElement, textElement, messageElement, success = true, message = '') {
@@ -697,7 +779,7 @@
 
         function updateBotStatusDisplay(status) {
             botStatusSpan.textContent = status;
-            botStatusSpan.classList.remove('text-green-400', 'text-yellow-400', 'text-red-400');
+            botStatusSpan.classList.remove('text-green-400', 'text-yellow-400', 'text-red-400', 'text-gray-400');
             switch (status) {
                 case 'ready':
                     botStatusSpan.classList.add('text-green-400');
@@ -910,6 +992,41 @@
                 }
             }
         }
+
+        // New 2FA Fetch Function
+        async function fetch2FAStatus() {
+            showLoader(manage2FALoader, manage2FAText, securityMessage, 'Fetching 2FA status...', 'info');
+            disable2FABtn.classList.add('hidden'); // Hide disable button while fetching
+            try {
+                const data = await authenticatedFetch('/api/admin/2fa/status');
+                if (data.twoFactorEnabled) {
+                    twoFactorStatusSpan.textContent = 'Enabled';
+                    twoFactorStatusSpan.classList.remove('text-yellow-400', 'text-red-400');
+                    twoFactorStatusSpan.classList.add('text-green-400');
+                    manage2FABtn.textContent = 'Manage 2FA'; // Change button text
+                    disable2FABtn.classList.remove('hidden'); // Show disable button
+                    securityMessage.textContent = 'Two-Factor Authentication is currently enabled.';
+                    securityMessage.className = 'message mt-3 success';
+                } else {
+                    twoFactorStatusSpan.textContent = 'Disabled';
+                    twoFactorStatusSpan.classList.remove('text-green-400', 'text-red-400');
+                    twoFactorStatusSpan.classList.add('text-yellow-400');
+                    manage2FABtn.textContent = 'Enable 2FA'; // Change button text
+                    disable2FABtn.classList.add('hidden'); // Hide disable button
+                    securityMessage.textContent = 'Two-Factor Authentication is currently disabled. Recommended for security.';
+                    securityMessage.className = 'message mt-3 info';
+                }
+                hideLoader(manage2FALoader, manage2FAText, securityMessage, true, '');
+            } catch (error) {
+                console.error('Error fetching 2FA status:', error);
+                if (!error.message.includes('Unauthorized')) {
+                    hideLoader(manage2FALoader, manage2FAText, securityMessage, false, `Error fetching 2FA status: ${error.message}`);
+                    twoFactorStatusSpan.textContent = 'Error';
+                    twoFactorStatusSpan.classList.add('text-red-400');
+                }
+            }
+        }
+
 
         // --- Render Functions ---
 
@@ -1169,6 +1286,16 @@
             }
         }
 
+        function openTwoFactorModal() {
+            twoFactorQrCodeImg.classList.add('hidden');
+            twoFactorSecretDisplay.classList.add('hidden');
+            twoFactorSecretKey.textContent = '';
+            twoFactorVerifyCodeInput.value = '';
+            twoFactorModalMessage.classList.add('hidden');
+            twoFactorModal.style.display = 'flex';
+        }
+
+
         // --- Action Functions ---
 
         async function saveMenuItem() {
@@ -1348,6 +1475,67 @@
             });
         }
 
+        // New 2FA Action Functions
+        async function generate2FASecret() {
+            showLoader(generate2FALoader, generate2FAText, twoFactorModalMessage, 'Generating new secret...', 'info');
+            try {
+                const data = await authenticatedFetch('/api/admin/2fa/generate', { method: 'POST' });
+                twoFactorQrCodeImg.src = data.qrCodeUrl;
+                twoFactorQrCodeImg.classList.remove('hidden');
+                twoFactorSecretKey.textContent = data.secret;
+                twoFactorSecretDisplay.classList.remove('hidden');
+                hideLoader(generate2FALoader, generate2FAText, twoFactorModalMessage, true, 'New secret generated. Scan QR or copy key.');
+                generate2FAText.textContent = 'Regenerate 2FA Secret'; // Change button text after first generation
+            } catch (error) {
+                console.error('Error generating 2FA secret:', error);
+                hideLoader(generate2FALoader, generate2FAText, twoFactorModalMessage, false, `Error: ${error.message}`);
+            }
+        }
+
+        async function verify2FACode() {
+            const totpCode = twoFactorVerifyCodeInput.value.trim();
+            if (!totpCode || totpCode.length !== 6) {
+                twoFactorModalMessage.textContent = 'Please enter a valid 6-digit code.';
+                twoFactorModalMessage.className = 'message mt-3 error';
+                twoFactorModalMessage.classList.remove('hidden');
+                return;
+            }
+
+            showLoader(verify2FALoader, verify2FAText, twoFactorModalMessage, 'Verifying code...', 'info');
+            try {
+                const result = await authenticatedFetch('/api/admin/2fa/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ totpCode })
+                });
+                if (result.verified) {
+                    hideLoader(verify2FALoader, verify2FAText, twoFactorModalMessage, true, '2FA successfully enabled and verified!');
+                    fetch2FAStatus(); // Refresh status on main security page
+                    setTimeout(() => twoFactorModal.style.display = 'none', 1500);
+                } else {
+                    hideLoader(verify2FALoader, verify2FAText, twoFactorModalMessage, false, 'Invalid 2FA code. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error verifying 2FA code:', error);
+                hideLoader(verify2FALoader, verify2FAText, twoFactorModalMessage, false, `Error: ${error.message}`);
+            }
+        }
+
+        async function disable2FA() {
+            if (!confirm('Are you sure you want to disable Two-Factor Authentication? This will reduce your account security.')) {
+                return;
+            }
+            showLoader(disable2FALoader, disable2FAText, securityMessage, 'Disabling 2FA...', 'info');
+            try {
+                const result = await authenticatedFetch('/api/admin/2fa/disable', { method: 'POST' });
+                hideLoader(disable2FALoader, disable2FAText, securityMessage, true, result.message);
+                fetch2FAStatus(); // Refresh status
+            } catch (error) {
+                console.error('Error disabling 2FA:', error);
+                hideLoader(disable2FALoader, disable2FAText, securityMessage, false, `Error: ${error.message}`);
+            }
+        }
+
 
         // --- Navigation Logic ---
         const navLinks = document.querySelectorAll('.nav-link');
@@ -1381,6 +1569,9 @@
                     break;
                 case 'settings-section':
                     fetchSettings();
+                    break;
+                case 'security-section': // New case for security section
+                    fetch2FAStatus();
                     break;
             }
         }
@@ -1458,6 +1649,14 @@
         saveSettingsBtn.addEventListener('click', saveSettings);
         addDeliveryRateBtn.addEventListener('click', addDeliveryRateInput);
 
+        // 2FA Event Listeners
+        refresh2FAStatusBtn.addEventListener('click', fetch2FAStatus);
+        manage2FABtn.addEventListener('click', openTwoFactorModal);
+        generate2FASecretBtn.addEventListener('click', generate2FASecret);
+        verify2FACodeBtn.addEventListener('click', verify2FACode);
+        disable2FABtn.addEventListener('click', disable2FA);
+
+
         document.querySelectorAll('.modal .close-button').forEach(button => {
             button.addEventListener('click', (e) => {
                 e.target.closest('.modal').style.display = 'none';
@@ -1469,6 +1668,9 @@
             }
             if (event.target === orderDetailsModal) {
                 orderDetailsModal.style.display = 'none';
+            }
+            if (event.target === twoFactorModal) { // New: Close 2FA modal
+                twoFactorModal.style.display = 'none';
             }
         });
 
