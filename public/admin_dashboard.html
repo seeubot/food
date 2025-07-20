@@ -777,6 +777,17 @@
         // This function handles token injection and robust error parsing
         async function authenticatedFetch(url, options = {}) {
             const token = localStorage.getItem('jwtToken');
+            // IMPORTANT: If no token exists, this request will fail, and the catch block
+            // should redirect to login.
+            if (!token) {
+                // This scenario should ideally be caught by the DOMContentLoaded check below,
+                // but as a fallback for direct API calls, we redirect here.
+                console.error('No JWT token found in localStorage. Redirecting to login.');
+                window.location.href = '/admin/login';
+                // Throw an error to stop further execution of the async function
+                throw new Error('Unauthorized: No token provided.');
+            }
+
             const headers = {
                 ...options.headers,
                 'Authorization': `Bearer ${token}`
@@ -795,6 +806,12 @@
                     throw new Error(response.statusText || 'Unknown server error');
                 }
                 // Throw an error with the message from the JSON response
+                if (response.status === 401 || response.status === 403) {
+                    alert('Session expired or unauthorized. Please log in again.');
+                    localStorage.removeItem('jwtToken'); // Clear invalid token
+                    window.location.href = '/admin/login';
+                    throw new Error(errorData.message || 'Authentication failed.'); // Stop further execution
+                }
                 throw new Error(errorData.message || 'Failed to perform operation');
             }
 
@@ -816,12 +833,11 @@
                 hideLoader(requestQrLoader, requestQrText, botMessage, true, 'Status updated.');
             } catch (error) {
                 console.error('Error fetching bot status:', error);
-                hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error fetching status: ${error.message}`);
-                botStatusSpan.textContent = 'Error';
-                botStatusSpan.classList.add('text-red-400');
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                // The authenticatedFetch already handles redirection for 401/403
+                if (!error.message.includes('Unauthorized')) { // Avoid double messaging if already redirected
+                    hideLoader(requestQrLoader, requestQrText, botMessage, false, `Error fetching status: ${error.message}`);
+                    botStatusSpan.textContent = 'Error';
+                    botStatusSpan.classList.add('text-red-400');
                 }
             }
         }
@@ -834,13 +850,11 @@
                 renderOrders(orders);
             } catch (error) {
                 console.error('Error fetching orders:', error);
-                ordersListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load orders.</p>';
-                ordersMessage.textContent = `Error: ${error.message}`;
-                ordersMessage.className = 'message mt-3 error';
-                ordersMessage.classList.remove('hidden');
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    ordersListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load orders.</p>';
+                    ordersMessage.textContent = `Error: ${error.message}`;
+                    ordersMessage.className = 'message mt-3 error';
+                    ordersMessage.classList.remove('hidden');
                 }
             }
         }
@@ -853,13 +867,11 @@
                 renderMenuItems(items);
             } catch (error) {
                 console.error('Error fetching menu items:', error);
-                menuItemsListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load menu items.</p>';
-                menuMessage.textContent = `Error: ${error.message}`;
-                menuMessage.className = 'message mt-3 error';
-                menuMessage.classList.remove('hidden');
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    menuItemsListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load menu items.</p>';
+                    menuMessage.textContent = `Error: ${error.message}`;
+                    menuMessage.className = 'message mt-3 error';
+                    menuMessage.classList.remove('hidden');
                 }
             }
         }
@@ -872,13 +884,11 @@
                 renderCustomers(customers);
             } catch (error) {
                 console.error('Error fetching customers:', error);
-                customersListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load customer data.</p>';
-                customersMessage.textContent = `Error: ${error.message}`;
-                customersMessage.className = 'message mt-3 error';
-                customersMessage.classList.remove('hidden');
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    customersListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load customer data.</p>';
+                    customersMessage.textContent = `Error: ${error.message}`;
+                    customersMessage.className = 'message mt-3 error';
+                    customersMessage.classList.remove('hidden');
                 }
             }
         }
@@ -893,12 +903,10 @@
                 renderDeliveryRates(settings.deliveryRates || []);
             } catch (error) {
                 console.error('Error fetching settings:', error);
-                settingsMessage.textContent = `Error loading settings: ${error.message}`;
-                settingsMessage.className = 'message mt-3 error';
-                settingsMessage.classList.remove('hidden');
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    settingsMessage.textContent = `Error loading settings: ${error.message}`;
+                    settingsMessage.className = 'message mt-3 error';
+                    settingsMessage.classList.remove('hidden');
                 }
             }
         }
@@ -1105,12 +1113,11 @@
                     })
                     .catch(error => {
                         console.error('Error fetching menu item for edit:', error);
-                        menuItemMessage.textContent = `Error loading item: ${error.message}`;
-                        menuItemMessage.className = 'message mt-3 error';
-                        menuItemMessage.classList.remove('hidden');
-                        if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                            alert('Session expired or unauthorized. Please log in again.');
-                            window.location.href = '/admin/login';
+                        // authenticatedFetch already handles redirection for 401/403
+                        if (!error.message.includes('Unauthorized')) {
+                            menuItemMessage.textContent = `Error loading item: ${error.message}`;
+                            menuItemMessage.className = 'message mt-3 error';
+                            menuItemMessage.classList.remove('hidden');
                         }
                     });
             } else {
@@ -1156,10 +1163,8 @@
                 orderDetailsModal.style.display = 'flex';
             } catch (error) {
                 console.error('Error fetching order details:', error);
-                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error loading order: ${error.message}`);
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error loading order: ${error.message}`);
                 }
             }
         }
@@ -1193,10 +1198,8 @@
                 setTimeout(() => menuItemModal.style.display = 'none', 1500);
             } catch (error) {
                 console.error('Error saving menu item:', error);
-                hideLoader(menuItemLoader, menuItemText, menuItemMessage, false, `Error: ${error.message}`);
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    hideLoader(menuItemLoader, menuItemText, menuItemMessage, false, `Error: ${error.message}`);
                 }
             }
         }
@@ -1213,12 +1216,10 @@
                 fetchMenuItems();
             } catch (error) {
                 console.error('Error deleting menu item:', error);
-                menuMessage.textContent = `Error: ${error.message}`;
-                menuMessage.className = 'message mt-3 error';
-                menuMessage.classList.remove('hidden');
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    menuMessage.textContent = `Error: ${error.message}`;
+                    menuMessage.className = 'message mt-3 error';
+                    menuMessage.classList.remove('hidden');
                 }
             }
         }
@@ -1236,10 +1237,8 @@
                 setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
             } catch (error) {
                 console.error('Error updating order status:', error);
-                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${error.message}`);
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${error.message}`);
                 }
             }
         }
@@ -1254,10 +1253,8 @@
                 setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
             } catch (error) {
                 console.error('Error deleting order:', error);
-                hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${error.message}`);
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, false, `Error: ${error.message}`);
                 }
             }
         }
@@ -1274,12 +1271,10 @@
                 fetchCustomers();
             } catch (error) {
                 console.error('Error deleting customer:', error);
-                customersMessage.textContent = `Error: ${error.message}`;
-                customersMessage.className = 'message mt-3 error';
-                customersMessage.classList.remove('hidden');
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    customersMessage.textContent = `Error: ${error.message}`;
+                    customersMessage.className = 'message mt-3 error';
+                    customersMessage.classList.remove('hidden');
                 }
             }
         }
@@ -1292,12 +1287,10 @@
                 openOrderDetailsModal(order._id);
             } catch (error) {
                 console.error(`Error fetching latest order for ${customerPhone}:`, error);
-                customersMessage.textContent = `Error fetching latest order: ${error.message}`;
-                customersMessage.className = 'message mt-3 error';
-                customersMessage.classList.remove('hidden');
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    customersMessage.textContent = `Error fetching latest order: ${error.message}`;
+                    customersMessage.className = 'message mt-3 error';
+                    customersMessage.classList.remove('hidden');
                 }
             }
         }
@@ -1335,10 +1328,8 @@
                 fetchSettings();
             } catch (error) {
                 console.error('Error saving settings:', error);
-                hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, false, `Error: ${error.message}`);
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
+                if (!error.message.includes('Unauthorized')) {
+                    hideLoader(saveSettingsBtn.querySelector('.loader'), saveSettingsBtn.querySelector('span:not(.loader)'), settingsMessage, false, `Error: ${error.message}`);
                 }
             }
         }
@@ -1449,10 +1440,7 @@
                 // No specific success message needed here, status updates via socket.io
             } catch (error) {
                 hideLoader(loadSessionLoader, loadSessionText, botMessage, false, `Error: ${error.message}`);
-                if (error.message.includes('Unauthorized') || error.message.includes('Forbidden')) {
-                    alert('Session expired or unauthorized. Please log in again.');
-                    window.location.href = '/admin/login';
-                }
+                // authenticatedFetch already handles redirection for 401/403
             } finally {
                 loadSessionBtn.disabled = false;
                 requestQrBtn.disabled = false;
