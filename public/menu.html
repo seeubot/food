@@ -67,12 +67,29 @@
             border-bottom: 2px solid #333333;
             padding-bottom: 0.5rem;
         }
+        .menu-carousel-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
         .menu-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            grid-auto-flow: column; /* Arrange items in columns */
+            grid-auto-columns: minmax(280px, 1fr); /* Min width for items */
             gap: 1.5rem;
+            overflow-x: auto; /* Enable horizontal scrolling */
+            scroll-snap-type: x mandatory; /* Snap to items */
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            scrollbar-width: none; /* Hide scrollbar for Firefox */
+            padding-bottom: 1rem; /* Space for potential scrollbar on some systems */
+        }
+        .menu-grid::-webkit-scrollbar {
+            display: none; /* Hide scrollbar for Chrome, Safari, Opera */
         }
         .menu-item-card {
+            scroll-snap-align: start; /* Snap point for each item */
+            flex-shrink: 0; /* Prevent items from shrinking */
+            width: 280px; /* Fixed width for consistent scrolling */
             background-color: #1a1a1a;
             border-radius: 0.75rem;
             box-shadow: 0 4px 8px rgba(255,255,255,0.08);
@@ -117,6 +134,40 @@
         }
         /* Removed quantity controls and add to cart from main grid */
 
+        /* Carousel Navigation Buttons */
+        .scroll-btn {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 0.5rem;
+            cursor: pointer;
+            z-index: 10;
+            font-size: 1.5rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .scroll-btn:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        .scroll-btn.left {
+            left: -10px;
+        }
+        .scroll-btn.right {
+            right: -10px;
+        }
+        /* Hide buttons if not needed (e.g., only one item) */
+        .scroll-btn.hidden {
+            display: none;
+        }
+
         /* Cart Modal */
         .cart-modal {
             display: none;
@@ -146,18 +197,24 @@
             overflow-y: auto; /* Enable scrolling for content */
         }
         .close-button {
-            color: #aaaaaa;
+            color: #ffffff; /* Make cross more visible */
             position: absolute;
-            top: 1rem;
-            right: 1rem;
-            font-size: 1.75rem;
+            top: 0.75rem; /* Adjust position slightly */
+            right: 0.75rem; /* Adjust position slightly */
+            font-size: 2rem; /* Increase size for better touch target */
             font-weight: bold;
             cursor: pointer;
+            background-color: rgba(0,0,0,0.3); /* Add a subtle background */
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
         }
         .close-button:hover, .close-button:focus {
-            color: #ffffff;
-            text-decoration: none;
-            cursor: pointer;
+            background-color: rgba(0,0,0,0.6);
         }
         .cart-items-list {
             list-style: none;
@@ -456,7 +513,10 @@
                 padding: 1rem;
             }
             .menu-grid {
-                grid-template-columns: 1fr;
+                grid-auto-columns: 90%; /* Make items wider on small screens */
+            }
+            .menu-item-card {
+                width: 90%; /* Adjust card width to match grid-auto-columns */
             }
             .header-cart-btn, #track-order-header-btn {
                 flex-grow: 1; /* Make buttons expand */
@@ -475,6 +535,12 @@
             }
             #item-details-modal .modal-content {
                 padding: 1rem;
+            }
+            .scroll-btn.left {
+                left: 5px; /* Adjust button position for small screens */
+            }
+            .scroll-btn.right {
+                right: 5px; /* Adjust button position for small screens */
             }
         }
     </style>
@@ -550,7 +616,7 @@
                     <label for="payment-method">Payment Method:</label>
                     <select id="payment-method" class="form-group w-full p-2 rounded-md bg-gray-700 text-white">
                         <option value="Cash on Delivery">Cash on Delivery</option>
-                        <option value="Online Payment">Online Payment</option>
+                        <!-- <option value="Online Payment">Online Payment</option> -->
                     </select>
                 </div>
                 <button type="submit" id="place-order-btn" class="btn-checkout">
@@ -664,6 +730,27 @@
 
         const PLACEHOLDER_IMAGE = 'https://placehold.co/400x180/333333/ffffff?text=No+Image';
 
+        // --- Global Error Redirection ---
+        function redirectToErrorPage(message = 'An unexpected error occurred. Redirecting...', delay = 3000) {
+            console.error(message);
+            // You might want to display a temporary message to the user before redirecting
+            const tempMessageDiv = document.createElement('div');
+            tempMessageDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: #cc0000; color: white; padding: 15px 30px; border-radius: 8px; z-index: 2000; font-size: 1.2rem; text-align: center;';
+            tempMessageDiv.textContent = message;
+            document.body.appendChild(tempMessageDiv);
+
+            setTimeout(() => {
+                window.location.href = '/status'; // Redirect to the bot status page as the "index panel"
+            }, delay);
+        }
+
+        // Catch unhandled JavaScript errors
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('Unhandled JavaScript Error:', { message, source, lineno, colno, error });
+            redirectToErrorPage('A critical error occurred. Redirecting to status page.', 5000);
+            return true; // Prevent default error handling
+        };
+
         // --- Header Scroll Logic ---
         const header = document.getElementById('main-header'); // Get the header element
         let lastScrollTop = 0;
@@ -739,13 +826,14 @@
             try {
                 const response = await fetch('/api/menu');
                 if (!response.ok) {
-                    throw new Error('Failed to fetch menu items.');
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 menuItems = await response.json();
                 renderMenu();
             } catch (error) {
-                menuSectionsContainer.innerHTML = `<p class="text-center text-red-400">Error loading menu: ${error.message}</p>`;
                 console.error('Error fetching menu:', error);
+                menuSectionsContainer.innerHTML = `<p class="text-center text-red-400">Error loading menu: ${error.message}</p>`;
+                redirectToErrorPage('Failed to load menu. Redirecting...');
             }
         }
 
@@ -754,7 +842,7 @@
             try {
                 const response = await fetch('/api/public/settings');
                 if (!response.ok) {
-                    throw new Error('Failed to fetch shop settings.');
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const settings = await response.json();
                 shopNameDisplay.textContent = settings.shopName || 'Delicious Bites';
@@ -763,6 +851,7 @@
             } catch (error) {
                 console.error('Error fetching public settings:', error);
                 shopNameDisplay.textContent = 'Delicious Bites (Error)';
+                redirectToErrorPage('Failed to load shop settings. Redirecting...');
             }
         }
 
@@ -787,13 +876,15 @@
                 menuHtml += `
                     <section class="category-section">
                         <h2>${category}</h2>
-                        <div class="menu-grid">
+                        <div class="menu-carousel-wrapper">
+                            <button class="scroll-btn left" data-target-id="menu-grid-${category.replace(/\s/g, '-')}" data-direction="left">&lt;</button>
+                            <div class="menu-grid" id="menu-grid-${category.replace(/\s/g, '-')}">
                 `;
                 categories[category].forEach(item => {
                     if (item.isAvailable) {
                         menuHtml += `
                             <div class="menu-item-card" data-item-id="${item._id}">
-                                <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
+                                <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDE R_IMAGE}';">
                                 <div class="item-details">
                                     <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                                     <p>${item.description || 'No description available.'}</p>
@@ -804,6 +895,8 @@
                     }
                 });
                 menuHtml += `
+                            </div>
+                            <button class="scroll-btn right" data-target-id="menu-grid-${category.replace(/\s/g, '-')}" data-direction="right">&gt;</button>
                         </div>
                     </section>
                 `;
@@ -815,6 +908,23 @@
                 card.addEventListener('click', (e) => {
                     const itemId = e.currentTarget.dataset.itemId; // Use currentTarget to get the card itself
                     openItemDetailsModal(itemId);
+                });
+            });
+
+            // Add event listeners for carousel scroll buttons
+            document.querySelectorAll('.scroll-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const targetId = e.target.dataset.targetId;
+                    const direction = e.target.dataset.direction;
+                    const scrollContainer = document.getElementById(targetId);
+                    if (scrollContainer) {
+                        const scrollAmount = scrollContainer.offsetWidth * 0.8; // Scroll 80% of container width
+                        if (direction === 'left') {
+                            scrollContainer.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+                        } else {
+                            scrollContainer.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+                        }
+                    }
                 });
             });
 
@@ -906,7 +1016,7 @@
 
         document.querySelectorAll('.close-button').forEach(button => {
             button.addEventListener('click', (e) => {
-                e.target.closest('.modal').style.display = 'none';
+                e.target.closest('.cart-modal').style.display = 'none'; // Use closest to ensure correct modal is targeted
                 // Clear messages and reset states based on which modal is closing
                 if (e.target.closest('#cart-modal')) {
                     checkoutMessage.classList.add('hidden');
@@ -1076,6 +1186,8 @@
                 mapModal.style.display = 'none';
                 placeOrder(); // Re-call the order placement function after map selection
             } else {
+                // This alert will only show if selectedDeliveryLocation is null/invalid
+                // after the user has interacted with the map.
                 alert('Please select a location on the map first.');
             }
         });
@@ -1131,6 +1243,8 @@
                 const distance = calculateDistance(shopLocation.latitude, shopLocation.longitude, finalCustomerLocation.latitude, finalCustomerLocation.longitude);
                 deliveryFee = getDeliveryFee(distance);
             } else {
+                // This block should ideally not be hit if selectedDeliveryLocation is properly set
+                // but kept as a fallback.
                 deliveryFee = getDeliveryFee(0); // Fallback to base fee if no valid location
                 checkoutMessage.textContent = 'Could not get precise location for delivery fee. Proceeding with standard fee.';
                 checkoutMessage.className = 'message mt-3 info';
@@ -1177,11 +1291,13 @@
                         window.location.href = `/track?orderId=${result.orderId}`;
                     }, 2000);
                 } else {
-                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, result.message || 'Failed to place order.');
+                    const errorMessage = result.message || 'Failed to place order.';
+                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, errorMessage);
                 }
             } catch (error) {
                 console.error('Error placing order:', error);
                 hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred. Please try again.');
+                redirectToErrorPage('Order placement failed due to network error. Redirecting...');
             } finally {
                 placeOrderBtn.disabled = false;
             }
@@ -1204,30 +1320,31 @@
 
             try {
                 const response = await fetch(`/api/order/${orderId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const order = await response.json();
 
-                if (response.ok) {
-                    trackedOrderIdSpan.textContent = order._id;
-                    trackedOrderStatusSpan.textContent = order.status;
-                    trackedOrderStatusSpan.className = `status-text status-${order.status.replace(/\s/g, '')}`; // Add status-specific class
-                    trackedOrderTotalSpan.textContent = order.totalAmount.toFixed(2);
+                trackedOrderIdSpan.textContent = order._id;
+                trackedOrderStatusSpan.textContent = order.status;
+                trackedOrderStatusSpan.className = `status-text status-${order.status.replace(/\s/g, '')}`; // Add status-specific class
+                trackedOrderTotalSpan.textContent = order.totalAmount.toFixed(2);
 
-                    trackedOrderItemsList.innerHTML = '';
-                    if (Array.isArray(order.items)) {
-                        order.items.forEach(item => {
-                            const li = document.createElement('li');
-                            li.textContent = `${item.name} x ${item.quantity}`;
-                            trackedOrderItemsList.appendChild(li);
-                        });
-                    }
-                    orderStatusDisplay.classList.remove('hidden');
-                    hideLoader(trackOrderLoader, trackOrderText, trackOrderMessage, true, 'Order found!');
-                } else {
-                    hideLoader(trackOrderLoader, trackOrderText, trackOrderMessage, false, order.message || 'Order not found.');
+                trackedOrderItemsList.innerHTML = '';
+                if (Array.isArray(order.items)) {
+                    order.items.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = `${item.name} x ${item.quantity}`;
+                        trackedOrderItemsList.appendChild(li);
+                    });
                 }
+                orderStatusDisplay.classList.remove('hidden');
+                hideLoader(trackOrderLoader, trackOrderText, trackOrderMessage, true, 'Order found!');
+
             } catch (error) {
                 console.error('Error tracking order:', error);
-                hideLoader(trackOrderLoader, trackOrderText, trackOrderMessage, false, 'An error occurred while tracking. Please try again.');
+                hideLoader(trackOrderLoader, trackOrderText, trackOrderMessage, false, 'Order not found or an error occurred.');
+                redirectToErrorPage('Order tracking failed. Redirecting...');
             } finally {
                 trackOrderBtn.disabled = false;
             }
