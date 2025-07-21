@@ -22,12 +22,10 @@
             padding-bottom: 5rem; /* Space for fixed bottom nav */
         }
 
-        /* Red Sidebar on the left - REMOVED */
-
         /* Header styles - Red/White Theme */
         .header {
             background-color: #E63946; /* Red color from the image */
-            padding: 1rem;
+            padding: 1.25rem 1rem; /* Increased vertical padding for more height */
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             position: sticky;
             top: 0;
@@ -40,7 +38,7 @@
             border-bottom-right-radius: 1.5rem;
             transition: transform 0.3s ease-out;
             color: #FFFFFF; /* White text for red background */
-            padding-left: 1rem; /* Adjusted padding as sidebar is removed */
+            padding-left: 1rem;
         }
         .header.header-hidden {
             transform: translateY(-100%);
@@ -51,7 +49,7 @@
             gap: 1rem;
         }
         .header-title {
-            font-size: 1.5rem;
+            font-size: 1.6rem; /* Slightly increased font size for new title */
             font-weight: 700;
             color: #FFFFFF;
         }
@@ -92,7 +90,7 @@
             margin: 0 auto;
             flex-grow: 1;
             background-color: #F8F8F8; /* Light background */
-            padding-left: 1.5rem; /* Adjusted padding as sidebar is removed */
+            padding-left: 1.5rem;
         }
 
         /* Category Tabs (now acting as scrollable menu) - REMOVED */
@@ -154,7 +152,7 @@
             margin-right: 1.5rem;
             border: 3px solid #E63946; /* Red border */
             background-color: #F0F0F0;
-            margin-left: 0; /* Adjusted margin-left as sidebar is removed */
+            margin-left: 0;
         }
         .category-card .item-image-circle img {
             width: 100%;
@@ -185,14 +183,13 @@
         .menu-item-list-by-category {
             padding-top: 1rem; /* Space after category title */
             padding-bottom: 1rem;
-            /* Removed display: none; and display: block; from here */
         }
         .menu-item-list-by-category h2 {
             font-size: 1.8rem;
             font-weight: 700;
             color: #1A1A1A;
             margin-bottom: 1.5rem;
-            padding-left: 0; /* Adjusted padding-left as sidebar is removed */
+            padding-left: 0;
         }
         .menu-item-list-by-category .menu-list-container {
             display: flex;
@@ -229,16 +226,16 @@
             height: 100%;
             object-fit: cover;
         }
+        .menu-item-list-by-category .item-info {
+            flex-grow: 1;
+        }
         .menu-item-list-by-category .item-info h3 {
             font-size: 1.2rem;
             font-weight: 700;
             color: #1A1A1A;
             margin-bottom: 0.25rem;
         }
-        .menu-item-list-by-category .item-info p {
-            font-size: 0.9rem;
-            color: #555555;
-        }
+        /* Removed .menu-item-list-by-category .item-info p (description) */
         .menu-item-list-by-category .item-price {
             font-size: 1.1rem;
             font-weight: 700;
@@ -743,13 +740,13 @@
                 padding-bottom: 4.5rem; /* Adjust space for bottom nav */
             }
             .header {
-                padding: 0.75rem;
-                padding-left: 0.75rem; /* Adjusted padding-left for mobile as sidebar is removed */
+                padding: 0.8rem 0.75rem; /* Adjusted padding for mobile header height */
+                padding-left: 0.75rem;
                 border-bottom-left-radius: 1rem;
                 border-bottom-right-radius: 1rem;
             }
             .header-title {
-                font-size: 1.2rem;
+                font-size: 1.3rem; /* Adjusted font size for mobile header title */
             }
             .header-cart-btn {
                 padding: 0.4rem 0.8rem;
@@ -764,7 +761,7 @@
 
             .menu-container {
                 padding: 1rem;
-                padding-left: 1rem; /* Adjusted padding-left for mobile as sidebar is removed */
+                padding-left: 1rem;
             }
 
             .category-card {
@@ -780,7 +777,7 @@
                 width: 60px;
                 height: 60px;
                 margin-right: 1rem;
-                margin-left: 0; /* Adjusted margin-left for mobile as sidebar is removed */
+                margin-left: 0;
             }
             .category-card .item-info h3 {
                 font-size: 1.4rem;
@@ -795,7 +792,7 @@
             .menu-item-list-by-category h2 {
                 font-size: 1.5rem;
                 margin-bottom: 1rem;
-                padding-left: 0; /* Adjusted padding-left for mobile as sidebar is removed */
+                padding-left: 0;
             }
             .menu-item-list-by-category .menu-list-item-card {
                 padding: 0.6rem 0.8rem;
@@ -809,9 +806,7 @@
             .menu-item-list-by-category .item-info h3 {
                 font-size: 1.1rem;
             }
-            .menu-item-list-by-category .item-info p {
-                font-size: 0.8rem;
-            }
+            /* Removed .menu-item-list-by-category .item-info p (description) */
             .menu-item-list-by-category .item-price {
                 font-size: 1rem;
             }
@@ -899,13 +894,11 @@
     </style>
 </head>
 <body>
-    <!-- Red Sidebar - REMOVED -->
-
     <!-- Header -->
     <header class="header" id="main-header">
         <div class="header-left">
             <!-- Hamburger menu icon removed as side menu is removed -->
-            <span class="header-title">Food Items</span>
+            <span class="header-title">JAR-Just a Remedy</span>
         </div>
         <div class="header-right">
             <!-- Cart button -->
@@ -1312,7 +1305,7 @@
                 // Create a separate section for each category's items (always visible, stacked)
                 const categorySection = document.createElement('section');
                 categorySection.id = `category-section-${categoryName.replace(/\s+/g, '-')}`;
-                categorySection.className = 'menu-item-list-by-category'; // Removed 'hidden' class
+                categorySection.className = 'menu-item-list-by-category';
                 categorySection.innerHTML = `
                     <h2>${categoryName}</h2>
                     <div class="menu-list-container">
@@ -1330,7 +1323,7 @@
                         </div>
                         <div class="item-info">
                             <h3>${item.name}</h3>
-                            <p>${item.description || 'Delicious food item'}</p>
+                            <!-- Removed description from here as per request -->
                         </div>
                         <span class="item-price">₹${item.price.toFixed(2)}</span>
                         <i class="fas fa-chevron-right item-arrow"></i>
@@ -1343,8 +1336,6 @@
                 });
                 menuItemSectionsContainer.appendChild(categorySection);
             });
-            // No need for handleScrollForCategorySections if all are visible by default
-            // window.removeEventListener('scroll', handleScrollForCategorySections); // Ensure it's not lingering
         }
 
 
@@ -1840,7 +1831,6 @@
             if (targetId === 'home-screen') {
                 homeScreen.classList.remove('hidden');
                 document.querySelector('.nav-item[data-target="home-screen"]').classList.add('active');
-                // No need to hide individual category item lists as they are always visible now
             } else if (targetId === 'cart-modal') {
                 cartModal.style.display = 'flex';
                 updateCartDisplay();
@@ -1863,12 +1853,6 @@
                 showSection(target);
             });
         });
-
-        // Hamburger menu icon click (removed as per request)
-        // document.querySelector('.header-left .header-icon').addEventListener('click', () => {
-        //     alert('Hamburger menu clicked! (Placeholder for side navigation)');
-        // });
-
 
         // --- Initialize on page load ---
         document.addEventListener('DOMContentLoaded', async () => {
