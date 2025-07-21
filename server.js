@@ -668,17 +668,29 @@ app.get('/admin/logout', (req, res) => {
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
+
+    // List of HTML routes that require authentication
+    const htmlAuthRoutes = ['/dashboard']; // Add other HTML routes if they need auth
+
     if (token == null) {
         console.log('Unauthorized: No token provided. (Request to ' + req.path + ')');
-        return res.status(401).json({ message: 'Unauthorized: No token provided.' });
+        if (htmlAuthRoutes.includes(req.path)) {
+            return res.redirect('/admin/login'); // Redirect to login for HTML pages
+        }
+        return res.status(401).json({ message: 'Unauthorized: No token provided.' }); // For API calls
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
             console.error('JWT Verification Error:', err.message, '(Token received for ' + req.path + ')');
-            // Check if token is expired
             if (err.name === 'TokenExpiredError') {
+                if (htmlAuthRoutes.includes(req.path)) {
+                    return res.redirect('/admin/login'); // Redirect to login if token expired for HTML pages
+                }
                 return res.status(401).json({ message: 'Unauthorized: Session expired. Please log in again.' });
+            }
+            if (htmlAuthRoutes.includes(req.path)) {
+                return res.redirect('/admin/login'); // Redirect to login for other auth errors on HTML pages
             }
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
         }
@@ -1143,6 +1155,9 @@ app.get('/status', (req, res) => {
 app.get('/', (req, res) => {
     res.redirect('/menu');
 });
+
+// Add favicon.ico handler to prevent it from hitting the catch-all
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 
 // --- Serve other static assets (CSS, JS, images) ---
