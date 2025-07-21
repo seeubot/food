@@ -327,6 +327,20 @@
         .call-button:hover {
             background-color: #1DA851;
         }
+        .track-button {
+            background-color: #007bff; /* Blue for track */
+            color: #ffffff;
+            padding: 0.6rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .track-button:hover {
+            background-color: #0056b3;
+        }
 
 
         /* Responsive adjustments */
@@ -560,6 +574,11 @@
             <div id="modal-customer-map-address" class="text-center">Loading customer address...</div>
             <p class="text-gray-400 text-sm mt-1 mb-4">This is the last known location provided by the customer.</p>
 
+            <div class="flex justify-end gap-2 mb-4">
+                <a id="track-delivery-btn" href="#" target="_blank" class="track-button hidden">
+                    <i class="fas fa-map-marker-alt"></i> Track Delivery
+                </a>
+            </div>
 
             <div class="form-group">
                 <label for="modal-order-status">Update Status:</label>
@@ -696,6 +715,10 @@
         const modalCustomerMapAddress = document.getElementById('modal-customer-map-address');
         let orderDetailsMap = null;
         let orderDetailsMarker = null;
+
+        // New Track Button
+        const trackDeliveryBtn = document.getElementById('track-delivery-btn');
+        let shopLocation = null; // To store shop's location fetched from settings
 
         // Menu Tab
         const addMenuItemBtn = document.getElementById('add-menu-item-btn');
@@ -942,6 +965,21 @@
             if (order.customerLocation && order.customerLocation.latitude && order.customerLocation.longitude) {
                 initModalMap(order.customerLocation.latitude, order.customerLocation.longitude);
                 modalCustomerMapAddress.textContent = order.customerLocation.address || 'Location provided by customer.';
+                
+                // Set Track Delivery button href
+                if (shopLocation && shopLocation.latitude && shopLocation.longitude) {
+                    const originLat = shopLocation.latitude;
+                    const originLon = shopLocation.longitude;
+                    const destLat = order.customerLocation.latitude;
+                    const destLon = order.customerLocation.longitude;
+                    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLon}&destination=${destLat},${destLon}`;
+                    trackDeliveryBtn.href = googleMapsUrl;
+                    trackDeliveryBtn.classList.remove('hidden');
+                } else {
+                    trackDeliveryBtn.classList.add('hidden');
+                    console.warn('Shop location not available for tracking link.');
+                }
+
             } else {
                 modalCustomerMapAddress.textContent = 'Customer location not available.';
                 // If map was previously initialized, destroy it or hide it
@@ -951,6 +989,7 @@
                     orderDetailsMarker = null;
                 }
                 modalCustomerMap.innerHTML = '<p class="text-gray-400 text-center py-4">Map not available for this order.</p>';
+                trackDeliveryBtn.classList.add('hidden'); // Hide track button if no customer location
             }
 
 
@@ -1182,6 +1221,7 @@
                 shopNameInput.value = data.shopName || '';
                 shopLatitudeInput.value = data.shopLocation ? data.shopLocation.latitude : '';
                 shopLongitudeInput.value = data.shopLocation ? data.shopLocation.longitude : '';
+                shopLocation = data.shopLocation; // Store shop location globally
                 renderDeliveryRates(data.deliveryRates || []);
                 updateWhatsappStatus(data.whatsappStatus, data.lastAuthenticatedAt);
                 fetch2FAStatus(); // Fetch 2FA status after general settings
@@ -1244,6 +1284,7 @@
 
             sendData('/api/admin/settings', 'PUT', settingsData, saveSettingsBtn, saveSettingsBtn, settingsMessage, (data) => {
                 // Settings saved, no need to refresh the whole page, just update status
+                shopLocation = data.settings.shopLocation; // Update global shopLocation
             });
         });
 
