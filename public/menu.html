@@ -40,8 +40,24 @@
             -ms-overflow-style: none;  /* IE and Edge */
             scrollbar-width: none;  /* Firefox */
         }
-        /* Leaflet map container styling */
-        #delivery-map {
+        /* Discount Badge Styling */
+        .discount-badge {
+            display: inline-flex;
+            align-items: center;
+            background-color: #fef2f2; /* red-50 */
+            color: #dc2626; /* red-600 */
+            font-size: 0.75rem; /* text-xs */
+            font-weight: 600; /* font-semibold */
+            padding: 0.25rem 0.5rem; /* px-2 py-1 */
+            border-radius: 0.375rem; /* rounded-md */
+            border: 1px solid #ef4444; /* red-500 */
+            margin-left: 0.5rem;
+        }
+        .discount-badge svg {
+            margin-right: 0.25rem;
+        }
+        /* Leaflet map container styling for modal */
+        #delivery-map-modal {
             height: 300px; /* Adjust height as needed */
             width: 100%;
             border-radius: 0.5rem; /* rounded-md */
@@ -123,7 +139,7 @@
             customerLocation: {
                 latitude: null,
                 longitude: null,
-                address: 'Location not set on map.'
+                address: 'Location not set.'
             },
             loading: {
                 menu: false,
@@ -167,9 +183,9 @@
         const modalCloseButton = document.getElementById('modal-close-button');
         const modalCloseFooterButton = document.getElementById('modal-close-footer-button');
 
-        // Leaflet Map Variables
-        let map = null;
-        let marker = null;
+        // Leaflet Map Variables (now local to the modal function)
+        let mapInstance = null;
+        let markerInstance = null;
 
         // --- Utility Functions ---
         function showLoading(section) {
@@ -217,11 +233,11 @@
             }
             appState.modal.onClose = null;
             modalBody.innerHTML = ''; // Clear content
-            // Destroy map instance if it exists in the modal
-            if (map) {
-                map.remove();
-                map = null;
-                marker = null;
+            // Destroy map instance if it exists and is managed by this modal
+            if (mapInstance) {
+                mapInstance.remove();
+                mapInstance = null;
+                markerInstance = null;
             }
         }
 
@@ -295,9 +311,13 @@
                             </h3>
                             <p class="text-gray-600 text-sm mb-3 flex-1">${item.description || 'No description available.'}</p>
                             <div class="flex justify-between items-center mt-auto pt-2 border-t border-gray-100">
-                                <div class="flex items-baseline">
-                                    <span class="text-gray-500 line-through mr-2 text-sm">₹${displayedOriginalPrice.toFixed(2)}</span>
+                                <div class="flex flex-col items-start">
+                                    <span class="text-gray-500 line-through text-sm">₹${displayedOriginalPrice.toFixed(2)}</span>
                                     <span class="text-red-600 font-bold text-lg">₹${discountedPrice.toFixed(2)}</span>
+                                    <span class="discount-badge">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-tag"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414L19 21l3-3Z"/><path d="M7 7h.01"/></svg>
+                                        30% OFF
+                                    </span>
                                 </div>
                                 <button data-id="${item._id}" class="add-to-cart-button bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus mr-1 inline-block"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
@@ -392,21 +412,18 @@
 
                 <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-6">
                     <button id="proceed-to-checkout-button"
-                        class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center ${appState.cart.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+                        class="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center ${appState.cart.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
                         ${appState.cart.length === 0 ? 'disabled' : ''}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle mr-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
                         Proceed to Checkout
                     </button>
                     <button id="continue-shopping-button"
-                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                        class="flex-1 sm:flex-none bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
                         Continue Shopping
                     </button>
                 </div>
             `;
             showModal('Your Shopping Cart', cartModalHtml);
-
-            // Update header cart count
-            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
 
             // Add event listeners for cart actions within the modal
             const cartItemsListModal = document.getElementById('cart-items-list-modal');
@@ -429,7 +446,10 @@
                 });
             }
 
-            document.getElementById('proceed-to-checkout-button').addEventListener('click', showDeliveryLocationModal);
+            document.getElementById('proceed-to-checkout-button').addEventListener('click', () => {
+                hideModal(); // Hide cart modal first
+                showLocationSelectionModal(); // Open location modal
+            });
             document.getElementById('continue-shopping-button').addEventListener('click', hideModal);
         }
 
@@ -439,8 +459,8 @@
             if (!menuItem) return;
 
             const existingItemIndex = appState.cart.findIndex(item => item._id === itemId);
-            const actualPrice = menuItem.price;
-            const discountedPrice = actualPrice; // This is the price customer pays
+            const actualPrice = menuItem.price; // This is the price from the dashboard
+            const discountedPrice = actualPrice; // The actual price is what the customer pays after "discount"
             const displayedOriginalPrice = actualPrice / (1 - DISCOUNT_PERCENTAGE); // Inflated for display
 
             if (existingItemIndex > -1) {
@@ -476,16 +496,215 @@
             cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
         }
 
-        // --- Checkout & Order Placement ---
-        function showDeliveryLocationModal() {
+        // --- Location Selection Modal ---
+        function showLocationSelectionModal() {
+            const locationModalHtml = `
+                <div id="location-modal-message" class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-md mb-4 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-2 animate-spin mr-2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                    <span id="location-message-text">Attempting to get your live GPS location...</span>
+                </div>
+
+                <div id="delivery-map-modal" class="rounded-md mb-4"></div>
+
+                <p id="selected-address-modal" class="text-lg font-semibold text-gray-800 mb-4 text-center">Selected Location: Loading...</p>
+
+                <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 justify-center">
+                    <button id="use-live-location-button"
+                        class="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
+                        Use Live Location
+                    </button>
+                    <button id="pin-location-button"
+                        class="flex-1 sm:flex-none bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hand-grab mr-2"><path d="M18 11.5V9.14a2 2 0 0 0-2-2.06l-3.7-.5a2 2 0 0 1-1.87-2.12c.26-1.05.77-2.06 1.54-2.86A4 4 0 0 0 9 2.05L6.5 3.5 2 6.5l4.32 5.02a2 2 0 0 1 .15 2.76l-.73.82a2 2 0 0 0-.02 2.92l3.52 3.52a3 3 0 0 0 4.25 0l4.32-4.32a2 2 0 0 0 .02-2.92Z"/><path d="m18 11.5 1.52-1.52a2.12 2.12 0 0 1 3 3L18 17.5"/></svg>
+                        Pin Location on Map
+                    </button>
+                </div>
+
+                <button id="confirm-location-button"
+                    class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle mr-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+                    Confirm Location & Continue
+                </button>
+            `;
+            showModal('Select Delivery Location', locationModalHtml, () => {
+                // This callback runs when the location modal is closed
+                // Ensure map instance is destroyed
+                if (mapInstance) {
+                    mapInstance.remove();
+                    mapInstance = null;
+                    markerInstance = null;
+                }
+            });
+
+            // Initialize map after the modal is shown
+            initializeMapInModal();
+
+            // Event listeners for buttons within the location modal
+            document.getElementById('use-live-location-button').addEventListener('click', () => getLiveLocationModal(true));
+            document.getElementById('pin-location-button').addEventListener('click', () => {
+                if (markerInstance) {
+                    markerInstance.dragging.enable();
+                    document.getElementById('location-message-text').textContent = 'Drag the map pin to your exact delivery location.';
+                    document.getElementById('location-modal-message').classList.remove('bg-red-100', 'border-red-400', 'text-red-700');
+                    document.getElementById('location-modal-message').classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                }
+            });
+            document.getElementById('confirm-location-button').addEventListener('click', () => {
+                if (appState.customerLocation.latitude === null || appState.customerLocation.longitude === null) {
+                    const msgDiv = document.getElementById('location-modal-message');
+                    const msgText = document.getElementById('location-message-text');
+                    msgText.textContent = 'Please select a location on the map first.';
+                    msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                    msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+                    return;
+                }
+                hideModal(); // Close location modal
+                showFinalCheckoutModal(); // Open final checkout modal
+            });
+        }
+
+        function initializeMapInModal() {
+            const mapElement = document.getElementById('delivery-map-modal');
+            if (!mapElement) return;
+
+            // Default location (shop location or a general city)
+            const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
+            const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
+            const defaultZoom = 13;
+
+            // Initialize map after a small delay to ensure modal is fully rendered
+            setTimeout(() => {
+                mapInstance = L.map('delivery-map-modal').setView([defaultLat, defaultLng], defaultZoom);
+                // Satellite view tile layer
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                }).addTo(mapInstance);
+
+                markerInstance = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(mapInstance);
+
+                // Update appState with initial marker position
+                updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+
+                // Try to get user's current GPS location immediately
+                getLiveLocationModal(false); // Do not re-enable buttons here
+
+                // Event listener for marker drag end
+                markerInstance.on('dragend', (event) => {
+                    const latlng = markerInstance.getLatLng();
+                    updateSelectedLocation(latlng.lat, latlng.lng, `Pinned Location (Lat: ${latlng.lat.toFixed(4)}, Lng: ${latlng.lng.toFixed(4)})`);
+                });
+
+                // Invalidate size to ensure map renders correctly in modal
+                mapInstance.invalidateSize();
+            }, 100); // Small delay to ensure modal is fully visible
+        }
+
+        function updateSelectedLocation(lat, lng, address) {
+            appState.customerLocation.latitude = lat;
+            appState.customerLocation.longitude = lng;
+            appState.customerLocation.address = address;
+            document.getElementById('selected-address-modal').textContent = `Selected Location: ${address}`;
+        }
+
+        function getLiveLocationModal(re_enable_buttons = true) {
+            const msgDiv = document.getElementById('location-modal-message');
+            const msgText = document.getElementById('location-message-text');
+            msgDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
+            msgDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+            msgText.textContent = 'Attempting to get your live GPS location...';
+
+            const useLiveButton = document.getElementById('use-live-location-button');
+            const pinButton = document.getElementById('pin-location-button');
+            const confirmButton = document.getElementById('confirm-location-button');
+
+            if (re_enable_buttons) { // Only disable if explicitly triggered by button
+                useLiveButton.disabled = true;
+                pinButton.disabled = true;
+                confirmButton.disabled = true;
+            }
+
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLng = position.coords.longitude;
+                        const userAccuracy = position.coords.accuracy; // in meters
+
+                        mapInstance.setView([userLat, userLng], Math.max(mapInstance.getZoom(), 16)); // Zoom in closer for live location
+                        markerInstance.setLatLng([userLat, userLng]);
+                        updateSelectedLocation(userLat, userLng, `GPS Location (Accuracy: ${userAccuracy.toFixed(0)}m)`);
+
+                        msgDiv.classList.add('hidden');
+                        if (re_enable_buttons) {
+                            useLiveButton.disabled = false;
+                            pinButton.disabled = false;
+                            confirmButton.disabled = false;
+                        }
+                    },
+                    (error) => {
+                        console.warn('Error getting GPS location:', error.message);
+                        msgText.textContent = 'Could not get your GPS location. Please drag the map pin to set your delivery address.';
+                        msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                        msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+
+                        // Fallback to current marker position (which defaults to shop)
+                        const currentLatlng = markerInstance.getLatLng();
+                        updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Default Shop Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
+
+                        if (re_enable_buttons) {
+                            useLiveButton.disabled = false;
+                            pinButton.disabled = false;
+                            confirmButton.disabled = false;
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true, // Request high accuracy GPS
+                        timeout: 10000, // 10 seconds timeout
+                        maximumAge: 0 // No cached position
+                    }
+                );
+            } else {
+                msgText.textContent = 'Geolocation is not supported by your browser. Please drag the map pin to set your delivery address.';
+                msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+
+                // Fallback to current marker position (which defaults to shop)
+                const currentLatlng = markerInstance.getLatLng();
+                updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Default Shop Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
+
+                if (re_enable_buttons) {
+                    useLiveButton.disabled = false;
+                    pinButton.disabled = false;
+                    confirmButton.disabled = false;
+                }
+            }
+        }
+
+        // --- Final Checkout Modal (after location selection) ---
+        function showFinalCheckoutModal() {
+            // Cart and customerLocation are already in appState
             if (appState.cart.length === 0) {
                 showMessage('Information', 'Your cart is empty. Please add items before checking out.');
                 return;
             }
 
-            const currentSubtotal = parseFloat(document.getElementById('cart-subtotal-modal').textContent);
-            const currentTransportTax = parseFloat(document.getElementById('cart-transport-tax-modal').textContent);
-            const currentTotal = parseFloat(document.getElementById('cart-total-modal').textContent);
+            // Recalculate summary based on cart items
+            let subtotal = 0;
+            appState.cart.forEach(item => {
+                subtotal += item.discountedPrice * item.quantity;
+            });
+
+            let transportTax = 0;
+            if (appState.shopSettings && appState.shopSettings.deliveryRates && appState.shopSettings.deliveryRates.length > 0) {
+                if (subtotal > 0) {
+                    transportTax = Math.min(...appState.shopSettings.deliveryRates.map(r => r.amount));
+                }
+            } else {
+                transportTax = subtotal > 0 ? 30.00 : 0.00;
+            }
+            const total = subtotal + transportTax;
 
             const checkoutFormHtml = `
                 <div id="checkout-modal-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
@@ -504,14 +723,18 @@
                             class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Set Delivery Location (Drag pin to adjust)</label>
-                        <div id="delivery-map" class="rounded-md mb-4"></div>
-                        <p id="selected-address" class="text-sm text-gray-600 mb-4">Selected Location: ${appState.customerLocation.address}</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Location</label>
+                        <p id="final-delivery-address" class="text-gray-700 font-semibold mb-2">${appState.customerLocation.address}</p>
+                        <p class="text-sm text-gray-500">Lat: ${appState.customerLocation.latitude ? appState.customerLocation.latitude.toFixed(4) : 'N/A'}, Lng: ${appState.customerLocation.longitude ? appState.customerLocation.longitude.toFixed(4) : 'N/A'}</p>
+                        <button type="button" id="change-location-button" class="mt-2 text-blue-600 hover:underline text-sm flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-1"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
+                            Change Location
+                        </button>
                     </div>
                     <div class="border-t border-gray-200 pt-4 mt-4 space-y-2">
-                        <p class="flex justify-between"><span>Order Subtotal:</span> <span class="font-semibold">₹${currentSubtotal.toFixed(2)}</span></p>
-                        <p class="flex justify-between"><span>Transport Tax:</span> <span class="font-semibold">₹${currentTransportTax.toFixed(2)}</span></p>
-                        <p class="flex justify-between text-lg font-bold text-red-600"><span>Total Payable:</span> <span>₹${currentTotal.toFixed(2)}</span></p>
+                        <p class="flex justify-between"><span>Order Subtotal:</span> <span class="font-semibold">₹${subtotal.toFixed(2)}</span></p>
+                        <p class="flex justify-between"><span>Transport Tax:</span> <span class="font-semibold">₹${transportTax.toFixed(2)}</span></p>
+                        <p class="flex justify-between text-lg font-bold text-red-600"><span>Total Payable:</span> <span>₹${total.toFixed(2)}</span></p>
                         <p class="text-sm text-gray-600">Payment Method: <span class="font-semibold">Cash on Delivery (COD)</span></p>
                     </div>
                     <div class="pt-4 border-t border-gray-200">
@@ -522,79 +745,13 @@
                     </div>
                 </form>
             `;
-            showModal('Confirm Your Order', checkoutFormHtml, initializeMapInModal); // Pass map init function to onClose
+            showModal('Confirm Your Order', checkoutFormHtml);
 
             document.getElementById('checkout-form').addEventListener('submit', handlePlaceOrder);
-        }
-
-        function initializeMapInModal() {
-            const mapElement = document.getElementById('delivery-map');
-            if (!mapElement) return;
-
-            // Default location (shop location or a general city)
-            const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
-            const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
-            const defaultZoom = 13;
-
-            // Initialize map after a small delay to ensure modal is fully rendered
-            setTimeout(() => {
-                map = L.map('delivery-map').setView([defaultLat, defaultLng], defaultZoom);
-                // Esri World Imagery for satellite view
-                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                }).addTo(map);
-
-                marker = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map);
-
-                // Update appState with initial marker position
-                appState.customerLocation.latitude = defaultLat;
-                appState.customerLocation.longitude = defaultLng;
-                appState.customerLocation.address = 'Default shop location.';
-                document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address} (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`;
-
-                // Try to get user's current GPS location
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const userLat = position.coords.latitude;
-                            const userLng = position.coords.longitude;
-                            const userAccuracy = position.coords.accuracy; // in meters
-
-                            map.setView([userLat, userLng], Math.max(defaultZoom, 16)); // Zoom in more for user location
-                            marker.setLatLng([userLat, userLng]);
-
-                            appState.customerLocation.latitude = userLat;
-                            appState.customerLocation.longitude = userLng;
-                            appState.customerLocation.address = `GPS Location (Accuracy: ${userAccuracy.toFixed(0)}m)`;
-                            document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address} (Lat: ${userLat.toFixed(4)}, Lng: ${userLng.toFixed(4)})`;
-                        },
-                        (error) => {
-                            console.warn('Error getting GPS location:', error.message);
-                            // Fallback to default location if GPS fails or denied
-                            showMessage('Information', 'Could not get your GPS location. Please drag the map pin to set your delivery address.');
-                        },
-                        {
-                            enableHighAccuracy: true, // Request high accuracy GPS
-                            timeout: 10000, // 10 seconds timeout
-                            maximumAge: 0 // No cached position
-                        }
-                    );
-                } else {
-                    showMessage('Information', 'Geolocation is not supported by your browser. Please drag the map pin to set your delivery address.');
-                }
-
-                // Event listener for marker drag end
-                marker.on('dragend', (event) => {
-                    const latlng = marker.getLatLng();
-                    appState.customerLocation.latitude = latlng.lat;
-                    appState.customerLocation.longitude = latlng.lng;
-                    appState.customerLocation.address = `Pinned Location (Lat: ${latlng.lat.toFixed(4)}, Lng: ${latlng.lng.toFixed(4)})`;
-                    document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address}`;
-                });
-
-                // Invalidate size to ensure map renders correctly in modal
-                map.invalidateSize();
-            }, 100); // Small delay to ensure modal is fully visible
+            document.getElementById('change-location-button').addEventListener('click', () => {
+                hideModal(); // Hide current modal
+                showLocationSelectionModal(); // Go back to location selection
+            });
         }
 
         async function handlePlaceOrder(e) {
@@ -609,12 +766,11 @@
 
             const customerName = document.getElementById('customer-name').value;
             const customerPhone = document.getElementById('customer-phone').value;
-            // Delivery address comes from the map interaction
-            const deliveryAddress = appState.customerLocation.address;
+            const deliveryAddress = appState.customerLocation.address; // From selected location
 
             // Basic validation
             if (!customerName || !customerPhone || !deliveryAddress || appState.customerLocation.latitude === null || appState.customerLocation.longitude === null) {
-                modalErrorText.textContent = 'Please fill in all required fields and set your delivery location on the map.';
+                modalErrorText.textContent = 'Please fill in all required fields and ensure your delivery location is set.';
                 modalErrorDiv.classList.remove('hidden');
                 placeOrderButton.textContent = 'Place Order';
                 placeOrderButton.disabled = false;
@@ -630,9 +786,9 @@
 
             const orderPayload = {
                 items: appState.cart.map(item => ({
-                    productId: item._id, // Backend expects productId for existing items
+                    productId: item._id,
                     name: item.name,
-                    price: item.originalPrice, // Send original price to backend, discount applied on frontend
+                    price: item.originalPrice, // Send original price to backend
                     quantity: item.quantity,
                 })),
                 customerName: customerName,
@@ -643,10 +799,10 @@
                     longitude: appState.customerLocation.longitude,
                     address: appState.customerLocation.address
                 },
-                subtotal: parseFloat(document.getElementById('cart-subtotal-modal').textContent), // This is the discounted subtotal
+                subtotal: parseFloat(document.getElementById('cart-subtotal-modal').textContent), // Discounted subtotal
                 transportTax: parseFloat(document.getElementById('cart-transport-tax-modal').textContent),
                 totalAmount: parseFloat(document.getElementById('cart-total-modal').textContent),
-                paymentMethod: 'Cash on Delivery', // Hardcoded as per backend
+                paymentMethod: 'Cash on Delivery',
             };
 
             try {
@@ -674,7 +830,6 @@
                 // Clear cart after successful order
                 appState.cart = [];
                 cartItemCount.textContent = 0; // Update header count
-                // No need to re-render cart content here as it was in a modal that's now closed.
 
             } catch (err) {
                 modalErrorText.textContent = err.message;
@@ -689,7 +844,28 @@
         document.addEventListener('DOMContentLoaded', () => {
             fetchShopSettings();
             fetchMenuItems();
-            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0); // Initial count
+
+            // Check if we need to open the final checkout modal directly (e.g., if user navigated back from location page)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('openCheckoutModal') === 'true') {
+                // Ensure cart and location are restored from session storage if they exist
+                const storedCart = sessionStorage.getItem('currentCart');
+                if (storedCart) {
+                    appState.cart = JSON.parse(storedCart);
+                    cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
+                }
+                const storedLocation = sessionStorage.getItem('selectedCustomerLocation');
+                if (storedLocation) {
+                    appState.customerLocation = JSON.parse(storedLocation);
+                }
+
+                showFinalCheckoutModal();
+                // Clean up URL to prevent re-opening on refresh
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.delete('openCheckoutModal');
+                window.history.replaceState({}, document.title, newUrl.toString());
+            }
+
 
             // Event delegation for Add to Cart buttons
             menuItemsContainer.addEventListener('click', (e) => {
