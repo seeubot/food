@@ -65,10 +65,10 @@
     </header>
 
     <!-- Main Content Area -->
-    <main class="flex-1 container mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <main class="flex-1 container mx-auto p-4 md:p-6 grid grid-cols-1 gap-6">
 
-        <!-- Menu Items Section -->
-        <section class="lg:col-span-2 bg-white rounded-lg shadow-md p-4 md:p-6">
+        <!-- Menu Items Section (now full width) -->
+        <section class="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Our Delicious Menu</h2>
 
             <div id="loading-spinner" class="flex justify-center items-center py-8 hidden">
@@ -81,41 +81,10 @@
                 <span class="block sm:inline ml-2" id="menu-error-text"></span>
             </div>
 
-            <div id="menu-items-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div id="menu-items-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <!-- Menu items will be dynamically loaded here -->
             </div>
             <p id="no-menu-items-message" class="text-center text-gray-600 mt-8 hidden">No menu items available at the moment. Please check back later!</p>
-        </section>
-
-        <!-- Cart and Checkout Section -->
-        <section class="lg:col-span-1 bg-white rounded-lg shadow-md p-4 md:p-6 sticky top-20 h-fit">
-            <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Your Order</h2>
-
-            <div id="cart-items-list" class="space-y-4 mb-6 max-h-64 overflow-y-auto pr-2">
-                <!-- Cart items will be dynamically loaded here -->
-                <p id="empty-cart-message" class="text-center text-gray-600">Your cart is empty. Add some delicious food!</p>
-            </div>
-
-            <div id="cart-summary" class="border-t border-gray-200 pt-4 space-y-2 text-gray-700">
-                <div class="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span class="font-semibold">₹<span id="cart-subtotal">0.00</span></span>
-                </div>
-                <div class="flex justify-between">
-                    <span>Transport Tax:</span>
-                    <span class="font-semibold">₹<span id="cart-transport-tax">0.00</span></span>
-                </div>
-                <div class="flex justify-between text-lg font-bold text-red-600">
-                    <span>Total:</span>
-                    <span>₹<span id="cart-total">0.00</span></span>
-                </div>
-            </div>
-
-            <button id="checkout-button"
-                class="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle mr-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
-                Proceed to Checkout
-            </button>
         </section>
 
     </main>
@@ -149,7 +118,7 @@
         // --- Global State ---
         const appState = {
             menuItems: [],
-            cart: [], // { _id: item._id, name: item.name, originalPrice: item.price, discountedPrice: calculated, quantity: 1 }
+            cart: [], // { _id: item._id, name: item.name, originalPrice: item.price, displayedOriginalPrice: calculated, discountedPrice: calculated, quantity: 1 }
             shopSettings: null,
             customerLocation: {
                 latitude: null,
@@ -169,7 +138,7 @@
                 isOpen: false,
                 title: '',
                 content: '',
-                onClose: null,
+                onClose: null, // Callback to run when modal closes
             },
         };
 
@@ -190,13 +159,6 @@
         const menuErrorText = document.getElementById('menu-error-text');
         const menuItemsContainer = document.getElementById('menu-items-container');
         const noMenuItemsMessage = document.getElementById('no-menu-items-message');
-
-        const cartItemsList = document.getElementById('cart-items-list');
-        const emptyCartMessage = document.getElementById('empty-cart-message');
-        const cartSubtotal = document.getElementById('cart-subtotal');
-        const cartTransportTax = document.getElementById('cart-transport-tax');
-        const cartTotal = document.getElementById('cart-total');
-        const checkoutButton = document.getElementById('checkout-button');
 
         // Modal Elements
         const modalBackdrop = document.getElementById('modal-backdrop');
@@ -225,19 +187,16 @@
         }
 
         function showMessage(type, message) {
-            const targetElement = type === 'error' ? menuErrorMessage : null; // Currently only menu error message
-            const targetTextElement = type === 'error' ? menuErrorText : null;
+            // For general messages, use the modal
+            showModal(type === 'success' ? 'Success!' : 'Information', `<p class="text-gray-700">${message}</p>`);
+        }
 
-            if (targetElement && targetTextElement) {
-                targetTextElement.textContent = message;
-                targetElement.classList.remove('hidden');
-                setTimeout(() => {
-                    targetElement.classList.add('hidden');
-                }, 5000);
-            } else {
-                // For other messages, use the modal
-                showModal(type === 'success' ? 'Success!' : 'Information', `<p class="text-gray-700">${message}</p>`);
-            }
+        function showMenuErrorMessage(message) {
+            menuErrorText.textContent = message;
+            menuErrorMessage.classList.remove('hidden');
+            setTimeout(() => {
+                menuErrorMessage.classList.add('hidden');
+            }, 5000);
         }
 
         function showModal(title, contentHtml, onCloseCallback = null) {
@@ -254,7 +213,7 @@
             modalBackdrop.classList.add('hidden');
             appState.modal.isOpen = false;
             if (appState.modal.onClose) {
-                appState.modal.onClose();
+                appState.modal.onClose(); // Execute callback if provided
             }
             appState.modal.onClose = null;
             modalBody.innerHTML = ''; // Clear content
@@ -288,7 +247,7 @@
                 headerShopName.textContent = data.shopName || 'Delicious Bites';
             } catch (err) {
                 console.error('Error fetching shop settings:', err);
-                showMessage('error', `Failed to load shop details: ${err.message}`);
+                showMenuErrorMessage(`Failed to load shop details: ${err.message}`);
             } finally {
                 hideLoading('settings');
             }
@@ -306,7 +265,7 @@
                 renderMenuItems();
             } catch (err) {
                 console.error('Error fetching menu items:', err);
-                showMessage('error', `Failed to load menu: ${err.message}`);
+                showMenuErrorMessage(`Failed to load menu: ${err.message}`);
             } finally {
                 hideLoading('menu');
             }
@@ -320,7 +279,10 @@
             } else {
                 noMenuItemsMessage.classList.add('hidden');
                 appState.menuItems.forEach(item => {
-                    const discountedPrice = item.price * (1 - DISCOUNT_PERCENTAGE);
+                    const actualPrice = item.price; // This is the price from the dashboard
+                    const discountedPrice = actualPrice; // The actual price is what the customer pays after "discount"
+                    const displayedOriginalPrice = actualPrice / (1 - DISCOUNT_PERCENTAGE); // Inflated price for display
+
                     const itemCard = document.createElement('div');
                     itemCard.className = 'bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 flex flex-col';
                     itemCard.innerHTML = `
@@ -333,8 +295,10 @@
                             </h3>
                             <p class="text-gray-600 text-sm mb-3 flex-1">${item.description || 'No description available.'}</p>
                             <div class="flex justify-between items-center mt-auto pt-2 border-t border-gray-100">
-                                <span class="text-gray-500 line-through mr-2">₹${item.price.toFixed(2)}</span>
-                                <span class="text-red-600 font-bold text-lg">₹${discountedPrice.toFixed(2)}</span>
+                                <div class="flex items-baseline">
+                                    <span class="text-gray-500 line-through mr-2 text-sm">₹${displayedOriginalPrice.toFixed(2)}</span>
+                                    <span class="text-red-600 font-bold text-lg">₹${discountedPrice.toFixed(2)}</span>
+                                </div>
                                 <button data-id="${item._id}" class="add-to-cart-button bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus mr-1 inline-block"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
                                     Add
@@ -354,72 +318,119 @@
             lucide.createIcons(); // Re-render Lucide icons for new elements
         }
 
-        function renderCart() {
-            cartItemsList.innerHTML = '';
+        function renderCartContentInModal() {
+            let cartItemsHtml = '';
+            let subtotal = 0;
+
             if (appState.cart.length === 0) {
-                emptyCartMessage.classList.remove('hidden');
-                checkoutButton.disabled = true;
+                cartItemsHtml = '<p class="text-center text-gray-600">Your cart is empty. Add some delicious food!</p>';
             } else {
-                emptyCartMessage.classList.add('hidden');
-                checkoutButton.disabled = false;
                 appState.cart.forEach(item => {
-                    const originalPrice = item.originalPrice;
-                    const discountedPrice = item.discountedPrice;
-                    const cartItemDiv = document.createElement('div');
-                    cartItemDiv.className = 'flex items-center justify-between bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200';
-                    cartItemDiv.innerHTML = `
-                        <div class="flex-1">
-                            <p class="font-semibold text-gray-800">${item.name}</p>
-                            <p class="text-sm text-gray-600">
-                                <span class="line-through">₹${originalPrice.toFixed(2)}</span>
-                                <span class="text-red-600 ml-1">₹${discountedPrice.toFixed(2)}</span> each
-                            </p>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <button data-id="${item._id}" class="quantity-decrease-button text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus"><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                            </button>
-                            <span class="font-bold text-gray-800">${item.quantity}</span>
-                            <button data-id="${item._id}" class="quantity-increase-button text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                            </button>
-                            <button data-id="${item._id}" class="remove-from-cart-button text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-gray-200 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                            </button>
+                    subtotal += item.discountedPrice * item.quantity;
+                    cartItemsHtml += `
+                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800">${item.name}</p>
+                                <p class="text-sm text-gray-600">
+                                    <span class="line-through">₹${item.displayedOriginalPrice.toFixed(2)}</span>
+                                    <span class="text-red-600 ml-1">₹${item.discountedPrice.toFixed(2)}</span> each
+                                </p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button data-id="${item._id}" class="quantity-decrease-button text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus"><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                </button>
+                                <span class="font-bold text-gray-800">${item.quantity}</span>
+                                <button data-id="${item._id}" class="quantity-increase-button text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                </button>
+                                <button data-id="${item._id}" class="remove-from-cart-button text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-gray-200 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                </button>
+                            </div>
                         </div>
                     `;
-                    cartItemsList.appendChild(cartItemDiv);
                 });
             }
-            updateCartSummary();
-            lucide.createIcons(); // Re-render Lucide icons for new elements
-        }
 
-        function updateCartSummary() {
-            let subtotal = 0;
-            appState.cart.forEach(item => {
-                subtotal += item.discountedPrice * item.quantity;
-            });
-            appState.cartSubtotal = subtotal; // Store in state if needed elsewhere
-
+            // Calculate transport tax based on subtotal (simplified)
             let transportTax = 0;
             if (appState.shopSettings && appState.shopSettings.deliveryRates && appState.shopSettings.deliveryRates.length > 0) {
                 if (subtotal > 0) {
-                    // For simplicity, let's just pick the lowest delivery rate if any items are in cart
-                    // A more robust solution would calculate based on actual distance from shop to customerLocation
+                    // For simplicity, take the lowest delivery rate if any items are in cart
                     transportTax = Math.min(...appState.shopSettings.deliveryRates.map(r => r.amount));
                 }
             } else {
                 transportTax = subtotal > 0 ? 30.00 : 0.00; // Example fixed tax if no settings
             }
 
-            appState.cartTransportTax = transportTax;
             const total = subtotal + transportTax;
 
+            const cartModalHtml = `
+                <div id="cart-modal-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
+                    <strong class="font-bold">Error!</strong>
+                    <span class="block sm:inline ml-2" id="cart-modal-error-text"></span>
+                </div>
+                <div id="cart-items-list-modal" class="space-y-4 mb-6 max-h-64 overflow-y-auto pr-2">
+                    ${cartItemsHtml}
+                </div>
+
+                <div id="cart-summary-modal" class="border-t border-gray-200 pt-4 space-y-2 text-gray-700">
+                    <div class="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span class="font-semibold">₹<span id="cart-subtotal-modal">${subtotal.toFixed(2)}</span></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Transport Tax:</span>
+                        <span class="font-semibold">₹<span id="cart-transport-tax-modal">${transportTax.toFixed(2)}</span></span>
+                    </div>
+                    <div class="flex justify-between text-lg font-bold text-red-600">
+                        <span>Total:</span>
+                        <span>₹<span id="cart-total-modal">${total.toFixed(2)}</span></span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-6">
+                    <button id="proceed-to-checkout-button"
+                        class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center ${appState.cart.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+                        ${appState.cart.length === 0 ? 'disabled' : ''}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle mr-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+                        Proceed to Checkout
+                    </button>
+                    <button id="continue-shopping-button"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
+                        Continue Shopping
+                    </button>
+                </div>
+            `;
+            showModal('Your Shopping Cart', cartModalHtml);
+
+            // Update header cart count
             cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
-            cartSubtotal.textContent = subtotal.toFixed(2);
-            cartTransportTax.textContent = transportTax.toFixed(2);
-            cartTotal.textContent = total.toFixed(2);
+
+            // Add event listeners for cart actions within the modal
+            const cartItemsListModal = document.getElementById('cart-items-list-modal');
+            if (cartItemsListModal) {
+                cartItemsListModal.addEventListener('click', (e) => {
+                    const decreaseButton = e.target.closest('.quantity-decrease-button');
+                    const increaseButton = e.target.closest('.quantity-increase-button');
+                    const removeButton = e.target.closest('.remove-from-cart-button');
+
+                    if (decreaseButton) {
+                        updateCartQuantity(decreaseButton.dataset.id, -1);
+                        renderCartContentInModal(); // Re-render modal content
+                    } else if (increaseButton) {
+                        updateCartQuantity(increaseButton.dataset.id, 1);
+                        renderCartContentInModal(); // Re-render modal content
+                    } else if (removeButton) {
+                        removeFromCart(removeButton.dataset.id);
+                        renderCartContentInModal(); // Re-render modal content
+                    }
+                });
+            }
+
+            document.getElementById('proceed-to-checkout-button').addEventListener('click', showDeliveryLocationModal);
+            document.getElementById('continue-shopping-button').addEventListener('click', hideModal);
         }
 
         // --- Cart Actions ---
@@ -428,19 +439,24 @@
             if (!menuItem) return;
 
             const existingItemIndex = appState.cart.findIndex(item => item._id === itemId);
+            const actualPrice = menuItem.price;
+            const discountedPrice = actualPrice; // This is the price customer pays
+            const displayedOriginalPrice = actualPrice / (1 - DISCOUNT_PERCENTAGE); // Inflated for display
+
             if (existingItemIndex > -1) {
                 appState.cart[existingItemIndex].quantity += 1;
             } else {
-                const discountedPrice = menuItem.price * (1 - DISCOUNT_PERCENTAGE);
                 appState.cart.push({
                     _id: menuItem._id,
                     name: menuItem.name,
-                    originalPrice: menuItem.price,
+                    originalPrice: actualPrice,
+                    displayedOriginalPrice: displayedOriginalPrice,
                     discountedPrice: discountedPrice,
                     quantity: 1,
                 });
             }
-            renderCart();
+            // Only update the header cart count here, full cart render happens in modal
+            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
             showMessage('success', `${menuItem.name} added to cart!`);
         }
 
@@ -452,24 +468,24 @@
                     appState.cart.splice(itemIndex, 1); // Remove if quantity is 0 or less
                 }
             }
-            renderCart();
+            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
         }
 
         function removeFromCart(itemId) {
             appState.cart = appState.cart.filter(item => item._id !== itemId);
-            renderCart();
+            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
         }
 
         // --- Checkout & Order Placement ---
-        function showCheckoutModal() {
+        function showDeliveryLocationModal() {
             if (appState.cart.length === 0) {
                 showMessage('Information', 'Your cart is empty. Please add items before checking out.');
                 return;
             }
 
-            const currentSubtotal = parseFloat(cartSubtotal.textContent);
-            const currentTransportTax = parseFloat(cartTransportTax.textContent);
-            const currentTotal = parseFloat(cartTotal.textContent);
+            const currentSubtotal = parseFloat(document.getElementById('cart-subtotal-modal').textContent);
+            const currentTransportTax = parseFloat(document.getElementById('cart-transport-tax-modal').textContent);
+            const currentTotal = parseFloat(document.getElementById('cart-total-modal').textContent);
 
             const checkoutFormHtml = `
                 <div id="checkout-modal-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
@@ -508,15 +524,7 @@
             `;
             showModal('Confirm Your Order', checkoutFormHtml, initializeMapInModal); // Pass map init function to onClose
 
-            // If an order ID is present in the URL (from /track), pre-fill the phone number
-            const urlParams = new URLSearchParams(window.location.search);
-            const orderIdFromUrl = urlParams.get('orderId');
-            if (orderIdFromUrl) {
-                // You might need an API to fetch customer phone by orderId if not already known
-                // For now, this is a placeholder. A real implementation would fetch order details.
-                // Example: fetch(`/api/order/${orderIdFromUrl}`).then(res => res.json()).then(data => { document.getElementById('customer-phone').value = data.customerPhone; });
-                console.log(`Order ID from URL: ${orderIdFromUrl}. Pre-filling phone number is not implemented without a specific API for it.`);
-            }
+            document.getElementById('checkout-form').addEventListener('submit', handlePlaceOrder);
         }
 
         function initializeMapInModal() {
@@ -528,64 +536,66 @@
             const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
             const defaultZoom = 13;
 
-            map = L.map('delivery-map').setView([defaultLat, defaultLng], defaultZoom);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
+            // Initialize map after a small delay to ensure modal is fully rendered
+            setTimeout(() => {
+                map = L.map('delivery-map').setView([defaultLat, defaultLng], defaultZoom);
+                // Esri World Imagery for satellite view
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                }).addTo(map);
 
-            marker = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map);
+                marker = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map);
 
-            // Update appState with initial marker position
-            appState.customerLocation.latitude = defaultLat;
-            appState.customerLocation.longitude = defaultLng;
-            appState.customerLocation.address = 'Default shop location.';
-            document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address} (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`;
+                // Update appState with initial marker position
+                appState.customerLocation.latitude = defaultLat;
+                appState.customerLocation.longitude = defaultLng;
+                appState.customerLocation.address = 'Default shop location.';
+                document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address} (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`;
 
+                // Try to get user's current GPS location
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const userLat = position.coords.latitude;
+                            const userLng = position.coords.longitude;
+                            const userAccuracy = position.coords.accuracy; // in meters
 
-            // Try to get user's current GPS location
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const userLat = position.coords.latitude;
-                        const userLng = position.coords.longitude;
-                        const userAccuracy = position.coords.accuracy; // in meters
+                            map.setView([userLat, userLng], Math.max(defaultZoom, 16)); // Zoom in more for user location
+                            marker.setLatLng([userLat, userLng]);
 
-                        map.setView([userLat, userLng], Math.max(defaultZoom, 15)); // Zoom in more for user location
-                        marker.setLatLng([userLat, userLng]);
+                            appState.customerLocation.latitude = userLat;
+                            appState.customerLocation.longitude = userLng;
+                            appState.customerLocation.address = `GPS Location (Accuracy: ${userAccuracy.toFixed(0)}m)`;
+                            document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address} (Lat: ${userLat.toFixed(4)}, Lng: ${userLng.toFixed(4)})`;
+                        },
+                        (error) => {
+                            console.warn('Error getting GPS location:', error.message);
+                            // Fallback to default location if GPS fails or denied
+                            showMessage('Information', 'Could not get your GPS location. Please drag the map pin to set your delivery address.');
+                        },
+                        {
+                            enableHighAccuracy: true, // Request high accuracy GPS
+                            timeout: 10000, // 10 seconds timeout
+                            maximumAge: 0 // No cached position
+                        }
+                    );
+                } else {
+                    showMessage('Information', 'Geolocation is not supported by your browser. Please drag the map pin to set your delivery address.');
+                }
 
-                        appState.customerLocation.latitude = userLat;
-                        appState.customerLocation.longitude = userLng;
-                        appState.customerLocation.address = `GPS Location (Accuracy: ${userAccuracy.toFixed(0)}m)`;
-                        document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address} (Lat: ${userLat.toFixed(4)}, Lng: ${userLng.toFixed(4)})`;
-                    },
-                    (error) => {
-                        console.warn('Error getting GPS location:', error.message);
-                        // Fallback to default location if GPS fails or denied
-                        showMessage('Information', 'Could not get your GPS location. Please drag the map pin to set your delivery address.');
-                    },
-                    {
-                        enableHighAccuracy: true, // Request high accuracy GPS
-                        timeout: 10000, // 10 seconds timeout
-                        maximumAge: 0 // No cached position
-                    }
-                );
-            } else {
-                showMessage('Information', 'Geolocation is not supported by your browser. Please drag the map pin to set your delivery address.');
-            }
+                // Event listener for marker drag end
+                marker.on('dragend', (event) => {
+                    const latlng = marker.getLatLng();
+                    appState.customerLocation.latitude = latlng.lat;
+                    appState.customerLocation.longitude = latlng.lng;
+                    appState.customerLocation.address = `Pinned Location (Lat: ${latlng.lat.toFixed(4)}, Lng: ${latlng.lng.toFixed(4)})`;
+                    document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address}`;
+                });
 
-            // Event listener for marker drag end
-            marker.on('dragend', (event) => {
-                const latlng = marker.getLatLng();
-                appState.customerLocation.latitude = latlng.lat;
-                appState.customerLocation.longitude = latlng.lng;
-                appState.customerLocation.address = `Pinned Location (Lat: ${latlng.lat.toFixed(4)}, Lng: ${latlng.lng.toFixed(4)})`;
-                document.getElementById('selected-address').textContent = `Selected Location: ${appState.customerLocation.address}`;
-            });
-
-            // Invalidate size to ensure map renders correctly in modal
-            map.invalidateSize();
+                // Invalidate size to ensure map renders correctly in modal
+                map.invalidateSize();
+            }, 100); // Small delay to ensure modal is fully visible
         }
-
 
         async function handlePlaceOrder(e) {
             e.preventDefault();
@@ -603,7 +613,7 @@
             const deliveryAddress = appState.customerLocation.address;
 
             // Basic validation
-            if (!customerName || !customerPhone || !deliveryAddress || !appState.customerLocation.latitude || !appState.customerLocation.longitude) {
+            if (!customerName || !customerPhone || !deliveryAddress || appState.customerLocation.latitude === null || appState.customerLocation.longitude === null) {
                 modalErrorText.textContent = 'Please fill in all required fields and set your delivery location on the map.';
                 modalErrorDiv.classList.remove('hidden');
                 placeOrderButton.textContent = 'Place Order';
@@ -633,9 +643,9 @@
                     longitude: appState.customerLocation.longitude,
                     address: appState.customerLocation.address
                 },
-                subtotal: parseFloat(cartSubtotal.textContent), // This is the discounted subtotal
-                transportTax: parseFloat(cartTransportTax.textContent),
-                totalAmount: parseFloat(cartTotal.textContent),
+                subtotal: parseFloat(document.getElementById('cart-subtotal-modal').textContent), // This is the discounted subtotal
+                transportTax: parseFloat(document.getElementById('cart-transport-tax-modal').textContent),
+                totalAmount: parseFloat(document.getElementById('cart-total-modal').textContent),
                 paymentMethod: 'Cash on Delivery', // Hardcoded as per backend
             };
 
@@ -652,7 +662,7 @@
                     throw new Error(data.message || 'Failed to place order.');
                 }
 
-                hideModal();
+                hideModal(); // Hide the checkout modal
                 showModal('Order Placed Successfully!', `
                     <p class="text-gray-700 mb-4">Thank you for your order! Your order has been placed successfully.</p>
                     <p class="text-gray-700 mb-2"><strong class="font-semibold">Order ID:</strong> ${data.orderId}</p>
@@ -663,7 +673,8 @@
 
                 // Clear cart after successful order
                 appState.cart = [];
-                renderCart();
+                cartItemCount.textContent = 0; // Update header count
+                // No need to re-render cart content here as it was in a modal that's now closed.
 
             } catch (err) {
                 modalErrorText.textContent = err.message;
@@ -678,7 +689,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             fetchShopSettings();
             fetchMenuItems();
-            renderCart(); // Initial render of empty cart
+            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0); // Initial count
 
             // Event delegation for Add to Cart buttons
             menuItemsContainer.addEventListener('click', (e) => {
@@ -689,31 +700,8 @@
                 }
             });
 
-            // Event delegation for cart quantity and remove buttons
-            cartItemsList.addEventListener('click', (e) => {
-                const decreaseButton = e.target.closest('.quantity-decrease-button');
-                const increaseButton = e.target.closest('.quantity-increase-button');
-                const removeButton = e.target.closest('.remove-from-cart-button');
-
-                if (decreaseButton) {
-                    updateCartQuantity(decreaseButton.dataset.id, -1);
-                } else if (increaseButton) {
-                    updateCartQuantity(increaseButton.dataset.id, 1);
-                } else if (removeButton) {
-                    removeFromCart(removeButton.dataset.id);
-                }
-            });
-
-            viewCartButton.addEventListener('click', () => {
-                // On mobile, this button could scroll to the cart section or open a cart modal
-                // For simplicity, it will just scroll to the cart section on all devices
-                document.getElementById('cart-items-list').scrollIntoView({ behavior: 'smooth', block: 'start' });
-            });
-
-            checkoutButton.addEventListener('click', showCheckoutModal);
-
-            // Ensure icons are rendered
-            lucide.createIcons();
+            // View Cart Button (opens the cart modal)
+            viewCartButton.addEventListener('click', renderCartContentInModal);
         });
     </script>
 </body>
