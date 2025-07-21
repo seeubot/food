@@ -48,42 +48,19 @@
             align-items: center;
             gap: 1rem;
         }
-        .header-icon {
+        /* Style for the new JAR button */
+        .header-jar-button {
             font-size: 1.5rem;
+            font-weight: 700;
             color: #ffffff;
             cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 50%;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            background-color: rgba(255,255,255,0.1);
             transition: background-color 0.2s;
         }
-        .header-icon:hover {
-            background-color: rgba(255,255,255,0.1);
-        }
-        .search-input-container {
-            position: absolute;
-            top: 100%; /* Below the header */
-            left: 0;
-            width: 100%;
-            background-color: #2a2a2a; /* Darker gray for search */
-            padding: 0.75rem 1rem;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            z-index: 99;
-            display: none; /* Hidden by default */
-        }
-        .search-input-container.active {
-            display: block;
-        }
-        .search-input {
-            width: 100%;
-            background-color: #3a3a3a; /* Even darker gray */
-            border: 1px solid #555555;
-            border-radius: 0.75rem;
-            padding: 0.75rem 1rem;
-            color: #ffffff;
-            font-size: 1rem;
-        }
-        .search-input::placeholder {
-            color: #aaaaaa;
+        .header-jar-button:hover {
+            background-color: rgba(255,255,255,0.2);
         }
         .header-cart-btn {
             background-color: #333333; /* Dark gray for cart button */
@@ -317,6 +294,12 @@
             z-index: 1000;
             border-top-left-radius: 1.5rem;
             border-top-right-radius: 1.5rem;
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out; /* Smooth transition for hiding/showing */
+        }
+        .bottom-nav-hidden {
+            transform: translateY(100%); /* Move out of view */
+            opacity: 0;
+            pointer-events: none; /* Disable interactions when hidden */
         }
         .nav-item {
             display: flex;
@@ -655,7 +638,7 @@
             background-color: #dddddd;
         }
 
-        /* Item Details Modal Navigation Buttons (REMOVED FROM HTML) */
+        /* Item Details Modal Navigation Buttons (REMOVED) */
         .item-details-nav-buttons {
             display: none; /* Hide navigation buttons */
         }
@@ -673,9 +656,7 @@
             .header-left span { /* Hello, User! */
                 font-size: 0.9rem;
             }
-            .header-icon {
-                font-size: 1.3rem;
-            }
+            /* .header-icon { Removed, replaced by .header-jar-button } */
             .menu-container {
                 padding: 1rem;
             }
@@ -766,7 +747,8 @@
     <!-- Header -->
     <header class="header" id="main-header">
         <div class="header-left">
-            <i class="fas fa-search header-icon" id="search-icon"></i>
+            <!-- Replaced search icon with JAR button -->
+            <span class="header-jar-button" id="jar-button">JAR</span>
             <span class="text-white text-lg font-semibold hidden sm:block">Hello, User!</span>
         </div>
         <div class="header-right">
@@ -777,10 +759,7 @@
         </div>
     </header>
 
-    <!-- Search Input Container -->
-    <div id="search-input-container" class="search-input-container">
-        <input type="text" id="search-input" class="search-input" placeholder="Search for food...">
-    </div>
+    <!-- Search Input Container (REMOVED) -->
 
     <main class="menu-container" id="home-screen">
         <!-- Featured Item Section -->
@@ -822,8 +801,8 @@
     <section id="order-tracking-section" class="order-tracking-section hidden menu-container">
         <h2>Track Your Order</h2>
         <div class="form-group">
-            <label for="track-order-id">Enter Order ID:</label>
-            <input type="text" id="track-order-id" placeholder="e.g., 65b3c4f5a6d7e8f9a0b1c2d3">
+            <label for="track-order-id">Enter Order ID or PIN:</label>
+            <input type="text" id="track-order-id" placeholder="e.g., JAR12345ABC or 1234567890">
         </div>
         <button id="track-order-btn" class="btn-primary w-full">
             <span id="track-order-loader" class="loader hidden"></span>
@@ -831,6 +810,7 @@
         </button>
         <div id="order-status-display" class="order-status-display hidden">
             <p>Order ID: <span id="tracked-order-id" class="font-semibold"></span></p>
+            <p>PIN: <span id="tracked-order-pin" class="font-semibold"></span></p>
             <p>Status: <span id="tracked-order-status" class="status-text"></span></p>
             <p>Total: ₹<span id="tracked-order-total"></span></p>
             <p>Items:</p>
@@ -924,7 +904,7 @@
     </div>
 
     <!-- Bottom Navigation Bar -->
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" id="bottom-nav">
         <div class="nav-item active" data-target="home-screen">
             <i class="fas fa-home"></i>
             <span>Home</span>
@@ -967,6 +947,7 @@
         const trackOrderText = document.getElementById('track-order-text');
         const orderStatusDisplay = document.getElementById('order-status-display');
         const trackedOrderIdSpan = document.getElementById('tracked-order-id');
+        const trackedOrderPinSpan = document.getElementById('tracked-order-pin'); // New PIN display
         const trackedOrderStatusSpan = document.getElementById('tracked-order-status');
         const trackedOrderTotalSpan = document.getElementById('tracked-order-total');
         const trackedOrderItemsList = document.getElementById('tracked-order-items');
@@ -991,7 +972,6 @@
         const itemDetailsIncreaseBtn = document.getElementById('item-details-increase-btn');
         const itemDetailsAddToCartBtn = document.getElementById('item-details-add-to-cart-btn');
         const itemDetailsMessage = document.getElementById('item-details-message');
-        // itemDetailsPrevBtn and itemDetailsNextBtn are removed from HTML and thus not referenced here
 
         // New elements for redesigned layout
         const featuredItemSection = document.getElementById('featured-item-section');
@@ -1002,12 +982,11 @@
         const featuredOrderBtn = document.getElementById('featured-order-btn');
         const categoryButtonsContainer = document.getElementById('category-buttons-container');
         const popularNowGrid = document.getElementById('popular-now-grid');
-        const seeMorePopularBtn = document.getElementById('see-more-popular-btn');
-        const searchIcon = document.getElementById('search-icon');
-        const searchInputContainer = document.getElementById('search-input-container');
-        const searchInput = document.getElementById('search-input');
+        const seeMorePopularBtn = document.getElementById('see-more-popular-btn'); // This button is now hidden by CSS
+        const jarButton = document.getElementById('jar-button'); // New JAR button
         const headerCartBtn = document.getElementById('header-cart-btn'); // Cart button in header
         const cartCountSpan = document.getElementById('cart-count'); // Cart count in header
+        const bottomNav = document.getElementById('bottom-nav'); // Reference to the bottom navigation
 
         let cart = [];
         let menuItems = [];
@@ -1193,8 +1172,9 @@
             popularNowGrid.innerHTML = '';
             const filteredItems = menuItems.filter(item => {
                 const matchesCategory = currentActiveCategory === 'All' || item.category === currentActiveCategory;
-                const matchesSearch = searchInput.value.trim() === '' || item.name.toLowerCase().includes(searchInput.value.trim().toLowerCase()) || item.description.toLowerCase().includes(searchInput.value.trim().toLowerCase());
-                return matchesCategory && matchesSearch && item.isAvailable;
+                // Search input is removed, so this part of filtering is also removed.
+                // const matchesSearch = searchInput.value.trim() === '' || item.name.toLowerCase().includes(searchInput.value.trim().toLowerCase()) || item.description.toLowerCase().includes(searchInput.value.trim().toLowerCase());
+                return matchesCategory && item.isAvailable;
             });
 
             filteredItems.sort((a, b) => {
@@ -1204,7 +1184,7 @@
             });
 
             if (filteredItems.length === 0) {
-                popularNowGrid.innerHTML = '<p class="text-center text-gray-400 w-full">No items found in this category or matching your search.</p>';
+                popularNowGrid.innerHTML = '<p class="text-center text-gray-400 w-full">No items found in this category.</p>';
                 return;
             }
 
@@ -1213,7 +1193,7 @@
                 card.className = 'menu-item-card';
                 card.dataset.itemId = item._id;
                 card.innerHTML = `
-                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
+                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDE R_IMAGE}';">
                     <div class="item-details">
                         <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                         <div class="stars">
@@ -1336,6 +1316,7 @@
                     mapAddressDisplay.textContent = 'Drag marker or click map to select location';
                 } else if (e.target.closest('#item-details-modal')) {
                     itemDetailsMessage.classList.add('hidden');
+                    bottomNav.classList.remove('bottom-nav-hidden'); // Show bottom nav when closing item details
                 }
             });
         });
@@ -1352,6 +1333,7 @@
             if (event.target === itemDetailsModal) {
                 itemDetailsModal.style.display = 'none';
                 itemDetailsMessage.classList.add('hidden');
+                bottomNav.classList.remove('bottom-nav-hidden'); // Show bottom nav when clicking outside item details
             }
         });
 
@@ -1385,6 +1367,7 @@
             }
             renderItemDetailsModalContent(menuItems[currentItemIndexInModal]);
             itemDetailsModal.style.display = 'flex';
+            bottomNav.classList.add('bottom-nav-hidden'); // Hide bottom nav when opening item details
         }
 
         itemDetailsDecreaseBtn.addEventListener('click', () => updateQuantityInModal('decrease'));
@@ -1401,6 +1384,7 @@
                 setTimeout(() => {
                     itemDetailsModal.style.display = 'none';
                     itemDetailsMessage.classList.add('hidden');
+                    bottomNav.classList.remove('bottom-nav-hidden'); // Show bottom nav after adding to cart and closing modal
                     showSection('home-screen'); // Show main menu
                 }, 800); // Give a short delay for message to be seen
             } else {
@@ -1598,7 +1582,7 @@
 
                     // Step 2: Open Razorpay Checkout
                     const options = {
-                        key: 'YOUR_RAZORPAY_KEY_ID', // Replace with your actual Razorpay Key ID (e.g., from .env, but hardcoded here for frontend example)
+                        key: 'rzp_test_YOUR_KEY_ID', // Replace with your actual Razorpay Key ID
                         amount: totalAmount * 100, // Amount in paisa
                         currency: 'INR',
                         name: 'Delicious Bites',
@@ -1622,7 +1606,7 @@
                                 const verifyResult = await verifyResponse.json();
 
                                 if (verifyResponse.ok) {
-                                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Payment successful! Order placed. Order ID: ' + verifyResult.orderId.substring(0, 6) + '...');
+                                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Payment successful! Order placed. Order ID: ' + verifyResult.orderId + '...');
                                     cart = [];
                                     selectedDeliveryLocation = null;
                                     deliveryAddressInput.value = '';
@@ -1630,7 +1614,7 @@
                                     setTimeout(() => {
                                         cartModal.style.display = 'none';
                                         showSection('order-tracking-section');
-                                        trackOrderIdInput.value = verifyResult.orderId;
+                                        trackOrderIdInput.value = verifyResult.orderId; // Use customOrderId
                                         trackOrder();
                                     }, 2000);
                                 } else {
@@ -1687,7 +1671,7 @@
                     const result = await response.json();
 
                     if (response.ok) {
-                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Order placed successfully! Order ID: ' + result.orderId.substring(0, 6) + '...');
+                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Order placed successfully! Order ID: ' + result.orderId + '...');
                         cart = [];
                         selectedDeliveryLocation = null;
                         deliveryAddressInput.value = '';
@@ -1695,7 +1679,7 @@
                         setTimeout(() => {
                             cartModal.style.display = 'none';
                             showSection('order-tracking-section');
-                            trackOrderIdInput.value = result.orderId;
+                            trackOrderIdInput.value = result.orderId; // Use customOrderId
                             trackOrder();
                         }, 2000);
                     } else {
@@ -1714,9 +1698,9 @@
 
         // --- Order Tracking Logic ---
         async function trackOrder() {
-            const orderId = trackOrderIdInput.value.trim();
-            if (!orderId) {
-                trackOrderMessage.textContent = 'Please enter an Order ID.';
+            const orderIdOrPin = trackOrderIdInput.value.trim();
+            if (!orderIdOrPin) {
+                trackOrderMessage.textContent = 'Please enter an Order ID or PIN.';
                 trackOrderMessage.className = 'message mt-3 error';
                 trackOrderMessage.classList.add('hidden');
                 orderStatusDisplay.classList.add('hidden');
@@ -1728,13 +1712,15 @@
             orderStatusDisplay.classList.add('hidden');
 
             try {
-                const response = await fetch(`/api/order/${orderId}`);
+                // Use the new /api/order/:id endpoint which handles both customOrderId and pinId
+                const response = await fetch(`/api/order/${orderIdOrPin}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const order = await response.json();
 
-                trackedOrderIdSpan.textContent = order._id;
+                trackedOrderIdSpan.textContent = order.customOrderId;
+                trackedOrderPinSpan.textContent = order.pinId;
                 trackedOrderStatusSpan.textContent = order.status;
                 trackedOrderStatusSpan.className = `status-text status-${order.status.replace(/\s/g, '')}`;
                 trackedOrderTotalSpan.textContent = order.totalAmount.toFixed(2);
@@ -1775,6 +1761,9 @@
             mapModal.style.display = 'none';
             itemDetailsModal.style.display = 'none';
 
+            // Ensure bottom nav is visible when switching sections
+            bottomNav.classList.remove('bottom-nav-hidden');
+
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
 
             if (targetId === 'home-screen') {
@@ -1803,25 +1792,10 @@
             });
         });
 
-        // Search functionality
-        searchIcon.addEventListener('click', () => {
-            searchInputContainer.classList.toggle('active');
-            if (searchInputContainer.classList.contains('active')) {
-                searchInput.focus();
-            } else {
-                searchInput.value = '';
-                filterAndRenderPopularItems();
-            }
+        // JAR button functionality
+        jarButton.addEventListener('click', () => {
+            showSection('order-tracking-section');
         });
-
-        searchInput.addEventListener('input', () => {
-            filterAndRenderPopularItems();
-        });
-
-        // "See More" button for Popular Now (now hidden by CSS)
-        // seeMorePopularBtn.addEventListener('click', () => {
-        //     popularNowGrid.scrollBy({ left: popularNowGrid.scrollWidth, behavior: 'smooth' });
-        // });
 
 
         // --- Initialize on page load ---
