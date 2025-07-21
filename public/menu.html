@@ -555,49 +555,192 @@
             display: none !important;
         }
 
-        /* Item Details Modal Styles */
+        /* Item Details Modal Styles - REDESIGNED */
+        #item-details-modal {
+            background-color: #000000; /* Full black background for immersive feel */
+            align-items: flex-start; /* Align to top for image */
+            padding: 0; /* Remove padding from modal overlay */
+        }
         #item-details-modal .modal-content {
-            max-width: 500px;
-            padding: 1.5rem;
-            text-align: center;
+            background-color: #1a1a1a; /* Dark gray for content */
+            width: 100%;
+            max-width: 500px; /* Constrain width */
+            padding: 0; /* Remove internal padding, handled by inner divs */
+            border-radius: 0; /* No border radius for full-screen feel on mobile */
+            box-shadow: none; /* No shadow for full-screen feel */
+            max-height: 100vh; /* Allow full height */
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Close button repositioned for the new design */
+        #item-details-modal .close-button {
+            top: 1rem;
+            left: 1rem; /* Position top-left */
+            right: auto;
+            z-index: 1010; /* Above image */
+            background-color: rgba(0,0,0,0.5); /* Darker background for contrast */
+            color: #ffffff;
+        }
+
+        #item-details-image-container {
+            width: 100%;
+            height: 300px; /* Fixed height for image */
+            overflow: hidden;
+            position: relative;
+            border-bottom-left-radius: 1.5rem; /* Rounded bottom corners for image */
+            border-bottom-right-radius: 1.5rem;
         }
         #item-details-image {
-            width: 180px;
-            height: 180px;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            border-radius: 50%;
-            margin: 0 auto 1.5rem auto;
-            border: 4px solid #ffffff; /* White border */
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+        #item-details-content {
+            padding: 1.5rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #item-details-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
         }
         #item-details-name {
             font-size: 2rem;
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            color: #ffffff;
+            line-height: 1.2;
         }
-        #item-details-stars {
-            color: #000000; /* Black stars */
-            margin-bottom: 1rem;
+        #item-details-rating {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: #bbbbbb; /* Light gray for rating text */
+            font-size: 0.9rem;
+        }
+        #item-details-rating .stars {
+            color: #ffc107; /* Gold stars */
             font-size: 1.1rem;
-            -webkit-text-stroke: 0.5px #ffffff; /* White stroke for visibility */
+            -webkit-text-stroke: 0; /* Remove stroke for gold stars */
         }
         #item-details-description {
             font-size: 1rem;
             color: #cccccc;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
-        #item-details-price {
-            font-size: 1.5rem;
+
+        /* Latest Reviews Section */
+        .reviews-section {
+            background-color: #2a2a2a;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .reviews-section h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #ffffff;
+        }
+        .review-item {
+            font-size: 0.9rem;
+            color: #cccccc;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Ingredients Section */
+        .ingredients-section {
+            background-color: #2a2a2a;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .ingredients-section h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #ffffff;
+        }
+        .ingredients-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: center;
+        }
+        .ingredient-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #333333;
+            border-radius: 0.75rem;
+            padding: 0.75rem;
+            width: 80px; /* Fixed width for ingredient icon/text */
+            text-align: center;
+            font-size: 0.8rem;
+            color: #cccccc;
+        }
+        .ingredient-item img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Additions Section */
+        .additions-section {
+            background-color: #2a2a2a;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .additions-section h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #ffffff;
+        }
+        .additions-section select {
+            background-color: #333333;
+            border: 1px solid #555555;
+            color: #ffffff;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            width: 100%;
+        }
+        .additions-section select option {
+            background-color: #333333;
+            color: #ffffff;
+        }
+
+        /* Price and Quantity Controls */
+        #item-details-footer {
+            background-color: #2a2a2a; /* Darker background for footer */
+            padding: 1.5rem;
+            border-top-left-radius: 1.5rem;
+            border-top-right-radius: 1.5rem;
+            margin-top: auto; /* Push to bottom */
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        #item-details-price-quantity {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #item-details-price-total {
+            font-size: 1.8rem;
             font-weight: 700;
             color: #bbbbbb; /* Light gray price */
-            margin-bottom: 1.5rem;
         }
         #item-details-quantity-controls {
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
+            gap: 0.5rem; /* Smaller gap */
         }
         #item-details-quantity-controls .quantity-control {
             background-color: #333333;
@@ -717,15 +860,31 @@
             #map {
                 height: 250px;
             }
-            #item-details-image {
-                width: 150px;
-                height: 150px;
+            /* Item details modal specific for mobile */
+            #item-details-modal .modal-content {
+                border-radius: 0; /* No radius for full height on mobile */
+            }
+            #item-details-image-container {
+                height: 250px; /* Slightly smaller image on mobile */
+                border-bottom-left-radius: 1rem;
+                border-bottom-right-radius: 1rem;
+            }
+            #item-details-content {
+                padding: 1rem;
             }
             #item-details-name {
                 font-size: 1.75rem;
             }
-            #item-details-price {
-                font-size: 1.25rem;
+            #item-details-rating .stars {
+                font-size: 1rem;
+            }
+            #item-details-footer {
+                padding: 1rem;
+                border-top-left-radius: 1rem;
+                border-top-right-radius: 1rem;
+            }
+            #item-details-price-total {
+                font-size: 1.5rem;
             }
             #item-details-quantity-controls .quantity-control button {
                 padding: 0.6rem 0.8rem;
@@ -876,29 +1035,69 @@
         </div>
     </div>
 
-    <!-- Item Details Modal -->
+    <!-- Item Details Modal - REDESIGNED -->
     <div id="item-details-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
-            <img id="item-details-image" src="" alt="Item Image" class="mx-auto">
-            <h2 id="item-details-name" class="mb-2"></h2>
-            <div id="item-details-stars" class="stars">
-                <!-- Stars will be generated here -->
+            <div id="item-details-image-container">
+                <img id="item-details-image" src="" alt="Item Image">
             </div>
-            <p id="item-details-description" class="mb-3"></p>
-            <div id="item-details-price" class="mb-4"></div>
+            <div id="item-details-content">
+                <div id="item-details-header">
+                    <h2 id="item-details-name"></h2>
+                    <div id="item-details-rating">
+                        <span id="item-details-star-rating"></span>
+                        <div class="stars" id="item-details-stars">
+                            <!-- Stars will be generated here -->
+                        </div>
+                    </div>
+                </div>
+                <p id="item-details-description"></p>
 
-            <div id="item-details-quantity-controls" class="flex justify-center items-center gap-4 mb-4">
-                <div class="quantity-control">
-                    <button id="item-details-decrease-btn">-</button>
-                    <span id="item-details-quantity">0</span>
-                    <button id="item-details-increase-btn">+</button>
+                <!-- Latest Reviews Section -->
+                <div class="reviews-section">
+                    <h3>Latest Reviews</h3>
+                    <div id="latest-reviews-content">
+                        <p class="review-item">⭐⭐⭐⭐⭐ "Absolutely delicious! Highly recommend." - User A</p>
+                        <p class="review-item">⭐⭐⭐⭐ "Great taste, good portion size." - User B</p>
+                        <p class="review-item">⭐⭐⭐⭐⭐ "My go-to comfort food!" - User C</p>
+                    </div>
+                </div>
+
+                <!-- Ingredients Section -->
+                <div class="ingredients-section">
+                    <h3>Ingredients</h3>
+                    <div id="ingredients-grid" class="ingredients-grid">
+                        <!-- Ingredient items will be dynamically added here -->
+                    </div>
+                </div>
+
+                <!-- Additions Section -->
+                <div class="additions-section">
+                    <h3>Additions</h3>
+                    <select id="item-details-additions-select">
+                        <option value="">No additions</option>
+                        <option value="extra_sauce">+ Extra Sauce (₹20)</option>
+                        <option value="cheese_burst">+ Cheese Burst (₹50)</option>
+                        <option value="extra_veg">+ Extra Veggies (₹30)</option>
+                    </select>
                 </div>
             </div>
-            <button id="item-details-add-to-cart-btn" class="btn-primary w-full">Add to Cart</button>
-            <p id="item-details-message" class="message mt-3"></p>
 
-            <!-- Item Details Navigation Buttons (REMOVED) -->
+            <div id="item-details-footer">
+                <div id="item-details-price-quantity">
+                    <div id="item-details-price-total">₹0.00</div>
+                    <div id="item-details-quantity-controls">
+                        <div class="quantity-control">
+                            <button id="item-details-decrease-btn">-</button>
+                            <span id="item-details-quantity">0</span>
+                            <button id="item-details-increase-btn">+</button>
+                        </div>
+                    </div>
+                </div>
+                <button id="item-details-add-to-cart-btn" class="btn-primary w-full">Add to Cart</button>
+                <p id="item-details-message" class="message mt-3 hidden"></p>
+            </div>
         </div>
     </div>
 
@@ -959,13 +1158,17 @@
         const confirmLocationBtn = document.getElementById('confirm-location-btn');
         const centerLiveLocationBtn = document.getElementById('center-live-location-btn');
 
-        // Item Details Modal Elements
+        // Item Details Modal Elements - REDESIGNED
         const itemDetailsModal = document.getElementById('item-details-modal');
         const itemDetailsImage = document.getElementById('item-details-image');
         const itemDetailsName = document.getElementById('item-details-name');
-        const itemDetailsStars = document.getElementById('item-details-stars');
+        const itemDetailsStarRating = document.getElementById('item-details-star-rating'); // For numerical rating
+        const itemDetailsStars = document.getElementById('item-details-stars'); // For star icons
         const itemDetailsDescription = document.getElementById('item-details-description');
-        const itemDetailsPrice = document.getElementById('item-details-price');
+        const latestReviewsContent = document.getElementById('latest-reviews-content'); // New reviews section
+        const ingredientsGrid = document.getElementById('ingredients-grid'); // New ingredients section
+        const itemDetailsAdditionsSelect = document.getElementById('item-details-additions-select'); // New additions select
+        const itemDetailsPriceTotal = document.getElementById('item-details-price-total'); // Total price in footer
         const itemDetailsQuantitySpan = document.getElementById('item-details-quantity');
         const itemDetailsDecreaseBtn = document.getElementById('item-details-decrease-btn');
         const itemDetailsIncreaseBtn = document.getElementById('item-details-increase-btn');
@@ -1000,6 +1203,21 @@
         let currentActiveCategory = 'All'; // Track active category for filtering
 
         const PLACEHOLDER_IMAGE = 'https://placehold.co/400x180/333333/ffffff?text=No+Image';
+
+        // Placeholder for ingredient images (replace with actual paths/URLs if available)
+        const INGREDIENT_ICONS = {
+            "rice": "https://placehold.co/40x40/555555/ffffff?text=Rice",
+            "chicken": "https://placehold.co/40x40/555555/ffffff?text=Chicken",
+            "vegetables": "https://placehold.co/40x40/555555/ffffff?text=Veg",
+            "sauce": "https://placehold.co/40x40/555555/ffffff?text=Sauce",
+            "cheese": "https://placehold.co/40x40/555555/ffffff?text=Cheese",
+            "bread": "https://placehold.co/40x40/555555/ffffff?text=Bread",
+            "meat": "https://placehold.co/40x40/555555/ffffff?text=Meat",
+            "salad": "https://placehold.co/40x40/555555/ffffff?text=Salad",
+            "spices": "https://placehold.co/40x40/555555/ffffff?text=Spices",
+            "oil": "https://placehold.co/40x40/555555/ffffff?text=Oil"
+        };
+
 
         // --- Global Error Redirection ---
         function redirectToErrorPage(message = 'An unexpected error occurred. Redirecting...', delay = 3000) {
@@ -1192,7 +1410,7 @@
                 card.className = 'menu-item-card';
                 card.dataset.itemId = item._id;
                 card.innerHTML = `
-                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
+                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHELDER_IMAGE}';">
                     <div class="item-details">
                         <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                         <div class="stars">
@@ -1226,12 +1444,16 @@
 
         function updateQuantityInModal(action) {
             let currentQuantity = parseInt(itemDetailsQuantitySpan.textContent);
+            const currentItem = menuItems[currentItemIndexInModal];
+            let currentPrice = currentItem.price;
+
             if (action === 'increase') {
                 currentQuantity++;
             } else if (action === 'decrease' && currentQuantity > 0) {
                 currentQuantity--;
             }
             itemDetailsQuantitySpan.textContent = currentQuantity;
+            itemDetailsPriceTotal.textContent = `₹${(currentPrice * currentQuantity).toFixed(2)}`;
         }
 
         function addToCart(itemId, quantity) {
@@ -1343,17 +1565,39 @@
             }
         });
 
-        // Item Details Modal Functions
+        // Item Details Modal Functions - REDESIGNED
         function renderItemDetailsModalContent(item) {
             itemDetailsImage.src = item.imageUrl || PLACEHOLDER_IMAGE;
             itemDetailsImage.onerror = () => { itemDetailsImage.onerror=null; itemDetailsImage.src=PLACEHOLDER_IMAGE; };
             itemDetailsName.textContent = item.name;
             itemDetailsDescription.textContent = item.description || 'No description available.';
-            itemDetailsPrice.textContent = `₹${item.price.toFixed(2)}`;
-            itemDetailsStars.innerHTML = generateStarRating(item.rating || 4.5);
+            
+            const rating = item.rating || 4.5;
+            itemDetailsStarRating.textContent = rating.toFixed(1); // Display numerical rating
+            itemDetailsStars.innerHTML = generateStarRating(rating); // Display star icons
+
+            // Render Ingredients (using placeholder icons for now)
+            ingredientsGrid.innerHTML = '';
+            const itemIngredients = item.ingredients || ['rice', 'chicken', 'vegetables', 'sauce']; // Placeholder ingredients
+            itemIngredients.slice(0, 4).forEach(ingredient => { // Limit to 4 for display
+                const ingredientName = ingredient.toLowerCase();
+                const iconSrc = INGREDIENT_ICONS[ingredientName] || INGREDIENT_ICONS['oil']; // Fallback icon
+                const div = document.createElement('div');
+                div.className = 'ingredient-item';
+                div.innerHTML = `
+                    <img src="${iconSrc}" alt="${ingredientName}">
+                    <span>${ingredientName.charAt(0).toUpperCase() + ingredientName.slice(1)}</span>
+                `;
+                ingredientsGrid.appendChild(div);
+            });
+
+            // Additions (placeholder)
+            itemDetailsAdditionsSelect.value = ''; // Reset selection
 
             const itemInCart = cart.find(cartItem => cartItem.productId === item._id);
-            itemDetailsQuantitySpan.textContent = itemInCart ? itemInCart.quantity : 0;
+            const quantityInCart = itemInCart ? itemInCart.quantity : 0;
+            itemDetailsQuantitySpan.textContent = quantityInCart;
+            itemDetailsPriceTotal.textContent = `₹${(item.price * quantityInCart).toFixed(2)}`;
 
             itemDetailsMessage.classList.add('hidden');
         }
