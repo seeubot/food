@@ -318,7 +318,22 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
     client.on('message', async msg => {
         const chatId = msg.from;
         const text = msg.body.toLowerCase().trim();
-        const customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
+
+        // MODIFICATION START: Robust customerPhone extraction and validation
+        let customerPhone;
+        if (chatId && typeof chatId === 'string') {
+            customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
+            customerPhone = customerPhone.trim(); // Ensure no leading/trailing whitespace
+        }
+
+        if (!customerPhone) {
+            console.error(`[WhatsApp Message Handler] Invalid or empty customerPhone derived from chatId: '${chatId}'. Skipping message processing for this message.`);
+            // Optionally, send a message back to the user that their number is unrecognized
+            // await client.sendMessage(chatId, "Sorry, I couldn't identify your number. Please ensure your WhatsApp is linked to a valid phone number.");
+            return; // Exit early if phone number is invalid
+        }
+        // MODIFICATION END
+
         const customerName = msg._data.notifyName;
 
         if (msg.hasMedia && msg.type === 'location' && msg.location) {
@@ -908,7 +923,7 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
 app.delete('/api/admin/orders/:id', authenticateToken, async (req, res) => {
     try {
         const deletedOrder = await Order.findByIdAndDelete(req.params.id);
-        if (!deletedOrder) return res.status(404).json({ message: 'Order not found' });
+        if (!deletedOrder) return res.status(404).json({ message: 'Item not found' });
         res.json({ message: 'Order deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting order', error: error.message });
