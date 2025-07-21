@@ -19,7 +19,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            padding-bottom: 4rem; /* Space for fixed bottom nav */
+            padding-bottom: 5rem; /* Increased space for fixed bottom nav */
         }
 
         /* Header styles */
@@ -220,31 +220,21 @@
         /* Popular Now / Menu Grid */
         .menu-grid-container {
             display: flex;
-            flex-wrap: wrap; /* Allow items to wrap to next line on small screens */
+            flex-wrap: wrap; /* Allow items to wrap to next line on all screens */
             justify-content: center; /* Center items when wrapping */
             gap: 1.5rem;
             padding-bottom: 1rem;
-            /* Remove horizontal scroll by default for mobile */
-            overflow-x: hidden;
-            scroll-snap-type: none;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            scroll-snap-type: none; /* Remove scroll snapping */
         }
         .menu-grid-container::-webkit-scrollbar {
             display: none;
         }
 
-        /* On larger screens, revert to horizontal scroll */
-        @media (min-width: 768px) { /* md breakpoint and up */
-            .menu-grid-container {
-                flex-wrap: nowrap; /* Prevent wrapping */
-                overflow-x: auto; /* Enable horizontal scroll */
-                scroll-snap-type: x mandatory;
-            }
-        }
-
         .menu-item-card {
             flex-shrink: 0;
-            /* Using clamp for responsive width */
-            width: clamp(160px, 45vw, 250px); /* Min 160px, preferred 45% viewport width, Max 250px */
+            /* Calculate width for 2 items per row on mobile with 1.5rem gap */
+            width: calc((100% - 1.5rem) / 2);
             background-color: #1a1a1a; /* Dark gray */
             border-radius: 1.25rem;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
@@ -253,13 +243,21 @@
             flex-direction: column;
             transition: transform 0.2s ease-in-out;
             cursor: pointer;
-            /* Remove scroll-snap-align by default for mobile vertical stacking */
-            scroll-snap-align: none;
+            scroll-snap-align: none; /* Remove scroll snapping */
         }
-        /* On larger screens, re-enable scroll-snap-align */
-        @media (min-width: 768px) {
+
+        /* Responsive adjustments for larger screens (e.g., tablet and desktop) */
+        @media (min-width: 640px) { /* sm breakpoint */
             .menu-item-card {
-                scroll-snap-align: start;
+                /* For 3 items per row on small tablets */
+                width: calc((100% - 2 * 1.5rem) / 3); /* (Total width - 2*gap) / 3 */
+            }
+        }
+
+        @media (min-width: 768px) { /* md breakpoint */
+            .menu-item-card {
+                /* For 4 items per row on larger tablets/desktops */
+                width: calc((100% - 3 * 1.5rem) / 4); /* (Total width - 3*gap) / 4 */
             }
         }
 
@@ -298,18 +296,8 @@
             margin-top: auto;
         }
         .see-more-btn {
-            background-color: #333333;
-            color: #ffffff;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            margin-top: 1.5rem;
-            width: fit-content;
-            align-self: center;
-            transition: background-color 0.2s;
-        }
-        .see-more-btn:hover {
-            background-color: #555555;
+            /* Hidden as horizontal scroll is removed */
+            display: none;
         }
 
         /* Bottom Navigation Bar */
@@ -738,11 +726,7 @@
                 padding: 0.6rem 1rem;
                 font-size: 0.9rem;
             }
-            /* Menu item cards for mobile: allow wrapping, adjust size */
-            .menu-item-card {
-                width: clamp(150px, 46vw, 200px); /* Tighter clamp for mobile, allowing 2 per row */
-                margin-bottom: 1rem; /* Add some vertical spacing when wrapping */
-            }
+            /* Menu item cards for mobile: already handled by calc() in base style */
             .menu-item-card img {
                 height: 100px;
                 border-bottom-left-radius: 0.5rem;
@@ -797,9 +781,9 @@
                 padding: 0.6rem 0.8rem;
                 font-size: 1rem;
             }
-            /* Ensure see more button is centered on mobile */
+            /* Ensure see more button is hidden on mobile */
             #see-more-popular-btn {
-                width: 100%;
+                display: none;
             }
         }
     </style>
@@ -850,6 +834,7 @@
             <div id="popular-now-grid" class="menu-grid-container">
                 <!-- Popular items will be rendered here -->
             </div>
+            <!-- "See More" button is now hidden by CSS for all screen sizes -->
             <button id="see-more-popular-btn" class="see-more-btn mx-auto">See More</button>
         </section>
 
@@ -1784,13 +1769,10 @@
             filterAndRenderPopularItems();
         });
 
-        // "See More" button for Popular Now
-        seeMorePopularBtn.addEventListener('click', () => {
-            // On mobile, this button is less about scrolling and more about showing all.
-            // For desktop, it can still scroll.
-            // For now, let's keep it simple and just scroll if overflow is present.
-            popularNowGrid.scrollBy({ left: popularNowGrid.scrollWidth, behavior: 'smooth' });
-        });
+        // "See More" button for Popular Now (now hidden by CSS)
+        // seeMorePopularBtn.addEventListener('click', () => {
+        //     popularNowGrid.scrollBy({ left: popularNowGrid.scrollWidth, behavior: 'smooth' });
+        // });
 
 
         // --- Initialize on page load ---
