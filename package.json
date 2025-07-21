@@ -1,13 +1,21 @@
 {
-  "name": "whatsapp-food-ordering-bot-admin",
+  "name": "delicious-bites-backend",
   "version": "1.0.0",
-  "description": "Admin panel and backend for a WhatsApp food ordering bot with 2FA.",
-  "main": "index.js",
+  "description": "Backend server for Delicious Bites food ordering bot with WhatsApp integration and Razorpay.",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "whatsapp-bot",
+    "food-ordering",
+    "razorpay",
+    "nodejs",
+    "express",
+    "mongodb"
+  ],
+  "author": "Your Name/Company",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -18,9 +26,12 @@
     "mongoose": "^8.4.1",
     "node-cron": "^3.0.3",
     "qrcode": "^1.5.3",
+    "razorpay": "^2.9.4",
     "socket.io": "^4.7.5",
     "speakeasy": "^2.0.0",
     "whatsapp-web.js": "^1.23.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.3"
   }
 }
-
