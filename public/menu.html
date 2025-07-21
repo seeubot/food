@@ -47,28 +47,11 @@
             align-items: center;
             gap: 1rem;
         }
-        .header-icon { /* Hamburger, User Avatar */
-            font-size: 1.5rem;
-            color: #1A1A1A; /* Dark icon */
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 50%;
-            transition: background-color 0.2s;
-        }
-        .header-icon:hover {
-            background-color: rgba(0,0,0,0.1);
-        }
+        /* Removed .header-icon and .header-avatar styles as they are removed */
         .header-title {
             font-size: 1.5rem;
             font-weight: 700;
             color: #1A1A1A;
-        }
-        .header-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #1A1A1A;
         }
         .header-cart-btn {
             background-color: #1A1A1A; /* Dark button */
@@ -219,7 +202,7 @@
         }
 
 
-        /* Menu Item List - Inspired by Image 2 */
+        /* Menu Item List - Inspired by Image 2 - More Attractive */
         .menu-list-section {
             margin-bottom: 2rem;
         }
@@ -236,28 +219,28 @@
         }
         .menu-list-item-card {
             background-color: #FFFFFF; /* White card background */
-            border-radius: 1rem;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            border-radius: 1.25rem; /* Slightly more rounded */
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08); /* More prominent shadow */
             display: flex;
             align-items: center;
-            padding: 0.75rem 1rem;
+            padding: 1rem 1.25rem; /* Increased padding */
             cursor: pointer;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s;
             border: 1px solid #E0E0E0;
         }
         .menu-list-item-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            transform: translateY(-5px); /* More pronounced lift */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15); /* Even stronger shadow on hover */
         }
         .menu-list-item-card .item-image-circle {
-            width: 60px;
-            height: 60px;
+            width: 70px; /* Slightly larger image circle */
+            height: 70px;
             border-radius: 50%;
             overflow: hidden;
             flex-shrink: 0;
-            margin-right: 1rem;
-            border: 2px solid #FFD700; /* Yellow border */
-            background-color: #F0F0F0; /* Light background for image circle */
+            margin-right: 1.25rem; /* Increased margin */
+            border: 3px solid #FFD700; /* Thicker yellow border */
+            background-color: #F0F0F0;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -271,26 +254,26 @@
             flex-grow: 1;
         }
         .menu-list-item-card .item-info h3 {
-            font-size: 1.2rem;
-            font-weight: 700;
+            font-size: 1.3rem; /* Slightly larger font */
+            font-weight: 800; /* Bolder */
             color: #1A1A1A;
             margin-bottom: 0.25rem;
         }
         .menu-list-item-card .item-info p {
-            font-size: 0.9rem;
+            font-size: 0.95rem; /* Slightly larger */
             color: #555555;
         }
         .menu-list-item-card .item-price {
-            font-size: 1.1rem;
-            font-weight: 700;
+            font-size: 1.2rem; /* Slightly larger */
+            font-weight: 800; /* Bolder */
             color: #1A1A1A;
-            margin-left: 1rem;
+            margin-left: 1.5rem; /* Increased margin */
             white-space: nowrap;
         }
         .menu-list-item-card .item-arrow {
-            font-size: 1.2rem;
+            font-size: 1.4rem; /* Larger arrow */
             color: #555555;
-            margin-left: 1rem;
+            margin-left: 1.5rem;
             flex-shrink: 0;
         }
 
@@ -517,17 +500,72 @@
         .status-Delivered { color: #1A1A1A; }
         .status-Cancelled { color: #cc0000; }
 
-        /* Map Modal Styles - Adjusted for new theme */
+        /* Map Modal Styles - REDESIGNED */
         #map-modal .modal-content {
-            background-color: #FFFFFF;
-            color: #1A1A1A;
+            background-color: #1A1A1A; /* Dark background for map modal content */
+            color: #ffffff; /* White text */
+            padding: 1.5rem; /* Slightly reduced padding */
+            border-radius: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            max-width: 550px; /* Slightly narrower */
+            display: flex;
+            flex-direction: column;
+        }
+        #map-modal .close-button {
+            background-color: rgba(255,255,255,0.1);
+            color: #ffffff;
+        }
+        #map-modal .close-button:hover {
+            background-color: rgba(255,255,255,0.2);
+        }
+        #map-modal h2 {
+            color: #FFD700; /* Yellow title */
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-align: center;
         }
         #map {
-            background-color: #E0E0E0;
+            height: 300px; /* Fixed height for the map */
+            width: 100%;
+            background-color: #333333;
+            border-radius: 1rem; /* More rounded map */
+            margin-bottom: 1rem;
+            flex-grow: 1;
         }
         #map-address-display {
-            background-color: #F0F0F0;
-            color: #1A1A1A;
+            background-color: #333333; /* Darker background for address display */
+            padding: 0.75rem;
+            border-radius: 0.75rem; /* More rounded */
+            color: #FFD700; /* Yellow text for address */
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            min-height: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            border: 1px solid #555555;
+        }
+        #map-modal .map-action-buttons {
+            display: flex;
+            flex-direction: column; /* Stack buttons vertically */
+            gap: 0.75rem; /* Smaller gap */
+            margin-top: 0.5rem;
+        }
+        #map-modal .map-action-buttons button {
+            flex-grow: 1;
+            background-color: #FFD700; /* Yellow buttons */
+            color: #1A1A1A; /* Dark text */
+            padding: 0.8rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            transition: background-color 0.2s;
+            box-shadow: 0 4px 8px rgba(255,215,0,0.3);
+        }
+        #map-modal .map-action-buttons button:hover {
+            background-color: #FFC107;
         }
         /* Hide Leaflet zoom controls and attribution */
         .leaflet-control-zoom {
@@ -582,31 +620,8 @@
             object-fit: cover;
         }
 
-        /* Item Details Header (inside modal) */
-        #item-details-modal-header-controls {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            display: flex;
-            gap: 0.5rem;
-            z-index: 1010;
-        }
-        #item-details-modal-header-controls .icon-button {
-            background-color: rgba(0,0,0,0.5);
-            color: #ffffff;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        #item-details-modal-header-controls .icon-button:hover {
-            background-color: rgba(0,0,0,0.7);
-        }
+        /* Item Details Header (inside modal) - REMOVED LIKE/DOTS */
+        /* #item-details-modal-header-controls { display: none; } */
 
         #item-details-content {
             padding: 1.5rem;
@@ -762,15 +777,7 @@
             .header-title {
                 font-size: 1.2rem;
             }
-            .header-icon {
-                font-size: 1.3rem;
-                width: 36px;
-                height: 36px;
-            }
-            .header-avatar {
-                width: 36px;
-                height: 36px;
-            }
+            /* Removed .header-icon and .header-avatar responsive styles */
             .header-cart-btn {
                 padding: 0.4rem 0.8rem;
                 font-size: 0.9rem;
@@ -942,11 +949,11 @@
     <!-- Header -->
     <header class="header" id="main-header">
         <div class="header-left">
-            <i class="fas fa-bars header-icon"></i>
+            <!-- Removed hamburger menu icon -->
             <span class="header-title">Food Items</span>
         </div>
         <div class="header-right">
-            <img src="https://placehold.co/40x40/FFD700/1A1A1A?text=U" alt="User Avatar" class="header-avatar">
+            <!-- Removed user avatar -->
             <button id="header-cart-btn" class="header-cart-btn">
                 <i class="fas fa-shopping-cart"></i>
                 <span id="cart-count" class="cart-count hidden">0</span>
@@ -1056,12 +1063,12 @@
     <div id="map-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
-            <h2 class="text-2xl font-bold mb-4">Select Delivery Location</h2>
+            <h2>Select Delivery Location</h2>
             <div id="map"></div>
             <div id="map-address-display" class="text-center">Drag marker or click map to select location</div>
             <div class="map-action-buttons">
-                <button id="center-live-location-btn" class="btn-primary">Center to Live Location</button>
-                <button id="confirm-location-btn" class="btn-primary">Confirm Location</button>
+                <button id="center-live-location-btn">Center to Live Location</button>
+                <button id="confirm-location-btn">Confirm Location</button>
             </div>
         </div>
     </div>
@@ -1072,10 +1079,7 @@
             <span class="close-button">&times;</span>
             <div id="item-details-image-container">
                 <img id="item-details-image" src="" alt="Item Image">
-                <div id="item-details-modal-header-controls">
-                    <div class="icon-button"><i class="fas fa-ellipsis-h"></i></div>
-                    <div class="icon-button"><i class="far fa-heart"></i></div>
-                </div>
+                <!-- Removed like and ... dots as per request -->
             </div>
             <div id="item-details-content">
                 <h2 id="item-details-name"></h2>
@@ -1518,6 +1522,7 @@
         headerCartBtn.addEventListener('click', () => {
             cartModal.style.display = 'flex';
             updateCartDisplay();
+            bottomNav.classList.add('bottom-nav-hidden'); // Hide bottom nav when cart opens
         });
 
         document.querySelectorAll('.close-button').forEach(button => {
@@ -1525,6 +1530,7 @@
                 e.target.closest('.modal').style.display = 'none';
                 if (e.target.closest('#cart-modal')) {
                     checkoutMessage.classList.add('hidden');
+                    bottomNav.classList.remove('bottom-nav-hidden'); // Show bottom nav when cart closes
                 } else if (e.target.closest('#map-modal')) {
                     mapAddressDisplay.textContent = 'Drag marker or click map to select location';
                 } else if (e.target.closest('#item-details-modal')) {
@@ -1538,6 +1544,7 @@
             if (event.target === cartModal) {
                 cartModal.style.display = 'none';
                 checkoutMessage.classList.add('hidden');
+                bottomNav.classList.remove('bottom-nav-hidden'); // Show bottom nav when clicking outside cart
             }
             if (event.target === mapModal) {
                 mapModal.style.display = 'none';
@@ -1660,6 +1667,7 @@
                 map.invalidateSize();
             }
 
+            // Always attempt to center on live location when map modal opens
             centerMapToLiveLocation();
         }
 
@@ -1673,12 +1681,22 @@
                     marker.setLatLng([userLat, userLon]);
                     reverseGeocode(userLat, userLon);
                 }, (error) => {
-                    console.warn('Geolocation failed for initial map view:', error.message);
+                    console.warn('Geolocation failed:', error.message);
+                    let errorMessage = 'Could not get your live location.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMessage += ' Please enable location permissions for this site.';
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        errorMessage += ' Location information is unavailable.';
+                    } else if (error.code === error.TIMEOUT) {
+                        errorMessage += ' The request to get user location timed out.';
+                    }
+                    mapAddressDisplay.textContent = errorMessage + ' Centering on shop location.';
                     map.setView([shopLocation.latitude, shopLocation.longitude], 13);
                     marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
                     reverseGeocode(shopLocation.latitude, shopLocation.longitude);
-                }, { timeout: 5000, enableHighAccuracy: false });
+                }, { timeout: 10000, enableHighAccuracy: true }); // Increased timeout and enabled high accuracy
             } else {
+                mapAddressDisplay.textContent = 'Geolocation is not supported by your browser. Centering on shop location.';
                 map.setView([shopLocation.latitude, shopLocation.longitude], 13);
                 marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
                 reverseGeocode(shopLocation.latitude, shopLocation.longitude);
@@ -1933,10 +1951,10 @@
             });
         });
 
-        // JAR button functionality (now generic hamburger menu)
-        document.querySelector('.header-left .header-icon').addEventListener('click', () => {
-            alert('Hamburger menu clicked! (Placeholder for side navigation)');
-        });
+        // Removed JAR button functionality as per request (hamburger menu is gone)
+        // document.querySelector('.header-left .header-icon').addEventListener('click', () => {
+        //     alert('Hamburger menu clicked! (Placeholder for side navigation)');
+        // });
 
 
         // --- Initialize on page load ---
