@@ -1,7 +1,7 @@
 {
   "name": "delicious-bites-backend",
   "version": "1.0.0",
-  "description": "Backend server for Delicious Bites food ordering bot with WhatsApp integration and Razorpay.",
+  "description": "Backend server for Delicious Bites food ordering bot with WhatsApp integration.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,7 +10,6 @@
   "keywords": [
     "whatsapp-bot",
     "food-ordering",
-    "razorpay",
     "nodejs",
     "express",
     "mongodb"
@@ -26,7 +25,6 @@
     "mongoose": "^8.4.1",
     "node-cron": "^3.0.3",
     "qrcode": "^1.5.3",
-    "razorpay": "^2.9.4",
     "socket.io": "^4.7.5",
     "speakeasy": "^2.0.0",
     "whatsapp-web.js": "^1.23.0"
