@@ -591,9 +591,8 @@
     <script>
         const socket = io();
         const token = localStorage.getItem('adminToken');
-        if (!token) {
-            window.location.href = '/admin/login';
-        }
+        // REMOVED: if (!token) { window.location.href = '/admin/login'; }
+        // The server-side authentication middleware now handles redirection for HTML pages.
 
         // --- DOM Elements ---
         const logoutBtn = document.getElementById('logout-btn');
@@ -724,7 +723,10 @@
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
                         localStorage.removeItem('adminToken');
-                        window.location.href = '/admin/login';
+                        // Server should handle the redirect for HTML pages, but for API calls, we redirect client-side
+                        if (window.location.pathname.startsWith('/dashboard') || window.location.pathname.startsWith('/admin/')) {
+                            window.location.href = '/admin/login';
+                        }
                         return;
                     }
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -755,7 +757,9 @@
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
                         localStorage.removeItem('adminToken');
-                        window.location.href = '/admin/login';
+                        if (window.location.pathname.startsWith('/dashboard') || window.location.pathname.startsWith('/admin/')) {
+                            window.location.href = '/admin/login';
+                        }
                         return;
                     }
                     throw new Error(data.message || `HTTP error! status: ${response.status}`);
@@ -782,7 +786,9 @@
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
                         localStorage.removeItem('adminToken');
-                        window.location.href = '/admin/login';
+                        if (window.location.pathname.startsWith('/dashboard') || window.location.pathname.startsWith('/admin/')) {
+                            window.location.href = '/admin/login';
+                        }
                         return;
                     }
                     throw new Error(data.message || `HTTP error! status: ${response.status}`);
