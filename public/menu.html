@@ -334,7 +334,7 @@
             margin-bottom: 0.25rem;
         }
 
-        /* Modals (Cart, Map, Item Details) */
+        /* Modals (Cart, Map, Item Details, Inconvenience) */
         .modal {
             display: none;
             position: fixed;
@@ -938,6 +938,18 @@
         </div>
     </div>
 
+    <!-- Inconvenience Modal (New) -->
+    <div id="inconvenience-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" data-modal-id="inconvenience-modal">&times;</span>
+            <h2 class="text-2xl font-bold mb-4 text-center">Sorry for the Inconvenience!</h2>
+            <p class="text-center text-lg text-gray-300 mb-6" id="inconvenience-message">
+                We encountered an issue while processing your request. Please try again later.
+            </p>
+            <button id="inconvenience-modal-close-btn" class="btn-primary w-full">Close</button>
+        </div>
+    </div>
+
     <!-- Bottom Navigation Bar -->
     <nav class="bottom-nav" id="bottom-nav">
         <div class="nav-item active" data-target="home-screen">
@@ -1026,6 +1038,12 @@
         const cartCountSpan = document.getElementById('cart-count');
         const bottomNav = document.getElementById('bottom-nav'); // Reference to the bottom navigation
 
+        // Inconvenience Modal Elements (New)
+        const inconvenienceModal = document.getElementById('inconvenience-modal');
+        const inconvenienceMessage = document.getElementById('inconvenience-message');
+        const inconvenienceModalCloseBtn = document.getElementById('inconvenience-modal-close-btn');
+
+
         let cart = [];
         let menuItems = [];
         let deliveryRates = [];
@@ -1040,23 +1058,17 @@
 
         const PLACEHOLDER_IMAGE = 'https://placehold.co/400x180/333333/ffffff?text=No+Image';
 
-        // --- Global Error Redirection ---
-        function redirectToErrorPage(message = 'An unexpected error occurred. Redirecting...', delay = 3000) {
-            console.error(message);
-            const tempMessageDiv = document.createElement('div');
-            tempMessageDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: #cc0000; color: white; padding: 15px 30px; border-radius: 8px; z-index: 2000; font-size: 1.2rem; text-align: center;';
-            tempMessageDiv.textContent = message;
-            document.body.appendChild(tempMessageDiv);
-
-            setTimeout(() => {
-                window.location.href = '/status'; // Redirect to the bot status page as the "index panel"
-            }, delay);
+        // --- Inconvenience Modal Function (New) ---
+        function showInconvenienceModal(message = 'We encountered an issue. Please try again later.') {
+            inconvenienceMessage.textContent = message;
+            inconvenienceModal.style.display = 'flex';
+            toggleBottomNav(false); // Hide bottom nav when modal is open
         }
 
         // Catch unhandled JavaScript errors
         window.onerror = function(message, source, lineno, colno, error) {
             console.error('Unhandled JavaScript Error:', { message, source, lineno, colno, error });
-            redirectToErrorPage('A critical error occurred. Redirecting to status page.', 5000);
+            showInconvenienceModal('A critical error occurred. Please refresh the page or try again later.');
             return true; // Prevent default error handling
         };
 
@@ -1139,7 +1151,7 @@
             } catch (error) {
                 console.error('Error fetching menu:', error);
                 menuSectionsContainer.innerHTML = `<p class="text-center text-red-400">Error loading menu: ${error.message}</p>`;
-                redirectToErrorPage('Failed to load menu. Redirecting...');
+                showInconvenienceModal('Failed to load menu items. Please check your internet connection or try again later.');
             }
         }
 
@@ -1154,7 +1166,7 @@
                 shopLocation = settings.shopLocation;
             } catch (error) {
                 console.error('Error fetching public settings:', error);
-                redirectToErrorPage('Failed to load shop settings. Redirecting...');
+                showInconvenienceModal('Failed to load shop settings. Some features might not work correctly.');
             }
         }
 
@@ -1230,7 +1242,7 @@
                 card.className = 'menu-item-card';
                 card.dataset.itemId = item._id;
                 card.innerHTML = `
-                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHELDER_IMAGE}';">
+                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
                     <div class="item-details">
                         <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                         <div class="item-price">₹${item.price.toFixed(2)}</div>
@@ -1338,6 +1350,8 @@
                     mapAddressDisplay.textContent = 'Drag marker or click map to select location';
                 } else if (e.target.closest('#item-details-modal')) {
                     itemDetailsMessage.classList.add('hidden');
+                } else if (e.target.closest('#inconvenience-modal')) { // New: Inconvenience modal close
+                    // No specific message reset needed for inconvenience modal
                 }
             });
         });
@@ -1358,7 +1372,17 @@
                 itemDetailsMessage.classList.add('hidden');
                 toggleBottomNav(true); // Show bottom nav
             }
+            if (event.target === inconvenienceModal) { // New: Inconvenience modal close
+                inconvenienceModal.style.display = 'none';
+                toggleBottomNav(true); // Show bottom nav
+            }
         });
+
+        inconvenienceModalCloseBtn.addEventListener('click', () => { // New: Inconvenience modal close button
+            inconvenienceModal.style.display = 'none';
+            toggleBottomNav(true); // Show bottom nav
+        });
+
 
         cartItemsList.addEventListener('click', (e) => {
             if (e.target.dataset.action === 'remove-from-cart') {
@@ -1476,6 +1500,7 @@
                     map.setView([shopLocation.latitude, shopLocation.longitude], 13);
                     marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
                     reverseGeocode(shopLocation.latitude, shopLocation.longitude);
+                    showInconvenienceModal('Could not get your live location. Please drag the map marker to your delivery address.');
                 }, { timeout: 5000, enableHighAccuracy: false });
             } else {
                 map.setView([shopLocation.latitude, shopLocation.longitude], 13);
@@ -1512,6 +1537,7 @@
                     longitude: lon,
                     address: `Coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)} (Address lookup failed)`
                 };
+                showInconvenienceModal('Could not fetch address for the selected location. Please try again.');
             }
         }
 
@@ -1627,11 +1653,12 @@
                 } else {
                     const errorMessage = result.message || 'Failed to place order.';
                     hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, errorMessage);
+                    showInconvenienceModal(`Failed to place order: ${errorMessage}`);
                 }
             } catch (error) {
                 console.error('Error placing order:', error);
                 hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred. Please try again.');
-                redirectToErrorPage('Order placement failed due to network error. Redirecting...');
+                showInconvenienceModal('Order placement failed due to a network error. Please check your internet connection.');
             } finally {
                 placeOrderBtn.disabled = false;
             }
@@ -1678,7 +1705,7 @@
             } catch (error) {
                 console.error('Error tracking order:', error);
                 hideLoader(trackOrderLoader, trackOrderText, trackOrderMessage, false, 'Order not found or an error occurred.');
-                redirectToErrorPage('Order tracking failed. Redirecting...');
+                showInconvenienceModal('Failed to track order. Please ensure the Order ID is correct and try again.');
             } finally {
                 trackOrderBtn.disabled = false;
             }
@@ -1700,6 +1727,7 @@
             cartModal.style.display = 'none';
             mapModal.style.display = 'none';
             itemDetailsModal.style.display = 'none';
+            inconvenienceModal.style.display = 'none'; // Ensure inconvenience modal is hidden
             toggleBottomNav(true); // Always show bottom nav when switching main sections
 
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
