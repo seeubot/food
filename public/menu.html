@@ -5,28 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delicious Bites - Online Menu</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Leaflet CSS for map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        /* Custom styles for Black & White theme and layout adjustments */
+        /* Custom styles for Yellow & White theme */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #000000; /* Pure black background */
-            color: #ffffff; /* Pure white text */
+            background-color: #F8F8F8; /* Light background for the main content area */
+            color: #1A1A1A; /* Dark text for contrast */
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            padding-bottom: 5rem; /* Increased space for fixed bottom nav */
+            padding-bottom: 5rem; /* Space for fixed bottom nav */
         }
 
-        /* Header styles */
+        /* Header styles - Yellow Theme */
         .header {
-            background-color: #1a1a1a; /* Dark gray for header */
+            background-color: #FFD700; /* Vibrant Yellow */
             padding: 1rem;
-            box-shadow: 0 2px 4px rgba(255,255,255,0.05); /* Subtle white shadow */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             position: sticky;
             top: 0;
             width: 100%;
@@ -34,37 +34,47 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom-left-radius: 1rem;
-            border-bottom-right-radius: 1rem;
-            transition: transform 0.3s ease-out; /* Smooth transition for hiding */
+            border-bottom-left-radius: 1.5rem;
+            border-bottom-right-radius: 1.5rem;
+            transition: transform 0.3s ease-out;
+            color: #1A1A1A; /* Dark text for yellow background */
         }
         .header.header-hidden {
-            transform: translateY(-100%); /* Hide header by moving it up */
+            transform: translateY(-100%);
         }
         .header-left, .header-right {
             display: flex;
             align-items: center;
             gap: 1rem;
         }
-        /* Style for the new JAR button */
-        .header-jar-button {
+        .header-icon { /* Hamburger, User Avatar */
             font-size: 1.5rem;
-            font-weight: 700;
-            color: #ffffff;
+            color: #1A1A1A; /* Dark icon */
             cursor: pointer;
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.5rem;
-            background-color: rgba(255,255,255,0.1);
+            padding: 0.5rem;
+            border-radius: 50%;
             transition: background-color 0.2s;
         }
-        .header-jar-button:hover {
-            background-color: rgba(255,255,255,0.2);
+        .header-icon:hover {
+            background-color: rgba(0,0,0,0.1);
+        }
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1A1A1A;
+        }
+        .header-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #1A1A1A;
         }
         .header-cart-btn {
-            background-color: #333333; /* Dark gray for cart button */
-            color: #ffffff;
+            background-color: #1A1A1A; /* Dark button */
+            color: #FFD700; /* Yellow text/icon */
             padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
+            border-radius: 0.75rem;
             font-weight: 600;
             transition: background-color 0.2s;
             display: flex;
@@ -74,10 +84,10 @@
             position: relative;
         }
         .header-cart-btn:hover {
-            background-color: #555555;
+            background-color: #333333;
         }
         .cart-count {
-            background-color: #cc0000; /* Red for count, stands out */
+            background-color: #cc0000; /* Red for count */
             color: #ffffff;
             border-radius: 50%;
             padding: 0.2em 0.5em;
@@ -96,17 +106,53 @@
             max-width: 1200px;
             margin: 0 auto;
             flex-grow: 1;
+            background-color: #F8F8F8; /* Light background */
         }
 
-        /* Featured Item Card */
+        /* Category Tabs - Yellow Theme */
+        .category-tabs-container {
+            display: flex;
+            overflow-x: auto;
+            gap: 0.75rem;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .category-tabs-container::-webkit-scrollbar {
+            display: none;
+        }
+        .category-tab-btn {
+            flex-shrink: 0;
+            background-color: #E0E0E0; /* Light gray */
+            color: #555555; /* Medium gray text */
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            transition: background-color 0.2s, color 0.2s;
+            scroll-snap-align: start;
+            border: 1px solid #D0D0D0;
+        }
+        .category-tab-btn.active {
+            background-color: #1A1A1A; /* Dark active background */
+            color: #FFD700; /* Yellow text for active */
+            border-color: #1A1A1A;
+        }
+        .category-tab-btn:hover:not(.active) {
+            background-color: #D0D0D0;
+        }
+
+        /* Featured Item Card - Yellow Theme */
         .featured-item-card {
-            background-color: #1a1a1a; /* Dark gray */
+            background-color: #FFFFFF; /* White card */
             border-radius: 1.5rem;
             overflow: hidden;
             margin-bottom: 2rem;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
             display: flex;
             flex-direction: column;
+            border: 1px solid #E0E0E0;
         }
         .featured-item-card img {
             width: 100%;
@@ -123,159 +169,131 @@
         }
         .featured-item-details h2 {
             font-size: 2.25rem;
-            font-weight: 700;
-            color: #ffffff;
+            font-weight: 800; /* Extra bold */
+            color: #1A1A1A;
             margin-bottom: 0.5rem;
             line-height: 1.2;
         }
         .featured-item-details p {
             font-size: 1rem;
-            color: #cccccc;
+            color: #555555;
             margin-bottom: 1rem;
         }
         .featured-item-price {
             font-size: 1.8rem;
-            font-weight: 700;
-            color: #bbbbbb; /* Light gray for price */
+            font-weight: 800;
+            color: #1A1A1A;
             margin-bottom: 1.5rem;
         }
         .featured-order-btn {
-            background-color: #ffffff; /* White button */
-            color: #000000; /* Black text */
+            background-color: #FFD700; /* Yellow button */
+            color: #1A1A1A; /* Dark text */
             padding: 0.75rem 1.5rem;
             border-radius: 0.75rem;
-            font-weight: 600;
+            font-weight: 700;
             font-size: 1.1rem;
             width: 100%;
             transition: background-color 0.2s;
             text-align: center;
+            box-shadow: 0 4px 8px rgba(255,215,0,0.3);
         }
         .featured-order-btn:hover {
-            background-color: #dddddd;
+            background-color: #FFC107;
         }
-
-        /* Category Buttons */
-        .category-section {
-            margin-bottom: 2rem;
-        }
-        .category-section h2 {
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: #ffffff;
+        .pagination-dots {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: -1rem; /* Pull dots slightly over the card */
             margin-bottom: 1.5rem;
         }
-        .category-buttons-container {
-            display: flex;
-            overflow-x: auto;
-            gap: 0.75rem;
-            padding-bottom: 0.5rem;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #D0D0D0;
+            border-radius: 50%;
+            transition: background-color 0.2s;
         }
-        .category-buttons-container::-webkit-scrollbar {
-            display: none;
-        }
-        .category-btn {
-            flex-shrink: 0;
-            background-color: #333333; /* Dark gray */
-            color: #cccccc;
-            padding: 0.75rem 1.25rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            transition: background-color 0.2s, color 0.2s;
-            scroll-snap-align: start;
-        }
-        .category-btn.active {
-            background-color: #ffffff; /* White active */
-            color: #000000; /* Black text */
-        }
-        .category-btn:hover:not(.active) {
-            background-color: #555555;
+        .dot.active {
+            background-color: #FFD700; /* Active dot is yellow */
         }
 
-        /* Popular Now / Menu Grid */
-        .menu-grid-container {
-            display: flex;
-            flex-wrap: wrap; /* Allow items to wrap to next line on all screens */
-            justify-content: center; /* Center items when wrapping */
-            gap: 1.5rem;
-            padding-bottom: 1rem;
-            overflow-x: hidden; /* Prevent horizontal scroll */
-            scroll-snap-type: none; /* Remove scroll snapping */
-        }
-        .menu-grid-container::-webkit-scrollbar {
-            display: none;
-        }
 
-        .menu-item-card {
-            flex-shrink: 0;
-            /* Calculate width for 2 items per row on mobile with 1.5rem gap */
-            width: calc((100% - 1.5rem) / 2);
-            background-color: #1a1a1a; /* Dark gray */
-            border-radius: 1.25rem;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            overflow: hidden;
+        /* Menu Item List - Inspired by Image 2 */
+        .menu-list-section {
+            margin-bottom: 2rem;
+        }
+        .menu-list-section h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1A1A1A;
+            margin-bottom: 1.5rem;
+        }
+        .menu-list-container {
             display: flex;
-            flex-direction: column;
-            transition: transform 0.2s ease-in-out;
+            flex-direction: column; /* Stack vertically */
+            gap: 1rem; /* Space between cards */
+        }
+        .menu-list-item-card {
+            background-color: #FFFFFF; /* White card background */
+            border-radius: 1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
             cursor: pointer;
-            scroll-snap-align: none; /* Remove scroll snapping */
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s;
+            border: 1px solid #E0E0E0;
         }
-
-        /* Responsive adjustments for larger screens (e.g., tablet and desktop) */
-        @media (min-width: 640px) { /* sm breakpoint */
-            .menu-item-card {
-                /* For 3 items per row on small tablets */
-                width: calc((100% - 2 * 1.5rem) / 3); /* (Total width - 2*gap) / 3 */
-            }
+        .menu-list-item-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
         }
-
-        @media (min-width: 768px) { /* md breakpoint */
-            .menu-item-card {
-                /* For 4 items per row on larger tablets/desktops */
-                width: calc((100% - 3 * 1.5rem) / 4); /* (Total width - 3*gap) / 4 */
-            }
-        }
-
-        .menu-item-card:hover {
-            transform: translateY(-5px);
-        }
-        .menu-item-card img {
-            width: 100%;
-            height: 120px;
-            object-fit: cover;
-            border-bottom-left-radius: 0.75rem;
-            border-bottom-right-radius: 0.75rem;
-        }
-        .item-details {
-            padding: 0.75rem;
-            flex-grow: 1;
+        .menu-list-item-card .item-image-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            overflow: hidden;
+            flex-shrink: 0;
+            margin-right: 1rem;
+            border: 2px solid #FFD700; /* Yellow border */
+            background-color: #F0F0F0; /* Light background for image circle */
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        .item-details h3 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #ffffff;
+        .menu-list-item-card .item-image-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .menu-list-item-card .item-info {
+            flex-grow: 1;
+        }
+        .menu-list-item-card .item-info h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1A1A1A;
             margin-bottom: 0.25rem;
         }
-        .item-details .stars {
-            color: #000000; /* Black stars */
-            margin-bottom: 0.5rem;
+        .menu-list-item-card .item-info p {
             font-size: 0.9rem;
-            -webkit-text-stroke: 0.5px #ffffff; /* White stroke for visibility on dark background */
+            color: #555555;
         }
-        .item-details .item-price {
-            font-size: 1rem;
+        .menu-list-item-card .item-price {
+            font-size: 1.1rem;
             font-weight: 700;
-            color: #bbbbbb; /* Light gray for price */
-            margin-top: auto;
+            color: #1A1A1A;
+            margin-left: 1rem;
+            white-space: nowrap;
         }
-        .see-more-btn {
-            /* Hidden as horizontal scroll is removed */
-            display: none;
+        .menu-list-item-card .item-arrow {
+            font-size: 1.2rem;
+            color: #555555;
+            margin-left: 1rem;
+            flex-shrink: 0;
         }
+
 
         /* Bottom Navigation Bar */
         .bottom-nav {
@@ -283,7 +301,7 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            background-color: #1a1a1a; /* Dark gray */
+            background-color: #1A1A1A; /* Dark background */
             display: flex;
             justify-content: space-around;
             align-items: center;
@@ -292,12 +310,12 @@
             z-index: 1000;
             border-top-left-radius: 1.5rem;
             border-top-right-radius: 1.5rem;
-            transition: transform 0.3s ease-out, opacity 0.3s ease-out; /* Smooth transition for hiding/showing */
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
         }
         .bottom-nav-hidden {
-            transform: translateY(100%); /* Move out of view */
+            transform: translateY(100%);
             opacity: 0;
-            pointer-events: none; /* Disable interactions when hidden */
+            pointer-events: none;
         }
         .nav-item {
             display: flex;
@@ -312,8 +330,8 @@
             position: relative;
         }
         .nav-item.active {
-            color: #ffffff; /* White for active */
-            background-color: rgba(255,255,255,0.1); /* Subtle white background */
+            color: #FFD700; /* Yellow for active */
+            background-color: rgba(255,215,0,0.1); /* Subtle yellow background */
         }
         .nav-item:hover:not(.active) {
             background-color: rgba(255,255,255,0.05);
@@ -323,7 +341,7 @@
             margin-bottom: 0.25rem;
         }
 
-        /* Modals (Cart, Map, Item Details) */
+        /* Modals (Cart, Map) - Adjusted for new theme */
         .modal {
             display: none;
             position: fixed;
@@ -339,40 +357,41 @@
             padding: 1rem;
         }
         .modal-content {
-            background-color: #1a1a1a; /* Dark gray */
+            background-color: #FFFFFF; /* White modal content */
             margin: auto;
             padding: 2rem;
             border-radius: 1.5rem;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             width: 90%;
             max-width: 600px;
             position: relative;
-            color: #ffffff;
+            color: #1A1A1A; /* Dark text */
             max-height: 90vh;
             overflow-y: auto;
         }
         .close-button {
-            color: #ffffff;
+            color: #555555;
             position: absolute;
             top: 1rem;
             right: 1rem;
             font-size: 2rem;
             font-weight: bold;
             cursor: pointer;
-            background-color: rgba(255,255,255,0.1);
+            background-color: rgba(0,0,0,0.05);
             border-radius: 50%;
             width: 40px;
             height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, color 0.2s;
         }
         .close-button:hover, .close-button:focus {
-            background-color: rgba(255,255,255,0.2);
+            background-color: rgba(0,0,0,0.1);
+            color: #1A1A1A;
         }
 
-        /* Cart specific styles */
+        /* Cart specific styles - Adjusted for new theme */
         .cart-items-list {
             list-style: none;
             padding: 0;
@@ -383,14 +402,14 @@
             justify-content: space-between;
             align-items: center;
             padding: 0.75rem 0;
-            border-bottom: 1px solid #333333;
+            border-bottom: 1px solid #E0E0E0;
         }
         .cart-item:last-child {
             border-bottom: none;
         }
         .cart-summary {
             margin-top: 1.5rem;
-            border-top: 1px solid #333333;
+            border-top: 1px solid #E0E0E0;
             padding-top: 1.5rem;
         }
         .cart-summary div {
@@ -402,48 +421,43 @@
         .cart-summary .total {
             font-size: 1.4rem;
             font-weight: 700;
-            color: #bbbbbb; /* Light gray total */
-        }
-        .form-group {
-            margin-bottom: 1rem;
+            color: #1A1A1A;
         }
         .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: #cccccc;
+            color: #555555;
         }
         .form-group input[type="text"],
         .form-group input[type="tel"],
         .form-group textarea,
         .form-group select {
-            background-color: #333333;
-            border: 1px solid #555555;
-            color: #ffffff;
+            background-color: #F0F0F0;
+            border: 1px solid #D0D0D0;
+            color: #1A1A1A;
             padding: 0.75rem 1rem;
             border-radius: 0.75rem;
             width: 100%;
         }
         .form-group input::placeholder,
         .form-group textarea::placeholder {
-            color: #888888;
+            color: #AAAAAA;
         }
         .form-group select option {
-            background-color: #333333; /* For select options */
-            color: #ffffff;
+            background-color: #F0F0F0;
+            color: #1A1A1A;
         }
         .btn-primary, .btn-checkout {
-            background-color: #ffffff; /* White button */
-            color: #000000; /* Black text */
+            background-color: #FFD700; /* Yellow button */
+            color: #1A1A1A; /* Dark text */
             padding: 0.75rem 1.5rem;
             border-radius: 0.75rem;
             font-weight: 700;
             font-size: 1.125rem;
             width: 100%;
             transition: background-color 0.2s ease-in-out;
+            box-shadow: 0 4px 8px rgba(255,215,0,0.3);
         }
         .btn-primary:hover, .btn-checkout:hover {
-            background-color: #dddddd;
+            background-color: #FFC107;
         }
         .message {
             margin-top: 1rem;
@@ -451,17 +465,17 @@
             text-align: center;
         }
         .message.error {
-            color: #ff6666;
+            color: #cc0000;
         }
         .message.success {
-            color: #66ff66;
+            color: #008000;
         }
         .message.info {
-            color: #ffff66;
+            color: #FFA500;
         }
         .loader {
-            border: 4px solid #333333;
-            border-top: 4px solid #ffffff; /* White loader top */
+            border: 4px solid #D0D0D0;
+            border-top: 4px solid #FFD700; /* Yellow loader top */
             border-radius: 50%;
             width: 20px;
             height: 20px;
@@ -475,76 +489,45 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Order Tracking Section */
+        /* Order Tracking Section - Adjusted for new theme */
         .order-tracking-section {
-            background-color: #1a1a1a;
+            background-color: #FFFFFF;
             padding: 1.5rem;
             border-radius: 1.5rem;
             margin-bottom: 2rem;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            color: #1A1A1A;
         }
         .order-tracking-section h2 {
-            font-size: 1.75rem;
-            font-weight: 600;
-            color: #ffffff;
-            margin-bottom: 1rem;
+            color: #1A1A1A;
         }
         .order-status-display {
-            background-color: #2a2a2a;
-            padding: 1rem;
-            border-radius: 0.75rem;
-            margin-top: 1rem;
+            background-color: #F0F0F0;
         }
         .order-status-display p {
-            margin-bottom: 0.5rem;
+            color: #555555;
         }
         .order-status-display .status-text {
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: #ffff66; /* Default info color, can be adjusted */
+            color: #FFA500; /* Default info color, can be adjusted */
         }
-        .status-Pending { color: #ffff66; }
-        .status-Confirmed { color: #aaaaaa; } /* Gray */
-        .status-Preparing { color: #888888; } /* Darker Gray */
-        .status-Out { color: #666666; } /* Even Darker Gray */
-        .status-Delivered { color: #ffffff; } /* White */
-        .status-Cancelled { color: #ff6666; } /* Red for cancellation */
+        .status-Pending { color: #FFA500; }
+        .status-Confirmed { color: #555555; }
+        .status-Preparing { color: #888888; }
+        .status-Out { color: #AAAAAA; }
+        .status-Delivered { color: #1A1A1A; }
+        .status-Cancelled { color: #cc0000; }
 
-        /* Map Modal Styles */
+        /* Map Modal Styles - Adjusted for new theme */
         #map-modal .modal-content {
-            max-width: 800px;
-            height: 90%;
-            display: flex;
-            flex-direction: column;
+            background-color: #FFFFFF;
+            color: #1A1A1A;
         }
         #map {
-            height: 400px;
-            width: 100%;
-            background-color: #333333;
-            border-radius: 0.75rem;
-            margin-bottom: 1rem;
-            flex-grow: 1;
+            background-color: #E0E0E0;
         }
         #map-address-display {
-            background-color: #2a2a2a;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            color: #ffffff;
-            font-size: 0.95rem;
-            margin-bottom: 1rem;
-            min-height: 3rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-        }
-        #map-modal .map-action-buttons {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-        #map-modal .map-action-buttons button {
-            flex-grow: 1;
+            background-color: #F0F0F0;
+            color: #1A1A1A;
         }
         /* Hide Leaflet zoom controls and attribution */
         .leaflet-control-zoom {
@@ -554,258 +537,270 @@
             display: none !important;
         }
 
-        /* Item Details Modal Styles - REDESIGNED */
+        /* Item Details Modal Styles - REDESIGNED (Yellow/Black theme from Image 1 right panel) */
         #item-details-modal {
-            background-color: #000000; /* Full black background for immersive feel */
-            align-items: flex-start; /* Align to top for image */
-            padding: 0; /* Remove padding from modal overlay */
+            background-color: rgba(0,0,0,0.7); /* Darker overlay */
+            align-items: flex-start;
+            padding: 0;
         }
         #item-details-modal .modal-content {
-            background-color: #1a1a1a; /* Dark gray for content */
+            background-color: #FFFFFF; /* White content background */
             width: 100%;
-            max-width: 500px; /* Constrain width */
-            padding: 0; /* Remove internal padding, handled by inner divs */
-            border-radius: 0; /* No border radius for full-screen feel on mobile */
-            box-shadow: none; /* No shadow for full-screen feel */
-            max-height: 100vh; /* Allow full height */
+            max-width: 500px;
+            padding: 0;
+            border-radius: 1.5rem; /* Rounded corners for the modal content */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            max-height: 95vh; /* Slightly less than full height */
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            margin-top: 2.5vh; /* Center vertically slightly */
         }
-        /* Close button repositioned for the new design */
         #item-details-modal .close-button {
             top: 1rem;
-            left: 1rem; /* Position top-left */
+            left: 1rem;
             right: auto;
-            z-index: 1010; /* Above image */
-            background-color: rgba(0,0,0,0.5); /* Darker background for contrast */
+            z-index: 1010;
+            background-color: rgba(0,0,0,0.5); /* Dark background for contrast */
             color: #ffffff;
+        }
+        #item-details-modal .close-button:hover {
+            background-color: rgba(0,0,0,0.7);
         }
 
         #item-details-image-container {
             width: 100%;
-            height: 300px; /* Fixed height for image */
+            height: 280px; /* Adjusted height for image */
             overflow: hidden;
             position: relative;
-            border-bottom-left-radius: 1.5rem; /* Rounded bottom corners for image */
-            border-bottom-right-radius: 1.5rem;
+            border-top-left-radius: 1.5rem; /* Match modal content radius */
+            border-top-right-radius: 1.5rem;
         }
         #item-details-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
+
+        /* Item Details Header (inside modal) */
+        #item-details-modal-header-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            z-index: 1010;
+        }
+        #item-details-modal-header-controls .icon-button {
+            background-color: rgba(0,0,0,0.5);
+            color: #ffffff;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #item-details-modal-header-controls .icon-button:hover {
+            background-color: rgba(0,0,0,0.7);
+        }
+
         #item-details-content {
             padding: 1.5rem;
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-        }
-        #item-details-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.75rem;
+            color: #1A1A1A; /* Dark text */
         }
         #item-details-name {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #ffffff;
+            font-size: 2.25rem; /* Larger font size */
+            font-weight: 800;
+            color: #1A1A1A;
             line-height: 1.2;
-        }
-        #item-details-rating {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            color: #bbbbbb; /* Light gray for rating text */
-            font-size: 0.9rem;
-        }
-        #item-details-rating .stars {
-            color: #ffc107; /* Gold stars */
-            font-size: 1.1rem;
-            -webkit-text-stroke: 0; /* Remove stroke for gold stars */
-        }
-        #item-details-description {
-            font-size: 1rem;
-            color: #cccccc;
-            margin-bottom: 1.5rem;
-        }
-
-        /* Latest Reviews Section */
-        .reviews-section {
-            background-color: #2a2a2a;
-            padding: 1rem;
-            border-radius: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-        .reviews-section h3 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            color: #ffffff;
-        }
-        .review-item {
-            font-size: 0.9rem;
-            color: #cccccc;
             margin-bottom: 0.5rem;
         }
-
-        /* Ingredients Section */
-        .ingredients-section {
-            background-color: #2a2a2a;
-            padding: 1rem;
-            border-radius: 0.75rem;
+        #item-details-sub-description { /* New element for sub-description */
+            font-size: 0.95rem;
+            color: #555555;
             margin-bottom: 1.5rem;
         }
-        .ingredients-section h3 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            color: #ffffff;
+
+        /* Size/Option Selection */
+        .item-options-section {
+            margin-bottom: 1.5rem;
         }
-        .ingredients-grid {
+        .item-options-section h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1A1A1A;
+            margin-bottom: 0.75rem;
+        }
+        .item-option-buttons {
             display: flex;
-            flex-wrap: wrap;
             gap: 0.75rem;
-            justify-content: center;
+            flex-wrap: wrap;
         }
-        .ingredient-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #333333;
+        .item-option-button {
+            background-color: #E0E0E0; /* Light gray */
+            color: #555555;
+            padding: 0.75rem 1.25rem;
             border-radius: 0.75rem;
-            padding: 0.75rem;
-            width: 80px; /* Fixed width for ingredient icon/text */
-            text-align: center;
-            font-size: 0.8rem;
-            color: #cccccc;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            border: 1px solid #D0D0D0;
         }
-        .ingredient-item img {
-            width: 40px;
-            height: 40px;
-            object-fit: contain;
-            margin-bottom: 0.25rem;
+        .item-option-button.active {
+            background-color: #1A1A1A; /* Dark active */
+            color: #FFD700; /* Yellow text */
+            border-color: #1A1A1A;
+        }
+        .item-option-button:hover:not(.active) {
+            background-color: #D0D0D0;
         }
 
-        /* Additions Section */
-        .additions-section {
-            background-color: #2a2a2a;
-            padding: 1rem;
-            border-radius: 0.75rem;
+        /* Price Section (NOW/BEFORE) */
+        .item-price-section {
+            display: flex;
+            align-items: flex-end;
+            gap: 1rem;
+            margin-top: auto; /* Push to bottom of content area */
             margin-bottom: 1.5rem;
         }
-        .additions-section h3 {
-            font-size: 1.1rem;
+        .price-now {
+            font-size: 2.5rem; /* Large NOW price */
+            font-weight: 800;
+            color: #1A1A1A;
+            line-height: 1;
+        }
+        .price-before {
+            font-size: 1.2rem;
             font-weight: 600;
-            margin-bottom: 0.75rem;
-            color: #ffffff;
+            color: #AAAAAA; /* Light gray strikethrough */
+            text-decoration: line-through;
+            line-height: 1;
         }
-        .additions-section select {
-            background-color: #333333;
-            border: 1px solid #555555;
-            color: #ffffff;
-            padding: 0.75rem 1rem;
-            border-radius: 0.75rem;
-            width: 100%;
-        }
-        .additions-section select option {
-            background-color: #333333;
-            color: #ffffff;
+        .price-discount {
+            background-color: #FFD700; /* Yellow discount tag */
+            color: #1A1A1A;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            white-space: nowrap;
         }
 
-        /* Price and Quantity Controls */
+        /* Quantity Controls and Add to Cart Button */
         #item-details-footer {
-            background-color: #2a2a2a; /* Darker background for footer */
+            background-color: #1A1A1A; /* Dark background for footer */
             padding: 1.5rem;
             border-top-left-radius: 1.5rem;
             border-top-right-radius: 1.5rem;
-            margin-top: auto; /* Push to bottom */
             display: flex;
             flex-direction: column;
             gap: 1rem;
-        }
-        #item-details-price-quantity {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        #item-details-price-total {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #bbbbbb; /* Light gray price */
         }
         #item-details-quantity-controls {
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 0.5rem; /* Smaller gap */
+            gap: 0.5rem;
+            margin-bottom: 1rem; /* Space before Add to Cart button */
         }
-        #item-details-quantity-controls .quantity-control {
+        #item-details-quantity-controls .quantity-control-button {
             background-color: #333333;
-            border-radius: 0.75rem;
-            overflow: hidden;
+            color: #FFD700; /* Yellow icons */
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            font-size: 1.8rem;
+            font-weight: 700;
             display: flex;
             align-items: center;
-        }
-        #item-details-quantity-controls .quantity-control button {
-            background-color: #555555;
-            color: #ffffff;
-            padding: 0.75rem 1rem;
-            font-size: 1.2rem;
-            font-weight: 700;
+            justify-content: center;
             transition: background-color 0.2s;
         }
-        #item-details-quantity-controls .quantity-control button:hover {
-            background-color: #777777;
+        #item-details-quantity-controls .quantity-control-button:hover {
+            background-color: #555555;
         }
-        #item-details-quantity-controls .quantity-control span {
-            padding: 0.75rem 1rem;
+        #item-details-quantity {
             color: #ffffff;
-            font-weight: 600;
-            font-size: 1.1rem;
+            font-weight: 700;
+            font-size: 1.8rem;
+            min-width: 60px;
+            text-align: center;
         }
         #item-details-add-to-cart-btn {
-            background-color: #ffffff;
-            color: #000000;
+            background-color: #FFD700; /* Yellow button */
+            color: #1A1A1A; /* Dark text */
             padding: 0.75rem 1.5rem;
             border-radius: 0.75rem;
             font-weight: 700;
             font-size: 1.125rem;
             width: 100%;
             transition: background-color 0.2s;
+            box-shadow: 0 4px 8px rgba(255,215,0,0.3);
         }
         #item-details-add-to-cart-btn:hover {
-            background-color: #dddddd;
-        }
-
-        /* Item Details Modal Navigation Buttons (REMOVED) */
-        .item-details-nav-buttons {
-            display: none; /* Hide navigation buttons */
+            background-color: #FFC107;
         }
 
 
         /* Responsive adjustments */
-        @media (max-width: 767px) { /* Mobile specific adjustments (up to md breakpoint) */
+        @media (max-width: 767px) { /* Mobile specific adjustments */
             body {
-                padding-bottom: 5rem; /* Ensure enough space for bottom nav */
+                padding-bottom: 4.5rem; /* Adjust space for bottom nav */
             }
             .header {
+                padding: 0.75rem;
                 border-bottom-left-radius: 1rem;
                 border-bottom-right-radius: 1rem;
             }
-            .header-left span { /* Hello, User! */
+            .header-title {
+                font-size: 1.2rem;
+            }
+            .header-icon {
+                font-size: 1.3rem;
+                width: 36px;
+                height: 36px;
+            }
+            .header-avatar {
+                width: 36px;
+                height: 36px;
+            }
+            .header-cart-btn {
+                padding: 0.4rem 0.8rem;
                 font-size: 0.9rem;
             }
-            /* .header-icon { Removed, replaced by .header-jar-button } */
+            .cart-count {
+                top: -6px;
+                right: -6px;
+                padding: 0.1em 0.4em;
+                font-size: 0.7rem;
+            }
+
             .menu-container {
                 padding: 1rem;
             }
+            .category-tabs-container {
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+            }
+            .category-tab-btn {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+                border-radius: 0.5rem;
+            }
+
             .featured-item-card {
                 border-radius: 1rem;
+                margin-bottom: 1.5rem;
             }
             .featured-item-card img {
-                height: 200px;
+                height: 180px;
                 border-bottom-left-radius: 1rem;
                 border-bottom-right-radius: 1rem;
             }
@@ -818,28 +813,53 @@
             .featured-item-price {
                 font-size: 1.5rem;
             }
-            .category-btn {
-                padding: 0.6rem 1rem;
-                font-size: 0.9rem;
-            }
-            /* Menu item cards for mobile: already handled by calc() in base style */
-            .menu-item-card img {
-                height: 100px;
-                border-bottom-left-radius: 0.5rem;
-                border-bottom-right-radius: 0.5rem;
-            }
-            .item-details h3 {
+            .featured-order-btn {
+                padding: 0.6rem 1.2rem;
                 font-size: 1rem;
+                border-radius: 0.6rem;
             }
-            .item-details .stars {
+            .pagination-dots {
+                margin-top: -0.75rem;
+                margin-bottom: 1rem;
+            }
+            .dot {
+                width: 6px;
+                height: 6px;
+            }
+
+            .menu-list-section h2 {
+                font-size: 1.5rem;
+                margin-bottom: 1rem;
+            }
+            .menu-list-container {
+                gap: 0.75rem;
+            }
+            .menu-list-item-card {
+                padding: 0.6rem 0.8rem;
+                border-radius: 0.75rem;
+            }
+            .menu-list-item-card .item-image-circle {
+                width: 50px;
+                height: 50px;
+                margin-right: 0.75rem;
+            }
+            .menu-list-item-card .item-info h3 {
+                font-size: 1.1rem;
+            }
+            .menu-list-item-card .item-info p {
                 font-size: 0.8rem;
             }
-            .item-details .item-price {
-                font-size: 0.9rem;
+            .menu-list-item-card .item-price {
+                font-size: 1rem;
             }
+            .menu-list-item-card .item-arrow {
+                font-size: 1rem;
+            }
+
             .bottom-nav {
+                padding: 0.4rem 0;
                 border-top-left-radius: 1rem;
-                border-top-right-radius: 1.5rem; /* Corrected from 1rem to 1.5rem for consistency */
+                border-top-right-radius: 1rem;
             }
             .nav-item i {
                 font-size: 1.3rem;
@@ -847,6 +867,7 @@
             .nav-item span {
                 font-size: 0.7rem;
             }
+
             .modal-content {
                 padding: 1.5rem;
                 border-radius: 1rem;
@@ -859,14 +880,16 @@
             #map {
                 height: 250px;
             }
-            /* Item details modal specific for mobile */
+
+            /* Item Details Modal specific for mobile */
             #item-details-modal .modal-content {
-                border-radius: 0; /* No radius for full height on mobile */
+                border-radius: 1rem; /* Smaller radius for mobile */
+                margin-top: 2.5vh;
             }
             #item-details-image-container {
-                height: 250px; /* Slightly smaller image on mobile */
-                border-bottom-left-radius: 1rem;
-                border-bottom-right-radius: 1rem;
+                height: 200px; /* Smaller image on mobile */
+                border-top-left-radius: 1rem;
+                border-top-right-radius: 1rem;
             }
             #item-details-content {
                 padding: 1rem;
@@ -874,28 +897,43 @@
             #item-details-name {
                 font-size: 1.75rem;
             }
-            #item-details-rating .stars {
+            #item-details-sub-description {
+                font-size: 0.85rem;
+            }
+            .item-option-button {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+                border-radius: 0.6rem;
+            }
+            .price-now {
+                font-size: 2rem;
+            }
+            .price-before {
                 font-size: 1rem;
+            }
+            .price-discount {
+                padding: 0.2rem 0.5rem;
+                font-size: 0.8rem;
+                border-radius: 0.4rem;
             }
             #item-details-footer {
                 padding: 1rem;
                 border-top-left-radius: 1rem;
                 border-top-right-radius: 1rem;
             }
-            #item-details-price-total {
+            #item-details-quantity-controls .quantity-control-button {
+                width: 40px;
+                height: 40px;
                 font-size: 1.5rem;
             }
-            #item-details-quantity-controls .quantity-control button {
-                padding: 0.6rem 0.8rem;
-                font-size: 1.1rem;
+            #item-details-quantity {
+                font-size: 1.5rem;
+                min-width: 50px;
             }
-            #item-details-quantity-controls .quantity-control span {
-                padding: 0.6rem 0.8rem;
+            #item-details-add-to-cart-btn {
+                padding: 0.6rem 1.2rem;
                 font-size: 1rem;
-            }
-            /* Ensure see more button is hidden on mobile */
-            #see-more-popular-btn {
-                display: none;
+                border-radius: 0.6rem;
             }
         }
     </style>
@@ -904,11 +942,11 @@
     <!-- Header -->
     <header class="header" id="main-header">
         <div class="header-left">
-            <!-- Replaced search icon with JAR button -->
-            <span class="header-jar-button" id="jar-button">JAR</span>
-            <span class="text-white text-lg font-semibold hidden sm:block">Hello, User!</span>
+            <i class="fas fa-bars header-icon"></i>
+            <span class="header-title">Food Items</span>
         </div>
         <div class="header-right">
+            <img src="https://placehold.co/40x40/FFD700/1A1A1A?text=U" alt="User Avatar" class="header-avatar">
             <button id="header-cart-btn" class="header-cart-btn">
                 <i class="fas fa-shopping-cart"></i>
                 <span id="cart-count" class="cart-count hidden">0</span>
@@ -916,9 +954,12 @@
         </div>
     </header>
 
-    <!-- Search Input Container (REMOVED) -->
-
     <main class="menu-container" id="home-screen">
+        <!-- Category Tabs Section -->
+        <div id="category-tabs-container" class="category-tabs-container">
+            <!-- Category buttons will be rendered here -->
+        </div>
+
         <!-- Featured Item Section -->
         <section id="featured-item-section" class="featured-item-card hidden">
             <img id="featured-item-image" src="" alt="Featured Item">
@@ -926,32 +967,23 @@
                 <h2 id="featured-item-name"></h2>
                 <p id="featured-item-description"></p>
                 <div class="featured-item-price" id="featured-item-price"></div>
-                <button id="featured-order-btn" class="featured-order-btn">Order Now</button>
+                <button id="featured-order-btn" class="featured-order-btn">Buy</button>
             </div>
         </section>
-
-        <!-- Meal Categories Section -->
-        <section class="category-section">
-            <h2 class="text-xl font-bold">Meal Category</h2>
-            <div id="category-buttons-container" class="category-buttons-container">
-                <!-- Category buttons will be rendered here -->
-            </div>
-        </section>
-
-        <!-- Popular Now Section -->
-        <section class="category-section">
-            <h2 class="text-xl font-bold">Popular Now</h2>
-            <div id="popular-now-grid" class="menu-grid-container">
-                <!-- Popular items will be rendered here -->
-            </div>
-            <!-- "See More" button is now hidden by CSS for all screen sizes -->
-            <button id="see-more-popular-btn" class="see-more-btn mx-auto">See More</button>
-        </section>
-
-        <!-- Placeholder for dynamic menu sections (if needed for other categories) -->
-        <div id="menu-sections">
-            <p class="text-center text-gray-400">Loading menu items...</p>
+        <div class="pagination-dots">
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
         </div>
+
+        <!-- Menu Item List Section (replacing Popular Now) -->
+        <section class="menu-list-section">
+            <h2 class="text-xl font-bold">All Items</h2> <!-- Title for the list -->
+            <div id="menu-item-list-container" class="menu-list-container">
+                <!-- Menu items will be rendered here -->
+                <p class="text-center text-gray-400">Loading menu items...</p>
+            </div>
+        </section>
     </main>
 
     <!-- Order Tracking Section (Initially hidden, toggled by nav bar) -->
@@ -1006,9 +1038,9 @@
                 </div>
                 <div class="form-group">
                     <label for="payment-method">Payment Method:</label>
-                    <select id="payment-method" class="form-group w-full p-2 rounded-md bg-gray-700 text-white">
+                    <select id="payment-method" class="form-group w-full p-2 rounded-md">
                         <option value="Cash on Delivery">Cash on Delivery</option>
-                        <option value="Online Payment (Coming Soon)" disabled>Online Payment (Coming Soon)</option> <!-- Disabled and updated text -->
+                        <option value="Online Payment (Coming Soon)" disabled>Online Payment (Coming Soon)</option>
                     </select>
                 </div>
                 <button type="submit" id="place-order-btn" class="btn-checkout">
@@ -1040,61 +1072,40 @@
             <span class="close-button">&times;</span>
             <div id="item-details-image-container">
                 <img id="item-details-image" src="" alt="Item Image">
+                <div id="item-details-modal-header-controls">
+                    <div class="icon-button"><i class="fas fa-ellipsis-h"></i></div>
+                    <div class="icon-button"><i class="far fa-heart"></i></div>
+                </div>
             </div>
             <div id="item-details-content">
-                <div id="item-details-header">
-                    <h2 id="item-details-name"></h2>
-                    <div id="item-details-rating">
-                        <span id="item-details-star-rating"></span>
-                        <div class="stars" id="item-details-stars">
-                            <!-- Stars will be generated here -->
-                        </div>
-                    </div>
-                </div>
-                <p id="item-details-description"></p>
+                <h2 id="item-details-name"></h2>
+                <p id="item-details-sub-description"></p>
 
-                <!-- Latest Reviews Section -->
-                <div class="reviews-section">
-                    <h3>Latest Reviews</h3>
-                    <div id="latest-reviews-content">
-                        <p class="review-item">⭐⭐⭐⭐⭐ "Absolutely delicious! Highly recommend." - User A</p>
-                        <p class="review-item">⭐⭐⭐⭐ "Great taste, good portion size." - User B</p>
-                        <p class="review-item">⭐⭐⭐⭐⭐ "My go-to comfort food!" - User C</p>
+                <!-- Size/Option Selection -->
+                <div class="item-options-section">
+                    <h3>Select Size</h3>
+                    <div class="item-option-buttons">
+                        <button class="item-option-button active" data-size="Small">Small</button>
+                        <button class="item-option-button" data-size="Medium">Medium</button>
+                        <button class="item-option-button" data-size="Big">Big</button>
                     </div>
                 </div>
 
-                <!-- Ingredients Section -->
-                <div class="ingredients-section">
-                    <h3>Ingredients</h3>
-                    <div id="ingredients-grid" class="ingredients-grid">
-                        <!-- Ingredient items will be dynamically added here -->
-                    </div>
-                </div>
-
-                <!-- Additions Section -->
-                <div class="additions-section">
-                    <h3>Additions</h3>
-                    <select id="item-details-additions-select">
-                        <option value="">No additions</option>
-                        <option value="extra_sauce">+ Extra Sauce (₹20)</option>
-                        <option value="cheese_burst">+ Cheese Burst (₹50)</option>
-                        <option value="extra_veg">+ Extra Veggies (₹30)</option>
-                    </select>
+                <!-- Price Section (NOW/BEFORE) -->
+                <div class="item-price-section">
+                    <span class="price-now" id="item-details-price-now">₹0.00</span>
+                    <span class="price-before" id="item-details-price-before">₹0.00</span>
+                    <span class="price-discount" id="item-details-discount">0% Off</span>
                 </div>
             </div>
 
             <div id="item-details-footer">
-                <div id="item-details-price-quantity">
-                    <div id="item-details-price-total">₹0.00</div>
-                    <div id="item-details-quantity-controls">
-                        <div class="quantity-control">
-                            <button id="item-details-decrease-btn">-</button>
-                            <span id="item-details-quantity">0</span>
-                            <button id="item-details-increase-btn">+</button>
-                        </div>
-                    </div>
+                <div id="item-details-quantity-controls">
+                    <button id="item-details-decrease-btn" class="quantity-control-button"><i class="fas fa-minus"></i></button>
+                    <span id="item-details-quantity">0</span>
+                    <button id="item-details-increase-btn" class="quantity-control-button"><i class="fas fa-plus"></i></button>
                 </div>
-                <button id="item-details-add-to-cart-btn" class="btn-primary w-full">Add to Cart</button>
+                <button id="item-details-add-to-cart-btn" class="btn-primary w-full">Buy</button>
                 <p id="item-details-message" class="message mt-3 hidden"></p>
             </div>
         </div>
@@ -1124,7 +1135,7 @@
 
         // --- DOM Elements ---
         const homeScreen = document.getElementById('home-screen');
-        const menuSectionsContainer = document.getElementById('menu-sections');
+        const menuSectionsContainer = document.getElementById('menu-item-list-container'); // Changed to target the list container
         const cartModal = document.getElementById('cart-modal');
         const cartItemsList = document.getElementById('cart-items-list');
         const cartSubtotalSpan = document.getElementById('cart-subtotal');
@@ -1147,7 +1158,7 @@
         const trackOrderText = document.getElementById('track-order-text');
         const orderStatusDisplay = document.getElementById('order-status-display');
         const trackedOrderIdSpan = document.getElementById('tracked-order-id');
-        const trackedOrderPinSpan = document.getElementById('tracked-order-pin'); // New PIN display
+        const trackedOrderPinSpan = document.getElementById('tracked-order-pin');
         const trackedOrderStatusSpan = document.getElementById('tracked-order-status');
         const trackedOrderTotalSpan = document.getElementById('tracked-order-total');
         const trackedOrderItemsList = document.getElementById('tracked-order-items');
@@ -1164,33 +1175,30 @@
         const itemDetailsModal = document.getElementById('item-details-modal');
         const itemDetailsImage = document.getElementById('item-details-image');
         const itemDetailsName = document.getElementById('item-details-name');
-        const itemDetailsStarRating = document.getElementById('item-details-star-rating'); // For numerical rating
-        const itemDetailsStars = document.getElementById('item-details-stars'); // For star icons
-        const itemDetailsDescription = document.getElementById('item-details-description');
-        const latestReviewsContent = document.getElementById('latest-reviews-content'); // New reviews section
-        const ingredientsGrid = document.getElementById('ingredients-grid'); // New ingredients section
-        const itemDetailsAdditionsSelect = document.getElementById('item-details-additions-select'); // New additions select
-        const itemDetailsPriceTotal = document.getElementById('item-details-price-total'); // Total price in footer
+        const itemDetailsSubDescription = document.getElementById('item-details-sub-description'); // New sub-description
+        const itemOptionButtons = document.querySelectorAll('.item-option-button'); // Size/Option buttons
+        const itemDetailsPriceNow = document.getElementById('item-details-price-now'); // NOW price
+        const itemDetailsPriceBefore = document.getElementById('item-details-price-before'); // BEFORE price
+        const itemDetailsDiscount = document.getElementById('item-details-discount'); // Discount percentage
         const itemDetailsQuantitySpan = document.getElementById('item-details-quantity');
         const itemDetailsDecreaseBtn = document.getElementById('item-details-decrease-btn');
         const itemDetailsIncreaseBtn = document.getElementById('item-details-increase-btn');
         const itemDetailsAddToCartBtn = document.getElementById('item-details-add-to-cart-btn');
         const itemDetailsMessage = document.getElementById('item-details-message');
 
-        // New elements for redesigned layout
+        // Main Menu Elements - REDESIGNED
         const featuredItemSection = document.getElementById('featured-item-section');
         const featuredItemImage = document.getElementById('featured-item-image');
         const featuredItemName = document.getElementById('featured-item-name');
         const featuredItemDescription = document.getElementById('featured-item-description');
         const featuredItemPrice = document.getElementById('featured-item-price');
         const featuredOrderBtn = document.getElementById('featured-order-btn');
-        const categoryButtonsContainer = document.getElementById('category-buttons-container');
-        const popularNowGrid = document.getElementById('popular-now-grid');
-        const seeMorePopularBtn = document.getElementById('see-more-popular-btn'); // This button is now hidden by CSS
-        const jarButton = document.getElementById('jar-button'); // New JAR button
-        const headerCartBtn = document.getElementById('header-cart-btn'); // Cart button in header
-        const cartCountSpan = document.getElementById('cart-count'); // Cart count in header
-        const bottomNav = document.getElementById('bottom-nav'); // Reference to the bottom navigation
+        const categoryTabsContainer = document.getElementById('category-tabs-container'); // Renamed from categoryButtonsContainer
+        const menuItemListContainer = document.getElementById('menu-item-list-container'); // New container for list items
+        const paginationDots = document.querySelectorAll('.pagination-dots .dot'); // Pagination dots
+        const headerCartBtn = document.getElementById('header-cart-btn');
+        const cartCountSpan = document.getElementById('cart-count');
+        const bottomNav = document.getElementById('bottom-nav');
 
         let cart = [];
         let menuItems = [];
@@ -1201,25 +1209,11 @@
         let map = null;
         let marker = null;
         let selectedDeliveryLocation = null; // { latitude, longitude, address }
-        let currentItemIndexInModal = -1; // Stores the index of the currently open item in the modal
+        let currentItemInModal = null; // Stores the currently open item object in the modal
         let currentActiveCategory = 'All'; // Track active category for filtering
 
-        const PLACEHOLDER_IMAGE = 'https://placehold.co/400x180/333333/ffffff?text=No+Image';
-
-        // Placeholder for ingredient images (replace with actual paths/URLs if available)
-        const INGREDIENT_ICONS = {
-            "rice": "https://placehold.co/40x40/555555/ffffff?text=Rice",
-            "chicken": "https://placehold.co/40x40/555555/ffffff?text=Chicken",
-            "vegetables": "https://placehold.co/40x40/555555/ffffff?text=Veg",
-            "sauce": "https://placehold.co/40x40/555555/ffffff?text=Sauce",
-            "cheese": "https://placehold.co/40x40/555555/ffffff?text=Cheese",
-            "bread": "https://placehold.co/40x40/555555/ffffff?text=Bread",
-            "meat": "https://placehold.co/40x40/555555/ffffff?text=Meat",
-            "salad": "https://placehold.co/40x40/555555/ffffff?text=Salad",
-            "spices": "https://placehold.co/40x40/555555/ffffff?text=Spices",
-            "oil": "https://placehold.co/40x40/555555/ffffff?text=Oil"
-        };
-
+        const PLACEHOLDER_IMAGE = 'https://placehold.co/400x280/FFD700/1A1A1A?text=No+Image'; // Updated placeholder for yellow theme
+        const CIRCULAR_PLACEHOLDER_IMAGE = 'https://placehold.co/60x60/FFD700/1A1A1A?text=Item'; // New placeholder for circular images
 
         // --- Global Error Redirection ---
         function redirectToErrorPage(message = 'An unexpected error occurred. Redirecting...', delay = 3000) {
@@ -1230,15 +1224,14 @@
             document.body.appendChild(tempMessageDiv);
 
             setTimeout(() => {
-                window.location.href = '/status'; // Redirect to the bot status page as the "index panel"
+                window.location.href = '/status';
             }, delay);
         }
 
-        // Catch unhandled JavaScript errors
         window.onerror = function(message, source, lineno, colno, error) {
             console.error('Unhandled JavaScript Error:', { message, source, lineno, colno, error });
             redirectToErrorPage('A critical error occurred. Redirecting to status page.', 5000);
-            return true; // Prevent default error handling
+            return true;
         };
 
         // --- Header Scroll Logic ---
@@ -1249,10 +1242,8 @@
             const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
             if (currentScrollTop > lastScrollTop && currentScrollTop > header.offsetHeight) {
-                // Scrolling down, hide header
                 header.classList.add('header-hidden');
             } else {
-                // Scrolling up, show header
                 header.classList.remove('header-hidden');
             }
             lastScrollTop = currentScrollTop <= 0 ? 0 : currentScrollTop;
@@ -1261,7 +1252,7 @@
         // --- Utility Functions ---
         function showLoader(loaderElement, textElement, messageElement, message = 'Loading...', type = 'info') {
             loaderElement.classList.remove('hidden');
-            textElement.classList.add('hidden');
+            if (textElement) textElement.classList.add('hidden'); // textElement might be null for some loaders
             messageElement.textContent = message;
             messageElement.className = `message mt-3 ${type}`;
             messageElement.classList.remove('hidden');
@@ -1269,7 +1260,7 @@
 
         function hideLoader(loaderElement, textElement, messageElement, success = true, message = '') {
             loaderElement.classList.add('hidden');
-            textElement.classList.remove('hidden');
+            if (textElement) textElement.classList.remove('hidden');
             messageElement.textContent = message;
             messageElement.className = `message mt-3 ${success ? 'success' : 'error'}`;
             if (!message) messageElement.classList.add('hidden');
@@ -1277,7 +1268,7 @@
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Radius of Earth in kilometers
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a =
@@ -1285,16 +1276,14 @@
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c; // Distance in km
+            return R * c;
         }
 
         function getDeliveryFee(distanceKm) {
             if (!deliveryRates || deliveryRates.length === 0) {
                 return 0;
             }
-
             deliveryRates.sort((a, b) => a.kms - b.kms);
-
             let fee = 0;
             for (let i = 0; i < deliveryRates.length; i++) {
                 if (distanceKm <= deliveryRates[i].kms) {
@@ -1318,12 +1307,12 @@
                     throw new Error(`Failed to fetch menu items. Server responded with status ${response.status}.`);
                 }
                 menuItems = await response.json();
-                console.log('Menu items fetched successfully:', menuItems); // Log fetched data
+                console.log('Menu items fetched successfully:', menuItems);
                 renderHomePage();
             } catch (error) {
                 console.error('Error in fetchMenu:', error);
-                menuSectionsContainer.innerHTML = `<p class="text-center text-red-400">Error loading menu: ${error.message}</p>`;
-                redirectToErrorPage('Failed to load menu. Redirecting...');
+                menuItemListContainer.innerHTML = `<p class="text-center text-red-500 w-full">Error loading menu: ${error.message}</p>`;
+                redirectToErrorPage('Failed to load menu. Redirecting...', 5000);
             }
         }
 
@@ -1341,32 +1330,37 @@
                 console.log('Public settings fetched:', settings);
             } catch (error) {
                 console.error('Error in fetchPublicSettings:', error);
-                redirectToErrorPage('Failed to load shop settings. Redirecting...');
+                redirectToErrorPage('Failed to load shop settings. Redirecting...', 5000);
             }
         }
 
         // --- Render Functions ---
         function renderHomePage() {
             if (!menuItems || menuItems.length === 0) {
-                menuSectionsContainer.innerHTML = '<p class="text-center text-gray-400">No menu items available at the moment. Please check back later!</p>';
-                featuredItemSection.classList.add('hidden'); // Hide featured section if no items
-                categoryButtonsContainer.innerHTML = ''; // Clear categories
-                popularNowGrid.innerHTML = ''; // Clear popular items
+                menuItemListContainer.innerHTML = '<p class="text-center text-gray-500 w-full">No menu items available at the moment. Please check back later!</p>';
+                featuredItemSection.classList.add('hidden');
+                categoryTabsContainer.innerHTML = '';
                 return;
             }
 
             // Render Featured Item
-            const featuredItem = menuItems.find(item => item.isTrending) || menuItems[0]; // Prioritize trending, fallback to first
+            const featuredItem = menuItems.find(item => item.isTrending) || menuItems[0];
             if (featuredItem) {
                 featuredItemSection.classList.remove('hidden');
                 featuredItemImage.src = featuredItem.imageUrl || PLACEHOLDER_IMAGE;
                 featuredItemImage.onerror = () => { featuredItemImage.onerror=null; featuredItemImage.src=PLACEHOLDER_IMAGE; };
                 featuredItemName.textContent = featuredItem.name;
                 featuredItemDescription.textContent = featuredItem.description || 'A delicious culinary delight.';
-                featuredItemPrice.textContent = `only ₹${featuredItem.price.toFixed(2)}`;
+                featuredItemPrice.textContent = `₹${featuredItem.price.toFixed(2)}`;
                 featuredOrderBtn.onclick = () => openItemDetailsModal(featuredItem._id);
+                // Activate first pagination dot (visual only)
+                paginationDots.forEach((dot, index) => {
+                    if (index === 0) dot.classList.add('active');
+                    else dot.classList.remove('active');
+                });
             } else {
                 featuredItemSection.classList.add('hidden');
+                paginationDots.forEach(dot => dot.classList.remove('active'));
             }
 
             // Render Categories
@@ -1377,84 +1371,62 @@
                 }
             });
 
-            categoryButtonsContainer.innerHTML = '';
+            categoryTabsContainer.innerHTML = '';
             categories.forEach(category => {
                 const button = document.createElement('button');
-                button.className = `category-btn ${category === currentActiveCategory ? 'active' : ''}`;
+                button.className = `category-tab-btn ${category === currentActiveCategory ? 'active' : ''}`;
                 button.textContent = category;
                 button.dataset.category = category;
                 button.addEventListener('click', () => {
                     currentActiveCategory = category;
-                    document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+                    document.querySelectorAll('.category-tab-btn').forEach(btn => btn.classList.remove('active'));
                     button.classList.add('active');
-                    filterAndRenderPopularItems();
+                    filterAndRenderMenuItems();
                 });
-                categoryButtonsContainer.appendChild(button);
+                categoryTabsContainer.appendChild(button);
             });
 
-            // Render Popular Now (filtered)
-            filterAndRenderPopularItems();
+            // Render Menu Item List
+            filterAndRenderMenuItems();
         }
 
-        function filterAndRenderPopularItems() {
-            popularNowGrid.innerHTML = '';
+        function filterAndRenderMenuItems() {
+            menuItemListContainer.innerHTML = '';
             const filteredItems = menuItems.filter(item => {
                 const matchesCategory = currentActiveCategory === 'All' || item.category === currentActiveCategory;
                 return matchesCategory && item.isAvailable;
             });
 
-            filteredItems.sort((a, b) => {
-                if (a.isTrending && !b.isTrending) return -1;
-                if (!a.isTrending && b.isTrending) return 1;
-                return a.name.localeCompare(b.name);
-            });
-
             if (filteredItems.length === 0) {
-                popularNowGrid.innerHTML = '<p class="text-center text-gray-400 w-full">No items found in this category.</p>';
+                menuItemListContainer.innerHTML = '<p class="text-center text-gray-500 w-full">No items found in this category.</p>';
                 return;
             }
 
             filteredItems.forEach(item => {
                 const card = document.createElement('div');
-                card.className = 'menu-item-card';
+                card.className = 'menu-list-item-card';
                 card.dataset.itemId = item._id;
                 card.innerHTML = `
-                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
-                    <div class="item-details">
-                        <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
-                        <div class="stars">
-                            ${generateStarRating(item.rating || 4.5)}
-                        </div>
-                        <div class="item-price">₹${item.price.toFixed(2)}</div>
+                    <div class="item-image-circle">
+                        <img src="${item.imageUrl || CIRCULAR_PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${CIRCULAR_PLACEHOLDER_IMAGE}';">
                     </div>
+                    <div class="item-info">
+                        <h3>${item.name}</h3>
+                        <p>${item.description || 'Delicious food item'}</p>
+                    </div>
+                    <span class="item-price">₹${item.price.toFixed(2)}</span>
+                    <i class="fas fa-chevron-right item-arrow"></i>
                 `;
                 card.addEventListener('click', (e) => {
                     openItemDetailsModal(e.currentTarget.dataset.itemId);
                 });
-                popularNowGrid.appendChild(card);
+                menuItemListContainer.appendChild(card);
             });
-        }
-
-        function generateStarRating(rating) {
-            let starsHtml = '';
-            const fullStars = Math.floor(rating);
-            const hasHalfStar = rating % 1 !== 0;
-            for (let i = 0; i < fullStars; i++) {
-                starsHtml += '<i class="fas fa-star"></i>';
-            }
-            if (hasHalfStar) {
-                starsHtml += '<i class="fas fa-star-half-alt"></i>';
-            }
-            for (let i = 0; i < (5 - fullStars - (hasHalfStar ? 1 : 0)); i++) {
-                starsHtml += '<i class="far fa-star"></i>'; // Empty star
-            }
-            return starsHtml;
         }
 
         function updateQuantityInModal(action) {
             let currentQuantity = parseInt(itemDetailsQuantitySpan.textContent);
-            const currentItem = menuItems[currentItemIndexInModal];
-            let currentPrice = currentItem.price;
+            let currentPrice = currentItemInModal.price; // Use base price from currentItemInModal
 
             if (action === 'increase') {
                 currentQuantity++;
@@ -1462,7 +1434,18 @@
                 currentQuantity--;
             }
             itemDetailsQuantitySpan.textContent = currentQuantity;
-            itemDetailsPriceTotal.textContent = `₹${(currentPrice * currentQuantity).toFixed(2)}`;
+            itemDetailsPriceNow.textContent = `₹${(currentPrice * currentQuantity).toFixed(2)}`;
+            // Update BEFORE price and discount based on NOW price (for visual effect)
+            if (currentQuantity > 0) {
+                const beforePrice = currentPrice * currentQuantity * 1.3; // Example: 30% higher
+                itemDetailsPriceBefore.textContent = `₹${beforePrice.toFixed(2)}`;
+                itemDetailsDiscount.textContent = '30% Off';
+                itemDetailsPriceBefore.classList.remove('hidden');
+                itemDetailsDiscount.classList.remove('hidden');
+            } else {
+                itemDetailsPriceBefore.classList.add('hidden');
+                itemDetailsDiscount.classList.add('hidden');
+            }
         }
 
         function addToCart(itemId, quantity) {
@@ -1501,7 +1484,7 @@
             let totalCartItems = 0;
 
             if (cart.length === 0) {
-                cartItemsList.innerHTML = '<li class="text-center text-gray-400">Your cart is empty.</li>';
+                cartItemsList.innerHTML = '<li class="text-center text-gray-500">Your cart is empty.</li>';
                 cartCountSpan.classList.add('hidden');
             } else {
                 cart.forEach((item, index) => {
@@ -1510,7 +1493,7 @@
                     li.innerHTML = `
                         <span>${item.name} x ${item.quantity}</span>
                         <span>₹${(item.price * item.quantity).toFixed(2)}
-                            <button class="text-red-400 ml-3 text-sm hover:text-red-500 transition-colors" data-index="${index}" data-action="remove-from-cart">Remove</button>
+                            <button class="text-red-500 ml-3 text-sm hover:text-red-700 transition-colors" data-index="${index}" data-action="remove-from-cart">Remove</button>
                         </span>
                     `;
                     cartItemsList.appendChild(li);
@@ -1576,74 +1559,72 @@
 
         // Item Details Modal Functions - REDESIGNED
         function renderItemDetailsModalContent(item) {
+            currentItemInModal = item; // Store the item object
+
             itemDetailsImage.src = item.imageUrl || PLACEHOLDER_IMAGE;
             itemDetailsImage.onerror = () => { itemDetailsImage.onerror=null; itemDetailsImage.src=PLACEHOLDER_IMAGE; };
             itemDetailsName.textContent = item.name;
-            itemDetailsDescription.textContent = item.description || 'No description available.';
-            
-            const rating = item.rating || 4.5;
-            itemDetailsStarRating.textContent = rating.toFixed(1); // Display numerical rating
-            itemDetailsStars.innerHTML = generateStarRating(rating); // Display star icons
+            itemDetailsSubDescription.textContent = item.category || 'Food Item'; // Use category as sub-description or a default
 
-            // Render Ingredients (using placeholder icons for now)
-            ingredientsGrid.innerHTML = '';
-            const itemIngredients = item.ingredients || ['rice', 'chicken', 'vegetables', 'sauce']; // Placeholder ingredients
-            itemIngredients.slice(0, 4).forEach(ingredient => { // Limit to 4 for display
-                const ingredientName = ingredient.toLowerCase();
-                const iconSrc = INGREDIENT_ICONS[ingredientName] || INGREDIENT_ICONS['oil']; // Fallback icon
-                const div = document.createElement('div');
-                div.className = 'ingredient-item';
-                div.innerHTML = `
-                    <img src="${iconSrc}" alt="${ingredientName}">
-                    <span>${ingredientName.charAt(0).toUpperCase() + ingredientName.slice(1)}</span>
-                `;
-                ingredientsGrid.appendChild(div);
+            // Reset size options and select default (e.g., first one)
+            itemOptionButtons.forEach((button, index) => {
+                button.classList.remove('active');
+                if (index === 0) button.classList.add('active'); // Default to 'Small' or first option
             });
 
-            // Additions (placeholder)
-            itemDetailsAdditionsSelect.value = ''; // Reset selection
-
+            // Set initial quantity from cart or 0
             const itemInCart = cart.find(cartItem => cartItem.productId === item._id);
             const quantityInCart = itemInCart ? itemInCart.quantity : 0;
             itemDetailsQuantitySpan.textContent = quantityInCart;
-            itemDetailsPriceTotal.textContent = `₹${(item.price * quantityInCart).toFixed(2)}`;
 
+            // Update prices based on initial quantity
+            updateQuantityInModal('none'); // Call with 'none' to just update display based on current quantity
+            
             itemDetailsMessage.classList.add('hidden');
         }
 
         function openItemDetailsModal(itemId) {
-            currentItemIndexInModal = menuItems.findIndex(item => item._id === itemId);
-            if (currentItemIndexInModal === -1) {
+            const item = menuItems.find(item => item._id === itemId);
+            if (!item) {
                 console.error('Item not found for modal:', itemId);
                 return;
             }
-            renderItemDetailsModalContent(menuItems[currentItemIndexInModal]);
+            renderItemDetailsModalContent(item);
             itemDetailsModal.style.display = 'flex';
-            bottomNav.classList.add('bottom-nav-hidden'); // Hide bottom nav when opening item details
+            bottomNav.classList.add('bottom-nav-hidden');
         }
 
         itemDetailsDecreaseBtn.addEventListener('click', () => updateQuantityInModal('decrease'));
         itemDetailsIncreaseBtn.addEventListener('click', () => updateQuantityInModal('increase'));
         itemDetailsAddToCartBtn.addEventListener('click', () => {
             const quantity = parseInt(itemDetailsQuantitySpan.textContent);
-            const currentItem = menuItems[currentItemIndexInModal];
+            const currentItem = currentItemInModal; // Use the stored item object
             if (quantity > 0 || cart.some(item => item.productId === currentItem._id)) {
                 addToCart(currentItem._id, quantity);
                 itemDetailsMessage.textContent = `${currentItem.name} quantity updated in cart!`;
                 itemDetailsMessage.className = 'message mt-3 success';
                 itemDetailsMessage.classList.remove('hidden');
-                // Close item details modal and show main menu
                 setTimeout(() => {
                     itemDetailsModal.style.display = 'none';
                     itemDetailsMessage.classList.add('hidden');
-                    bottomNav.classList.remove('bottom-nav-hidden'); // Show bottom nav after adding to cart and closing modal
-                    showSection('home-screen'); // Show main menu
-                }, 800); // Give a short delay for message to be seen
+                    bottomNav.classList.remove('bottom-nav-hidden');
+                    showSection('home-screen');
+                }, 800);
             } else {
                 itemDetailsMessage.textContent = 'Please select a quantity greater than zero.';
                 itemDetailsMessage.className = 'message mt-3 error';
                 itemDetailsMessage.classList.remove('hidden');
             }
+        });
+
+        // Event listener for size/option buttons
+        itemOptionButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                itemOptionButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                // In a real app, this would update currentItemInModal.price based on size
+                // For this demo, it's visual only.
+            });
         });
 
 
@@ -1655,7 +1636,6 @@
                 return;
             }
 
-            // Ensure the map container is empty before initializing
             mapDiv.innerHTML = '';
 
             if (map === null) {
@@ -1786,7 +1766,6 @@
                 return;
             }
 
-            // Handle "Online Payment (Coming Soon)"
             if (paymentMethod === 'Online Payment (Coming Soon)') {
                 hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'Online Payment will be added soon. Please choose Cash on Delivery for now.');
                 placeOrderBtn.disabled = false;
@@ -1814,7 +1793,6 @@
             cartDeliveryFeeSpan.textContent = deliveryFee.toFixed(2);
             cartTotalSpan.textContent = totalAmount.toFixed(2);
 
-            // Prepare order data to be sent to backend
             const orderData = {
                 items: cart.map(item => ({ productId: item.productId, quantity: item.quantity })),
                 customerName,
@@ -1827,7 +1805,6 @@
                 paymentMethod
             };
 
-            // Cash on Delivery (COD) logic - existing
             try {
                 const response = await fetch('/api/order', {
                     method: 'POST',
@@ -1846,7 +1823,7 @@
                     setTimeout(() => {
                         cartModal.style.display = 'none';
                         showSection('order-tracking-section');
-                        trackOrderIdInput.value = result.orderId; // Use customOrderId
+                        trackOrderIdInput.value = result.orderId;
                         trackOrder();
                     }, 2000);
                 } else {
@@ -1856,7 +1833,7 @@
             } catch (error) {
                 console.error('Error placing COD order:', error);
                 hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred. Please try again.');
-                redirectToErrorPage('Order placement failed due to network error. Redirecting...');
+                redirectToErrorPage('Order placement failed due to network error. Redirecting...', 5000);
             } finally {
                 placeOrderBtn.disabled = false;
             }
@@ -1868,7 +1845,7 @@
             if (!orderIdOrPin) {
                 trackOrderMessage.textContent = 'Please enter an Order ID or PIN.';
                 trackOrderMessage.className = 'message mt-3 error';
-                trackOrderMessage.classList.add('hidden');
+                trackOrderMessage.classList.remove('hidden');
                 orderStatusDisplay.classList.add('hidden');
                 return;
             }
@@ -1878,7 +1855,6 @@
             orderStatusDisplay.classList.add('hidden');
 
             try {
-                // Use the new /api/order/:id endpoint which handles both customOrderId and pinId
                 const response = await fetch(`/api/order/${orderIdOrPin}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -1905,7 +1881,7 @@
             } catch (error) {
                 console.error('Error tracking order:', error);
                 hideLoader(trackOrderLoader, trackOrderText, trackOrderMessage, false, 'Order not found or an error occurred.');
-                redirectToErrorPage('Order tracking failed. Redirecting...');
+                redirectToErrorPage('Order tracking failed. Redirecting...', 5000);
             } finally {
                 trackOrderBtn.disabled = false;
             }
@@ -1927,7 +1903,6 @@
             mapModal.style.display = 'none';
             itemDetailsModal.style.display = 'none';
 
-            // Ensure bottom nav is visible when switching sections
             bottomNav.classList.remove('bottom-nav-hidden');
 
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
@@ -1935,7 +1910,7 @@
             if (targetId === 'home-screen') {
                 homeScreen.classList.remove('hidden');
                 document.querySelector('.nav-item[data-target="home-screen"]').classList.add('active');
-            } else if (targetId === 'cart-modal') { // This is now only for direct modal open, not bottom nav
+            } else if (targetId === 'cart-modal') {
                 cartModal.style.display = 'flex';
                 updateCartDisplay();
             } else if (targetId === 'order-tracking-section') {
@@ -1958,9 +1933,9 @@
             });
         });
 
-        // JAR button functionality
-        jarButton.addEventListener('click', () => {
-            showSection('order-tracking-section');
+        // JAR button functionality (now generic hamburger menu)
+        document.querySelector('.header-left .header-icon').addEventListener('click', () => {
+            alert('Hamburger menu clicked! (Placeholder for side navigation)');
         });
 
 
@@ -1969,7 +1944,7 @@
             await fetchPublicSettings();
             await fetchMenu();
 
-            showSection('home-screen'); // Default to home screen
+            showSection('home-screen');
 
             const urlParams = new URLSearchParams(window.location.search);
             const orderIdFromUrl = urlParams.get('orderId');
