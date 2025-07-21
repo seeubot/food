@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Leaflet CSS for map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <!-- Removed Razorpay Standard Checkout Script -->
     <style>
         /* Custom styles for Black & White theme and layout adjustments */
         body {
@@ -1120,6 +1119,9 @@
     <!-- Leaflet JS for map -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
+        // Define WEB_MENU_URL here or ensure it's set in your environment
+        const WEB_MENU_URL = window.location.origin + '/menu'; // Fallback to current origin if not set via environment
+
         // --- DOM Elements ---
         const homeScreen = document.getElementById('home-screen');
         const menuSectionsContainer = document.getElementById('menu-sections');
@@ -1311,12 +1313,15 @@
             try {
                 const response = await fetch('/api/menu');
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error(`Error fetching menu: HTTP status ${response.status}, Response: ${errorText}`);
+                    throw new Error(`Failed to fetch menu items. Server responded with status ${response.status}.`);
                 }
                 menuItems = await response.json();
+                console.log('Menu items fetched successfully:', menuItems); // Log fetched data
                 renderHomePage();
             } catch (error) {
-                console.error('Error fetching menu:', error);
+                console.error('Error in fetchMenu:', error);
                 menuSectionsContainer.innerHTML = `<p class="text-center text-red-400">Error loading menu: ${error.message}</p>`;
                 redirectToErrorPage('Failed to load menu. Redirecting...');
             }
@@ -1326,13 +1331,16 @@
             try {
                 const response = await fetch('/api/public/settings');
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error(`Error fetching public settings: HTTP status ${response.status}, Response: ${errorText}`);
+                    throw new Error(`Failed to fetch shop settings. Server responded with status ${response.status}.`);
                 }
                 const settings = await response.json();
                 deliveryRates = settings.deliveryRates || [];
                 shopLocation = settings.shopLocation;
+                console.log('Public settings fetched:', settings);
             } catch (error) {
-                console.error('Error fetching public settings:', error);
+                console.error('Error in fetchPublicSettings:', error);
                 redirectToErrorPage('Failed to load shop settings. Redirecting...');
             }
         }
@@ -1341,11 +1349,14 @@
         function renderHomePage() {
             if (!menuItems || menuItems.length === 0) {
                 menuSectionsContainer.innerHTML = '<p class="text-center text-gray-400">No menu items available at the moment. Please check back later!</p>';
+                featuredItemSection.classList.add('hidden'); // Hide featured section if no items
+                categoryButtonsContainer.innerHTML = ''; // Clear categories
+                popularNowGrid.innerHTML = ''; // Clear popular items
                 return;
             }
 
             // Render Featured Item
-            const featuredItem = menuItems.find(item => item.isFeatured) || menuItems[0];
+            const featuredItem = menuItems.find(item => item.isTrending) || menuItems[0]; // Prioritize trending, fallback to first
             if (featuredItem) {
                 featuredItemSection.classList.remove('hidden');
                 featuredItemImage.src = featuredItem.imageUrl || PLACEHOLDER_IMAGE;
@@ -1389,8 +1400,6 @@
             popularNowGrid.innerHTML = '';
             const filteredItems = menuItems.filter(item => {
                 const matchesCategory = currentActiveCategory === 'All' || item.category === currentActiveCategory;
-                // Search input is removed, so this part of filtering is also removed.
-                // const matchesSearch = searchInput.value.trim() === '' || item.name.toLowerCase().includes(searchInput.value.trim().toLowerCase()) || item.description.toLowerCase().includes(searchInput.value.trim().toLowerCase());
                 return matchesCategory && item.isAvailable;
             });
 
@@ -1410,7 +1419,7 @@
                 card.className = 'menu-item-card';
                 card.dataset.itemId = item._id;
                 card.innerHTML = `
-                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHELDER_IMAGE}';">
+                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
                     <div class="item-details">
                         <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                         <div class="stars">
@@ -1646,10 +1655,13 @@
                 return;
             }
 
+            // Ensure the map container is empty before initializing
+            mapDiv.innerHTML = '';
+
             if (map === null) {
                 map = L.map('map', { zoomControl: false }).setView([shopLocation.latitude, shopLocation.longitude], 13);
                 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                    attribution: 'Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
                 }).addTo(map);
 
                 marker = L.marker([shopLocation.latitude, shopLocation.longitude], { draggable: true }).addTo(map);
