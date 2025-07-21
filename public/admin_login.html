@@ -204,23 +204,30 @@
         });
 
         // Check if a token exists on page load (e.g., if user navigated back)
-        // If so, redirect to dashboard. This helps prevent showing login if already authenticated.
-        document.addEventListener('DOMContentLoaded', () => {
+        // If so, attempt to verify it before redirecting.
+        document.addEventListener('DOMContentLoaded', async () => {
             const token = localStorage.getItem('adminToken');
             if (token) {
-                // Attempt to verify token with a lightweight API call
-                fetch('/api/admin/bot-status', { // Use a simple authenticated endpoint
-                    headers: { 'Authorization': `Bearer ${token}` }
-                }).then(response => {
+                try {
+                    // Attempt to verify token with a lightweight API call
+                    const response = await fetch('/api/admin/bot-status', { // Use a simple authenticated endpoint
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
                     if (response.ok) {
-                        window.location.href = '/dashboard'; // Token is valid, redirect
+                        // Token is valid, redirect to dashboard
+                        window.location.href = '/dashboard';
                     } else {
-                        localStorage.removeItem('adminToken'); // Token invalid, clear it
+                        // Token is invalid or expired, clear it and stay on login page
+                        localStorage.removeItem('adminToken');
+                        console.log('Invalid or expired token found. Please log in again.');
+                        // No redirect here, user stays on login page
                     }
-                }).catch(error => {
-                    console.error('Token validation failed:', error);
+                } catch (error) {
+                    console.error('Token validation failed due to network error:', error);
                     localStorage.removeItem('adminToken'); // Network error, assume invalid
-                });
+                    // No redirect here, user stays on login page
+                }
             }
         });
     </script>
