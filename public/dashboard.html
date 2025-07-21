@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Leaflet CSS for map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -283,6 +285,50 @@
             border-radius: 0.5rem;
         }
 
+        /* Map specific styles for modal */
+        #modal-customer-map {
+            height: 250px; /* Fixed height for the map */
+            width: 100%;
+            background-color: #333333;
+            border-radius: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        /* Hide Leaflet zoom controls and attribution */
+        .leaflet-control-zoom {
+            display: none !important;
+        }
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+        #modal-customer-map-address {
+            background-color: #2a2a2a;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            color: #ffffff;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            min-height: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .call-button {
+            background-color: #25D366; /* WhatsApp green */
+            color: #ffffff;
+            padding: 0.6rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+            display: inline-flex; /* Use flex to align icon and text */
+            align-items: center;
+            gap: 0.5rem; /* Space between icon and text */
+        }
+        .call-button:hover {
+            background-color: #1DA851;
+        }
+
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .header {
@@ -317,6 +363,9 @@
                 font-size: 1.5rem;
                 width: 30px;
                 height: 30px;
+            }
+            #modal-customer-map {
+                height: 200px; /* Adjust map height for smaller screens */
             }
         }
     </style>
@@ -482,7 +531,12 @@
                     <p><span class="font-semibold">Custom Order ID:</span> <span id="modal-order-custom-id"></span></p>
                     <p><span class="font-semibold">PIN:</span> <span id="modal-order-pin"></span></p>
                     <p><span class="font-semibold">Customer Name:</span> <span id="modal-customer-name"></span></p>
-                    <p><span class="font-semibold">Customer Phone:</span> <span id="modal-customer-phone"></span></p>
+                    <p><span class="font-semibold">Customer Phone:</span> <span id="modal-customer-phone"></span>
+                        <!-- Call Button Added Here -->
+                        <a id="call-customer-btn" href="#" class="call-button ml-2">
+                            <i class="fas fa-phone"></i> Call
+                        </a>
+                    </p>
                     <p><span class="font-semibold">Delivery Address:</span> <span id="modal-delivery-address"></span></p>
                     <p><span class="font-semibold">Order Date:</span> <span id="modal-order-date"></span></p>
                 </div>
@@ -499,6 +553,13 @@
             <ul id="modal-order-items" class="list-disc list-inside text-gray-400 mb-4">
                 <!-- Order items will be listed here -->
             </ul>
+
+            <!-- Customer Location Map Added Here -->
+            <h3 class="font-semibold text-lg mb-2">Customer Location:</h3>
+            <div id="modal-customer-map"></div>
+            <div id="modal-customer-map-address" class="text-center">Loading customer address...</div>
+            <p class="text-gray-400 text-sm mt-1 mb-4">This is the last known location provided by the customer.</p>
+
 
             <div class="form-group">
                 <label for="modal-order-status">Update Status:</label>
@@ -587,6 +648,8 @@
 
 
     <script src="/socket.io/socket.io.js"></script>
+    <!-- Leaflet JS for map -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         const socket = io();
         const token = localStorage.getItem('adminToken');
@@ -612,6 +675,7 @@
         const modalOrderPin = document.getElementById('modal-order-pin');
         const modalCustomerName = document.getElementById('modal-customer-name');
         const modalCustomerPhone = document.getElementById('modal-customer-phone');
+        const callCustomerBtn = document.getElementById('call-customer-btn'); // New Call Button
         const modalDeliveryAddress = document.getElementById('modal-delivery-address');
         const modalOrderDate = document.getElementById('modal-order-date');
         const modalSubtotal = document.getElementById('modal-subtotal');
@@ -626,6 +690,12 @@
         const saveOrderStatusLoader = document.getElementById('save-order-status-loader');
         const saveOrderStatusText = document.getElementById('save-order-status-text');
         const modalOrderMessage = document.getElementById('modal-order-message');
+
+        // Map elements for Order Details Modal
+        const modalCustomerMap = document.getElementById('modal-customer-map');
+        const modalCustomerMapAddress = document.getElementById('modal-customer-map-address');
+        let orderDetailsMap = null;
+        let orderDetailsMarker = null;
 
         // Menu Tab
         const addMenuItemBtn = document.getElementById('add-menu-item-btn');
@@ -850,6 +920,8 @@
             modalOrderPin.textContent = order.pinId || 'N/A';
             modalCustomerName.textContent = order.customerName;
             modalCustomerPhone.textContent = order.customerPhone;
+            // Set call button href
+            callCustomerBtn.href = `tel:${order.customerPhone}`;
             modalDeliveryAddress.textContent = order.deliveryAddress;
             modalOrderDate.textContent = new Date(order.orderDate).toLocaleString();
             modalSubtotal.textContent = order.subtotal.toFixed(2);
@@ -866,9 +938,44 @@
                 modalOrderItemsList.appendChild(li);
             });
 
+            // Initialize and display map
+            if (order.customerLocation && order.customerLocation.latitude && order.customerLocation.longitude) {
+                initModalMap(order.customerLocation.latitude, order.customerLocation.longitude);
+                modalCustomerMapAddress.textContent = order.customerLocation.address || 'Location provided by customer.';
+            } else {
+                modalCustomerMapAddress.textContent = 'Customer location not available.';
+                // If map was previously initialized, destroy it or hide it
+                if (orderDetailsMap) {
+                    orderDetailsMap.remove();
+                    orderDetailsMap = null;
+                    orderDetailsMarker = null;
+                }
+                modalCustomerMap.innerHTML = '<p class="text-gray-400 text-center py-4">Map not available for this order.</p>';
+            }
+
+
             modalOrderStatusSelect.value = order.status;
             modalOrderMessage.classList.add('hidden'); // Clear previous messages
             showModal(orderDetailsModal);
+        }
+
+        // --- Map Functions for Order Details Modal ---
+        function initModalMap(latitude, longitude) {
+            // Ensure the map container is empty before initializing
+            modalCustomerMap.innerHTML = '';
+
+            if (orderDetailsMap === null) {
+                orderDetailsMap = L.map('modal-customer-map', { zoomControl: false }).setView([latitude, longitude], 13);
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                }).addTo(orderDetailsMap);
+                orderDetailsMarker = L.marker([latitude, longitude]).addTo(orderDetailsMap);
+            } else {
+                orderDetailsMap.setView([latitude, longitude], 13);
+                orderDetailsMarker.setLatLng([latitude, longitude]);
+                // Invalidate size to ensure map renders correctly after modal display change
+                orderDetailsMap.invalidateSize();
+            }
         }
 
         saveOrderStatusBtn.addEventListener('click', () => {
@@ -1296,14 +1403,31 @@
             button.addEventListener('click', (e) => {
                 hideModal(e.target.closest('.modal'));
                 // Clear messages when closing modals
-                if (e.target.closest('#order-details-modal')) modalOrderMessage.classList.add('hidden');
+                if (e.target.closest('#order-details-modal')) {
+                    modalOrderMessage.classList.add('hidden');
+                    // Invalidate map size when modal closes to prevent rendering issues on next open
+                    if (orderDetailsMap) {
+                        orderDetailsMap.remove(); // Remove map instance completely
+                        orderDetailsMap = null;
+                        orderDetailsMarker = null;
+                        modalCustomerMap.innerHTML = ''; // Clear map div content
+                    }
+                }
                 if (e.target.closest('#menu-item-modal')) menuItemMessage.classList.add('hidden');
                 if (e.target.closest('#two-factor-modal')) twoFASetupMessage.classList.add('hidden');
             });
         });
 
         window.addEventListener('click', (event) => {
-            if (event.target === orderDetailsModal) hideModal(orderDetailsModal);
+            if (event.target === orderDetailsModal) {
+                hideModal(orderDetailsModal);
+                if (orderDetailsMap) {
+                    orderDetailsMap.remove(); // Remove map instance completely
+                    orderDetailsMap = null;
+                    orderDetailsMarker = null;
+                    modalCustomerMap.innerHTML = ''; // Clear map div content
+                }
+            }
             if (event.target === menuItemModal) hideModal(menuItemModal);
             if (event.target === twoFactorModal) hideModal(twoFactorModal);
         });
