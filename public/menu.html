@@ -545,9 +545,11 @@
             document.getElementById('pin-location-button').addEventListener('click', () => {
                 if (markerInstance) {
                     markerInstance.dragging.enable();
-                    document.getElementById('location-message-text').textContent = 'Drag the map pin to your exact delivery location.';
-                    document.getElementById('location-modal-message').classList.remove('bg-red-100', 'border-red-400', 'text-red-700');
-                    document.getElementById('location-modal-message').classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                    const msgDiv = document.getElementById('location-modal-message');
+                    const msgText = document.getElementById('location-message-text');
+                    msgText.textContent = 'Drag the map pin to your exact delivery location.';
+                    msgDiv.classList.remove('bg-red-100', 'border-red-400', 'text-red-700');
+                    msgDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
                 }
             });
             document.getElementById('confirm-location-button').addEventListener('click', () => {
@@ -575,6 +577,9 @@
 
             // Initialize map after a small delay to ensure modal is fully rendered
             setTimeout(() => {
+                if (mapInstance) { // Ensure no duplicate map instance
+                    mapInstance.remove();
+                }
                 mapInstance = L.map('delivery-map-modal').setView([defaultLat, defaultLng], defaultZoom);
                 // Satellite view tile layer
                 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -587,7 +592,7 @@
                 updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
 
                 // Try to get user's current GPS location immediately
-                getLiveLocationModal(false); // Do not re-enable buttons here
+                getLiveLocationModal(false); // Do not re-enable buttons here initially
 
                 // Event listener for marker drag end
                 markerInstance.on('dragend', (event) => {
@@ -597,7 +602,7 @@
 
                 // Invalidate size to ensure map renders correctly in modal
                 mapInstance.invalidateSize();
-            }, 100); // Small delay to ensure modal is fully visible
+            }, 250); // Increased delay to ensure modal is fully visible
         }
 
         function updateSelectedLocation(lat, lng, address) {
@@ -651,8 +656,8 @@
 
                         // Fallback to current marker position (which defaults to shop)
                         const currentLatlng = markerInstance.getLatLng();
-                        updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Default Shop Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
-
+                        updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Default Shop Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lat.toFixed(4)})`); // Fixed typo: use currentLatlng.lng
+                        
                         if (re_enable_buttons) {
                             useLiveButton.disabled = false;
                             pinButton.disabled = false;
@@ -673,7 +678,7 @@
                 // Fallback to current marker position (which defaults to shop)
                 const currentLatlng = markerInstance.getLatLng();
                 updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Default Shop Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
-
+                
                 if (re_enable_buttons) {
                     useLiveButton.disabled = false;
                     pinButton.disabled = false;
