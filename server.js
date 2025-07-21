@@ -34,8 +34,6 @@ const DEFAULT_ADMIN_USERNAME = 'dashboard_admin';
 const DEFAULT_ADMIN_PASSWORD = 'password123';
 // --- END WARNING ---
 
-// Removed Razorpay Initialization
-
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
@@ -987,9 +985,6 @@ app.get('/api/public/settings', async (req, res) => {
     }
 });
 
-// Removed endpoint to create Razorpay order
-// Removed endpoint to verify Razorpay payment and finalize order
-
 app.post('/api/order', async (req, res) => {
     try {
         const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount, paymentMethod } = req.body;
@@ -1018,7 +1013,7 @@ app.post('/api/order', async (req, res) => {
             });
         }
 
-        // Generate custom order ID and PIN ID for all orders (since online payment is removed for now)
+        // Generate custom order ID and PIN ID for all orders
         const customOrderId = generateCustomOrderId();
         const pinId = await generateUniquePinId();
 
@@ -1035,7 +1030,6 @@ app.post('/api/order', async (req, res) => {
             totalAmount,
             paymentMethod: 'Cash on Delivery', // Force to Cash on Delivery as online is removed
             status: 'Pending', // All new orders start as Pending
-            // razorpayOrderId and razorpayPaymentId will not be set here
         });
 
         await newOrder.save();
@@ -1145,8 +1139,9 @@ app.get('/status', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'status.html'));
 });
 
+// Changed default route to redirect to /menu
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'status.html'));
+    res.redirect('/menu');
 });
 
 
@@ -1154,9 +1149,10 @@ app.get('/', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Catch-all for undefined routes ---
+// Changed catch-all to redirect to /menu for better public user experience
 app.use((req, res) => {
-    console.log(`Unhandled route: ${req.method} ${req.originalUrl}. Redirecting to /status.`);
-    res.redirect('/status');
+    console.log(`Unhandled route: ${req.method} ${req.originalUrl}. Redirecting to /menu.`);
+    res.redirect('/menu');
 });
 
 
