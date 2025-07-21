@@ -11,20 +11,34 @@
     <!-- Leaflet CSS for map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        /* Custom styles for Yellow & White theme */
+        /* Custom styles for Red & White theme */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #F8F8F8; /* Light background for the main content area */
+            background-color: #F8F8F8; /* Very light background for the main content area */
             color: #1A1A1A; /* Dark text for contrast */
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             padding-bottom: 5rem; /* Space for fixed bottom nav */
+            /* Removed position: relative; as red-sidebar is gone */
         }
 
-        /* Header styles - Yellow Theme */
+        /* Red Sidebar on the left - REMOVED */
+        /*
+        .red-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px;
+            height: 100%;
+            background-color: #E63946;
+            z-index: 50;
+        }
+        */
+
+        /* Header styles - Red/White Theme */
         .header {
-            background-color: #FFD700; /* Vibrant Yellow */
+            background-color: #E63946; /* Red color from the image */
             padding: 1rem;
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             position: sticky;
@@ -37,7 +51,9 @@
             border-bottom-left-radius: 1.5rem;
             border-bottom-right-radius: 1.5rem;
             transition: transform 0.3s ease-out;
-            color: #1A1A1A; /* Dark text for yellow background */
+            color: #FFFFFF; /* White text for red background */
+            /* Adjusted padding-left as sidebar is removed */
+            padding-left: 1rem;
         }
         .header.header-hidden {
             transform: translateY(-100%);
@@ -47,15 +63,14 @@
             align-items: center;
             gap: 1rem;
         }
-        /* Removed .header-icon and .header-avatar styles as they are removed */
         .header-title {
             font-size: 1.5rem;
             font-weight: 700;
-            color: #1A1A1A;
+            color: #FFFFFF;
         }
         .header-cart-btn {
-            background-color: #1A1A1A; /* Dark button */
-            color: #FFD700; /* Yellow text/icon */
+            background-color: #FFFFFF; /* White button */
+            color: #E63946; /* Red text/icon */
             padding: 0.5rem 1rem;
             border-radius: 0.75rem;
             font-weight: 600;
@@ -67,10 +82,10 @@
             position: relative;
         }
         .header-cart-btn:hover {
-            background-color: #333333;
+            background-color: #F0F0F0;
         }
         .cart-count {
-            background-color: #cc0000; /* Red for count */
+            background-color: #1A1A1A; /* Dark for count, stands out */
             color: #ffffff;
             border-radius: 50%;
             padding: 0.2em 0.5em;
@@ -90,190 +105,166 @@
             margin: 0 auto;
             flex-grow: 1;
             background-color: #F8F8F8; /* Light background */
+            /* Adjusted padding-left as sidebar is removed */
+            padding-left: 1.5rem;
         }
 
-        /* Category Tabs - Yellow Theme */
+        /* Category Tabs (now acting as scrollable menu) - REMOVED */
         .category-tabs-container {
-            display: flex;
-            overflow-x: auto;
-            gap: 0.75rem;
-            padding-bottom: 0.5rem;
-            margin-bottom: 1.5rem;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-        .category-tabs-container::-webkit-scrollbar {
-            display: none;
-        }
-        .category-tab-btn {
-            flex-shrink: 0;
-            background-color: #E0E0E0; /* Light gray */
-            color: #555555; /* Medium gray text */
-            padding: 0.75rem 1.25rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            transition: background-color 0.2s, color 0.2s;
-            scroll-snap-align: start;
-            border: 1px solid #D0D0D0;
-        }
-        .category-tab-btn.active {
-            background-color: #1A1A1A; /* Dark active background */
-            color: #FFD700; /* Yellow text for active */
-            border-color: #1A1A1A;
-        }
-        .category-tab-btn:hover:not(.active) {
-            background-color: #D0D0D0;
+            display: none; /* Hide the category tabs from previous design */
         }
 
-        /* Featured Item Card - Yellow Theme */
+        /* Featured Item Card - REMOVED */
         .featured-item-card {
-            background-color: #FFFFFF; /* White card */
-            border-radius: 1.5rem;
-            overflow: hidden;
-            margin-bottom: 2rem;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #E0E0E0;
-        }
-        .featured-item-card img {
-            width: 100%;
-            height: 250px;
-            object-fit: cover;
-            border-bottom-left-radius: 1.5rem;
-            border-bottom-right-radius: 1.5rem;
-        }
-        .featured-item-details {
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        .featured-item-details h2 {
-            font-size: 2.25rem;
-            font-weight: 800; /* Extra bold */
-            color: #1A1A1A;
-            margin-bottom: 0.5rem;
-            line-height: 1.2;
-        }
-        .featured-item-details p {
-            font-size: 1rem;
-            color: #555555;
-            margin-bottom: 1rem;
-        }
-        .featured-item-price {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: #1A1A1A;
-            margin-bottom: 1.5rem;
-        }
-        .featured-order-btn {
-            background-color: #FFD700; /* Yellow button */
-            color: #1A1A1A; /* Dark text */
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            font-weight: 700;
-            font-size: 1.1rem;
-            width: 100%;
-            transition: background-color 0.2s;
-            text-align: center;
-            box-shadow: 0 4px 8px rgba(255,215,0,0.3);
-        }
-        .featured-order-btn:hover {
-            background-color: #FFC107;
+            display: none; /* Hide featured item section */
         }
         .pagination-dots {
-            display: flex;
-            justify-content: center;
-            gap: 0.5rem;
-            margin-top: -1rem; /* Pull dots slightly over the card */
-            margin-bottom: 1.5rem;
-        }
-        .dot {
-            width: 8px;
-            height: 8px;
-            background-color: #D0D0D0;
-            border-radius: 50%;
-            transition: background-color 0.2s;
-        }
-        .dot.active {
-            background-color: #FFD700; /* Active dot is yellow */
+            display: none; /* Hide pagination dots */
         }
 
-
-        /* Menu Item List - Inspired by Image 2 - More Attractive */
-        .menu-list-section {
+        /* Menu Item List - Category Cards (New Design from Image) */
+        .category-list-section {
             margin-bottom: 2rem;
         }
-        .menu-list-section h2 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #1A1A1A;
-            margin-bottom: 1.5rem;
-        }
-        .menu-list-container {
+        .category-list-container {
             display: flex;
-            flex-direction: column; /* Stack vertically */
-            gap: 1rem; /* Space between cards */
+            flex-direction: column;
+            gap: 1rem;
         }
-        .menu-list-item-card {
+        .category-card {
             background-color: #FFFFFF; /* White card background */
-            border-radius: 1.25rem; /* Slightly more rounded */
-            box-shadow: 0 6px 12px rgba(0,0,0,0.08); /* More prominent shadow */
+            border-radius: 1.5rem; /* More rounded */
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08); /* Prominent shadow */
             display: flex;
             align-items: center;
-            padding: 1rem 1.25rem; /* Increased padding */
+            padding: 1rem 1.25rem;
             cursor: pointer;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s;
             border: 1px solid #E0E0E0;
+            position: relative; /* For the red accent */
+            overflow: hidden; /* Ensure content stays within bounds */
         }
-        .menu-list-item-card:hover {
-            transform: translateY(-5px); /* More pronounced lift */
-            box-shadow: 0 10px 20px rgba(0,0,0,0.15); /* Even stronger shadow on hover */
+        .category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
         }
-        .menu-list-item-card .item-image-circle {
-            width: 70px; /* Slightly larger image circle */
-            height: 70px;
+        .category-card::before { /* Red accent on the left */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 15px; /* Width of the red accent */
+            height: 100%;
+            background-color: #E63946; /* Red color */
+            border-top-left-radius: 1.5rem;
+            border-bottom-left-radius: 1.5rem;
+        }
+        .category-card .item-image-circle {
+            width: 80px; /* Larger image circle */
+            height: 80px;
             border-radius: 50%;
             overflow: hidden;
             flex-shrink: 0;
-            margin-right: 1.25rem; /* Increased margin */
-            border: 3px solid #FFD700; /* Thicker yellow border */
+            margin-right: 1.5rem;
+            border: 3px solid #E63946; /* Red border */
             background-color: #F0F0F0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            /* Adjusted margin-left as sidebar is removed */
+            margin-left: 0;
         }
-        .menu-list-item-card .item-image-circle img {
+        .category-card .item-image-circle img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        .menu-list-item-card .item-info {
+        .category-card .item-info {
             flex-grow: 1;
         }
-        .menu-list-item-card .item-info h3 {
-            font-size: 1.3rem; /* Slightly larger font */
-            font-weight: 800; /* Bolder */
+        .category-card .item-info h3 {
+            font-size: 1.6rem; /* Larger font for category name */
+            font-weight: 800;
             color: #1A1A1A;
             margin-bottom: 0.25rem;
         }
-        .menu-list-item-card .item-info p {
-            font-size: 0.95rem; /* Slightly larger */
+        .category-card .item-info p {
+            font-size: 1rem; /* Larger font for item count */
             color: #555555;
         }
-        .menu-list-item-card .item-price {
-            font-size: 1.2rem; /* Slightly larger */
-            font-weight: 800; /* Bolder */
+        .category-card .item-arrow {
+            font-size: 1.6rem; /* Larger arrow */
+            color: #E63946; /* Red arrow */
+            margin-left: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        /* Individual Menu Item List within categories (Hidden on home page) */
+        .menu-item-list-by-category {
+            display: none; /* Initially hidden */
+            padding-top: 1rem; /* Space after category title */
+            padding-bottom: 1rem;
+        }
+        .menu-item-list-by-category.active {
+            display: block; /* Show when active */
+        }
+        .menu-item-list-by-category h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
             color: #1A1A1A;
-            margin-left: 1.5rem; /* Increased margin */
+            margin-bottom: 1.5rem;
+            /* Adjusted padding-left as sidebar is removed */
+            padding-left: 0;
+        }
+        .menu-item-list-by-category .menu-list-item-card {
+            background-color: #FFFFFF;
+            border-radius: 1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s;
+            border: 1px solid #E0E0E0;
+            margin-bottom: 0.75rem; /* Space between individual item cards */
+        }
+        .menu-item-list-by-category .menu-list-item-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .menu-item-list-by-category .item-image-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            overflow: hidden;
+            flex-shrink: 0;
+            margin-right: 1rem;
+            border: 2px solid #E63946; /* Red border */
+            background-color: #F0F0F0;
+        }
+        .menu-item-list-by-category .item-image-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .menu-item-list-by-category .item-info h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #1A1A1A;
+            margin-bottom: 0.25rem;
+        }
+        .menu-item-list-by-category .item-info p {
+            font-size: 0.9rem;
+            color: #555555;
+        }
+        .menu-item-list-by-category .item-price {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1A1A1A;
+            margin-left: 1rem;
             white-space: nowrap;
         }
-        .menu-list-item-card .item-arrow {
-            font-size: 1.4rem; /* Larger arrow */
+        .menu-item-list-by-category .item-arrow {
+            font-size: 1.2rem;
             color: #555555;
-            margin-left: 1.5rem;
+            margin-left: 1rem;
             flex-shrink: 0;
         }
 
@@ -313,8 +304,8 @@
             position: relative;
         }
         .nav-item.active {
-            color: #FFD700; /* Yellow for active */
-            background-color: rgba(255,215,0,0.1); /* Subtle yellow background */
+            color: #E63946; /* Red for active */
+            background-color: rgba(230,57,70,0.1); /* Subtle red background */
         }
         .nav-item:hover:not(.active) {
             background-color: rgba(255,255,255,0.05);
@@ -429,18 +420,18 @@
             color: #1A1A1A;
         }
         .btn-primary, .btn-checkout {
-            background-color: #FFD700; /* Yellow button */
-            color: #1A1A1A; /* Dark text */
+            background-color: #E63946; /* Red button */
+            color: #FFFFFF; /* White text */
             padding: 0.75rem 1.5rem;
             border-radius: 0.75rem;
             font-weight: 700;
             font-size: 1.125rem;
             width: 100%;
             transition: background-color 0.2s ease-in-out;
-            box-shadow: 0 4px 8px rgba(255,215,0,0.3);
+            box-shadow: 0 4px 8px rgba(230,57,70,0.3);
         }
         .btn-primary:hover, .btn-checkout:hover {
-            background-color: #FFC107;
+            background-color: #FA6974;
         }
         .message {
             margin-top: 1rem;
@@ -458,7 +449,7 @@
         }
         .loader {
             border: 4px solid #D0D0D0;
-            border-top: 4px solid #FFD700; /* Yellow loader top */
+            border-top: 4px solid #E63946; /* Red loader top */
             border-radius: 50%;
             width: 20px;
             height: 20px;
@@ -519,7 +510,7 @@
             background-color: rgba(255,255,255,0.2);
         }
         #map-modal h2 {
-            color: #FFD700; /* Yellow title */
+            color: #E63946; /* Red title */
             font-size: 1.8rem;
             font-weight: 700;
             margin-bottom: 1rem;
@@ -537,7 +528,7 @@
             background-color: #333333; /* Darker background for address display */
             padding: 0.75rem;
             border-radius: 0.75rem; /* More rounded */
-            color: #FFD700; /* Yellow text for address */
+            color: #E63946; /* Red text for address */
             font-size: 1rem;
             margin-bottom: 1.5rem;
             min-height: 3rem;
@@ -555,17 +546,17 @@
         }
         #map-modal .map-action-buttons button {
             flex-grow: 1;
-            background-color: #FFD700; /* Yellow buttons */
-            color: #1A1A1A; /* Dark text */
+            background-color: #E63946; /* Red buttons */
+            color: #FFFFFF; /* White text */
             padding: 0.8rem 1.5rem;
             border-radius: 0.75rem;
             font-weight: 700;
             font-size: 1.1rem;
             transition: background-color 0.2s;
-            box-shadow: 0 4px 8px rgba(255,215,0,0.3);
+            box-shadow: 0 4px 8px rgba(230,57,70,0.3);
         }
         #map-modal .map-action-buttons button:hover {
-            background-color: #FFC107;
+            background-color: #FA6974;
         }
         /* Hide Leaflet zoom controls and attribution */
         .leaflet-control-zoom {
@@ -575,7 +566,7 @@
             display: none !important;
         }
 
-        /* Item Details Modal Styles - REDESIGNED (Yellow/Black theme from Image 1 right panel) */
+        /* Item Details Modal Styles - REDESIGNED (Red/White theme) */
         #item-details-modal {
             background-color: rgba(0,0,0,0.7); /* Darker overlay */
             align-items: flex-start;
@@ -619,9 +610,6 @@
             height: 100%;
             object-fit: cover;
         }
-
-        /* Item Details Header (inside modal) - REMOVED LIKE/DOTS */
-        /* #item-details-modal-header-controls { display: none; } */
 
         #item-details-content {
             padding: 1.5rem;
@@ -669,9 +657,9 @@
             border: 1px solid #D0D0D0;
         }
         .item-option-button.active {
-            background-color: #1A1A1A; /* Dark active */
-            color: #FFD700; /* Yellow text */
-            border-color: #1A1A1A;
+            background-color: #E63946; /* Red active */
+            color: #FFFFFF; /* White text */
+            border-color: #E63946;
         }
         .item-option-button:hover:not(.active) {
             background-color: #D0D0D0;
@@ -699,8 +687,8 @@
             line-height: 1;
         }
         .price-discount {
-            background-color: #FFD700; /* Yellow discount tag */
-            color: #1A1A1A;
+            background-color: #E63946; /* Red discount tag */
+            color: #FFFFFF;
             padding: 0.25rem 0.75rem;
             border-radius: 0.5rem;
             font-size: 0.9rem;
@@ -727,7 +715,7 @@
         }
         #item-details-quantity-controls .quantity-control-button {
             background-color: #333333;
-            color: #FFD700; /* Yellow icons */
+            color: #E63946; /* Red icons */
             width: 48px;
             height: 48px;
             border-radius: 50%;
@@ -749,18 +737,18 @@
             text-align: center;
         }
         #item-details-add-to-cart-btn {
-            background-color: #FFD700; /* Yellow button */
-            color: #1A1A1A; /* Dark text */
+            background-color: #E63946; /* Red button */
+            color: #FFFFFF; /* White text */
             padding: 0.75rem 1.5rem;
             border-radius: 0.75rem;
             font-weight: 700;
             font-size: 1.125rem;
             width: 100%;
             transition: background-color 0.2s;
-            box-shadow: 0 4px 8px rgba(255,215,0,0.3);
+            box-shadow: 0 4px 8px rgba(230,57,70,0.3);
         }
         #item-details-add-to-cart-btn:hover {
-            background-color: #FFC107;
+            background-color: #FA6974;
         }
 
 
@@ -769,15 +757,17 @@
             body {
                 padding-bottom: 4.5rem; /* Adjust space for bottom nav */
             }
+            /* Removed .red-sidebar responsive styles */
             .header {
                 padding: 0.75rem;
+                /* Adjusted padding-left for mobile as sidebar is removed */
+                padding-left: 0.75rem;
                 border-bottom-left-radius: 1rem;
                 border-bottom-right-radius: 1rem;
             }
             .header-title {
                 font-size: 1.2rem;
             }
-            /* Removed .header-icon and .header-avatar responsive styles */
             .header-cart-btn {
                 padding: 0.4rem 0.8rem;
                 font-size: 0.9rem;
@@ -791,75 +781,61 @@
 
             .menu-container {
                 padding: 1rem;
+                /* Adjusted padding-left for mobile as sidebar is removed */
+                padding-left: 1rem;
             }
-            .category-tabs-container {
-                gap: 0.5rem;
-                margin-bottom: 1rem;
+
+            .category-card {
+                padding: 0.8rem 1rem;
+                border-radius: 1.25rem;
             }
-            .category-tab-btn {
-                padding: 0.6rem 1rem;
+            .category-card::before {
+                width: 12px; /* Smaller red accent */
+                border-top-left-radius: 1.25rem;
+                border-bottom-left-radius: 1.25rem;
+            }
+            .category-card .item-image-circle {
+                width: 60px;
+                height: 60px;
+                margin-right: 1rem;
+                /* Adjusted margin-left for mobile as sidebar is removed */
+                margin-left: 0;
+            }
+            .category-card .item-info h3 {
+                font-size: 1.4rem;
+            }
+            .category-card .item-info p {
                 font-size: 0.9rem;
-                border-radius: 0.5rem;
+            }
+            .category-card .item-arrow {
+                font-size: 1.4rem;
             }
 
-            .featured-item-card {
-                border-radius: 1rem;
-                margin-bottom: 1.5rem;
-            }
-            .featured-item-card img {
-                height: 180px;
-                border-bottom-left-radius: 1rem;
-                border-bottom-right-radius: 1rem;
-            }
-            .featured-item-details {
-                padding: 1rem;
-            }
-            .featured-item-details h2 {
-                font-size: 1.75rem;
-            }
-            .featured-item-price {
-                font-size: 1.5rem;
-            }
-            .featured-order-btn {
-                padding: 0.6rem 1.2rem;
-                font-size: 1rem;
-                border-radius: 0.6rem;
-            }
-            .pagination-dots {
-                margin-top: -0.75rem;
-                margin-bottom: 1rem;
-            }
-            .dot {
-                width: 6px;
-                height: 6px;
-            }
-
-            .menu-list-section h2 {
+            .menu-item-list-by-category h2 {
                 font-size: 1.5rem;
                 margin-bottom: 1rem;
+                /* Adjusted padding-left for mobile as sidebar is removed */
+                padding-left: 0;
             }
-            .menu-list-container {
-                gap: 0.75rem;
-            }
-            .menu-list-item-card {
+            .menu-item-list-by-category .menu-list-item-card {
                 padding: 0.6rem 0.8rem;
                 border-radius: 0.75rem;
             }
-            .menu-list-item-card .item-image-circle {
+            .menu-item-list-by-category .item-image-circle {
                 width: 50px;
                 height: 50px;
                 margin-right: 0.75rem;
             }
-            .menu-list-item-card .item-info h3 {
+            .menu-item-list-by-category .item-info h3 {
                 font-size: 1.1rem;
             }
-            .menu-list-item-card .item-info p {
+            .menu-item-list-by-category .item-info p {
                 font-size: 0.8rem;
             }
-            .menu-list-item-card .item-price {
+            .menu-item-list-by-category .item-price {
                 font-size: 1rem;
             }
-            .menu-list-item-card .item-arrow {
+            .menu-item-list-by-category .item-arrow {
                 font-size: 1rem;
             }
 
@@ -890,11 +866,11 @@
 
             /* Item Details Modal specific for mobile */
             #item-details-modal .modal-content {
-                border-radius: 1rem; /* Smaller radius for mobile */
+                border-radius: 1rem;
                 margin-top: 2.5vh;
             }
             #item-details-image-container {
-                height: 200px; /* Smaller image on mobile */
+                height: 200px;
                 border-top-left-radius: 1rem;
                 border-top-right-radius: 1rem;
             }
@@ -903,9 +879,6 @@
             }
             #item-details-name {
                 font-size: 1.75rem;
-            }
-            #item-details-sub-description {
-                font-size: 0.85rem;
             }
             .item-option-button {
                 padding: 0.6rem 1rem;
@@ -946,14 +919,18 @@
     </style>
 </head>
 <body>
+    <!-- Red Sidebar - REMOVED -->
+    <!-- <div class="red-sidebar"></div> -->
+
     <!-- Header -->
     <header class="header" id="main-header">
         <div class="header-left">
-            <!-- Removed hamburger menu icon -->
+            <!-- Hamburger menu icon (retained as per image, but without functionality for now) -->
+            <i class="fas fa-bars header-icon"></i>
             <span class="header-title">Food Items</span>
         </div>
         <div class="header-right">
-            <!-- Removed user avatar -->
+            <!-- Cart button -->
             <button id="header-cart-btn" class="header-cart-btn">
                 <i class="fas fa-shopping-cart"></i>
                 <span id="cart-count" class="cart-count hidden">0</span>
@@ -962,35 +939,18 @@
     </header>
 
     <main class="menu-container" id="home-screen">
-        <!-- Category Tabs Section -->
-        <div id="category-tabs-container" class="category-tabs-container">
-            <!-- Category buttons will be rendered here -->
-        </div>
-
-        <!-- Featured Item Section -->
-        <section id="featured-item-section" class="featured-item-card hidden">
-            <img id="featured-item-image" src="" alt="Featured Item">
-            <div class="featured-item-details">
-                <h2 id="featured-item-name"></h2>
-                <p id="featured-item-description"></p>
-                <div class="featured-item-price" id="featured-item-price"></div>
-                <button id="featured-order-btn" class="featured-order-btn">Buy</button>
+        <!-- Category List Section (Main display of categories) -->
+        <section class="category-list-section">
+            <div id="category-list-container" class="category-list-container">
+                <!-- Category cards will be rendered here -->
+                <p class="text-center text-gray-400">Loading categories...</p>
             </div>
         </section>
-        <div class="pagination-dots">
-            <div class="dot active"></div>
-            <div class="dot"></div>
-            <div class="dot"></div>
-        </div>
 
-        <!-- Menu Item List Section (replacing Popular Now) -->
-        <section class="menu-list-section">
-            <h2 class="text-xl font-bold">All Items</h2> <!-- Title for the list -->
-            <div id="menu-item-list-container" class="menu-list-container">
-                <!-- Menu items will be rendered here -->
-                <p class="text-center text-gray-400">Loading menu items...</p>
-            </div>
-        </section>
+        <!-- Dynamic Menu Item List Sections (for each category, hidden by default) -->
+        <div id="menu-item-sections-container">
+            <!-- Individual menu item lists for each category will be rendered here -->
+        </div>
     </main>
 
     <!-- Order Tracking Section (Initially hidden, toggled by nav bar) -->
@@ -1079,7 +1039,6 @@
             <span class="close-button">&times;</span>
             <div id="item-details-image-container">
                 <img id="item-details-image" src="" alt="Item Image">
-                <!-- Removed like and ... dots as per request -->
             </div>
             <div id="item-details-content">
                 <h2 id="item-details-name"></h2>
@@ -1135,11 +1094,13 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         // Define WEB_MENU_URL here or ensure it's set in your environment
-        const WEB_MENU_URL = window.location.origin + '/menu'; // Fallback to current origin if not set via environment
+        const WEB_MENU_URL = window.location.origin + '/menu';
 
         // --- DOM Elements ---
         const homeScreen = document.getElementById('home-screen');
-        const menuSectionsContainer = document.getElementById('menu-item-list-container'); // Changed to target the list container
+        const categoryListContainer = document.getElementById('category-list-container');
+        const menuItemSectionsContainer = document.getElementById('menu-item-sections-container');
+
         const cartModal = document.getElementById('cart-modal');
         const cartItemsList = document.getElementById('cart-items-list');
         const cartSubtotalSpan = document.getElementById('cart-subtotal');
@@ -1175,31 +1136,22 @@
         const confirmLocationBtn = document.getElementById('confirm-location-btn');
         const centerLiveLocationBtn = document.getElementById('center-live-location-btn');
 
-        // Item Details Modal Elements - REDESIGNED
+        // Item Details Modal Elements
         const itemDetailsModal = document.getElementById('item-details-modal');
         const itemDetailsImage = document.getElementById('item-details-image');
         const itemDetailsName = document.getElementById('item-details-name');
-        const itemDetailsSubDescription = document.getElementById('item-details-sub-description'); // New sub-description
-        const itemOptionButtons = document.querySelectorAll('.item-option-button'); // Size/Option buttons
-        const itemDetailsPriceNow = document.getElementById('item-details-price-now'); // NOW price
-        const itemDetailsPriceBefore = document.getElementById('item-details-price-before'); // BEFORE price
-        const itemDetailsDiscount = document.getElementById('item-details-discount'); // Discount percentage
+        const itemDetailsSubDescription = document.getElementById('item-details-sub-description');
+        const itemOptionButtons = document.querySelectorAll('.item-option-button');
+        const itemDetailsPriceNow = document.getElementById('item-details-price-now');
+        const itemDetailsPriceBefore = document.getElementById('item-details-price-before');
+        const itemDetailsDiscount = document.getElementById('item-details-discount');
         const itemDetailsQuantitySpan = document.getElementById('item-details-quantity');
         const itemDetailsDecreaseBtn = document.getElementById('item-details-decrease-btn');
         const itemDetailsIncreaseBtn = document.getElementById('item-details-increase-btn');
         const itemDetailsAddToCartBtn = document.getElementById('item-details-add-to-cart-btn');
         const itemDetailsMessage = document.getElementById('item-details-message');
 
-        // Main Menu Elements - REDESIGNED
-        const featuredItemSection = document.getElementById('featured-item-section');
-        const featuredItemImage = document.getElementById('featured-item-image');
-        const featuredItemName = document.getElementById('featured-item-name');
-        const featuredItemDescription = document.getElementById('featured-item-description');
-        const featuredItemPrice = document.getElementById('featured-item-price');
-        const featuredOrderBtn = document.getElementById('featured-order-btn');
-        const categoryTabsContainer = document.getElementById('category-tabs-container'); // Renamed from categoryButtonsContainer
-        const menuItemListContainer = document.getElementById('menu-item-list-container'); // New container for list items
-        const paginationDots = document.querySelectorAll('.pagination-dots .dot'); // Pagination dots
+        // Main Menu Elements (updated)
         const headerCartBtn = document.getElementById('header-cart-btn');
         const cartCountSpan = document.getElementById('cart-count');
         const bottomNav = document.getElementById('bottom-nav');
@@ -1207,17 +1159,16 @@
         let cart = [];
         let menuItems = [];
         let deliveryRates = [];
-        let shopLocation = null; // { latitude, longitude }
+        let shopLocation = null;
 
         // Map related variables
         let map = null;
         let marker = null;
-        let selectedDeliveryLocation = null; // { latitude, longitude, address }
-        let currentItemInModal = null; // Stores the currently open item object in the modal
-        let currentActiveCategory = 'All'; // Track active category for filtering
+        let selectedDeliveryLocation = null;
+        let currentItemInModal = null;
 
-        const PLACEHOLDER_IMAGE = 'https://placehold.co/400x280/FFD700/1A1A1A?text=No+Image'; // Updated placeholder for yellow theme
-        const CIRCULAR_PLACEHOLDER_IMAGE = 'https://placehold.co/60x60/FFD700/1A1A1A?text=Item'; // New placeholder for circular images
+        const PLACEHOLDER_IMAGE = 'https://placehold.co/400x280/E63946/FFFFFF?text=No+Image';
+        const CIRCULAR_PLACEHOLDER_IMAGE = 'https://placehold.co/80x80/E63946/FFFFFF?text=Item';
 
         // --- Global Error Redirection ---
         function redirectToErrorPage(message = 'An unexpected error occurred. Redirecting...', delay = 3000) {
@@ -1238,7 +1189,7 @@
             return true;
         };
 
-        // --- Header Scroll Logic ---
+        // --- Header Scroll Logic (retained) ---
         const header = document.getElementById('main-header');
         let lastScrollTop = 0;
 
@@ -1256,7 +1207,7 @@
         // --- Utility Functions ---
         function showLoader(loaderElement, textElement, messageElement, message = 'Loading...', type = 'info') {
             loaderElement.classList.remove('hidden');
-            if (textElement) textElement.classList.add('hidden'); // textElement might be null for some loaders
+            if (textElement) textElement.classList.add('hidden');
             messageElement.textContent = message;
             messageElement.className = `message mt-3 ${type}`;
             messageElement.classList.remove('hidden');
@@ -1315,7 +1266,7 @@
                 renderHomePage();
             } catch (error) {
                 console.error('Error in fetchMenu:', error);
-                menuItemListContainer.innerHTML = `<p class="text-center text-red-500 w-full">Error loading menu: ${error.message}</p>`;
+                categoryListContainer.innerHTML = `<p class="text-center text-red-500 w-full">Error loading menu: ${error.message}</p>`;
                 redirectToErrorPage('Failed to load menu. Redirecting...', 5000);
             }
         }
@@ -1341,96 +1292,102 @@
         // --- Render Functions ---
         function renderHomePage() {
             if (!menuItems || menuItems.length === 0) {
-                menuItemListContainer.innerHTML = '<p class="text-center text-gray-500 w-full">No menu items available at the moment. Please check back later!</p>';
-                featuredItemSection.classList.add('hidden');
-                categoryTabsContainer.innerHTML = '';
+                categoryListContainer.innerHTML = '<p class="text-center text-gray-500 w-full">No menu items available at the moment. Please check back later!</p>';
                 return;
             }
 
-            // Render Featured Item
-            const featuredItem = menuItems.find(item => item.isTrending) || menuItems[0];
-            if (featuredItem) {
-                featuredItemSection.classList.remove('hidden');
-                featuredItemImage.src = featuredItem.imageUrl || PLACEHOLDER_IMAGE;
-                featuredItemImage.onerror = () => { featuredItemImage.onerror=null; featuredItemImage.src=PLACEHOLDER_IMAGE; };
-                featuredItemName.textContent = featuredItem.name;
-                featuredItemDescription.textContent = featuredItem.description || 'A delicious culinary delight.';
-                featuredItemPrice.textContent = `₹${featuredItem.price.toFixed(2)}`;
-                featuredOrderBtn.onclick = () => openItemDetailsModal(featuredItem._id);
-                // Activate first pagination dot (visual only)
-                paginationDots.forEach((dot, index) => {
-                    if (index === 0) dot.classList.add('active');
-                    else dot.classList.remove('active');
-                });
-            } else {
-                featuredItemSection.classList.add('hidden');
-                paginationDots.forEach(dot => dot.classList.remove('active'));
-            }
-
-            // Render Categories
-            const categories = ['All'];
+            // Group items by category
+            const categoriesMap = new Map();
             menuItems.forEach(item => {
-                if (item.category && !categories.includes(item.category)) {
-                    categories.push(item.category);
+                const category = item.category || 'Uncategorized';
+                if (!categoriesMap.has(category)) {
+                    categoriesMap.set(category, []);
                 }
+                categoriesMap.get(category).push(item);
             });
 
-            categoryTabsContainer.innerHTML = '';
-            categories.forEach(category => {
-                const button = document.createElement('button');
-                button.className = `category-tab-btn ${category === currentActiveCategory ? 'active' : ''}`;
-                button.textContent = category;
-                button.dataset.category = category;
-                button.addEventListener('click', () => {
-                    currentActiveCategory = category;
-                    document.querySelectorAll('.category-tab-btn').forEach(btn => btn.classList.remove('active'));
-                    button.classList.add('active');
-                    filterAndRenderMenuItems();
-                });
-                categoryTabsContainer.appendChild(button);
-            });
+            // Render Category Cards (Home Page)
+            categoryListContainer.innerHTML = '';
+            menuItemSectionsContainer.innerHTML = ''; // Clear previous item sections
 
-            // Render Menu Item List
-            filterAndRenderMenuItems();
-        }
-
-        function filterAndRenderMenuItems() {
-            menuItemListContainer.innerHTML = '';
-            const filteredItems = menuItems.filter(item => {
-                const matchesCategory = currentActiveCategory === 'All' || item.category === currentActiveCategory;
-                return matchesCategory && item.isAvailable;
-            });
-
-            if (filteredItems.length === 0) {
-                menuItemListContainer.innerHTML = '<p class="text-center text-gray-500 w-full">No items found in this category.</p>';
-                return;
-            }
-
-            filteredItems.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'menu-list-item-card';
-                card.dataset.itemId = item._id;
-                card.innerHTML = `
+            categoriesMap.forEach((items, categoryName) => {
+                // Create category card for the main home screen
+                const categoryCard = document.createElement('div');
+                categoryCard.className = 'category-card';
+                categoryCard.dataset.category = categoryName; // Use data attribute for scrolling
+                categoryCard.innerHTML = `
                     <div class="item-image-circle">
-                        <img src="${item.imageUrl || CIRCULAR_PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${CIRCULAR_PLACEHOLDER_IMAGE}';">
+                        <img src="${items[0].imageUrl || CIRCULAR_PLACEHOLDER_IMAGE}" alt="${categoryName}" onerror="this.onerror=null;this.src='${CIRCULAR_PLACEHOLDER_IMAGE}';">
                     </div>
                     <div class="item-info">
-                        <h3>${item.name}</h3>
-                        <p>${item.description || 'Delicious food item'}</p>
+                        <h3>${categoryName}</h3>
+                        <p>${items.length} items</p>
                     </div>
-                    <span class="item-price">₹${item.price.toFixed(2)}</span>
                     <i class="fas fa-chevron-right item-arrow"></i>
                 `;
-                card.addEventListener('click', (e) => {
-                    openItemDetailsModal(e.currentTarget.dataset.itemId);
+                categoryCard.addEventListener('click', () => {
+                    // Scroll to the corresponding menu item section
+                    document.getElementById(`category-section-${categoryName.replace(/\s+/g, '-')}`).scrollIntoView({ behavior: 'smooth' });
                 });
-                menuItemListContainer.appendChild(card);
+                categoryListContainer.appendChild(categoryCard);
+
+                // Create a separate section for each category's items (initially hidden)
+                const categorySection = document.createElement('section');
+                categorySection.id = `category-section-${categoryName.replace(/\s+/g, '-')}`;
+                categorySection.className = 'menu-item-list-by-category';
+                categorySection.innerHTML = `
+                    <h2>${categoryName}</h2>
+                    <div class="menu-list-container">
+                        <!-- Items for this category will be rendered here -->
+                    </div>
+                `;
+                const itemListDiv = categorySection.querySelector('.menu-list-container');
+                items.forEach(item => {
+                    const itemCard = document.createElement('div');
+                    itemCard.className = 'menu-list-item-card';
+                    itemCard.dataset.itemId = item._id;
+                    itemCard.innerHTML = `
+                        <div class="item-image-circle">
+                            <img src="${item.imageUrl || CIRCULAR_PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${CIRCULAR_PLACEHOLDER_IMAGE}';">
+                        </div>
+                        <div class="item-info">
+                            <h3>${item.name}</h3>
+                            <p>${item.description || 'Delicious food item'}</p>
+                        </div>
+                        <span class="item-price">₹${item.price.toFixed(2)}</span>
+                        <i class="fas fa-chevron-right item-arrow"></i>
+                    `;
+                    itemCard.addEventListener('click', (e) => {
+                        openItemDetailsModal(e.currentTarget.dataset.itemId);
+                    });
+                    itemListDiv.appendChild(itemCard);
+                });
+                menuItemSectionsContainer.appendChild(categorySection);
             });
         }
+
+        // Function to show/hide category item lists based on scroll (optional, for visual effect)
+        // This is a basic implementation. For a more robust solution, consider Intersection Observer API.
+        function handleScrollForCategorySections() {
+            const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+            const sections = document.querySelectorAll('.menu-item-list-by-category');
+            
+            sections.forEach(section => {
+                const rect = section.getBoundingClientRect();
+                // If section is mostly in view
+                if (rect.top <= window.innerHeight / 2 && rect.bottom >= window.innerHeight / 2) {
+                    section.classList.add('active');
+                } else {
+                    section.classList.remove('active');
+                }
+            });
+        }
+        window.addEventListener('scroll', handleScrollForCategorySections);
+
 
         function updateQuantityInModal(action) {
             let currentQuantity = parseInt(itemDetailsQuantitySpan.textContent);
-            let currentPrice = currentItemInModal.price; // Use base price from currentItemInModal
+            let currentPrice = currentItemInModal.price;
 
             if (action === 'increase') {
                 currentQuantity++;
@@ -1439,9 +1396,8 @@
             }
             itemDetailsQuantitySpan.textContent = currentQuantity;
             itemDetailsPriceNow.textContent = `₹${(currentPrice * currentQuantity).toFixed(2)}`;
-            // Update BEFORE price and discount based on NOW price (for visual effect)
             if (currentQuantity > 0) {
-                const beforePrice = currentPrice * currentQuantity * 1.3; // Example: 30% higher
+                const beforePrice = currentPrice * currentQuantity * 1.3;
                 itemDetailsPriceBefore.textContent = `₹${beforePrice.toFixed(2)}`;
                 itemDetailsDiscount.textContent = '30% Off';
                 itemDetailsPriceBefore.classList.remove('hidden');
@@ -1564,28 +1520,25 @@
             }
         });
 
-        // Item Details Modal Functions - REDESIGNED
+        // Item Details Modal Functions
         function renderItemDetailsModalContent(item) {
-            currentItemInModal = item; // Store the item object
+            currentItemInModal = item;
 
             itemDetailsImage.src = item.imageUrl || PLACEHOLDER_IMAGE;
             itemDetailsImage.onerror = () => { itemDetailsImage.onerror=null; itemDetailsImage.src=PLACEHOLDER_IMAGE; };
             itemDetailsName.textContent = item.name;
-            itemDetailsSubDescription.textContent = item.category || 'Food Item'; // Use category as sub-description or a default
+            itemDetailsSubDescription.textContent = item.category || 'Food Item';
 
-            // Reset size options and select default (e.g., first one)
             itemOptionButtons.forEach((button, index) => {
                 button.classList.remove('active');
-                if (index === 0) button.classList.add('active'); // Default to 'Small' or first option
+                if (index === 0) button.classList.add('active');
             });
 
-            // Set initial quantity from cart or 0
             const itemInCart = cart.find(cartItem => cartItem.productId === item._id);
             const quantityInCart = itemInCart ? itemInCart.quantity : 0;
             itemDetailsQuantitySpan.textContent = quantityInCart;
 
-            // Update prices based on initial quantity
-            updateQuantityInModal('none'); // Call with 'none' to just update display based on current quantity
+            updateQuantityInModal('none');
             
             itemDetailsMessage.classList.add('hidden');
         }
@@ -1605,7 +1558,7 @@
         itemDetailsIncreaseBtn.addEventListener('click', () => updateQuantityInModal('increase'));
         itemDetailsAddToCartBtn.addEventListener('click', () => {
             const quantity = parseInt(itemDetailsQuantitySpan.textContent);
-            const currentItem = currentItemInModal; // Use the stored item object
+            const currentItem = currentItemInModal;
             if (quantity > 0 || cart.some(item => item.productId === currentItem._id)) {
                 addToCart(currentItem._id, quantity);
                 itemDetailsMessage.textContent = `${currentItem.name} quantity updated in cart!`;
@@ -1624,13 +1577,10 @@
             }
         });
 
-        // Event listener for size/option buttons
         itemOptionButtons.forEach(button => {
             button.addEventListener('click', () => {
                 itemOptionButtons.forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
-                // In a real app, this would update currentItemInModal.price based on size
-                // For this demo, it's visual only.
             });
         });
 
@@ -1667,7 +1617,6 @@
                 map.invalidateSize();
             }
 
-            // Always attempt to center on live location when map modal opens
             centerMapToLiveLocation();
         }
 
@@ -1694,7 +1643,7 @@
                     map.setView([shopLocation.latitude, shopLocation.longitude], 13);
                     marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
                     reverseGeocode(shopLocation.latitude, shopLocation.longitude);
-                }, { timeout: 10000, enableHighAccuracy: true }); // Increased timeout and enabled high accuracy
+                }, { timeout: 10000, enableHighAccuracy: true });
             } else {
                 mapAddressDisplay.textContent = 'Geolocation is not supported by your browser. Centering on shop location.';
                 map.setView([shopLocation.latitude, shopLocation.longitude], 13);
@@ -1731,7 +1680,7 @@
                     longitude: lon,
                     address: `Coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)} (Address lookup failed)`
                 };
-            }
+                }
         }
 
         confirmLocationBtn.addEventListener('click', () => {
@@ -1928,6 +1877,10 @@
             if (targetId === 'home-screen') {
                 homeScreen.classList.remove('hidden');
                 document.querySelector('.nav-item[data-target="home-screen"]').classList.add('active');
+                // Hide all individual category item lists when returning to home screen
+                document.querySelectorAll('.menu-item-list-by-category').forEach(section => {
+                    section.classList.remove('active');
+                });
             } else if (targetId === 'cart-modal') {
                 cartModal.style.display = 'flex';
                 updateCartDisplay();
@@ -1951,10 +1904,10 @@
             });
         });
 
-        // Removed JAR button functionality as per request (hamburger menu is gone)
-        // document.querySelector('.header-left .header-icon').addEventListener('click', () => {
-        //     alert('Hamburger menu clicked! (Placeholder for side navigation)');
-        // });
+        // Hamburger menu icon click (no functionality, just placeholder alert)
+        document.querySelector('.header-left .header-icon').addEventListener('click', () => {
+            alert('Hamburger menu clicked! (Placeholder for side navigation)');
+        });
 
 
         // --- Initialize on page load ---
@@ -1962,7 +1915,7 @@
             await fetchPublicSettings();
             await fetchMenu();
 
-            showSection('home-screen');
+            showSection('home-screen'); // Start on the home screen with category cards
 
             const urlParams = new URLSearchParams(window.location.search);
             const orderIdFromUrl = urlParams.get('orderId');
