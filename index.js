@@ -11,8 +11,7 @@ const moment = require('moment-timezone');
 const cron = require('node-cron');
 const speakeasy = require('speakeasy');
 const fs = require('fs');
-const crypto = require('crypto'); // For Razorpay signature verification
-const Razorpay = require('razorpay'); // Import Razorpay
+const crypto = require('crypto'); // Still needed for general crypto operations if any, but not directly for Razorpay anymore
 
 require('dotenv').config();
 
@@ -35,11 +34,7 @@ const DEFAULT_ADMIN_USERNAME = 'dashboard_admin';
 const DEFAULT_ADMIN_PASSWORD = 'password123';
 // --- END WARNING ---
 
-// Razorpay Initialization
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Removed Razorpay Initialization
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -84,8 +79,8 @@ const OrderSchema = new mongoose.Schema({
     paymentMethod: { type: String, default: 'Cash on Delivery', enum: ['Cash on Delivery', 'Online Payment'] },
     deliveryAddress: String,
     lastMessageTimestamp: { type: Date, default: Date.now },
-    razorpayOrderId: { type: String, unique: true, sparse: true }, // Store Razorpay Order ID
-    razorpayPaymentId: { type: String, unique: true, sparse: true }, // Store Razorpay Payment ID
+    razorpayOrderId: { type: String, unique: true, sparse: true }, // Kept sparse for historical data, not populated for new orders
+    razorpayPaymentId: { type: String, unique: true, sparse: true }, // Kept sparse for historical data, not populated for new orders
 });
 
 const CustomerSchema = new mongoose.Schema({
@@ -190,7 +185,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 
     isInitializing = true;
     currentInitializationAttempt++;
-    console.log(`[WhatsApp] Starting initialization (Force new session: ${forceNewSession}). Attempt ${currentInitializationAttempt}/${MAX_INITIALIZATION_ATTEMPTS}`);
+    console.log(`[WhatsApp] Starting initialization (Force new session: ${forceNewSession}). Attempt ${currentInitializationAttempt}/${MAX_INITIALIZATION_ATTEMPT}`);
 
     // Update status in DB and emit to dashboard
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
@@ -397,9 +392,8 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 break;
             case 'op':
             case 'online payment':
-                // This case is primarily handled by the web menu now.
-                // If a user types 'op', they should be redirected to the web menu.
-                await client.sendMessage(chatId, 'To complete an online payment, please place your order through our web menu: ' + process.env.WEB_MENU_URL);
+                // Online payment is now "Coming Soon"
+                await client.sendMessage(chatId, 'Online payment will be added soon! For now, please use Cash on Delivery or place your order through our web menu: ' + process.env.WEB_MENU_URL);
                 break;
             default:
                 // Check if the message is a PIN for order tracking
@@ -543,11 +537,9 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
         if (order.pinId) {
             orderListMessage += `  PIN: ${order.pinId}\n`;
         }
-        order.items.forEach(item => {
-            orderListMessage += `  - ${item.name} x ${item.quantity}\n`;
-        });
         orderListMessage += `  Total: ₹${order.totalAmount.toFixed(2)}\n`;
         orderListMessage += `  Status: ${order.status}\n`;
+        orderListMessage += `  Payment: ${order.paymentMethod}\n`;
         orderListMessage += `  Date: ${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n`;
     });
     await client.sendMessage(chatId, orderListMessage);
@@ -995,112 +987,8 @@ app.get('/api/public/settings', async (req, res) => {
     }
 });
 
-// New endpoint to create Razorpay order
-app.post('/api/create-razorpay-order', async (req, res) => {
-    const { amount, currency } = req.body; // amount in paisa
-
-    if (!amount || !currency) {
-        return res.status(400).json({ message: 'Amount and currency are required.' });
-    }
-
-    try {
-        const options = {
-            amount: amount, // amount in the smallest currency unit
-            currency: currency,
-            receipt: `receipt_${Date.now()}`,
-            payment_capture: 1 // auto-capture payment
-        };
-        const order = await razorpay.orders.create(options);
-        res.status(200).json({ orderId: order.id });
-    } catch (error) {
-        console.error('Error creating Razorpay order:', error);
-        res.status(500).json({ message: 'Failed to create Razorpay order.', error: error.message });
-    }
-});
-
-// New endpoint to verify Razorpay payment and finalize order
-app.post('/api/verify-payment', async (req, res) => {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
-
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !orderData) {
-        return res.status(400).json({ message: 'Missing payment verification details or order data.' });
-    }
-
-    const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
-    shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
-    const digest = shasum.digest('hex');
-
-    if (digest === razorpay_signature) {
-        try {
-            // Generate custom order ID and PIN ID
-            const customOrderId = generateCustomOrderId();
-            const pinId = await generateUniquePinId();
-
-            const itemDetails = [];
-            for (const item of orderData.items) {
-                const product = await Item.findById(item.productId);
-                if (!product || !product.isAvailable) {
-                    // This should ideally be caught earlier in the frontend or order creation
-                    return res.status(400).json({ message: `Item ${item.name || item.productId} is not available.` });
-                }
-                itemDetails.push({
-                    itemId: product._id,
-                    name: product.name,
-                    price: product.price,
-                    quantity: item.quantity,
-                });
-            }
-
-            const newOrder = new Order({
-                customOrderId: customOrderId,
-                pinId: pinId,
-                items: itemDetails,
-                customerName: orderData.customerName,
-                customerPhone: orderData.customerPhone.trim(), // Ensure phone is trimmed
-                deliveryAddress: orderData.deliveryAddress,
-                customerLocation: orderData.customerLocation,
-                subtotal: orderData.subtotal,
-                transportTax: orderData.transportTax,
-                totalAmount: orderData.totalAmount,
-                paymentMethod: 'Online Payment', // Explicitly set as Online Payment
-                status: 'Confirmed', // Mark as confirmed after successful payment
-                razorpayOrderId: razorpay_order_id,
-                razorpayPaymentId: razorpay_payment_id,
-            });
-
-            await newOrder.save();
-
-            await Customer.findOneAndUpdate(
-                { customerPhone: orderData.customerPhone.trim() },
-                {
-                    $set: {
-                        customerName: orderData.customerName,
-                        lastKnownLocation: orderData.customerLocation,
-                        lastOrderDate: new Date()
-                    },
-                    $inc: { totalOrders: 1 }
-                },
-                { upsert: true, new: true }
-            );
-
-            if (whatsappReady) {
-                const customerChatId = orderData.customerPhone.includes('@c.us') ? orderData.customerPhone : orderData.customerPhone + '@c.us';
-                await client.sendMessage(customerChatId, `Your order (ID: ${newOrder.customOrderId}, PIN: ${newOrder.pinId}) has been placed successfully via online payment! We will notify you of its status updates. You can also view your orders by typing "My Orders" or by sending your PIN: ${newOrder.pinId}.`);
-            }
-            io.emit('new_order', newOrder); // Emit to admin dashboard
-
-            res.status(200).json({ message: 'Payment verified and order placed successfully!', orderId: newOrder.customOrderId, pinId: newOrder.pinId });
-
-        } catch (dbError) {
-            console.error('Error saving order after Razorpay verification:', dbError);
-            res.status(500).json({ message: 'Payment verified but failed to save order. Please contact support.', error: dbError.message });
-        }
-    } else {
-        console.warn('Razorpay signature mismatch for order:', razorpay_order_id);
-        res.status(400).json({ message: 'Payment verification failed: Invalid signature.' });
-    }
-});
-
+// Removed endpoint to create Razorpay order
+// Removed endpoint to verify Razorpay payment and finalize order
 
 app.post('/api/order', async (req, res) => {
     try {
@@ -1130,7 +1018,7 @@ app.post('/api/order', async (req, res) => {
             });
         }
 
-        // Generate custom order ID and PIN ID for COD orders
+        // Generate custom order ID and PIN ID for all orders (since online payment is removed for now)
         const customOrderId = generateCustomOrderId();
         const pinId = await generateUniquePinId();
 
@@ -1145,8 +1033,9 @@ app.post('/api/order', async (req, res) => {
             subtotal,
             transportTax,
             totalAmount,
-            paymentMethod,
-            status: 'Pending', // COD orders start as Pending
+            paymentMethod: 'Cash on Delivery', // Force to Cash on Delivery as online is removed
+            status: 'Pending', // All new orders start as Pending
+            // razorpayOrderId and razorpayPaymentId will not be set here
         });
 
         await newOrder.save();
