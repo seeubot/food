@@ -1,4 +1,4 @@
-const express = require('express');
+Const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
@@ -670,7 +670,8 @@ const authenticateToken = (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     // List of HTML routes that require authentication
-    const htmlAuthRoutes = ['/dashboard']; // Add other HTML routes if they need auth
+    // REMOVED: '/dashboard' from htmlAuthRoutes as it's now handled client-side
+    const htmlAuthRoutes = []; // Now, only API calls will use this middleware for 401/403 responses
 
     if (token == null) {
         console.log('Unauthorized: No token provided. (Request to ' + req.path + ')');
@@ -1130,9 +1131,11 @@ app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
-app.get('/dashboard', authenticateToken, (req, res) => {
+// MODIFICATION START: Removed authenticateToken middleware from /dashboard route
+app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
+// MODIFICATION END
 
 app.get('/menu', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'menu.html'));
