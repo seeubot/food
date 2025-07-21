@@ -232,7 +232,8 @@
         }
         .menu-item-card {
             flex-shrink: 0;
-            width: 200px;
+            /* Using clamp for responsive width */
+            width: clamp(160px, 45vw, 250px); /* Min 160px, preferred 45% viewport width, Max 250px */
             background-color: #1a1a1a; /* Dark gray */
             border-radius: 1.25rem;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
@@ -436,6 +437,10 @@
         .form-group input::placeholder,
         .form-group textarea::placeholder {
             color: #888888;
+        }
+        .form-group select option {
+            background-color: #333333; /* For select options */
+            color: #ffffff;
         }
         .btn-primary, .btn-checkout {
             background-color: #ffffff; /* White button */
@@ -714,10 +719,7 @@
                 padding: 0.6rem 1rem;
                 font-size: 0.9rem;
             }
-            .menu-item-card {
-                width: 180px;
-                border-radius: 1rem;
-            }
+            /* No need for specific width on menu-item-card here due to clamp() */
             .menu-item-card img {
                 height: 100px;
                 border-bottom-left-radius: 0.5rem;
