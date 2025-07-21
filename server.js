@@ -343,19 +343,20 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         console.log(`[WhatsApp] Message received from ${msg.from}: ${msg.body}`);
         io.emit('whatsapp_log', `Message from ${msg.from}: ${msg.body}`);
 
-        const chatId = msg.from;
-        const text = msg.body.toLowerCase().trim();
+        // Extract and strictly validate customerPhone
+        let customerPhone = ''; // Initialize to empty string
+        const rawChatId = msg.from;
 
-        let customerPhone;
-        if (chatId && typeof chatId === 'string') {
-            customerPhone = chatId.includes('@c.us') ? chatId.split('@')[0] : chatId;
+        if (typeof rawChatId === 'string' && rawChatId.length > 0) {
+            customerPhone = rawChatId.includes('@c.us') ? rawChatId.split('@')[0] : rawChatId;
             customerPhone = customerPhone.trim();
         }
 
-        if (!customerPhone) {
-            console.error(`[WhatsApp Message Handler] Invalid or empty customerPhone derived from chatId: '${chatId}'. Skipping message processing for this message.`);
-            io.emit('whatsapp_log', `Skipping message: Invalid phone number from ${chatId}`);
-            return;
+        // Final check for validity: customerPhone must be a non-empty string
+        if (customerPhone.length === 0) {
+            console.error(`[WhatsApp Message Handler] Invalid or empty customerPhone derived from msg.from: '${rawChatId}'. Skipping message processing for this message.`);
+            io.emit('whatsapp_log', `Skipping message: Invalid phone number from ${rawChatId}`);
+            return; // Exit if customerPhone is invalid
         }
 
         const customerName = msg._data.notifyName;
@@ -364,37 +365,41 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
             if (msg.hasMedia && msg.type === 'location' && msg.location) {
                 console.log(`[WhatsApp] Received location from ${customerPhone}`);
                 io.emit('whatsapp_log', `Received location from ${customerPhone}`);
-                const { latitude, longitude, address } = msg.location;
                 await Customer.findOneAndUpdate(
-                    { customerPhone: customerPhone },
+                    { customerPhone: customerPhone }, // Use the validated customerPhone
                     {
                         $set: {
                             lastKnownLocation: {
-                                latitude: latitude,
-                                longitude: longitude,
-                                address: address || 'Location shared via WhatsApp'
+                                latitude: msg.location.latitude,
+                                longitude: msg.location.longitude,
+                                address: msg.location.address || 'Location shared via WhatsApp'
                             }
                         }
                     },
                     { upsert: true, new: true }
                 );
-                await client.sendMessage(chatId, 'Your location has been updated. Thank you!');
+                await client.sendMessage(rawChatId, 'Your location has been updated. Thank you!');
                 io.emit('whatsapp_log', `Sent location confirmation to ${customerPhone}`);
                 return;
             }
 
+            // Log the customerPhone right before the database operation
+            console.log(`[WhatsApp Message Handler] Attempting DB operation for customerPhone: '${customerPhone}' (original msg.from: '${rawChatId}')`);
+
             let customer = await Customer.findOne({ customerPhone: customerPhone });
             if (!customer) {
-                console.log(`[WhatsApp] Creating new customer: ${customerPhone}`);
+                console.log(`[WhatsApp] Creating new customer with validated phone: ${customerPhone}`);
                 io.emit('whatsapp_log', `Creating new customer: ${customerPhone}`);
                 customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
-                await customer.save();
+                await customer.save(); // This is where the error occurs
+                console.log(`[WhatsApp] Successfully created new customer: ${customerPhone}`); // Log success
             } else {
                 if (customer.customerName !== customerName) {
                     console.log(`[WhatsApp] Updating customer name for ${customerPhone}`);
                     io.emit('whatsapp_log', `Updating customer name for ${customerPhone}`);
                     customer.customerName = customerName;
                     await customer.save();
+                    console.log(`[WhatsApp] Successfully updated customer name for ${customerPhone}`); // Log success
                 }
             }
 
@@ -405,31 +410,31 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 case 'menu':
                     console.log(`[WhatsApp] Sending welcome message to ${customerPhone}`);
                     io.emit('whatsapp_log', `Sending welcome message to ${customerPhone}`);
-                    await sendWelcomeMessage(chatId, customerName);
+                    await sendWelcomeMessage(rawChatId, customerName);
                     break;
                 case '1':
                 case 'view menu':
                     console.log(`[WhatsApp] Sending menu to ${customerPhone}`);
                     io.emit('whatsapp_log', `Sending menu to ${customerPhone}`);
-                    await sendMenu(chatId);
+                    await sendMenu(rawChatId);
                     break;
                 case '2':
                 case 'shop location':
                     console.log(`[WhatsApp] Sending shop location to ${customerPhone}`);
                     io.emit('whatsapp_log', `Sending shop location to ${customerPhone}`);
-                    await sendShopLocation(chatId);
+                    await sendShopLocation(rawChatId);
                     break;
                 case '4':
                 case 'my orders':
                     console.log(`[WhatsApp] Sending customer orders to ${customerPhone}`);
                     io.emit('whatsapp_log', `Sending customer orders to ${customerPhone}`);
-                    await sendCustomerOrders(chatId, customerPhone);
+                    await sendCustomerOrders(rawChatId, customerPhone);
                     break;
                 case '5':
                 case 'help':
                     console.log(`[WhatsApp] Sending help message to ${customerPhone}`);
                     io.emit('whatsapp_log', `Sending help message to ${customerPhone}`);
-                    await sendHelpMessage(chatId);
+                    await sendHelpMessage(rawChatId);
                     break;
                 case 'cod':
                 case 'cash on delivery':
@@ -441,11 +446,11 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                         { new: true, sort: { orderDate: -1 } }
                     );
                     if (pendingOrderCod) {
-                        await client.sendMessage(chatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
+                        await client.sendMessage(rawChatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
                         io.emit('new_order', pendingOrderCod);
                         io.emit('whatsapp_log', `Order ${pendingOrderCod.customOrderId} confirmed for COD.`);
                     } else {
-                        await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
+                        await client.sendMessage(rawChatId, 'You have no pending orders. Please place an order first.');
                         io.emit('whatsapp_log', `No pending orders for COD for ${customerPhone}.`);
                     }
                     break;
@@ -453,7 +458,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 case 'online payment':
                     console.log(`[WhatsApp] Online payment request from ${customerPhone}`);
                     io.emit('whatsapp_log', `Online payment request from ${customerPhone}`);
-                    await client.sendMessage(chatId, 'Online payment will be added soon! For now, please use Cash on Delivery or place your order through our web menu: ' + process.env.WEB_MENU_URL);
+                    await client.sendMessage(rawChatId, 'Online payment will be added soon! For now, please use Cash on Delivery or place your order through our web menu: ' + process.env.WEB_MENU_URL);
                     break;
                 default:
                     // Check if the message is a PIN for order tracking
@@ -462,7 +467,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                         io.emit('whatsapp_log', `Attempting to track order by PIN: ${text} for ${customerPhone}`);
                         const orderToTrack = await Order.findOne({ pinId: text });
                         if (orderToTrack) {
-                            await client.sendMessage(chatId, `Order ID: ${orderToTrack.customOrderId}\nStatus: ${orderToTrack.status}\nTotal: ₹${orderToTrack.totalAmount.toFixed(2)}\nItems: ${orderToTrack.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}`);
+                            await client.sendMessage(rawChatId, `Order ID: ${orderToTrack.customOrderId}\nStatus: ${orderToTrack.status}\nTotal: ₹${orderToTrack.totalAmount.toFixed(2)}\nItems: ${orderToTrack.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}`);
                             io.emit('whatsapp_log', `Order ${orderToTrack.customOrderId} found for PIN ${text}.`);
                             return;
                         }
@@ -479,28 +484,28 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                                 { $set: { deliveryAddress: msg.body } },
                                 { new: true }
                             );
-                            await client.sendMessage(chatId, 'Your delivery address has been saved. Please choose your payment method: ' +
+                            await client.sendMessage(rawChatId, 'Your delivery address has been saved. Please choose your payment method: ' +
                                                     "'Cash on Delivery' (COD) or 'Online Payment' (OP).");
                         } else {
                             console.log(`[WhatsApp] Unrecognized input from ${customerPhone} (has pending order with address)`);
                             io.emit('whatsapp_log', `Unrecognized input from ${customerPhone} (has pending order with address)`);
-                            await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
+                            await client.sendMessage(rawChatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
                         }
                     } else {
                         console.log(`[WhatsApp] Unrecognized input from ${customerPhone} (no recent pending order)`);
                         io.emit('whatsapp_log', `Unrecognized input from ${customerPhone} (no recent pending order)`);
-                        await client.sendMessage(chatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
+                        await client.sendMessage(rawChatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
                     }
                     break;
             }
         } catch (error) {
-            console.error(`[WhatsApp Message Handler] Error processing message from ${customerPhone}:`, error);
-            io.emit('whatsapp_log', `Error processing message from ${customerPhone}: ${error.message}`);
+            console.error(`[WhatsApp Message Handler] Error processing message from ${customerPhone} (rawChatId: ${rawChatId}):`, error);
+            io.emit('whatsapp_log', `Error processing message from ${customerPhone} (rawChatId: ${rawChatId}): ${error.message}`);
             // Attempt to send a generic error message back to the user
             try {
-                await client.sendMessage(chatId, 'Oops! Something went wrong while processing your request. Please try again or type "Help" for options.');
+                await client.sendMessage(rawChatId, 'Oops! Something went wrong while processing your request. Please try again or type "Help" for options.');
             } catch (sendError) {
-                console.error(`[WhatsApp Message Handler] Failed to send error message to ${customerPhone}:`, sendError);
+                console.error(`[WhatsApp Message Handler] Failed to send error message to ${rawChatId}:`, sendError);
             }
         }
     });
