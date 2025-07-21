@@ -329,6 +329,42 @@
             padding: 1rem;
         }
 
+        /* Payment Section Specific Styles */
+        .payment-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+        .summary-card {
+            background-color: #2a2a2a;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(255,255,255,0.05);
+        }
+        .summary-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #cccccc;
+            margin-bottom: 0.5rem;
+        }
+        .summary-card p {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .summary-card.revenue p {
+            color: #66ff66; /* Green for revenue */
+        }
+        .summary-card.cod p {
+            color: #ffff66; /* Yellow for COD */
+        }
+        .summary-card.online p {
+            color: #00bfff; /* Deep Sky Blue for Online */
+        }
+
+
         /* Responsive adjustments */
         @media (min-width: 768px) { /* Medium screens and up */
             .dashboard-container {
@@ -401,6 +437,7 @@
                 <a href="#orders-section" class="nav-link" data-section="orders-section">Orders</a>
                 <a href="#menu-section" class="nav-link" data-section="menu-section">Menu</a>
                 <a href="#customers-section" class="nav-link" data-section="customers-section">Customers</a>
+                <a href="#payments-section" class="nav-link" data-section="payments-section">Payments</a> <!-- New Link -->
                 <a href="#settings-section" class="nav-link" data-section="settings-section">Shop Settings</a>
                 <a href="#security-section" class="nav-link" data-section="security-section">Security</a>
             </div>
@@ -474,6 +511,53 @@
                         <p class="text-center text-gray-400">Loading customer data...</p>
                     </div>
                     <p id="customers-message" class="message mt-3"></p>
+                </div>
+            </section>
+
+            <!-- Payments Section (New) -->
+            <section id="payments-section" class="section-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Payment Overview</h2>
+                        <button id="refresh-payments-btn" class="btn-secondary btn-small">Refresh</button>
+                    </div>
+                    <div class="payment-summary-grid" id="payment-summary-grid">
+                        <div class="summary-card">
+                            <h3>Total Orders</h3>
+                            <p id="total-orders-count">0</p>
+                        </div>
+                        <div class="summary-card cod">
+                            <h3>Cash on Delivery</h3>
+                            <p id="cod-orders-count">0</p>
+                        </div>
+                        <div class="summary-card online">
+                            <h3>Online Payments</h3>
+                            <p id="online-orders-count">0</p>
+                        </div>
+                        <div class="summary-card revenue">
+                            <h3>Total Revenue</h3>
+                            <p>₹<span id="total-revenue">0.00</span></p>
+                        </div>
+                        <div class="summary-card revenue cod">
+                            <h3>COD Revenue</h3>
+                            <p>₹<span id="cod-revenue">0.00</span></p>
+                        </div>
+                        <div class="summary-card revenue online">
+                            <h3>Online Revenue</h3>
+                            <p>₹<span id="online-revenue">0.00</span></p>
+                        </div>
+                    </div>
+                    <p id="payments-summary-message" class="message mt-3"></p>
+                </div>
+
+                <div class="card mt-6">
+                    <div class="card-header">
+                        <h2>Recent Online Payment Orders</h2>
+                    </div>
+                    <div id="online-orders-list">
+                        <p class="text-center text-gray-400">Loading online orders...</p>
+                    </div>
+                    <p id="online-orders-message" class="message mt-3"></p>
                 </div>
             </section>
 
@@ -685,6 +769,20 @@
         const refreshCustomersBtn = document.getElementById('refresh-customers-btn');
         const customersMessage = document.getElementById('customers-message');
 
+        // Payments Elements (New)
+        const refreshPaymentsBtn = document.getElementById('refresh-payments-btn');
+        const paymentSummaryGrid = document.getElementById('payment-summary-grid');
+        const totalOrdersCount = document.getElementById('total-orders-count');
+        const codOrdersCount = document.getElementById('cod-orders-count');
+        const onlineOrdersCount = document.getElementById('online-orders-count');
+        const totalRevenue = document.getElementById('total-revenue');
+        const codRevenue = document.getElementById('cod-revenue');
+        const onlineRevenue = document.getElementById('online-revenue');
+        const paymentsSummaryMessage = document.getElementById('payments-summary-message');
+        const onlineOrdersListDiv = document.getElementById('online-orders-list');
+        const onlineOrdersMessage = document.getElementById('online-orders-message');
+
+
         // Settings Elements
         const settingsForm = document.getElementById('settings-form');
         const shopNameInput = document.getElementById('shop-name');
@@ -747,7 +845,7 @@
         const twoFactorSecretKey = document.getElementById('2fa-secret-key');
         const generate2FASecretBtn = document.getElementById('generate-2fa-secret-btn');
         const twoFactorVerifyCodeInput = document.getElementById('2fa-verify-code');
-        const verify2FACodeBtn = document.getElementById('verify-2fa-code-btn');
+        const verify2FACodeBtn = document.getElementById('2fa-verify-code-btn');
         const generate2FALoader = document.getElementById('generate-2fa-loader');
         const generate2FAText = document.getElementById('generate-2fa-text');
         const verify2FALoader = document.getElementById('verify-2fa-loader');
@@ -850,7 +948,7 @@
                 if (timeLeft <= 0) {
                     clearInterval(qrTimerInterval);
                     qrCodeSection.classList.add('hidden');
-                    updateBotStatusDisplay('qr_expired');
+                    updateBotStatusDisplay('qr_expired'); // Custom status for display
                 }
             }, 1000);
         }
@@ -971,6 +1069,58 @@
                     customersMessage.textContent = `Error: ${error.message}`;
                     customersMessage.className = 'message mt-3 error';
                     customersMessage.classList.remove('hidden');
+                }
+            }
+        }
+
+        async function fetchPaymentsData() {
+            paymentsSummaryMessage.classList.add('hidden');
+            onlineOrdersListDiv.innerHTML = '<p class="text-center text-gray-400">Loading online orders...</p>';
+            onlineOrdersMessage.classList.add('hidden');
+
+            try {
+                const orders = await authenticatedFetch('/api/admin/orders'); // Fetch all orders to aggregate
+
+                let totalOrders = orders.length;
+                let codOrders = 0;
+                let onlineOrders = 0;
+                let totalRevenueAmount = 0;
+                let codRevenueAmount = 0;
+                let onlineRevenueAmount = 0;
+
+                const recentOnlineOrders = [];
+
+                orders.forEach(order => {
+                    totalRevenueAmount += order.totalAmount;
+
+                    if (order.paymentMethod === 'Cash on Delivery') {
+                        codOrders++;
+                        codRevenueAmount += order.totalAmount;
+                    } else if (order.paymentMethod === 'Online Payment') {
+                        onlineOrders++;
+                        onlineRevenueAmount += order.totalAmount;
+                        recentOnlineOrders.push(order);
+                    }
+                });
+
+                // Update summary cards
+                totalOrdersCount.textContent = totalOrders;
+                codOrdersCount.textContent = codOrders;
+                onlineOrdersCount.textContent = onlineOrders;
+                totalRevenue.textContent = totalRevenueAmount.toFixed(2);
+                codRevenue.textContent = codRevenueAmount.toFixed(2);
+                onlineRevenue.textContent = onlineRevenueAmount.toFixed(2);
+
+                // Render recent online payment orders
+                renderOnlineOrders(recentOnlineOrders);
+
+            } catch (error) {
+                console.error('Error fetching payments data:', error);
+                if (!error.message.includes('Unauthorized')) {
+                    paymentsSummaryMessage.textContent = `Error loading payments data: ${error.message}`;
+                    paymentsSummaryMessage.className = 'message mt-3 error';
+                    paymentsSummaryMessage.classList.remove('hidden');
+                    onlineOrdersListDiv.innerHTML = '<p class="text-center text-red-400">Failed to load online orders.</p>';
                 }
             }
         }
@@ -1179,6 +1329,63 @@
             });
         }
 
+        function renderOnlineOrders(orders) {
+            if (!Array.isArray(orders) || orders.length === 0) {
+                onlineOrdersListDiv.innerHTML = '<p class="text-center text-gray-400">No online payment orders found.</p>';
+                return;
+            }
+            let tableHtml = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            // Sort by orderDate descending for recent orders
+            orders.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
+
+            orders.forEach(order => {
+                const orderIdShort = order._id.substring(0, 6);
+                const orderDate = new Date(order.orderDate).toLocaleString();
+                let statusClass = 'text-white';
+                switch(order.status) {
+                    case 'Pending': statusClass = 'text-yellow-400'; break;
+                    case 'Confirmed':
+                    case 'Preparing': statusClass = 'text-blue-400'; break;
+                    case 'Out for Delivery': statusClass = 'text-purple-400'; break;
+                    case 'Delivered': statusClass = 'text-green-400'; break;
+                    case 'Cancelled': statusClass = 'text-red-400'; break;
+                }
+
+                tableHtml += `
+                    <tr>
+                        <td>${orderIdShort}...</td>
+                        <td>${order.customerName}</td>
+                        <td>₹${order.totalAmount.toFixed(2)}</td>
+                        <td class="${statusClass}">${order.status}</td>
+                        <td>${orderDate}</td>
+                        <td>
+                            <button class="btn-secondary btn-small view-order-btn" data-id="${order._id}">View</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tableHtml += `</tbody></table>`;
+            onlineOrdersListDiv.innerHTML = tableHtml;
+
+            document.querySelectorAll('#online-orders-list .view-order-btn').forEach(button => {
+                button.addEventListener('click', () => openOrderDetailsModal(button.dataset.id));
+            });
+        }
+
+
         function renderDeliveryRates(rates) {
             if (!Array.isArray(rates) || rates.length === 0) {
                 deliveryRatesContainer.innerHTML = '<p class="text-gray-400 text-sm">No delivery rates configured. Add some!</p>';
@@ -1361,6 +1568,7 @@
                 });
                 hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, 'Order status updated!');
                 fetchOrders();
+                fetchPaymentsData(); // Refresh payments data when order status changes
                 setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
             } catch (error) {
                 console.error('Error updating order status:', error);
@@ -1377,6 +1585,7 @@
                 const result = await authenticatedFetch(`/api/admin/orders/${orderId}`, { method: 'DELETE' });
                 hideLoader(updateOrderLoader, updateOrderText, orderUpdateMessage, true, result.message);
                 fetchOrders();
+                fetchPaymentsData(); // Refresh payments data when an order is deleted
                 setTimeout(() => orderDetailsModal.style.display = 'none', 1500);
             } catch (error) {
                 console.error('Error deleting order:', error);
@@ -1494,8 +1703,16 @@
 
         async function verify2FACode() {
             const totpCode = twoFactorVerifyCodeInput.value.trim();
+            const secret = twoFactorSecretKey.textContent.trim(); // Get the secret from the displayed element
+
             if (!totpCode || totpCode.length !== 6) {
                 twoFactorModalMessage.textContent = 'Please enter a valid 6-digit code.';
+                twoFactorModalMessage.className = 'message mt-3 error';
+                twoFactorModalMessage.classList.remove('hidden');
+                return;
+            }
+            if (!secret) {
+                twoFactorModalMessage.textContent = 'Please generate a 2FA secret first.';
                 twoFactorModalMessage.className = 'message mt-3 error';
                 twoFactorModalMessage.classList.remove('hidden');
                 return;
@@ -1506,7 +1723,7 @@
                 const result = await authenticatedFetch('/api/admin/2fa/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ totpCode })
+                    body: JSON.stringify({ totpCode, secret }) // Send the secret for verification
                 });
                 if (result.verified) {
                     hideLoader(verify2FALoader, verify2FAText, twoFactorModalMessage, true, '2FA successfully enabled and verified!');
@@ -1566,6 +1783,9 @@
                     break;
                 case 'customers-section':
                     fetchCustomers();
+                    break;
+                case 'payments-section': // New case for payments section
+                    fetchPaymentsData();
                     break;
                 case 'settings-section':
                     fetchSettings();
@@ -1648,6 +1868,7 @@
         refreshCustomersBtn.addEventListener('click', fetchCustomers);
         saveSettingsBtn.addEventListener('click', saveSettings);
         addDeliveryRateBtn.addEventListener('click', addDeliveryRateInput);
+        refreshPaymentsBtn.addEventListener('click', fetchPaymentsData); // New event listener for payments refresh
 
         // 2FA Event Listeners
         refresh2FAStatusBtn.addEventListener('click', fetch2FAStatus);
