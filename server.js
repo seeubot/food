@@ -185,7 +185,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 
     isInitializing = true;
     currentInitializationAttempt++;
-    console.log(`[WhatsApp] Starting initialization (Force new session: ${forceNewSession}). Attempt ${currentInitializationAttempt}/${MAX_INITIALIZATION_ATTEMPT}`);
+    console.log(`[WhatsApp] Starting initialization (Force new session: ${forceNewSession}). Attempt ${currentInitializationAttempt}/${MAX_INITIALIZATION_ATTEMPTS}`);
 
     // Update status in DB and emit to dashboard
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
