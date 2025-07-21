@@ -11,6 +11,8 @@ const moment = require('moment-timezone');
 const cron = require('node-cron');
 const speakeasy = require('speakeasy');
 const fs = require('fs');
+const crypto = require('crypto'); // For Razorpay signature verification
+const Razorpay = require('razorpay'); // Import Razorpay
 
 require('dotenv').config();
 
@@ -33,6 +35,12 @@ const DEFAULT_ADMIN_USERNAME = 'dashboard_admin';
 const DEFAULT_ADMIN_PASSWORD = 'password123';
 // --- END WARNING ---
 
+// Razorpay Initialization
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
@@ -53,6 +61,8 @@ const ItemSchema = new mongoose.Schema({
 });
 
 const OrderSchema = new mongoose.Schema({
+    customOrderId: { type: String, unique: true, sparse: true }, // Custom user-facing order ID
+    pinId: { type: String, unique: true, sparse: true }, // 10-digit PIN for lookup
     customerPhone: { type: String, required: true },
     customerName: String,
     customerLocation: {
@@ -69,11 +79,13 @@ const OrderSchema = new mongoose.Schema({
     totalAmount: { type: Number, required: true },
     subtotal: { type: Number, default: 0 },
     transportTax: { type: Number, default: 0 },
-    orderDate: { type: Date, default: Date.now },
+    orderDate: { type: Date, default: Date.now, index: true }, // Indexed for faster sorting
     status: { type: String, default: 'Pending', enum: ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'] },
     paymentMethod: { type: String, default: 'Cash on Delivery', enum: ['Cash on Delivery', 'Online Payment'] },
     deliveryAddress: String,
-    lastMessageTimestamp: { type: Date, default: Date.now }
+    lastMessageTimestamp: { type: Date, default: Date.now },
+    razorpayOrderId: { type: String, unique: true, sparse: true }, // Store Razorpay Order ID
+    razorpayPaymentId: { type: String, unique: true, sparse: true }, // Store Razorpay Payment ID
 });
 
 const CustomerSchema = new mongoose.Schema({
@@ -114,6 +126,28 @@ const Order = mongoose.model('Order', OrderSchema);
 const Customer = mongoose.model('Customer', CustomerSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
+
+// --- Utility Functions for Custom IDs ---
+function generateCustomOrderId() {
+    const timestampPart = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 random chars
+    return `JAR${timestampPart}${randomPart}`;
+}
+
+async function generateUniquePinId() {
+    let pin;
+    let isUnique = false;
+    while (!isUnique) {
+        // Generate a random 10-digit number as a string
+        pin = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+        const existingOrder = await Order.findOne({ pinId: pin });
+        if (!existingOrder) {
+            isUnique = true;
+        }
+    }
+    return pin;
+}
+
 
 // --- WhatsApp Client Initialization & State Management ---
 let client = null;
@@ -363,19 +397,20 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 break;
             case 'op':
             case 'online payment':
-                const pendingOrderOp = await Order.findOneAndUpdate(
-                    { customerPhone: customerPhone, status: 'Pending' },
-                    { $set: { paymentMethod: 'Online Payment' } },
-                    { new: true, sort: { orderDate: -1 } }
-                );
-                if (pendingOrderOp) {
-                    await client.sendMessage(chatId, 'Thank you for choosing online payment. A payment link will be sent to you shortly. Your Order ID: ' + pendingOrderOp._id.substring(0,6) + '...');
-                    io.emit('new_order', pendingOrderOp);
-                } else {
-                    await client.sendMessage(chatId, 'You have no pending orders. Please place an order first.');
-                }
+                // This case is primarily handled by the web menu now.
+                // If a user types 'op', they should be redirected to the web menu.
+                await client.sendMessage(chatId, 'To complete an online payment, please place your order through our web menu: ' + process.env.WEB_MENU_URL);
                 break;
             default:
+                // Check if the message is a PIN for order tracking
+                if (text.length === 10 && !isNaN(text) && !text.startsWith('0')) { // Simple check for 10-digit number
+                    const orderToTrack = await Order.findOne({ pinId: text });
+                    if (orderToTrack) {
+                        await client.sendMessage(chatId, `Order ID: ${orderToTrack.customOrderId}\nStatus: ${orderToTrack.status}\nTotal: ₹${orderToTrack.totalAmount.toFixed(2)}\nItems: ${orderToTrack.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}`);
+                        return;
+                    }
+                }
+
                 const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
 
                 if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
@@ -493,6 +528,7 @@ const sendMenu = async (chatId) => {
 };
 
 const sendCustomerOrders = async (chatId, customerPhone) => {
+    // Fetch orders using customOrderId or pinId if available, otherwise use _id
     const orders = await Order.find({ customerPhone: customerPhone }).sort({ orderDate: -1 }).limit(5);
 
     if (orders.length === 0) {
@@ -502,7 +538,11 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
 
     let orderListMessage = 'Your Past Orders:\n\n';
     orders.forEach((order, index) => {
-        orderListMessage += `*Order ${index + 1} (ID: ${order._id.substring(0, 6)}...)*\n`;
+        const displayId = order.customOrderId || order._id.substring(0, 6) + '...';
+        orderListMessage += `*Order ${index + 1} (ID: ${displayId})*\n`;
+        if (order.pinId) {
+            orderListMessage += `  PIN: ${order.pinId}\n`;
+        }
         order.items.forEach(item => {
             orderListMessage += `  - ${item.name} x ${item.quantity}\n`;
         });
@@ -526,7 +566,7 @@ const sendHelpMessage = async (chatId) => {
 // --- Fleeting Lines for Re-Order Notifications ---
 const reOrderNotificationMessagesTelugu = [
     "Feeling hungry again? 😋 New flavors await on our menu! Order now! 🚀",
-    "Missing our delicious dishes? 💖 Order your next meal now! 🍽️",
+    "Missing our delicious dishes? 💖 Order your next meal now!🍽️",
     "7 days have passed! ⏳ It's the perfect time to re-order. Your favorite dishes are ready! ✨",
     "Special offer! 🎉 Get a discount on your next order this week. Check out the menu! 📜",
     "It's been 7 days since your last order from us. Re-order your favorites! 🧡",
@@ -826,6 +866,7 @@ app.delete('/api/admin/menu/:id', authenticateToken, async (req, res) => {
 
 app.get('/api/admin/orders', authenticateToken, async (req, res) => {
     try {
+        // Fetch orders and sort by orderDate for admin view
         const orders = await Order.find().sort({ orderDate: -1 });
         res.json(orders);
     } catch (error) {
@@ -852,7 +893,7 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
         if (whatsappReady) {
             // Ensure customerPhone is in the correct format for whatsapp-web.js
             const customerChatId = updatedOrder.customerPhone.includes('@c.us') ? updatedOrder.customerPhone : updatedOrder.customerPhone + '@c.us';
-            await client.sendMessage(customerChatId, `Your order (ID: ${updatedOrder._id.substring(0, 6)}...) status has been updated to '${status}'.`);
+            await client.sendMessage(customerChatId, `Your order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) status has been updated to '${status}'.`);
         }
 
         res.json({ message: 'Order status updated successfully', order: updatedOrder });
@@ -954,6 +995,113 @@ app.get('/api/public/settings', async (req, res) => {
     }
 });
 
+// New endpoint to create Razorpay order
+app.post('/api/create-razorpay-order', async (req, res) => {
+    const { amount, currency } = req.body; // amount in paisa
+
+    if (!amount || !currency) {
+        return res.status(400).json({ message: 'Amount and currency are required.' });
+    }
+
+    try {
+        const options = {
+            amount: amount, // amount in the smallest currency unit
+            currency: currency,
+            receipt: `receipt_${Date.now()}`,
+            payment_capture: 1 // auto-capture payment
+        };
+        const order = await razorpay.orders.create(options);
+        res.status(200).json({ orderId: order.id });
+    } catch (error) {
+        console.error('Error creating Razorpay order:', error);
+        res.status(500).json({ message: 'Failed to create Razorpay order.', error: error.message });
+    }
+});
+
+// New endpoint to verify Razorpay payment and finalize order
+app.post('/api/verify-payment', async (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !orderData) {
+        return res.status(400).json({ message: 'Missing payment verification details or order data.' });
+    }
+
+    const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
+    shasum.update(`${razorpay_order_id}|${razorpay_payment_id}`);
+    const digest = shasum.digest('hex');
+
+    if (digest === razorpay_signature) {
+        try {
+            // Generate custom order ID and PIN ID
+            const customOrderId = generateCustomOrderId();
+            const pinId = await generateUniquePinId();
+
+            const itemDetails = [];
+            for (const item of orderData.items) {
+                const product = await Item.findById(item.productId);
+                if (!product || !product.isAvailable) {
+                    // This should ideally be caught earlier in the frontend or order creation
+                    return res.status(400).json({ message: `Item ${item.name || item.productId} is not available.` });
+                }
+                itemDetails.push({
+                    itemId: product._id,
+                    name: product.name,
+                    price: product.price,
+                    quantity: item.quantity,
+                });
+            }
+
+            const newOrder = new Order({
+                customOrderId: customOrderId,
+                pinId: pinId,
+                items: itemDetails,
+                customerName: orderData.customerName,
+                customerPhone: orderData.customerPhone.trim(), // Ensure phone is trimmed
+                deliveryAddress: orderData.deliveryAddress,
+                customerLocation: orderData.customerLocation,
+                subtotal: orderData.subtotal,
+                transportTax: orderData.transportTax,
+                totalAmount: orderData.totalAmount,
+                paymentMethod: 'Online Payment', // Explicitly set as Online Payment
+                status: 'Confirmed', // Mark as confirmed after successful payment
+                razorpayOrderId: razorpay_order_id,
+                razorpayPaymentId: razorpay_payment_id,
+            });
+
+            await newOrder.save();
+
+            await Customer.findOneAndUpdate(
+                { customerPhone: orderData.customerPhone.trim() },
+                {
+                    $set: {
+                        customerName: orderData.customerName,
+                        lastKnownLocation: orderData.customerLocation,
+                        lastOrderDate: new Date()
+                    },
+                    $inc: { totalOrders: 1 }
+                },
+                { upsert: true, new: true }
+            );
+
+            if (whatsappReady) {
+                const customerChatId = orderData.customerPhone.includes('@c.us') ? orderData.customerPhone : orderData.customerPhone + '@c.us';
+                await client.sendMessage(customerChatId, `Your order (ID: ${newOrder.customOrderId}, PIN: ${newOrder.pinId}) has been placed successfully via online payment! We will notify you of its status updates. You can also view your orders by typing "My Orders" or by sending your PIN: ${newOrder.pinId}.`);
+            }
+            io.emit('new_order', newOrder); // Emit to admin dashboard
+
+            res.status(200).json({ message: 'Payment verified and order placed successfully!', orderId: newOrder.customOrderId, pinId: newOrder.pinId });
+
+        } catch (dbError) {
+            console.error('Error saving order after Razorpay verification:', dbError);
+            res.status(500).json({ message: 'Payment verified but failed to save order. Please contact support.', error: dbError.message });
+        }
+    } else {
+        console.warn('Razorpay signature mismatch for order:', razorpay_order_id);
+        res.status(400).json({ message: 'Payment verification failed: Invalid signature.' });
+    }
+});
+
+
 app.post('/api/order', async (req, res) => {
     try {
         const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount, paymentMethod } = req.body;
@@ -982,7 +1130,13 @@ app.post('/api/order', async (req, res) => {
             });
         }
 
+        // Generate custom order ID and PIN ID for COD orders
+        const customOrderId = generateCustomOrderId();
+        const pinId = await generateUniquePinId();
+
         const newOrder = new Order({
+            customOrderId: customOrderId,
+            pinId: pinId,
             items: itemDetails,
             customerName,
             customerPhone: cleanedCustomerPhone,
@@ -992,7 +1146,7 @@ app.post('/api/order', async (req, res) => {
             transportTax,
             totalAmount,
             paymentMethod,
-            status: 'Pending',
+            status: 'Pending', // COD orders start as Pending
         });
 
         await newOrder.save();
@@ -1014,10 +1168,10 @@ app.post('/api/order', async (req, res) => {
             io.emit('new_order', newOrder);
             // Ensure customerPhone is in the correct format for whatsapp-web.js
             const customerChatId = cleanedCustomerPhone.includes('@c.us') ? cleanedCustomerPhone : cleanedCustomerPhone + '@c.us';
-            await client.sendMessage(customerChatId, `Your order (ID: ${newOrder._id.substring(0, 6)}...) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders".`);
+            await client.sendMessage(customerChatId, `Your order (ID: ${newOrder.customOrderId}, PIN: ${newOrder.pinId}) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders" or by sending your PIN: ${newOrder.pinId}.`);
         }
 
-        res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder._id, order: newOrder });
+        res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder.customOrderId, pinId: newOrder.pinId, order: newOrder });
 
     } catch (err) {
         console.error('Error placing order:', err);
@@ -1031,7 +1185,20 @@ app.post('/api/order', async (req, res) => {
 
 app.get('/api/order/:id', async (req, res) => {
     try {
-        const order = await Order.findById(req.params.id);
+        const queryId = req.params.id;
+        let order;
+
+        // Try to find by customOrderId, then by pinId, then by MongoDB _id
+        if (queryId.startsWith('JAR')) {
+            order = await Order.findOne({ customOrderId: queryId });
+        }
+        if (!order && queryId.length === 10 && !isNaN(queryId)) { // Check if it looks like a PIN
+            order = await Order.findOne({ pinId: queryId });
+        }
+        if (!order && mongoose.Types.ObjectId.isValid(queryId)) { // Fallback to MongoDB _id
+            order = await Order.findById(queryId);
+        }
+
         if (!order) {
             return res.status(404).json({ message: 'Order not found.' });
         }
