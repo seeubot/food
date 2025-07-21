@@ -20,21 +20,9 @@
             display: flex;
             flex-direction: column;
             padding-bottom: 5rem; /* Space for fixed bottom nav */
-            /* Removed position: relative; as red-sidebar is gone */
         }
 
         /* Red Sidebar on the left - REMOVED */
-        /*
-        .red-sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 80px;
-            height: 100%;
-            background-color: #E63946;
-            z-index: 50;
-        }
-        */
 
         /* Header styles - Red/White Theme */
         .header {
@@ -52,8 +40,7 @@
             border-bottom-right-radius: 1.5rem;
             transition: transform 0.3s ease-out;
             color: #FFFFFF; /* White text for red background */
-            /* Adjusted padding-left as sidebar is removed */
-            padding-left: 1rem;
+            padding-left: 1rem; /* Adjusted padding as sidebar is removed */
         }
         .header.header-hidden {
             transform: translateY(-100%);
@@ -105,21 +92,20 @@
             margin: 0 auto;
             flex-grow: 1;
             background-color: #F8F8F8; /* Light background */
-            /* Adjusted padding-left as sidebar is removed */
-            padding-left: 1.5rem;
+            padding-left: 1.5rem; /* Adjusted padding as sidebar is removed */
         }
 
         /* Category Tabs (now acting as scrollable menu) - REMOVED */
         .category-tabs-container {
-            display: none; /* Hide the category tabs from previous design */
+            display: none;
         }
 
         /* Featured Item Card - REMOVED */
         .featured-item-card {
-            display: none; /* Hide featured item section */
+            display: none;
         }
         .pagination-dots {
-            display: none; /* Hide pagination dots */
+            display: none;
         }
 
         /* Menu Item List - Category Cards (New Design from Image) */
@@ -168,8 +154,7 @@
             margin-right: 1.5rem;
             border: 3px solid #E63946; /* Red border */
             background-color: #F0F0F0;
-            /* Adjusted margin-left as sidebar is removed */
-            margin-left: 0;
+            margin-left: 0; /* Adjusted margin-left as sidebar is removed */
         }
         .category-card .item-image-circle img {
             width: 100%;
@@ -196,22 +181,23 @@
             flex-shrink: 0;
         }
 
-        /* Individual Menu Item List within categories (Hidden on home page) */
+        /* Individual Menu Item List within categories (Always visible, scrollable) */
         .menu-item-list-by-category {
-            display: none; /* Initially hidden */
             padding-top: 1rem; /* Space after category title */
             padding-bottom: 1rem;
-        }
-        .menu-item-list-by-category.active {
-            display: block; /* Show when active */
+            /* Removed display: none; and display: block; from here */
         }
         .menu-item-list-by-category h2 {
             font-size: 1.8rem;
             font-weight: 700;
             color: #1A1A1A;
             margin-bottom: 1.5rem;
-            /* Adjusted padding-left as sidebar is removed */
-            padding-left: 0;
+            padding-left: 0; /* Adjusted padding-left as sidebar is removed */
+        }
+        .menu-item-list-by-category .menu-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem; /* Space between individual item cards */
         }
         .menu-item-list-by-category .menu-list-item-card {
             background-color: #FFFFFF;
@@ -223,7 +209,6 @@
             cursor: pointer;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s;
             border: 1px solid #E0E0E0;
-            margin-bottom: 0.75rem; /* Space between individual item cards */
         }
         .menu-item-list-by-category .menu-list-item-card:hover {
             transform: translateY(-3px);
@@ -412,7 +397,7 @@
             width: 100%;
         }
         .form-group input::placeholder,
-        .form-group textarea::placeholder {
+        .form-group input::placeholder {
             color: #AAAAAA;
         }
         .form-group select option {
@@ -757,11 +742,9 @@
             body {
                 padding-bottom: 4.5rem; /* Adjust space for bottom nav */
             }
-            /* Removed .red-sidebar responsive styles */
             .header {
                 padding: 0.75rem;
-                /* Adjusted padding-left for mobile as sidebar is removed */
-                padding-left: 0.75rem;
+                padding-left: 0.75rem; /* Adjusted padding-left for mobile as sidebar is removed */
                 border-bottom-left-radius: 1rem;
                 border-bottom-right-radius: 1rem;
             }
@@ -781,8 +764,7 @@
 
             .menu-container {
                 padding: 1rem;
-                /* Adjusted padding-left for mobile as sidebar is removed */
-                padding-left: 1rem;
+                padding-left: 1rem; /* Adjusted padding-left for mobile as sidebar is removed */
             }
 
             .category-card {
@@ -798,8 +780,7 @@
                 width: 60px;
                 height: 60px;
                 margin-right: 1rem;
-                /* Adjusted margin-left for mobile as sidebar is removed */
-                margin-left: 0;
+                margin-left: 0; /* Adjusted margin-left for mobile as sidebar is removed */
             }
             .category-card .item-info h3 {
                 font-size: 1.4rem;
@@ -814,8 +795,7 @@
             .menu-item-list-by-category h2 {
                 font-size: 1.5rem;
                 margin-bottom: 1rem;
-                /* Adjusted padding-left for mobile as sidebar is removed */
-                padding-left: 0;
+                padding-left: 0; /* Adjusted padding-left for mobile as sidebar is removed */
             }
             .menu-item-list-by-category .menu-list-item-card {
                 padding: 0.6rem 0.8rem;
@@ -920,13 +900,11 @@
 </head>
 <body>
     <!-- Red Sidebar - REMOVED -->
-    <!-- <div class="red-sidebar"></div> -->
 
     <!-- Header -->
     <header class="header" id="main-header">
         <div class="header-left">
-            <!-- Hamburger menu icon (retained as per image, but without functionality for now) -->
-            <i class="fas fa-bars header-icon"></i>
+            <!-- Hamburger menu icon removed as side menu is removed -->
             <span class="header-title">Food Items</span>
         </div>
         <div class="header-right">
@@ -947,7 +925,7 @@
             </div>
         </section>
 
-        <!-- Dynamic Menu Item List Sections (for each category, hidden by default) -->
+        <!-- Dynamic Menu Item List Sections (for each category) -->
         <div id="menu-item-sections-container">
             <!-- Individual menu item lists for each category will be rendered here -->
         </div>
@@ -1331,10 +1309,10 @@
                 });
                 categoryListContainer.appendChild(categoryCard);
 
-                // Create a separate section for each category's items (initially hidden)
+                // Create a separate section for each category's items (always visible, stacked)
                 const categorySection = document.createElement('section');
                 categorySection.id = `category-section-${categoryName.replace(/\s+/g, '-')}`;
-                categorySection.className = 'menu-item-list-by-category';
+                categorySection.className = 'menu-item-list-by-category'; // Removed 'hidden' class
                 categorySection.innerHTML = `
                     <h2>${categoryName}</h2>
                     <div class="menu-list-container">
@@ -1358,31 +1336,16 @@
                         <i class="fas fa-chevron-right item-arrow"></i>
                     `;
                     itemCard.addEventListener('click', (e) => {
+                        console.log('Clicked item:', e.currentTarget.dataset.itemId); // Debugging log
                         openItemDetailsModal(e.currentTarget.dataset.itemId);
                     });
                     itemListDiv.appendChild(itemCard);
                 });
                 menuItemSectionsContainer.appendChild(categorySection);
             });
+            // No need for handleScrollForCategorySections if all are visible by default
+            // window.removeEventListener('scroll', handleScrollForCategorySections); // Ensure it's not lingering
         }
-
-        // Function to show/hide category item lists based on scroll (optional, for visual effect)
-        // This is a basic implementation. For a more robust solution, consider Intersection Observer API.
-        function handleScrollForCategorySections() {
-            const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
-            const sections = document.querySelectorAll('.menu-item-list-by-category');
-            
-            sections.forEach(section => {
-                const rect = section.getBoundingClientRect();
-                // If section is mostly in view
-                if (rect.top <= window.innerHeight / 2 && rect.bottom >= window.innerHeight / 2) {
-                    section.classList.add('active');
-                } else {
-                    section.classList.remove('active');
-                }
-            });
-        }
-        window.addEventListener('scroll', handleScrollForCategorySections);
 
 
         function updateQuantityInModal(action) {
@@ -1877,10 +1840,7 @@
             if (targetId === 'home-screen') {
                 homeScreen.classList.remove('hidden');
                 document.querySelector('.nav-item[data-target="home-screen"]').classList.add('active');
-                // Hide all individual category item lists when returning to home screen
-                document.querySelectorAll('.menu-item-list-by-category').forEach(section => {
-                    section.classList.remove('active');
-                });
+                // No need to hide individual category item lists as they are always visible now
             } else if (targetId === 'cart-modal') {
                 cartModal.style.display = 'flex';
                 updateCartDisplay();
@@ -1904,10 +1864,10 @@
             });
         });
 
-        // Hamburger menu icon click (no functionality, just placeholder alert)
-        document.querySelector('.header-left .header-icon').addEventListener('click', () => {
-            alert('Hamburger menu clicked! (Placeholder for side navigation)');
-        });
+        // Hamburger menu icon click (removed as per request)
+        // document.querySelector('.header-left .header-icon').addEventListener('click', () => {
+        //     alert('Hamburger menu clicked! (Placeholder for side navigation)');
+        // });
 
 
         // --- Initialize on page load ---
