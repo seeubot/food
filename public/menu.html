@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Leaflet CSS for map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Razorpay Standard Checkout Script -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         /* Custom styles for Black & White theme and layout adjustments */
         body {
@@ -189,10 +191,15 @@
         }
         .category-buttons-container {
             display: flex;
-            flex-wrap: wrap; /* Allow items to wrap */
+            overflow-x: auto;
             gap: 0.75rem;
             padding-bottom: 0.5rem;
-            /* Removed overflow-x and scroll-snap-type */
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .category-buttons-container::-webkit-scrollbar {
+            display: none;
         }
         .category-btn {
             flex-shrink: 0;
@@ -202,7 +209,7 @@
             border-radius: 0.75rem;
             font-weight: 600;
             transition: background-color 0.2s, color 0.2s;
-            /* Removed scroll-snap-align */
+            scroll-snap-align: start;
         }
         .category-btn.active {
             background-color: #ffffff; /* White active */
@@ -219,8 +226,8 @@
             justify-content: center; /* Center items when wrapping */
             gap: 1.5rem;
             padding-bottom: 1rem;
-            overflow-x: hidden; /* Ensure no horizontal scroll */
-            /* Removed scroll-snap-type */
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            scroll-snap-type: none; /* Remove scroll snapping */
         }
         .menu-grid-container::-webkit-scrollbar {
             display: none;
@@ -238,7 +245,7 @@
             flex-direction: column;
             transition: transform 0.2s ease-in-out;
             cursor: pointer;
-            /* Removed scroll-snap-align */
+            scroll-snap-align: none; /* Remove scroll snapping */
         }
 
         /* Responsive adjustments for larger screens (e.g., tablet and desktop) */
@@ -278,7 +285,12 @@
             color: #ffffff;
             margin-bottom: 0.25rem;
         }
-        /* Removed .item-details .stars styles */
+        .item-details .stars {
+            color: #000000; /* Black stars */
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            -webkit-text-stroke: 0.5px #ffffff; /* White stroke for visibility on dark background */
+        }
         .item-details .item-price {
             font-size: 1rem;
             font-weight: 700;
@@ -305,10 +317,6 @@
             z-index: 1000;
             border-top-left-radius: 1.5rem;
             border-top-right-radius: 1.5rem;
-            transition: transform 0.3s ease-out; /* Smooth transition for hiding */
-        }
-        .bottom-nav.hidden-nav {
-            transform: translateY(100%); /* Hide nav by moving it down */
         }
         .nav-item {
             display: flex;
@@ -334,7 +342,7 @@
             margin-bottom: 0.25rem;
         }
 
-        /* Modals (Cart, Map, Item Details, Inconvenience) */
+        /* Modals (Cart, Map, Item Details) */
         .modal {
             display: none;
             position: fixed;
@@ -585,7 +593,12 @@
             font-weight: 700;
             margin-bottom: 0.5rem;
         }
-        /* Removed #item-details-stars styles */
+        #item-details-stars {
+            color: #000000; /* Black stars */
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            -webkit-text-stroke: 0.5px #ffffff; /* White stroke for visibility */
+        }
         #item-details-description {
             font-size: 1rem;
             color: #cccccc;
@@ -642,45 +655,17 @@
             background-color: #dddddd;
         }
 
-        /* Item Details Modal Navigation Buttons */
+        /* Item Details Modal Navigation Buttons (REMOVED FROM HTML) */
         .item-details-nav-buttons {
-            position: absolute;
-            top: 50%;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            transform: translateY(-50%);
-            padding: 0 1rem;
-            pointer-events: none; /* Allow clicks to pass through to modal content */
-        }
-        .item-details-nav-buttons button {
-            background-color: rgba(0,0,0,0.5);
-            color: white;
-            border: none;
-            padding: 0.5rem;
-            cursor: pointer;
-            z-index: 10;
-            font-size: 1.5rem;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.3s;
-            pointer-events: all; /* Make buttons clickable */
-        }
-        .item-details-nav-buttons button:hover {
-            background-color: rgba(0,0,0,0.8);
-        }
-        .item-details-nav-buttons button:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
+            display: none; /* Hide navigation buttons */
         }
 
 
         /* Responsive adjustments */
         @media (max-width: 767px) { /* Mobile specific adjustments (up to md breakpoint) */
+            body {
+                padding-bottom: 5rem; /* Ensure enough space for bottom nav */
+            }
             .header {
                 border-bottom-left-radius: 1rem;
                 border-bottom-right-radius: 1rem;
@@ -724,13 +709,15 @@
             .item-details h3 {
                 font-size: 1rem;
             }
-            /* Removed .item-details .stars styles */
+            .item-details .stars {
+                font-size: 0.8rem;
+            }
             .item-details .item-price {
                 font-size: 0.9rem;
             }
             .bottom-nav {
                 border-top-left-radius: 1rem;
-                border-top-right-radius: 1rem;
+                border-top-right-radius: 1.5rem; /* Corrected from 1rem to 1.5rem for consistency */
             }
             .nav-item i {
                 font-size: 1.3rem;
@@ -884,7 +871,7 @@
                     <label for="payment-method">Payment Method:</label>
                     <select id="payment-method" class="form-group w-full p-2 rounded-md bg-gray-700 text-white">
                         <option value="Cash on Delivery">Cash on Delivery</option>
-                        <option value="Online Payment">Online Payment</option> <!-- Added Online Payment -->
+                        <option value="Online Payment">Online Payment</option> <!-- Added Online Payment option -->
                     </select>
                 </div>
                 <button type="submit" id="place-order-btn" class="btn-checkout">
@@ -916,7 +903,9 @@
             <span class="close-button">&times;</span>
             <img id="item-details-image" src="" alt="Item Image" class="mx-auto">
             <h2 id="item-details-name" class="mb-2"></h2>
-            <!-- Removed #item-details-stars div -->
+            <div id="item-details-stars" class="stars">
+                <!-- Stars will be generated here -->
+            </div>
             <p id="item-details-description" class="mb-3"></p>
             <div id="item-details-price" class="mb-4"></div>
 
@@ -930,28 +919,12 @@
             <button id="item-details-add-to-cart-btn" class="btn-primary w-full">Add to Cart</button>
             <p id="item-details-message" class="message mt-3"></p>
 
-            <!-- Item Details Navigation Buttons -->
-            <div class="item-details-nav-buttons">
-                <button id="item-details-prev-btn" class="item-details-nav-btn">&lt;</button>
-                <button id="item-details-next-btn" class="item-details-nav-btn">&gt;</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Inconvenience Modal (New) -->
-    <div id="inconvenience-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" data-modal-id="inconvenience-modal">&times;</span>
-            <h2 class="text-2xl font-bold mb-4 text-center">Sorry for the Inconvenience!</h2>
-            <p class="text-center text-lg text-gray-300 mb-6" id="inconvenience-message">
-                We encountered an issue while processing your request. Please try again later.
-            </p>
-            <button id="inconvenience-modal-close-btn" class="btn-primary w-full">Close</button>
+            <!-- Item Details Navigation Buttons (REMOVED) -->
         </div>
     </div>
 
     <!-- Bottom Navigation Bar -->
-    <nav class="bottom-nav" id="bottom-nav">
+    <nav class="bottom-nav">
         <div class="nav-item active" data-target="home-screen">
             <i class="fas fa-home"></i>
             <span>Home</span>
@@ -1010,7 +983,7 @@
         const itemDetailsModal = document.getElementById('item-details-modal');
         const itemDetailsImage = document.getElementById('item-details-image');
         const itemDetailsName = document.getElementById('item-details-name');
-        // Removed itemDetailsStars
+        const itemDetailsStars = document.getElementById('item-details-stars');
         const itemDetailsDescription = document.getElementById('item-details-description');
         const itemDetailsPrice = document.getElementById('item-details-price');
         const itemDetailsQuantitySpan = document.getElementById('item-details-quantity');
@@ -1018,8 +991,7 @@
         const itemDetailsIncreaseBtn = document.getElementById('item-details-increase-btn');
         const itemDetailsAddToCartBtn = document.getElementById('item-details-add-to-cart-btn');
         const itemDetailsMessage = document.getElementById('item-details-message');
-        const itemDetailsPrevBtn = document.getElementById('item-details-prev-btn');
-        const itemDetailsNextBtn = document.getElementById('item-details-next-btn');
+        // itemDetailsPrevBtn and itemDetailsNextBtn are removed from HTML and thus not referenced here
 
         // New elements for redesigned layout
         const featuredItemSection = document.getElementById('featured-item-section');
@@ -1030,19 +1002,12 @@
         const featuredOrderBtn = document.getElementById('featured-order-btn');
         const categoryButtonsContainer = document.getElementById('category-buttons-container');
         const popularNowGrid = document.getElementById('popular-now-grid');
-        const seeMorePopularBtn = document.getElementById('see-more-popular-btn'); // Now hidden by CSS
+        const seeMorePopularBtn = document.getElementById('see-more-popular-btn');
         const searchIcon = document.getElementById('search-icon');
         const searchInputContainer = document.getElementById('search-input-container');
         const searchInput = document.getElementById('search-input');
-        const headerCartBtn = document.getElementById('header-cart-btn');
-        const cartCountSpan = document.getElementById('cart-count');
-        const bottomNav = document.getElementById('bottom-nav'); // Reference to the bottom navigation
-
-        // Inconvenience Modal Elements (New)
-        const inconvenienceModal = document.getElementById('inconvenience-modal');
-        const inconvenienceMessage = document.getElementById('inconvenience-message');
-        const inconvenienceModalCloseBtn = document.getElementById('inconvenience-modal-close-btn');
-
+        const headerCartBtn = document.getElementById('header-cart-btn'); // Cart button in header
+        const cartCountSpan = document.getElementById('cart-count'); // Cart count in header
 
         let cart = [];
         let menuItems = [];
@@ -1058,17 +1023,23 @@
 
         const PLACEHOLDER_IMAGE = 'https://placehold.co/400x180/333333/ffffff?text=No+Image';
 
-        // --- Inconvenience Modal Function (New) ---
-        function showInconvenienceModal(message = 'We encountered an issue. Please try again later.') {
-            inconvenienceMessage.textContent = message;
-            inconvenienceModal.style.display = 'flex';
-            toggleBottomNav(false); // Hide bottom nav when modal is open
+        // --- Global Error Redirection ---
+        function redirectToErrorPage(message = 'An unexpected error occurred. Redirecting...', delay = 3000) {
+            console.error(message);
+            const tempMessageDiv = document.createElement('div');
+            tempMessageDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: #cc0000; color: white; padding: 15px 30px; border-radius: 8px; z-index: 2000; font-size: 1.2rem; text-align: center;';
+            tempMessageDiv.textContent = message;
+            document.body.appendChild(tempMessageDiv);
+
+            setTimeout(() => {
+                window.location.href = '/status'; // Redirect to the bot status page as the "index panel"
+            }, delay);
         }
 
         // Catch unhandled JavaScript errors
         window.onerror = function(message, source, lineno, colno, error) {
             console.error('Unhandled JavaScript Error:', { message, source, lineno, colno, error });
-            showInconvenienceModal('A critical error occurred. Please refresh the page or try again later.');
+            redirectToErrorPage('A critical error occurred. Redirecting to status page.', 5000);
             return true; // Prevent default error handling
         };
 
@@ -1151,7 +1122,7 @@
             } catch (error) {
                 console.error('Error fetching menu:', error);
                 menuSectionsContainer.innerHTML = `<p class="text-center text-red-400">Error loading menu: ${error.message}</p>`;
-                showInconvenienceModal('Failed to load menu items. Please check your internet connection or try again later.');
+                redirectToErrorPage('Failed to load menu. Redirecting...');
             }
         }
 
@@ -1166,7 +1137,7 @@
                 shopLocation = settings.shopLocation;
             } catch (error) {
                 console.error('Error fetching public settings:', error);
-                showInconvenienceModal('Failed to load shop settings. Some features might not work correctly.');
+                redirectToErrorPage('Failed to load shop settings. Redirecting...');
             }
         }
 
@@ -1178,7 +1149,7 @@
             }
 
             // Render Featured Item
-            const featuredItem = menuItems.find(item => item.isTrending) || menuItems[0]; // Use isTrending for featured
+            const featuredItem = menuItems.find(item => item.isFeatured) || menuItems[0];
             if (featuredItem) {
                 featuredItemSection.classList.remove('hidden');
                 featuredItemImage.src = featuredItem.imageUrl || PLACEHOLDER_IMAGE;
@@ -1222,7 +1193,7 @@
             popularNowGrid.innerHTML = '';
             const filteredItems = menuItems.filter(item => {
                 const matchesCategory = currentActiveCategory === 'All' || item.category === currentActiveCategory;
-                const matchesSearch = searchInput.value.trim() === '' || item.name.toLowerCase().includes(searchInput.value.trim().toLowerCase()) || (item.description && item.description.toLowerCase().includes(searchInput.value.trim().toLowerCase()));
+                const matchesSearch = searchInput.value.trim() === '' || item.name.toLowerCase().includes(searchInput.value.trim().toLowerCase()) || item.description.toLowerCase().includes(searchInput.value.trim().toLowerCase());
                 return matchesCategory && matchesSearch && item.isAvailable;
             });
 
@@ -1245,6 +1216,9 @@
                     <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
                     <div class="item-details">
                         <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
+                        <div class="stars">
+                            ${generateStarRating(item.rating || 4.5)}
+                        </div>
                         <div class="item-price">₹${item.price.toFixed(2)}</div>
                     </div>
                 `;
@@ -1255,7 +1229,21 @@
             });
         }
 
-        // Removed generateStarRating function
+        function generateStarRating(rating) {
+            let starsHtml = '';
+            const fullStars = Math.floor(rating);
+            const hasHalfStar = rating % 1 !== 0;
+            for (let i = 0; i < fullStars; i++) {
+                starsHtml += '<i class="fas fa-star"></i>';
+            }
+            if (hasHalfStar) {
+                starsHtml += '<i class="fas fa-star-half-alt"></i>';
+            }
+            for (let i = 0; i < (5 - fullStars - (hasHalfStar ? 1 : 0)); i++) {
+                starsHtml += '<i class="far fa-star"></i>'; // Empty star
+            }
+            return starsHtml;
+        }
 
         function updateQuantityInModal(action) {
             let currentQuantity = parseInt(itemDetailsQuantitySpan.textContent);
@@ -1324,8 +1312,8 @@
             }
 
             cartSubtotalSpan.textContent = subtotal.toFixed(2);
-            cartDeliveryFeeSpan.textContent = '0.00'; // Reset, will be calculated on checkout
-            cartTotalSpan.textContent = subtotal.toFixed(2); // Reset, will be calculated on checkout
+            cartDeliveryFeeSpan.textContent = '0.00';
+            cartTotalSpan.textContent = subtotal.toFixed(2);
         }
 
         function removeFromCart(index) {
@@ -1336,22 +1324,18 @@
         // --- Event Listeners for Modals and Cart ---
         headerCartBtn.addEventListener('click', () => {
             cartModal.style.display = 'flex';
-            toggleBottomNav(false); // Hide bottom nav
             updateCartDisplay();
         });
 
         document.querySelectorAll('.close-button').forEach(button => {
             button.addEventListener('click', (e) => {
                 e.target.closest('.modal').style.display = 'none';
-                toggleBottomNav(true); // Show bottom nav
                 if (e.target.closest('#cart-modal')) {
                     checkoutMessage.classList.add('hidden');
                 } else if (e.target.closest('#map-modal')) {
                     mapAddressDisplay.textContent = 'Drag marker or click map to select location';
                 } else if (e.target.closest('#item-details-modal')) {
                     itemDetailsMessage.classList.add('hidden');
-                } else if (e.target.closest('#inconvenience-modal')) { // New: Inconvenience modal close
-                    // No specific message reset needed for inconvenience modal
                 }
             });
         });
@@ -1360,29 +1344,16 @@
             if (event.target === cartModal) {
                 cartModal.style.display = 'none';
                 checkoutMessage.classList.add('hidden');
-                toggleBottomNav(true); // Show bottom nav
             }
             if (event.target === mapModal) {
                 mapModal.style.display = 'none';
                 mapAddressDisplay.textContent = 'Drag marker or click map to select location';
-                toggleBottomNav(true); // Show bottom nav
             }
             if (event.target === itemDetailsModal) {
                 itemDetailsModal.style.display = 'none';
                 itemDetailsMessage.classList.add('hidden');
-                toggleBottomNav(true); // Show bottom nav
-            }
-            if (event.target === inconvenienceModal) { // New: Inconvenience modal close
-                inconvenienceModal.style.display = 'none';
-                toggleBottomNav(true); // Show bottom nav
             }
         });
-
-        inconvenienceModalCloseBtn.addEventListener('click', () => { // New: Inconvenience modal close button
-            inconvenienceModal.style.display = 'none';
-            toggleBottomNav(true); // Show bottom nav
-        });
-
 
         cartItemsList.addEventListener('click', (e) => {
             if (e.target.dataset.action === 'remove-from-cart') {
@@ -1398,14 +1369,10 @@
             itemDetailsName.textContent = item.name;
             itemDetailsDescription.textContent = item.description || 'No description available.';
             itemDetailsPrice.textContent = `₹${item.price.toFixed(2)}`;
-            // Removed itemDetailsStars.innerHTML = generateStarRating(item.rating || 4.5);
+            itemDetailsStars.innerHTML = generateStarRating(item.rating || 4.5);
 
             const itemInCart = cart.find(cartItem => cartItem.productId === item._id);
             itemDetailsQuantitySpan.textContent = itemInCart ? itemInCart.quantity : 0;
-
-            // Update navigation button states
-            itemDetailsPrevBtn.disabled = currentItemIndexInModal <= 0;
-            itemDetailsNextBtn.disabled = currentItemIndexInModal >= menuItems.length - 1;
 
             itemDetailsMessage.classList.add('hidden');
         }
@@ -1418,7 +1385,6 @@
             }
             renderItemDetailsModalContent(menuItems[currentItemIndexInModal]);
             itemDetailsModal.style.display = 'flex';
-            toggleBottomNav(false); // Hide bottom nav
         }
 
         itemDetailsDecreaseBtn.addEventListener('click', () => updateQuantityInModal('decrease'));
@@ -1431,24 +1397,16 @@
                 itemDetailsMessage.textContent = `${currentItem.name} quantity updated in cart!`;
                 itemDetailsMessage.className = 'message mt-3 success';
                 itemDetailsMessage.classList.remove('hidden');
+                // Close item details modal and show main menu
+                setTimeout(() => {
+                    itemDetailsModal.style.display = 'none';
+                    itemDetailsMessage.classList.add('hidden');
+                    showSection('home-screen'); // Show main menu
+                }, 800); // Give a short delay for message to be seen
             } else {
                 itemDetailsMessage.textContent = 'Please select a quantity greater than zero.';
                 itemDetailsMessage.className = 'message mt-3 error';
                 itemDetailsMessage.classList.remove('hidden');
-            }
-        });
-
-        itemDetailsPrevBtn.addEventListener('click', () => {
-            if (currentItemIndexInModal > 0) {
-                currentItemIndexInModal--;
-                renderItemDetailsModalContent(menuItems[currentItemIndexInModal]);
-            }
-        });
-
-        itemDetailsNextBtn.addEventListener('click', () => {
-            if (currentItemIndexInModal < menuItems.length - 1) {
-                currentItemIndexInModal++;
-                renderItemDetailsModalContent(menuItems[currentItemIndexInModal]);
             }
         });
 
@@ -1500,7 +1458,6 @@
                     map.setView([shopLocation.latitude, shopLocation.longitude], 13);
                     marker.setLatLng([shopLocation.latitude, shopLocation.longitude]);
                     reverseGeocode(shopLocation.latitude, shopLocation.longitude);
-                    showInconvenienceModal('Could not get your live location. Please drag the map marker to your delivery address.');
                 }, { timeout: 5000, enableHighAccuracy: false });
             } else {
                 map.setView([shopLocation.latitude, shopLocation.longitude], 13);
@@ -1537,7 +1494,6 @@
                     longitude: lon,
                     address: `Coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)} (Address lookup failed)`
                 };
-                showInconvenienceModal('Could not fetch address for the selected location. Please try again.');
             }
         }
 
@@ -1545,7 +1501,6 @@
             if (selectedDeliveryLocation && selectedDeliveryLocation.latitude !== null && selectedDeliveryLocation.longitude !== null) {
                 deliveryAddressInput.value = selectedDeliveryLocation.address;
                 mapModal.style.display = 'none';
-                toggleBottomNav(true); // Show bottom nav
                 placeOrder();
             } else {
                 checkoutMessage.textContent = 'Please select a valid location on the map.';
@@ -1584,7 +1539,6 @@
 
             if (!selectedDeliveryLocation || selectedDeliveryLocation.latitude === null || selectedDeliveryLocation.longitude === null) {
                 mapModal.style.display = 'flex';
-                toggleBottomNav(false); // Hide bottom nav
                 initMap();
                 mapAddressDisplay.textContent = 'Please select your delivery location on the map.';
                 checkoutMessage.textContent = 'Please select your delivery location on the map.';
@@ -1593,7 +1547,7 @@
                 return;
             }
 
-            showLoader(placeOrderLoader, placeOrderText, checkoutMessage, 'Placing order...', 'info');
+            showLoader(placeOrderLoader, placeOrderText, checkoutMessage, 'Processing order...', 'info');
             placeOrderBtn.disabled = true;
 
             let finalCustomerLocation = selectedDeliveryLocation;
@@ -1614,6 +1568,7 @@
             cartDeliveryFeeSpan.textContent = deliveryFee.toFixed(2);
             cartTotalSpan.textContent = totalAmount.toFixed(2);
 
+            // Prepare order data to be sent to backend
             const orderData = {
                 items: cart.map(item => ({ productId: item.productId, quantity: item.quantity })),
                 customerName,
@@ -1626,41 +1581,134 @@
                 paymentMethod
             };
 
-            try {
-                const response = await fetch('/api/order', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(orderData)
-                });
+            if (paymentMethod === 'Online Payment') {
+                try {
+                    // Step 1: Create Razorpay Order on Backend
+                    const razorpayOrderResponse = await fetch('/api/create-razorpay-order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: totalAmount * 100, currency: 'INR' }) // Razorpay expects amount in paisa
+                    });
 
-                const result = await response.json();
+                    if (!razorpayOrderResponse.ok) {
+                        const errorData = await razorpayOrderResponse.json();
+                        throw new Error(errorData.message || 'Failed to create Razorpay order.');
+                    }
+                    const { orderId: razorpayOrderId } = await razorpayOrderResponse.json();
 
-                if (response.ok) {
-                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Order placed successfully! Order ID: ' + result.orderId.substring(0, 6) + '...');
-                    cart = [];
-                    selectedDeliveryLocation = null;
-                    deliveryAddressInput.value = '';
-                    updateCartDisplay();
-                    setTimeout(() => {
-                        cartModal.style.display = 'none';
-                        toggleBottomNav(true); // Show bottom nav
-                        showSection('order-tracking-section');
-                        trackOrderIdInput.value = result.orderId;
-                        trackOrder();
-                    }, 2000);
-                } else {
-                    const errorMessage = result.message || 'Failed to place order.';
-                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, errorMessage);
-                    showInconvenienceModal(`Failed to place order: ${errorMessage}`);
+                    // Step 2: Open Razorpay Checkout
+                    const options = {
+                        key: 'YOUR_RAZORPAY_KEY_ID', // Replace with your actual Razorpay Key ID (e.g., from .env, but hardcoded here for frontend example)
+                        amount: totalAmount * 100, // Amount in paisa
+                        currency: 'INR',
+                        name: 'Delicious Bites',
+                        description: 'Order from Delicious Bites',
+                        order_id: razorpayOrderId, // This is the order ID obtained from your backend
+                        handler: async function (response) {
+                            // Payment successful, send details to backend for verification and final order placement
+                            showLoader(placeOrderLoader, placeOrderText, checkoutMessage, 'Verifying payment...', 'info');
+                            try {
+                                const verifyResponse = await fetch('/api/verify-payment', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        razorpay_order_id: response.razorpay_order_id,
+                                        razorpay_payment_id: response.razorpay_payment_id,
+                                        razorpay_signature: response.razorpay_signature,
+                                        orderData: orderData // Pass original order data to backend
+                                    })
+                                });
+
+                                const verifyResult = await verifyResponse.json();
+
+                                if (verifyResponse.ok) {
+                                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Payment successful! Order placed. Order ID: ' + verifyResult.orderId.substring(0, 6) + '...');
+                                    cart = [];
+                                    selectedDeliveryLocation = null;
+                                    deliveryAddressInput.value = '';
+                                    updateCartDisplay();
+                                    setTimeout(() => {
+                                        cartModal.style.display = 'none';
+                                        showSection('order-tracking-section');
+                                        trackOrderIdInput.value = verifyResult.orderId;
+                                        trackOrder();
+                                    }, 2000);
+                                } else {
+                                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, verifyResult.message || 'Payment verification failed. Please contact support.');
+                                }
+                            } catch (error) {
+                                console.error('Error during payment verification:', error);
+                                hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred during verification. Please contact support.');
+                            } finally {
+                                placeOrderBtn.disabled = false;
+                            }
+                        },
+                        prefill: {
+                            name: customerName,
+                            contact: customerPhone,
+                        },
+                        notes: {
+                            address: deliveryAddress
+                        },
+                        theme: {
+                            color: '#333333' // Dark theme for Razorpay modal
+                        }
+                    };
+
+                    const rzp = new Razorpay(options);
+                    rzp.open(); // Open the Razorpay checkout modal
+
+                    rzp.on('payment.failed', function (response){
+                        console.error('Razorpay Payment Failed:', response.error);
+                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, response.error.description || 'Payment failed. Please try again.');
+                        placeOrderBtn.disabled = false;
+                    });
+
+                    rzp.on('modal.close', function(){
+                        // User closed the modal without completing payment
+                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'Payment cancelled by user.');
+                        placeOrderBtn.disabled = false;
+                    });
+
+                } catch (error) {
+                    console.error('Error initiating Razorpay payment:', error);
+                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, error.message || 'Failed to initiate online payment.');
+                    placeOrderBtn.disabled = false;
                 }
-            } catch (error) {
-                console.error('Error placing order:', error);
-                hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred. Please try again.');
-                showInconvenienceModal('Order placement failed due to a network error. Please check your internet connection.');
-            } finally {
-                placeOrderBtn.disabled = false;
+            } else {
+                // Cash on Delivery (COD) logic - existing
+                try {
+                    const response = await fetch('/api/order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(orderData)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Order placed successfully! Order ID: ' + result.orderId.substring(0, 6) + '...');
+                        cart = [];
+                        selectedDeliveryLocation = null;
+                        deliveryAddressInput.value = '';
+                        updateCartDisplay();
+                        setTimeout(() => {
+                            cartModal.style.display = 'none';
+                            showSection('order-tracking-section');
+                            trackOrderIdInput.value = result.orderId;
+                            trackOrder();
+                        }, 2000);
+                    } else {
+                        const errorMessage = result.message || 'Failed to place order.';
+                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, errorMessage);
+                    }
+                } catch (error) {
+                    console.error('Error placing COD order:', error);
+                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred. Please try again.');
+                    redirectToErrorPage('Order placement failed due to network error. Redirecting...');
+                } finally {
+                    placeOrderBtn.disabled = false;
+                }
             }
         }
 
@@ -1705,7 +1753,7 @@
             } catch (error) {
                 console.error('Error tracking order:', error);
                 hideLoader(trackOrderLoader, trackOrderText, trackOrderMessage, false, 'Order not found or an error occurred.');
-                showInconvenienceModal('Failed to track order. Please ensure the Order ID is correct and try again.');
+                redirectToErrorPage('Order tracking failed. Redirecting...');
             } finally {
                 trackOrderBtn.disabled = false;
             }
@@ -1723,18 +1771,18 @@
         function showSection(targetId) {
             homeScreen.classList.add('hidden');
             orderTrackingSection.classList.add('hidden');
-            // Ensure all modals are hidden when switching sections
             cartModal.style.display = 'none';
             mapModal.style.display = 'none';
             itemDetailsModal.style.display = 'none';
-            inconvenienceModal.style.display = 'none'; // Ensure inconvenience modal is hidden
-            toggleBottomNav(true); // Always show bottom nav when switching main sections
 
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
 
             if (targetId === 'home-screen') {
                 homeScreen.classList.remove('hidden');
                 document.querySelector('.nav-item[data-target="home-screen"]').classList.add('active');
+            } else if (targetId === 'cart-modal') { // This is now only for direct modal open, not bottom nav
+                cartModal.style.display = 'flex';
+                updateCartDisplay();
             } else if (targetId === 'order-tracking-section') {
                 orderTrackingSection.classList.remove('hidden');
                 document.querySelector('.nav-item[data-target="order-tracking-section"]').classList.add('active');
@@ -1744,15 +1792,6 @@
             } else if (targetId === 'profile-placeholder') {
                 alert('Profile section coming soon!');
                 document.querySelector('.nav-item[data-target="profile-placeholder"]').classList.add('active');
-            }
-        }
-
-        // Function to toggle bottom navigation visibility
-        function toggleBottomNav(show) {
-            if (show) {
-                bottomNav.classList.remove('hidden-nav');
-            } else {
-                bottomNav.classList.add('hidden-nav');
             }
         }
 
@@ -1778,6 +1817,12 @@
         searchInput.addEventListener('input', () => {
             filterAndRenderPopularItems();
         });
+
+        // "See More" button for Popular Now (now hidden by CSS)
+        // seeMorePopularBtn.addEventListener('click', () => {
+        //     popularNowGrid.scrollBy({ left: popularNowGrid.scrollWidth, behavior: 'smooth' });
+        // });
+
 
         // --- Initialize on page load ---
         document.addEventListener('DOMContentLoaded', async () => {
