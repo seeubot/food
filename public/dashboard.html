@@ -156,8 +156,7 @@
             border-radius: 0.75rem;
             width: 100%;
         }
-        .form-group input::placeholder,
-        .form-group textarea::placeholder {
+        .form-group input::placeholder {
             color: #888888;
         }
         .message {
@@ -723,10 +722,8 @@
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
                         localStorage.removeItem('adminToken');
-                        // Server should handle the redirect for HTML pages, but for API calls, we redirect client-side
-                        if (window.location.pathname.startsWith('/dashboard') || window.location.pathname.startsWith('/admin/')) {
-                            window.location.href = '/admin/login';
-                        }
+                        // Redirect to login if unauthorized for API calls
+                        window.location.href = '/admin/login';
                         return;
                     }
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -757,9 +754,7 @@
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
                         localStorage.removeItem('adminToken');
-                        if (window.location.pathname.startsWith('/dashboard') || window.location.pathname.startsWith('/admin/')) {
-                            window.location.href = '/admin/login';
-                        }
+                        window.location.href = '/admin/login';
                         return;
                     }
                     throw new Error(data.message || `HTTP error! status: ${response.status}`);
@@ -786,9 +781,7 @@
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
                         localStorage.removeItem('adminToken');
-                        if (window.location.pathname.startsWith('/dashboard') || window.location.pathname.startsWith('/admin/')) {
-                            window.location.href = '/admin/login';
-                        }
+                        window.location.href = '/admin/login';
                         return;
                     }
                     throw new Error(data.message || `HTTP error! status: ${response.status}`);
@@ -1316,10 +1309,36 @@
         });
 
 
-        // --- Initial Load ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Activate the first tab by default
-            document.querySelector('.tab-nav-item').click();
+        // --- Initial Load (Client-side authentication check) ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('adminToken');
+            if (!token) {
+                // No token found, redirect to login
+                window.location.href = '/admin/login';
+                return; // Stop further execution
+            }
+
+            try {
+                // Token exists, attempt to verify it with a lightweight API call
+                const response = await fetch('/api/admin/bot-status', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    // Token is valid, proceed with loading dashboard content
+                    document.querySelector('.tab-nav-item').click(); // Activate the first tab by default
+                } else {
+                    // Token is invalid or expired (e.g., 401, 403 response)
+                    console.warn('Admin token invalid or expired. Redirecting to login.');
+                    localStorage.removeItem('adminToken'); // Clear invalid token
+                    window.location.href = '/admin/login'; // Redirect to login
+                }
+            } catch (error) {
+                // Network error or other fetch issue during token validation
+                console.error('Error validating admin token:', error);
+                localStorage.removeItem('adminToken'); // Clear token on network error
+                window.location.href = '/admin/login'; // Redirect to login
+            }
         });
     </script>
 </body>
