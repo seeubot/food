@@ -10,8 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Leaflet CSS for map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <!-- Razorpay Standard Checkout Script -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <!-- Removed Razorpay Standard Checkout Script -->
     <style>
         /* Custom styles for Black & White theme and layout adjustments */
         body {
@@ -851,7 +850,7 @@
                     <label for="payment-method">Payment Method:</label>
                     <select id="payment-method" class="form-group w-full p-2 rounded-md bg-gray-700 text-white">
                         <option value="Cash on Delivery">Cash on Delivery</option>
-                        <option value="Online Payment">Online Payment</option> <!-- Added Online Payment option -->
+                        <option value="Online Payment (Coming Soon)" disabled>Online Payment (Coming Soon)</option> <!-- Disabled and updated text -->
                     </select>
                 </div>
                 <button type="submit" id="place-order-btn" class="btn-checkout">
@@ -1193,7 +1192,7 @@
                 card.className = 'menu-item-card';
                 card.dataset.itemId = item._id;
                 card.innerHTML = `
-                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDE R_IMAGE}';">
+                    <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
                     <div class="item-details">
                         <h3>${item.name} ${item.isTrending ? '<span class="text-yellow-400 text-lg">✨</span>' : ''}</h3>
                         <div class="stars">
@@ -1531,6 +1530,13 @@
                 return;
             }
 
+            // Handle "Online Payment (Coming Soon)"
+            if (paymentMethod === 'Online Payment (Coming Soon)') {
+                hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'Online Payment will be added soon. Please choose Cash on Delivery for now.');
+                placeOrderBtn.disabled = false;
+                return;
+            }
+
             showLoader(placeOrderLoader, placeOrderText, checkoutMessage, 'Processing order...', 'info');
             placeOrderBtn.disabled = true;
 
@@ -1565,134 +1571,38 @@
                 paymentMethod
             };
 
-            if (paymentMethod === 'Online Payment') {
-                try {
-                    // Step 1: Create Razorpay Order on Backend
-                    const razorpayOrderResponse = await fetch('/api/create-razorpay-order', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ amount: totalAmount * 100, currency: 'INR' }) // Razorpay expects amount in paisa
-                    });
+            // Cash on Delivery (COD) logic - existing
+            try {
+                const response = await fetch('/api/order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
 
-                    if (!razorpayOrderResponse.ok) {
-                        const errorData = await razorpayOrderResponse.json();
-                        throw new Error(errorData.message || 'Failed to create Razorpay order.');
-                    }
-                    const { orderId: razorpayOrderId } = await razorpayOrderResponse.json();
+                const result = await response.json();
 
-                    // Step 2: Open Razorpay Checkout
-                    const options = {
-                        key: 'rzp_test_YOUR_KEY_ID', // Replace with your actual Razorpay Key ID
-                        amount: totalAmount * 100, // Amount in paisa
-                        currency: 'INR',
-                        name: 'Delicious Bites',
-                        description: 'Order from Delicious Bites',
-                        order_id: razorpayOrderId, // This is the order ID obtained from your backend
-                        handler: async function (response) {
-                            // Payment successful, send details to backend for verification and final order placement
-                            showLoader(placeOrderLoader, placeOrderText, checkoutMessage, 'Verifying payment...', 'info');
-                            try {
-                                const verifyResponse = await fetch('/api/verify-payment', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        razorpay_order_id: response.razorpay_order_id,
-                                        razorpay_payment_id: response.razorpay_payment_id,
-                                        razorpay_signature: response.razorpay_signature,
-                                        orderData: orderData // Pass original order data to backend
-                                    })
-                                });
-
-                                const verifyResult = await verifyResponse.json();
-
-                                if (verifyResponse.ok) {
-                                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Payment successful! Order placed. Order ID: ' + verifyResult.orderId + '...');
-                                    cart = [];
-                                    selectedDeliveryLocation = null;
-                                    deliveryAddressInput.value = '';
-                                    updateCartDisplay();
-                                    setTimeout(() => {
-                                        cartModal.style.display = 'none';
-                                        showSection('order-tracking-section');
-                                        trackOrderIdInput.value = verifyResult.orderId; // Use customOrderId
-                                        trackOrder();
-                                    }, 2000);
-                                } else {
-                                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, verifyResult.message || 'Payment verification failed. Please contact support.');
-                                }
-                            } catch (error) {
-                                console.error('Error during payment verification:', error);
-                                hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred during verification. Please contact support.');
-                            } finally {
-                                placeOrderBtn.disabled = false;
-                            }
-                        },
-                        prefill: {
-                            name: customerName,
-                            contact: customerPhone,
-                        },
-                        notes: {
-                            address: deliveryAddress
-                        },
-                        theme: {
-                            color: '#333333' // Dark theme for Razorpay modal
-                        }
-                    };
-
-                    const rzp = new Razorpay(options);
-                    rzp.open(); // Open the Razorpay checkout modal
-
-                    rzp.on('payment.failed', function (response){
-                        console.error('Razorpay Payment Failed:', response.error);
-                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, response.error.description || 'Payment failed. Please try again.');
-                        placeOrderBtn.disabled = false;
-                    });
-
-                    rzp.on('modal.close', function(){
-                        // User closed the modal without completing payment
-                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'Payment cancelled by user.');
-                        placeOrderBtn.disabled = false;
-                    });
-
-                } catch (error) {
-                    console.error('Error initiating Razorpay payment:', error);
-                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, error.message || 'Failed to initiate online payment.');
-                    placeOrderBtn.disabled = false;
+                if (response.ok) {
+                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Order placed successfully! Order ID: ' + result.orderId + '...');
+                    cart = [];
+                    selectedDeliveryLocation = null;
+                    deliveryAddressInput.value = '';
+                    updateCartDisplay();
+                    setTimeout(() => {
+                        cartModal.style.display = 'none';
+                        showSection('order-tracking-section');
+                        trackOrderIdInput.value = result.orderId; // Use customOrderId
+                        trackOrder();
+                    }, 2000);
+                } else {
+                    const errorMessage = result.message || 'Failed to place order.';
+                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, errorMessage);
                 }
-            } else {
-                // Cash on Delivery (COD) logic - existing
-                try {
-                    const response = await fetch('/api/order', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(orderData)
-                    });
-
-                    const result = await response.json();
-
-                    if (response.ok) {
-                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, true, 'Order placed successfully! Order ID: ' + result.orderId + '...');
-                        cart = [];
-                        selectedDeliveryLocation = null;
-                        deliveryAddressInput.value = '';
-                        updateCartDisplay();
-                        setTimeout(() => {
-                            cartModal.style.display = 'none';
-                            showSection('order-tracking-section');
-                            trackOrderIdInput.value = result.orderId; // Use customOrderId
-                            trackOrder();
-                        }, 2000);
-                    } else {
-                        const errorMessage = result.message || 'Failed to place order.';
-                        hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, errorMessage);
-                    }
-                } catch (error) {
-                    console.error('Error placing COD order:', error);
-                    hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred. Please try again.');
-                    redirectToErrorPage('Order placement failed due to network error. Redirecting...');
-                } finally {
-                    placeOrderBtn.disabled = false;
-                }
+            } catch (error) {
+                console.error('Error placing COD order:', error);
+                hideLoader(placeOrderLoader, placeOrderText, checkoutMessage, false, 'An error occurred. Please try again.');
+                redirectToErrorPage('Order placement failed due to network error. Redirecting...');
+            } finally {
+                placeOrderBtn.disabled = false;
             }
         }
 
