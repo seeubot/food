@@ -220,16 +220,27 @@
         /* Popular Now / Menu Grid */
         .menu-grid-container {
             display: flex;
-            overflow-x: auto;
+            flex-wrap: wrap; /* Allow items to wrap to next line on small screens */
+            justify-content: center; /* Center items when wrapping */
             gap: 1.5rem;
             padding-bottom: 1rem;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            /* Remove horizontal scroll by default for mobile */
+            overflow-x: hidden;
+            scroll-snap-type: none;
         }
         .menu-grid-container::-webkit-scrollbar {
             display: none;
         }
+
+        /* On larger screens, revert to horizontal scroll */
+        @media (min-width: 768px) { /* md breakpoint and up */
+            .menu-grid-container {
+                flex-wrap: nowrap; /* Prevent wrapping */
+                overflow-x: auto; /* Enable horizontal scroll */
+                scroll-snap-type: x mandatory;
+            }
+        }
+
         .menu-item-card {
             flex-shrink: 0;
             /* Using clamp for responsive width */
@@ -242,8 +253,16 @@
             flex-direction: column;
             transition: transform 0.2s ease-in-out;
             cursor: pointer;
-            scroll-snap-align: start;
+            /* Remove scroll-snap-align by default for mobile vertical stacking */
+            scroll-snap-align: none;
         }
+        /* On larger screens, re-enable scroll-snap-align */
+        @media (min-width: 768px) {
+            .menu-item-card {
+                scroll-snap-align: start;
+            }
+        }
+
         .menu-item-card:hover {
             transform: translateY(-5px);
         }
@@ -684,7 +703,7 @@
 
 
         /* Responsive adjustments */
-        @media (max-width: 640px) {
+        @media (max-width: 767px) { /* Mobile specific adjustments (up to md breakpoint) */
             .header {
                 border-bottom-left-radius: 1rem;
                 border-bottom-right-radius: 1rem;
@@ -719,7 +738,11 @@
                 padding: 0.6rem 1rem;
                 font-size: 0.9rem;
             }
-            /* No need for specific width on menu-item-card here due to clamp() */
+            /* Menu item cards for mobile: allow wrapping, adjust size */
+            .menu-item-card {
+                width: clamp(150px, 46vw, 200px); /* Tighter clamp for mobile, allowing 2 per row */
+                margin-bottom: 1rem; /* Add some vertical spacing when wrapping */
+            }
             .menu-item-card img {
                 height: 100px;
                 border-bottom-left-radius: 0.5rem;
@@ -773,6 +796,10 @@
             #item-details-quantity-controls .quantity-control span {
                 padding: 0.6rem 0.8rem;
                 font-size: 1rem;
+            }
+            /* Ensure see more button is centered on mobile */
+            #see-more-popular-btn {
+                width: 100%;
             }
         }
     </style>
@@ -1759,6 +1786,9 @@
 
         // "See More" button for Popular Now
         seeMorePopularBtn.addEventListener('click', () => {
+            // On mobile, this button is less about scrolling and more about showing all.
+            // For desktop, it can still scroll.
+            // For now, let's keep it simple and just scroll if overflow is present.
             popularNowGrid.scrollBy({ left: popularNowGrid.scrollWidth, behavior: 'smooth' });
         });
 
