@@ -342,6 +342,26 @@
             background-color: #0056b3;
         }
 
+        /* WhatsApp Log Console */
+        #whatsapp-log-console {
+            background-color: #2a2a2a;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            height: 200px; /* Fixed height for the console */
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            color: #cccccc;
+            margin-top: 1.5rem;
+        }
+        #whatsapp-log-console p {
+            margin-bottom: 0.25rem;
+            line-height: 1.2;
+        }
+        #whatsapp-log-console p:last-child {
+            margin-bottom: 0;
+        }
+
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -385,6 +405,15 @@
     </style>
 </head>
 <body>
+    <!-- MODIFICATION START: Immediate client-side authentication check -->
+    <script>
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+            window.location.href = '/admin/login';
+        }
+    </script>
+    <!-- MODIFICATION END -->
+
     <header class="header">
         <h1>Delicious Bites Admin</h1>
         <button id="logout-btn" class="logout-btn">Logout</button>
@@ -493,6 +522,12 @@
                 </div>
                 <button id="reconnect-whatsapp-btn" class="btn-primary w-full sm:w-auto">Reconnect WhatsApp</button>
                 <p id="whatsapp-message" class="message mt-3 hidden"></p>
+
+                <!-- New WhatsApp Log Console -->
+                <h3 class="text-lg font-bold mt-6 mb-3">WhatsApp Bot Logs</h3>
+                <div id="whatsapp-log-console">
+                    <p>Waiting for logs...</p>
+                </div>
             </div>
 
             <div class="card">
@@ -670,10 +705,12 @@
     <!-- Leaflet JS for map -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
+        // The token check is now at the very top of the <script> block for immediate redirection.
+        // const token = localStorage.getItem('adminToken'); // This is now declared globally in the immediate check
         const socket = io();
+        // Re-declare token here for scope within DOMContentLoaded and other functions
         const token = localStorage.getItem('adminToken');
-        // REMOVED: if (!token) { window.location.href = '/admin/login'; }
-        // The server-side authentication middleware now handles redirection for HTML pages.
+
 
         // --- DOM Elements ---
         const logoutBtn = document.getElementById('logout-btn');
@@ -754,6 +791,7 @@
         const qrCodeDisplay = document.getElementById('qrCodeDisplay');
         const reconnectWhatsappBtn = document.getElementById('reconnect-whatsapp-btn');
         const whatsappMessage = document.getElementById('whatsapp-message');
+        const whatsappLogConsole = document.getElementById('whatsapp-log-console'); // New log console element
 
         const twoFactorStatusSpan = document.getElementById('2fa-status');
         const enable2FABtn = document.getElementById('enable-2fa-btn');
@@ -1355,6 +1393,20 @@
             reconnectWhatsappBtn.disabled = false;
         });
 
+        // MODIFICATION START: WhatsApp Log Console Listener
+        socket.on('whatsapp_log', (logMessage) => {
+            const logEntry = document.createElement('p');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${logMessage}`;
+            whatsappLogConsole.appendChild(logEntry);
+            whatsappLogConsole.scrollTop = whatsappLogConsole.scrollHeight; // Auto-scroll to bottom
+            // Remove "Waiting for logs..." message if it's present
+            if (whatsappLogConsole.querySelector('p').textContent === 'Waiting for logs...') {
+                whatsappLogConsole.innerHTML = '';
+                whatsappLogConsole.appendChild(logEntry);
+            }
+        });
+        // MODIFICATION END
+
 
         // --- 2FA Management ---
         async function fetch2FAStatus() {
@@ -1476,13 +1528,10 @@
 
         // --- Initial Load (Client-side authentication check) ---
         document.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('adminToken');
-            if (!token) {
-                // No token found, redirect to login
-                window.location.href = '/admin/login';
-                return; // Stop further execution
-            }
+            // The initial token check and redirect is now at the very top of the script block.
+            // This ensures it runs before DOMContentLoaded if the token is missing.
 
+            // If we reach here, a token was found by the initial check.
             try {
                 // Token exists, attempt to verify it with a lightweight API call
                 const response = await fetch('/api/admin/bot-status', {
