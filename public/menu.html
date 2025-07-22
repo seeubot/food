@@ -4,14 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="shop-title">Delicious Bites Menu</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Mapbox GL JS CSS -->
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
-    <!-- Font Awesome for custom markers -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
         /* Custom scrollbar for better aesthetics */
@@ -57,7 +53,7 @@
         .discount-badge svg {
             margin-right: 0.25rem;
         }
-        /* Mapbox map container styling for modal */
+        /* Map container styling for modal */
         #delivery-map-modal {
             height: 300px; /* Adjust height as needed */
             width: 100%;
@@ -71,37 +67,48 @@
             width: 32px; height: 32px; border-radius: 50%; background: #28a5a5; box-shadow: 0 0 0 rgba(40,165,165,0.6); animation: pulse 1.8s infinite;
             display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.2em; border: 2px solid #fff;
         }
+        /* Pin marker specific style */
+        .custom-marker.pin-marker {
+            background: #f15555; /* Red background for pin */
+            box-shadow: 0 0 0 rgba(241, 85, 85, 0.6);
+            animation: pulse-red 1.8s infinite;
+        }
+
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(40,165,165,0.3);}
             70% { box-shadow: 0 0 0 14px rgba(40,165,165,0);}
             100% { box-shadow: 0 0 0 0 rgba(40,165,165,0);}
         }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(241, 85, 85, 0.3);}
+            70% { box-shadow: 0 0 0 14px rgba(241, 85, 85, 0);}
+            100% { box-shadow: 0 0 0 0 rgba(241, 85, 85, 0);}
+        }
 
-        /* Floating UI for map controls */
+        /* Floating UI for map controls - BOTTOM RIGHT */
         .floating-ui {
             position: absolute;
             z-index: 1000;
-            top: 12px; /* Adjusted for modal padding */
-            left: 50%;
-            transform: translateX(-50%);
+            bottom: 12px; /* Position at bottom */
+            right: 12px; /* Position at right */
             display: flex;
-            gap: 8px; /* Reduced gap */
-            background: rgba(255,255,255,0.95); /* Slightly less opaque */
+            gap: 8px;
+            background: rgba(255,255,255,0.95);
             border-radius: 16px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-            padding: 8px 14px; /* Reduced padding */
+            padding: 8px 14px;
         }
         .floating-ui button {
             background: #ef4444; /* red-500 */
             color: #fff;
             border: none;
             border-radius: 18px;
-            padding: 6px 16px; /* Reduced padding */
-            font-size: 0.9rem; /* Slightly smaller font */
+            padding: 6px 16px;
+            font-size: 0.9rem;
             cursor: pointer;
             transition: background 0.2s;
-            box-shadow: 0 2px 6px rgba(239,68,68,0.15); /* red-500 shadow */
-            font-weight: 600; /* Semibold */
+            box-shadow: 0 2px 6px rgba(239,68,68,0.15);
+            font-weight: 600;
         }
         .floating-ui button.active {
             background: #dc2626; /* red-600 */
@@ -111,22 +118,21 @@
             color: #dc2626; /* red-600 */
         }
 
-        /* Address Display */
+        /* Address Display - BOTTOM LEFT */
         .address-display {
             position: absolute;
-            bottom: 12px; /* Adjusted for modal padding */
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 10px 16px; /* Reduced padding */
+            bottom: 12px; /* Position at bottom */
+            left: 12px; /* Position at left */
+            padding: 10px 16px;
             border-radius: 14px;
-            min-width: 200px; /* Adjusted min-width */
+            min-width: 200px;
             background: rgba(255,255,255,0.98);
             box-shadow: 0 2px 10px rgba(0,0,0,0.10);
-            font-size: 0.9rem; /* Slightly smaller font */
+            font-size: 0.9rem;
             color: #222;
             z-index: 1000;
-            text-align: center;
-            max-width: calc(100% - 32px); /* Adjusted max-width */
+            text-align: left; /* Aligned left */
+            max-width: calc(100% - 130px); /* Adjust max-width to not overlap buttons */
             word-break: break-word;
             font-weight: 500;
         }
@@ -134,9 +140,8 @@
         @media (max-width: 600px) {
             .floating-ui {
                 flex-direction: column;
-                top: 7px;
-                left: 50%;
-                transform: translateX(-50%);
+                bottom: 7px;
+                right: 7px;
                 padding: 6px 10px;
                 gap: 6px;
             }
@@ -148,13 +153,14 @@
                 font-size: 0.8rem;
                 padding: 6px 6px;
                 bottom: 7px;
+                left: 7px;
+                max-width: calc(100% - 100px); /* Adjust for smaller screens */
             }
         }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
 
-    <!-- Header -->
     <header class="bg-red-600 text-white p-4 shadow-md sticky top-0 z-10">
         <div class="container mx-auto flex justify-between items-center flex-wrap">
             <h1 class="text-2xl font-bold" id="header-shop-name">Delicious Bites</h1>
@@ -167,10 +173,8 @@
         </div>
     </header>
 
-    <!-- Main Content Area -->
     <main class="flex-1 container mx-auto p-4 md:p-6 grid grid-cols-1 gap-6">
 
-        <!-- Menu Items Section (now full width) -->
         <section class="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Our Delicious Menu</h2>
 
@@ -185,14 +189,12 @@
             </div>
 
             <div id="menu-items-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Menu items will be dynamically loaded here -->
-            </div>
+                </div>
             <p id="no-menu-items-message" class="text-center text-gray-600 mt-8 hidden">No menu items available at the moment. Please check back later!</p>
         </section>
 
     </main>
 
-    <!-- Modals -->
     <div id="modal-backdrop" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex justify-center items-center z-50 p-4 hidden">
         <div id="modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-lg md:max-w-2xl lg:max-w-3xl overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:w-full">
             <div class="bg-red-600 px-4 py-3 sm:px-6 flex justify-between items-center rounded-t-lg">
@@ -202,8 +204,7 @@
                 </button>
             </div>
             <div id="modal-body" class="p-6 modal-content-scrollable max-h-[80vh] overflow-y-auto">
-                <!-- Modal content will be injected here by JS -->
-            </div>
+                </div>
             <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-lg">
                 <button type="button" id="modal-close-footer-button"
                     class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
@@ -213,8 +214,7 @@
         </div>
     </div>
 
-    <!-- Mapbox GL JS -->
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         // --- Global State ---
         const appState = {
@@ -250,10 +250,6 @@
         const MIN_DISCOUNT_PERCENTAGE = 0.10; // 10%
         const MAX_DISCOUNT_PERCENTAGE = 0.50; // 50%
 
-        // IMPORTANT: Replace 'YOUR_MAPBOX_ACCESS_TOKEN' with your actual Mapbox Public Access Token
-        // You can get one from https://account.mapbox.com/access-tokens/
-        mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
-
         // --- DOM Elements ---
         const shopTitle = document.getElementById('shop-title');
         const headerShopName = document.getElementById('header-shop-name');
@@ -273,7 +269,7 @@
         const modalCloseButton = document.getElementById('modal-close-button');
         const modalCloseFooterButton = document.getElementById('modal-close-footer-button');
 
-        // Mapbox Map Variables
+        // Leaflet Map Variables
         let mapInstance = null;
         let liveMarker = null;
         let pinMarker = null;
@@ -410,7 +406,7 @@
                     itemCard.innerHTML = `
                         <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}"
                             class="w-full h-48 object-cover object-center"
-                            onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
+                            onerror="this.onerror=null;this.src='${PLACEHOLDE-R_IMAGE}';">
                         <div class="p-4 flex-1 flex flex-col">
                             <h3 class="text-xl font-semibold text-gray-800 mb-2">${item.name}
                                 ${item.isTrending ? '<span class="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">TRENDING ✨</span>' : ''}
@@ -611,12 +607,10 @@
                 </div>
 
                 <div id="delivery-map-modal" class="rounded-md mb-4 relative">
-                    <!-- Floating UI for mode selection -->
                     <div class="floating-ui">
                         <button id="liveBtn" class="active">Live Location</button>
                         <button id="pinBtn">Pin Location</button>
                     </div>
-                    <!-- Address Display -->
                     <div id="address" class="address-display">Loading location…</div>
                 </div>
 
@@ -660,20 +654,23 @@
             });
         }
 
-        // --- Custom Marker HTML Elements ---
-        function createLiveMarkerElement() {
-            const el = document.createElement('div');
-            el.className = 'custom-marker';
-            el.innerHTML = "<i class='fas fa-crosshairs'></i>";
-            return el;
+        // --- Custom Marker Icons for Leaflet ---
+        function getLiveIcon() {
+            return L.divIcon({
+                className: 'custom-marker',
+                html: "<i class='fas fa-crosshairs'></i>",
+                iconSize: [32, 32],
+                iconAnchor: [16, 32] // Anchor at the bottom-center
+            });
         }
 
-        function createPinMarkerElement() {
-            const el = document.createElement('div');
-            el.className = 'custom-marker';
-            el.style.background = '#f15555'; // Red background for pin
-            el.innerHTML = "<i class='fas fa-map-pin'></i>";
-            return el;
+        function getPinIcon() {
+            return L.divIcon({
+                className: 'custom-marker pin-marker', // Added 'pin-marker' class
+                html: "<i class='fas fa-map-pin'></i>",
+                iconSize: [32, 32],
+                iconAnchor: [16, 32] // Anchor at the bottom-center
+            });
         }
 
         function initializeMapInModal() {
@@ -687,10 +684,10 @@
             const locationMessageDiv = document.getElementById('location-modal-message');
             const locationMessageText = document.getElementById('location-message-text');
 
-            // Default location (shop location or a general city)
-            const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399; // Hyderabad coordinates
+            // Default location (shop location or a general city like Hyderabad, India)
+            const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
             const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
-            const defaultZoom = 13;
+            const defaultZoom = 13; // Good starting zoom
 
             // Update address display with current coordinates and address
             function updateAddressDisplay(lat, lon, address) {
@@ -704,19 +701,16 @@
             function centerToLiveLocation(position) {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
-                const accuracy = position.coords.accuracy;
+                const accuracy = position.coords.accuracy; // Accuracy in meters
 
                 if (!mapInstance) return;
 
-                mapInstance.setCenter([lon, lat]); // Mapbox uses [longitude, latitude]
-                mapInstance.setZoom(Math.max(mapInstance.getZoom(), 16)); // Zoom in closer for live location
+                mapInstance.setView([lat, lon], Math.max(mapInstance.getZoom(), 16)); // Leaflet uses [lat, lon]
 
                 if (liveMarker) {
-                    liveMarker.setLngLat([lon, lat]);
+                    liveMarker.setLatLng([lat, lon]);
                 } else {
-                    liveMarker = new mapboxgl.Marker({ element: createLiveMarkerElement() })
-                        .setLngLat([lon, lat])
-                        .addTo(mapInstance);
+                    liveMarker = L.marker([lat, lon], { icon: getLiveIcon() }).addTo(mapInstance);
                 }
                 if (pinMarker) { pinMarker.remove(); pinMarker = null; } // Remove pin marker if live mode is active
 
@@ -784,22 +778,21 @@
                 locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
                 confirmButton.disabled = true;
 
+                // Add click listener for pinning. Use 'once' to get one click, then rely on drag.
                 mapInstance.once('click', async function(e){
-                    const lat = e.lngLat.lat;
-                    const lon = e.lngLat.lng;
+                    const lat = e.latlng.lat;
+                    const lon = e.latlng.lng;
 
                     if (pinMarker) {
-                        pinMarker.setLngLat([lon, lat]);
+                        pinMarker.setLatLng([lat, lon]);
                     } else {
-                        pinMarker = new mapboxgl.Marker({ element: createPinMarkerElement(), draggable: true })
-                            .setLngLat([lon, lat])
-                            .addTo(mapInstance);
+                        pinMarker = L.marker([lat, lon], { icon: getPinIcon(), draggable: true }).addTo(mapInstance);
                         
                         // Add dragend listener for the pin marker
                         pinMarker.on('dragend', async (event) => {
-                            const newLngLat = pinMarker.getLngLat();
-                            const newLat = newLngLat.lat;
-                            const newLon = newLngLat.lng;
+                            const newLatLng = pinMarker.getLatLng();
+                            const newLat = newLatLng.lat;
+                            const newLon = newLatLng.lng;
 
                             locationMessageText.textContent = 'Getting address for pinned location...';
                             locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
@@ -818,8 +811,7 @@
                         });
                     }
 
-                    mapInstance.setCenter([lon, lat]);
-                    mapInstance.setZoom(Math.max(mapInstance.getZoom(), 16));
+                    mapInstance.setView([lat, lon], Math.max(mapInstance.getZoom(), 16));
 
                     locationMessageText.textContent = 'Getting address for pinned location...';
                     locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
@@ -842,32 +834,32 @@
                 if (mapInstance) { // Ensure no duplicate map instance
                     mapInstance.remove();
                 }
-                mapInstance = new mapboxgl.Map({
-                    container: 'delivery-map-modal',
-                    style: 'mapbox://styles/mapbox/satellite-v9', // Satellite style
-                    center: [defaultLng, defaultLat], // Mapbox uses [longitude, latitude]
+                mapInstance = L.map('delivery-map-modal', {
+                    center: [defaultLat, defaultLng],
                     zoom: defaultZoom,
-                    attributionControl: false // Hide default Mapbox attribution
+                    zoomControl: false, // You can add custom zoom controls if needed
+                    attributionControl: false // Hide default Leaflet attribution
                 });
 
-                // Add custom attribution to comply with Mapbox policy
-                mapInstance.addControl(new mapboxgl.AttributionControl({
-                    customAttribution: '© Mapbox © OpenStreetMap'
-                }), 'bottom-right');
+                // Add Esri World Imagery satellite tile layer
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 19,
+                    // Optionally, add a custom attribution for Esri
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                }).addTo(mapInstance);
+
+                // Invalidate size to ensure map renders correctly within the modal
+                mapInstance.invalidateSize();
 
                 // Set initial location to shop default and try to activate live mode
-                mapInstance.on('load', () => {
-                    updateAddressDisplay(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
-                    activateLiveMode(); // Automatically try to get live location
-                });
+                updateAddressDisplay(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+                activateLiveMode(); // Automatically try to get live location
 
                 // Event listeners for mode buttons
                 liveBtn.onclick = activateLiveMode;
                 pinBtn.onclick = activatePinMode;
 
-                // Handle map resize if modal changes size (though not directly implemented here)
-                // mapInstance.resize(); // Can be called if modal size changes dynamically
-            }, 250); // Increased delay to ensure modal is fully visible
+            }, 250); // Delay to ensure modal is fully visible
         }
 
         function updateSelectedLocation(lat, lng, address) {
