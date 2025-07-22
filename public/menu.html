@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
      integrity="sha256-p4NxAoJBhIIN+hmNHrzxH+iPxlL85dbTEQeUM3GSbPM="
      crossorigin=""/>
+    <!-- Font Awesome for custom markers -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
         /* Custom scrollbar for better aesthetics */
         ::-webkit-scrollbar {
@@ -62,6 +64,92 @@
             width: 100%;
             border-radius: 0.5rem; /* rounded-md */
             margin-bottom: 1rem; /* mb-4 */
+            position: relative; /* Needed for absolute positioning of controls */
+        }
+
+        /* Custom Map Marker - animated pulse effect */
+        .custom-marker {
+            width: 32px; height: 32px; border-radius: 50%; background: #28a5a5; box-shadow: 0 0 0 rgba(40,165,165,0.6); animation: pulse 1.8s infinite;
+            display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.2em; border: 2px solid #fff;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(40,165,165,0.3);}
+            70% { box-shadow: 0 0 0 14px rgba(40,165,165,0);}
+            100% { box-shadow: 0 0 0 0 rgba(40,165,165,0);}
+        }
+
+        /* Floating UI for map controls */
+        .floating-ui {
+            position: absolute;
+            z-index: 1000;
+            top: 12px; /* Adjusted for modal padding */
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px; /* Reduced gap */
+            background: rgba(255,255,255,0.95); /* Slightly less opaque */
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            padding: 8px 14px; /* Reduced padding */
+        }
+        .floating-ui button {
+            background: #ef4444; /* red-500 */
+            color: #fff;
+            border: none;
+            border-radius: 18px;
+            padding: 6px 16px; /* Reduced padding */
+            font-size: 0.9rem; /* Slightly smaller font */
+            cursor: pointer;
+            transition: background 0.2s;
+            box-shadow: 0 2px 6px rgba(239,68,68,0.15); /* red-500 shadow */
+            font-weight: 600; /* Semibold */
+        }
+        .floating-ui button.active {
+            background: #dc2626; /* red-600 */
+        }
+        .floating-ui button:hover:not(.active) {
+            background: #fca5a5; /* red-300 */
+            color: #dc2626; /* red-600 */
+        }
+
+        /* Address Display */
+        .address-display {
+            position: absolute;
+            bottom: 12px; /* Adjusted for modal padding */
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 16px; /* Reduced padding */
+            border-radius: 14px;
+            min-width: 200px; /* Adjusted min-width */
+            background: rgba(255,255,255,0.98);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+            font-size: 0.9rem; /* Slightly smaller font */
+            color: #222;
+            z-index: 1000;
+            text-align: center;
+            max-width: calc(100% - 32px); /* Adjusted max-width */
+            word-break: break-word;
+            font-weight: 500;
+        }
+
+        @media (max-width: 600px) {
+            .floating-ui {
+                flex-direction: column;
+                top: 7px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 6px 10px;
+                gap: 6px;
+            }
+            .floating-ui button {
+                padding: 5px 12px;
+                font-size: 0.85rem;
+            }
+            .address-display {
+                font-size: 0.8rem;
+                padding: 6px 6px;
+                bottom: 7px;
+            }
         }
     </style>
 </head>
@@ -186,7 +274,9 @@
 
         // Leaflet Map Variables (now local to the modal function)
         let mapInstance = null;
-        let markerInstance = null;
+        let liveMarker = null;
+        let pinMarker = null;
+        let watchId = null; // For geolocation watch
 
         // --- Utility Functions ---
         function showLoading(section) {
@@ -234,12 +324,17 @@
             }
             appState.modal.onClose = null;
             modalBody.innerHTML = ''; // Clear content
-            // Destroy map instance if it exists and is managed by this modal
+            // Destroy map instance and clear watch if they exist
             if (mapInstance) {
                 mapInstance.remove();
                 mapInstance = null;
-                markerInstance = null;
             }
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            liveMarker = null;
+            pinMarker = null;
         }
 
         modalCloseButton.addEventListener('click', hideModal);
@@ -511,21 +606,20 @@
             const locationModalHtml = `
                 <div id="location-modal-message" class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-md mb-4 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-2 animate-spin mr-2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                    <span id="location-message-text">Attempting to get your live GPS location...</span>
+                    <span id="location-message-text">Initializing map...</span>
                 </div>
 
-                <div id="delivery-map-modal" class="rounded-md mb-4"></div>
+                <div id="delivery-map-modal" class="rounded-md mb-4 relative">
+                    <!-- Floating UI for mode selection -->
+                    <div class="floating-ui">
+                        <button id="liveBtn" class="active">Live Location</button>
+                        <button id="pinBtn">Pin Location</button>
+                    </div>
+                    <!-- Address Display -->
+                    <div id="address" class="address-display">Loading location…</div>
+                </div>
 
                 <p id="selected-address-modal" class="text-lg font-semibold text-gray-800 mb-4 text-center">Selected Location: Loading...</p>
-
-                <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 justify-center">
-                    <button id="get-live-location-button"
-                        class="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
-                        Get Live Location
-                    </button>
-                    <!-- "Pin Location on Map" is now implicit by dragging the marker -->
-                </div>
 
                 <button id="confirm-location-button"
                     class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center disabled:opacity-50" disabled>
@@ -535,20 +629,22 @@
             `;
             showModal('Select Delivery Location', locationModalHtml, () => {
                 // This callback runs when the location modal is closed
-                // Ensure map instance is destroyed
+                // Ensure map instance and watch are destroyed
                 if (mapInstance) {
                     mapInstance.remove();
                     mapInstance = null;
-                    markerInstance = null;
                 }
+                if (watchId) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                }
+                liveMarker = null;
+                pinMarker = null;
             });
 
             // Initialize map after the modal is shown
             initializeMapInModal();
 
-            // Event listener for the "Get Live Location" button
-            document.getElementById('get-live-location-button').addEventListener('click', () => getLiveLocationModal(true));
-            
             document.getElementById('confirm-location-button').addEventListener('click', () => {
                 if (appState.customerLocation.latitude === null || appState.customerLocation.longitude === null || appState.customerLocation.address === 'Location not set.') {
                     const msgDiv = document.getElementById('location-modal-message');
@@ -563,61 +659,176 @@
             });
         }
 
+        // --- Custom Marker as DivIcon ---
+        function getLiveIcon() {
+            return L.divIcon({
+                className: '', // No default class, custom styles applied
+                html: "<div class='custom-marker'><i class='fas fa-crosshairs'></i></div>",
+                iconSize: [32, 32],
+                iconAnchor: [16, 16],
+                popupAnchor: [0, -16]
+            });
+        }
+        function getPinIcon() {
+            return L.divIcon({
+                className: '',
+                html: "<div class='custom-marker' style='background:#f15555;'><i class='fas fa-map-pin'></i></div>",
+                iconSize: [32, 32],
+                iconAnchor: [16, 16],
+                popupAnchor: [0, -16]
+            });
+        }
+
         function initializeMapInModal() {
             const mapElement = document.getElementById('delivery-map-modal');
             if (!mapElement) return;
+
+            const addressDisplay = document.getElementById('address');
+            const liveBtn = document.getElementById('liveBtn');
+            const pinBtn = document.getElementById('pinBtn');
+            const confirmButton = document.getElementById('confirm-location-button');
+            const locationMessageDiv = document.getElementById('location-modal-message');
+            const locationMessageText = document.getElementById('location-message-text');
 
             // Default location (shop location or a general city)
             const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399; // Hyderabad coordinates
             const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
             const defaultZoom = 13;
 
+            // Update address display with current coordinates and address
+            function updateAddressDisplay(lat, lon, address) {
+                addressDisplay.innerHTML = `<div><b>Lat:</b> ${lat.toFixed(6)}<br><b>Lng:</b> ${lon.toFixed(6)}</div>
+                <div style="margin-top:7px;color:#555;"><span style="font-size:0.97em;">🔎 </span>${address}</div>`;
+                updateSelectedLocation(lat, lon, address); // Update appState and selected-address-modal
+                confirmButton.disabled = false; // Enable confirm button once a location is set
+            }
+
+            // Center and update marker/address for live location
+            function centerToLiveLocation(position) {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+
+                if (!mapInstance) return;
+
+                mapInstance.setView([lat, lon], Math.max(mapInstance.getZoom(), 16), { animate: true });
+
+                if (liveMarker) {
+                    liveMarker.setLatLng([lat, lon]);
+                } else {
+                    liveMarker = L.marker([lat, lon], {icon: getLiveIcon()}).addTo(mapInstance);
+                }
+                if (pinMarker) { mapInstance.removeLayer(pinMarker); pinMarker = null; }
+
+                locationMessageText.textContent = 'Getting address for your live location...';
+                locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
+                locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+
+                reverseGeocode(lat, lon).then(addr => {
+                    updateAddressDisplay(lat, lon, addr || `Live Location (Accuracy: ${accuracy.toFixed(0)}m)`);
+                    locationMessageDiv.classList.add('hidden');
+                }).catch(() => {
+                    updateAddressDisplay(lat, lon, `Live Location (Accuracy: ${accuracy.toFixed(0)}m)`);
+                    locationMessageDiv.classList.add('hidden');
+                });
+            }
+
+            function onGeoError(error) {
+                console.warn('Error getting GPS location:', error.message);
+                locationMessageText.textContent = 'Could not get your GPS location. Please ensure location services are enabled and permissions granted, or tap on the map to pin a location.';
+                locationMessageDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                locationMessageDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+                
+                // If geolocation fails, ensure a fallback location is set (e.g., default shop location)
+                if (appState.customerLocation.latitude === null || appState.customerLocation.longitude === null) {
+                    updateAddressDisplay(defaultLat, defaultLng, `Default Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+                }
+            }
+
+            function activateLiveMode() {
+                liveBtn.classList.add('active');
+                liveBtn.classList.remove('bg-gray-200', 'text-gray-800');
+                liveBtn.classList.add('bg-red-600', 'text-white');
+
+                pinBtn.classList.remove('active', 'bg-red-600', 'text-white');
+                pinBtn.classList.add('bg-gray-200', 'text-gray-800');
+
+                if (watchId) navigator.geolocation.clearWatch(watchId);
+                
+                locationMessageText.textContent = 'Attempting to get your live GPS location...';
+                locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
+                locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                confirmButton.disabled = true;
+
+                watchId = navigator.geolocation.watchPosition(centerToLiveLocation, onGeoError, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+                mapInstance.off('click'); // Disable click for pinning in live mode
+            }
+
+            function activatePinMode() {
+                pinBtn.classList.add('active');
+                pinBtn.classList.remove('bg-gray-200', 'text-gray-800');
+                pinBtn.classList.add('bg-red-600', 'text-white');
+
+                liveBtn.classList.remove('active', 'bg-red-600', 'text-white');
+                liveBtn.classList.add('bg-gray-200', 'text-gray-800');
+
+                if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+                
+                locationMessageText.textContent = 'Tap on the map to pin a delivery location.';
+                locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
+                locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                confirmButton.disabled = true;
+
+                mapInstance.once('click', async function(e){
+                    const lat = e.latlng.lat;
+                    const lon = e.latlng.lng;
+
+                    if (pinMarker) pinMarker.setLatLng([lat, lon]);
+                    else pinMarker = L.marker([lat, lon], {icon: getPinIcon()}).addTo(mapInstance);
+                    if (liveMarker) { mapInstance.removeLayer(liveMarker); liveMarker = null; }
+
+                    mapInstance.setView([lat, lon], Math.max(mapInstance.getZoom(), 16), { animate: true });
+
+                    locationMessageText.textContent = 'Getting address for pinned location...';
+                    locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
+                    locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                    
+                    try {
+                        let addr = await reverseGeocode(lat, lon);
+                        updateAddressDisplay(lat, lon, addr || `Pinned Location (Lat: ${lat.toFixed(4)}, Lng: ${lon.toFixed(4)})`);
+                    } catch (geoError) {
+                        console.error('Reverse geocoding failed on pin:', geoError);
+                        updateAddressDisplay(lat, lon, `Pinned Location (Lat: ${lat.toFixed(4)}, Lng: ${lon.toFixed(4)})`);
+                    } finally {
+                        locationMessageDiv.classList.add('hidden');
+                    }
+                });
+            }
+
             // Initialize map after a small delay to ensure modal is fully rendered
             setTimeout(() => {
                 if (mapInstance) { // Ensure no duplicate map instance
                     mapInstance.remove();
                 }
-                mapInstance = L.map('delivery-map-modal').setView([defaultLat, defaultLng], defaultZoom);
-                // OpenStreetMap standard tiles
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(mapInstance);
-
-                markerInstance = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(mapInstance);
-
-                // Update appState with initial marker position and get address
-                updateSelectedLocation(defaultLat, defaultLng, 'Default Shop Location'); // Initial placeholder
-                reverseGeocode(defaultLat, defaultLng).then(address => {
-                    updateSelectedLocation(defaultLat, defaultLng, address || `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
-                    document.getElementById('confirm-location-button').disabled = false;
-                }).catch(() => {
-                    updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
-                    document.getElementById('confirm-location-button').disabled = false;
-                });
+                mapInstance = L.map('delivery-map-modal', { zoomControl: true }).setView([defaultLat, defaultLng], defaultZoom);
                 
-                // Try to get user's current GPS location immediately
-                getLiveLocationModal(false); // Do not re-enable buttons here initially
+                // ESRI World Imagery tile layer for satellite view
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+                    maxZoom: 20
+                }).addTo(mapInstance);
+                
+                // Set initial location to shop default and try to activate live mode
+                updateAddressDisplay(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+                activateLiveMode(); // Automatically try to get live location
 
-                // Event listener for marker drag end
-                markerInstance.on('dragend', async (event) => {
-                    const latlng = markerInstance.getLatLng();
-                    document.getElementById('location-modal-message').classList.remove('hidden');
-                    document.getElementById('location-modal-message').classList.remove('bg-red-100', 'border-red-400', 'text-red-700');
-                    document.getElementById('location-modal-message').classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                    document.getElementById('location-message-text').textContent = 'Getting address for pinned location...';
-                    document.getElementById('confirm-location-button').disabled = true;
-
-                    let address = `Pinned Location (Lat: ${latlng.lat.toFixed(4)}, Lng: ${latlng.lng.toFixed(4)})`;
-                    try {
-                        const geocodedAddress = await reverseGeocode(latlng.lat, latlng.lng);
-                        address = geocodedAddress || address;
-                    } catch (geoError) {
-                        console.error('Reverse geocoding failed on drag:', geoError);
-                    }
-                    updateSelectedLocation(latlng.lat, latlng.lng, address);
-                    document.getElementById('location-modal-message').classList.add('hidden');
-                    document.getElementById('confirm-location-button').disabled = false;
-                });
+                // Event listeners for mode buttons
+                liveBtn.onclick = activateLiveMode;
+                pinBtn.onclick = activatePinMode;
 
                 // Invalidate size to ensure map renders correctly in modal
                 mapInstance.invalidateSize();
@@ -631,85 +842,6 @@
             document.getElementById('selected-address-modal').textContent = `Selected Location: ${address}`;
         }
 
-        async function getLiveLocationModal(re_enable_buttons = true) {
-            const msgDiv = document.getElementById('location-modal-message');
-            const msgText = document.getElementById('location-message-text');
-            const confirmButton = document.getElementById('confirm-location-button');
-            const getLiveButton = document.getElementById('get-live-location-button');
-
-            msgDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
-            msgDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
-            msgText.textContent = 'Attempting to get your live GPS location...';
-            confirmButton.disabled = true;
-            if (re_enable_buttons) {
-                getLiveButton.disabled = true;
-            }
-
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => { // Made async to await reverseGeocode
-                        const userLat = position.coords.latitude;
-                        const userLng = position.coords.longitude;
-                        const userAccuracy = position.coords.accuracy; // in meters
-
-                        mapInstance.setView([userLat, userLng], Math.max(mapInstance.getZoom(), 16)); // Zoom in closer for live location
-                        markerInstance.setLatLng([userLat, userLng]);
-
-                        msgText.textContent = 'Getting address for your location...'; // New message for geocoding
-                        let address = `GPS Location (Accuracy: ${userAccuracy.toFixed(0)}m, Lat: ${userLat.toFixed(4)}, Lng: ${userLng.toFixed(4)})`;
-                        
-                        try {
-                            const geocodedAddress = await reverseGeocode(userLat, userLng);
-                            address = geocodedAddress || address; // Use geocoded address if available
-                        } catch (geoError) {
-                            console.error('Reverse geocoding failed:', geoError);
-                            // Fallback to coordinates-based address
-                        }
-
-                        updateSelectedLocation(userLat, userLng, address);
-                        msgDiv.classList.add('hidden');
-                        confirmButton.disabled = false;
-                        if (re_enable_buttons) {
-                            getLiveButton.disabled = false;
-                        }
-                    },
-                    (error) => {
-                        console.warn('Error getting GPS location:', error.message);
-                        msgText.textContent = 'Could not get your GPS location. Please ensure location services are enabled and permissions granted, or drag the pin on the map.';
-                        msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                        msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
-
-                        // Fallback to current marker position (which defaults to shop or last pinned)
-                        const currentLatlng = markerInstance.getLatLng();
-                        updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
-                        
-                        confirmButton.disabled = false; // Allow user to confirm fallback location
-                        if (re_enable_buttons) {
-                            getLiveButton.disabled = false;
-                        }
-                    },
-                    {
-                        enableHighAccuracy: true, // Request high accuracy GPS
-                        timeout: 10000, // 10 seconds timeout
-                        maximumAge: 0 // No cached position
-                    }
-                );
-            } else {
-                msgText.textContent = 'Geolocation is not supported by your browser. Please drag the pin on the map to set your delivery address.';
-                msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
-
-                // Fallback to current marker position (which defaults to shop)
-                const currentLatlng = markerInstance.getLatLng();
-                updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
-                
-                confirmButton.disabled = false; // Allow user to confirm fallback location
-                if (re_enable_buttons) {
-                    getLiveButton.disabled = false;
-                }
-            }
-        }
-
         // --- Reverse Geocoding Function using Nominatim ---
         async function reverseGeocode(lat, lng) {
             const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
@@ -717,8 +849,7 @@
                 const response = await fetch(nominatimUrl, {
                     headers: {
                         // Provide a User-Agent to comply with Nominatim's usage policy
-                        // IMPORTANT: Replace 'your_email@example.com' with your actual email address
-                        'User-Agent': 'WhatsAppBotAdminDashboard/1.0 (your_email@example.com)' 
+                        'User-Agent': 'DeliciousBitesApp/1.0 (your_email@example.com)' // Replace with your actual email
                     }
                 });
                 if (!response.ok) {
