@@ -352,7 +352,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 
         if (typeof rawChatId === 'string' && rawChatId.length > 0) {
             customerPhone = rawChatId.includes('@c.us') ? rawChatId.split('@')[0] : rawChatId;
-            customerPhone = customerPhone.trim();
+            customerPhone = customerPhone.trim(); // Ensure no leading/trailing whitespace
         }
 
         // Final check for validity: customerPhone must be a non-empty string
@@ -365,16 +365,49 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         const customerName = msg._data.notifyName; // This can be null/undefined
 
         try {
-            // Find or create customer first
+            // Try to find the customer first
             let customer = await Customer.findOne({ customerPhone: customerPhone });
+
             if (!customer) {
-                console.log(`[WhatsApp] Creating new customer with validated phone: ${customerPhone}`);
-                io.emit('whatsapp_log', `Creating new customer: ${customerPhone}`);
-                customer = new Customer({ customerPhone: customerPhone, customerName: customerName || 'Unknown' }); // Provide a default name
-                await customer.save();
-                console.log(`[WhatsApp] Successfully created new customer: ${customerPhone}`);
+                // If customer not found, attempt to create.
+                // Wrap in a try-catch specifically for the save operation to handle duplicate key errors
+                try {
+                    console.log(`[WhatsApp] Attempting to create new customer with validated phone: ${customerPhone}`);
+                    io.emit('whatsapp_log', `Attempting to create new customer: ${customerPhone}`);
+                    customer = new Customer({
+                        customerPhone: customerPhone,
+                        customerName: customerName || 'Unknown'
+                    });
+                    await customer.save();
+                    console.log(`[WhatsApp] Successfully created new customer: ${customerPhone}`);
+                } catch (saveError) {
+                    // Check for duplicate key error (code 11000)
+                    if (saveError.code === 11000) {
+                        console.warn(`[WhatsApp] Duplicate key error during customer creation for ${customerPhone}. Attempting to find and update instead.`);
+                        io.emit('whatsapp_log', `Duplicate customer found for ${customerPhone}. Attempting update.`);
+                        // Retry finding the customer, assuming it exists but wasn't found initially
+                        customer = await Customer.findOne({ customerPhone: customerPhone });
+                        if (customer) {
+                            // Update existing customer's name if needed
+                            if (customerName && customer.customerName !== customerName) {
+                                customer.customerName = customerName;
+                                await customer.save();
+                                console.log(`[WhatsApp] Successfully updated existing customer: ${customerPhone}`);
+                                io.emit('whatsapp_log', `Updated existing customer: ${customerPhone}`);
+                            }
+                        } else {
+                            // If still not found after a duplicate error, it's a deeper issue.
+                            console.error(`[WhatsApp] Critical: Duplicate key error for ${customerPhone}, but customer still not found after retry.`, saveError);
+                            io.emit('whatsapp_log', `Critical error: Could not find or create customer ${customerPhone}.`);
+                            throw new Error(`Failed to process message: Could not establish customer record.`);
+                        }
+                    } else {
+                        // Re-throw other save errors
+                        throw saveError;
+                    }
+                }
             } else {
-                // Only update customerName if it's different and not null/empty
+                // Customer found, update existing customer's name if it changed
                 if (customerName && customer.customerName !== customerName) {
                     console.log(`[WhatsApp] Updating customer name for ${customerPhone}`);
                     io.emit('whatsapp_log', `Updating customer name for ${customerPhone}`);
@@ -700,9 +733,9 @@ const sendHelpMessage = async (chatId) => {
 const reOrderNotificationMessagesTelugu = [
     "Feeling hungry again? 😋 New flavors await on our menu! Order now! 🚀",
     "Missing our delicious dishes? 💖 Order your next meal now!🍽️",
-    "7 days have passed! ⏳ It's the perfect time to re-order. Your favorite dishes are ready! ✨",
+    "It's been a while! ⏳ It's the perfect time to re-order. Your favorite dishes are ready! ✨",
     "Special offer! 🎉 Get a discount on your next order this week. Check out the menu! 📜",
-    "It's been 7 days since your last order from us. Re-order your favorites! 🧡",
+    "It's been a day since your last order from us. Re-order your favorites! 🧡",
     "Hungry? 🤤 Order your favorite meal from Delicious Bites now! 💨",
     "Want to see what's new on our menu? 👀 Order now and try it out! 🌟",
     "Have you forgotten our taste? 😋 It's the perfect time to re-order! 🥳",
@@ -717,18 +750,18 @@ const sendReorderNotification = async () => {
         return;
     }
 
-    console.log('[Scheduler] Running 7-day re-order notification job...');
-    const sevenDaysAgo = moment().subtract(7, 'days').toDate();
-    const twoDaysAgo = moment().subtract(2, 'days').toDate();
+    console.log('[Scheduler] Running 1-day re-order notification job...');
+    const oneDayAgo = moment().subtract(1, 'day').toDate(); // Changed from 7 days
+    const twoDaysAgo = moment().subtract(2, 'days').toDate(); // Keep this to avoid spamming immediately after order
 
     try {
         const customersToNotify = await Customer.find({
             totalOrders: { $gt: 0 },
             $or: [
                 { lastNotificationSent: { $exists: false } },
-                { lastNotificationSent: { $lt: sevenDaysAgo } }
+                { lastNotificationSent: { $lt: oneDayAgo } } // Use oneDayAgo here
             ],
-            lastOrderDate: { $lt: twoDaysAgo }
+            lastOrderDate: { $lt: twoDaysAgo } // Only notify if last order was more than 2 days ago
         });
 
         console.log(`[Scheduler] Found ${customersToNotify.length} customers to notify.`);
@@ -749,10 +782,10 @@ const sendReorderNotification = async () => {
                 io.emit('whatsapp_log', `Failed to send re-order notification to ${customer.customerPhone}: ${msgSendError.message}`);
             }
         }
-        console.log('[Scheduler] 7-day re-order notification job finished.');
+        console.log('[Scheduler] 1-day re-order notification job finished.'); // Updated log message
 
     } catch (dbError) {
-        console.error('[Scheduler] Error in 7-day re-order notification job (DB query):', dbError);
+        console.error('[Scheduler] Error in 1-day re-order notification job (DB query):', dbError); // Updated log message
         io.emit('whatsapp_log', `Error in re-order notification job (DB query): ${dbError.message}`);
     }
 };
@@ -763,7 +796,7 @@ cron.schedule('0 9 * * *', () => {
     scheduled: true,
     timezone: "Asia/Kolkata"
 });
-console.log('7-day re-order notification job scheduled to run daily at 9:00 AM IST.');
+console.log('Daily re-order notification job scheduled to run daily at 9:00 AM IST.'); // Updated log message
 
 
 // --- Admin API Routes ---
@@ -1072,7 +1105,8 @@ app.get('/api/admin/customers', authenticateToken, async (req, res) => {
     try {
         const customers = await Customer.find({});
         res.json(customers);
-    } catch (error) {
+    }
+    catch (error) {
         res.status(500).json({ message: 'Error fetching customers', error: error.message });
     }
 });
@@ -1390,4 +1424,3 @@ server.listen(PORT, () => {
     console.log(`Default Admin Password (for initial setup): ${DEFAULT_ADMIN_PASSWORD}`);
     console.log('REMEMBER TO ENABLE 2FA FROM THE DASHBOARD AFTER FIRST LOGIN FOR SECURITY.');
 });
-
