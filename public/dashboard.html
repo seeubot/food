@@ -547,6 +547,8 @@
             modalBackdrop.classList.remove('hidden');
             appState.modal.isOpen = true;
             appState.modal.onClose = onCloseCallback;
+            // Ensure icons are rendered in modal content
+            lucide.createIcons();
         }
 
         function hideModal() {
@@ -658,7 +660,7 @@
         function navigateTo(view) {
             appState.currentView = view;
             renderContentSection();
-            // Close sidebar on mobile
+            // Close sidebar on mobile when a navigation button is clicked
             if (window.innerWidth < 768) { // md breakpoint in Tailwind
                 sidebar.classList.add('-translate-x-full');
             }
@@ -861,6 +863,10 @@
             const title = item ? 'Edit Menu Item' : 'Add New Menu Item';
             const formHtml = `
                 <form id="menu-item-form" class="space-y-4">
+                    <div id="form-error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
+                        <strong class="font-bold">Error!</strong>
+                        <span class="block sm:inline ml-2" id="form-error-text"></span>
+                    </div>
                     <div>
                         <label for="item-name" class="block text-sm font-medium text-gray-700">Name</label>
                         <input type="text" id="item-name" name="name" value="${item ? item.name : ''}" required
@@ -918,22 +924,15 @@
                     isTrending: document.getElementById('item-isTrending').checked,
                 };
 
+                const formErrorMessageDiv = document.getElementById('form-error-message');
+                const formErrorText = document.getElementById('form-error-text');
+
                 if (isNaN(formData.price) || formData.price <= 0) {
-                    // Create an error message div if it doesn't exist
-                    let errorMessageDiv = modalBody.querySelector('.form-error-message');
-                    if (!errorMessageDiv) {
-                        errorMessageDiv = document.createElement('div');
-                        errorMessageDiv.className = 'form-error-message bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4';
-                        errorMessageDiv.innerHTML = '<strong class="font-bold">Error!</strong> <span class="block sm:inline ml-2"></span>';
-                        modalBody.prepend(errorMessageDiv); // Add to the top of the modal body
-                    }
-                    errorMessageDiv.classList.remove('hidden');
-                    errorMessageDiv.querySelector('span').textContent = 'Price must be a positive number.';
+                    formErrorText.textContent = 'Price must be a positive number.';
+                    formErrorMessageDiv.classList.remove('hidden');
                     return;
                 } else {
-                    // Hide error message if price is valid
-                    const errorMessageDiv = modalBody.querySelector('.form-error-message');
-                    if (errorMessageDiv) errorMessageDiv.classList.add('hidden');
+                    formErrorMessageDiv.classList.add('hidden');
                 }
 
                 try {
@@ -957,16 +956,8 @@
                     hideModal();
                     fetchMenuItems();
                 } catch (err) {
-                    // Display error in modal
-                    let errorMessageDiv = modalBody.querySelector('.form-error-message');
-                    if (!errorMessageDiv) {
-                        errorMessageDiv = document.createElement('div');
-                        errorMessageDiv.className = 'form-error-message bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4';
-                        errorMessageDiv.innerHTML = '<strong class="font-bold">Error!</strong> <span class="block sm:inline ml-2"></span>';
-                        modalBody.prepend(errorMessageDiv);
-                    }
-                    errorMessageDiv.classList.remove('hidden');
-                    errorMessageDiv.querySelector('span').textContent = err.message;
+                    formErrorText.textContent = err.message;
+                    formErrorMessageDiv.classList.remove('hidden');
                 }
             });
         }
@@ -1163,13 +1154,26 @@
         }
 
         function showOrderDetailModal(order) {
+            const customerPhoneFormatted = order.customerPhone.startsWith('+') ? order.customerPhone : `+91${order.customerPhone}`; // Assuming Indian numbers, adjust as needed
+
+            const trackLocationButton = (order.customerLocation && order.customerLocation.latitude && order.customerLocation.longitude) ?
+                `<a href="https://www.google.com/maps/search/?api=1&query=${order.customerLocation.latitude},${order.customerLocation.longitude}" target="_blank"
+                    class="flex-1 inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
+                    Track Location
+                </a>` :
+                `<button disabled class="flex-1 inline-flex justify-center items-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-gray-200 text-base font-medium text-gray-700 cursor-not-allowed sm:text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
+                    Location N/A
+                </button>`;
+
             const contentHtml = `
                 <div class="space-y-4 text-gray-700">
                     <p><strong class="font-semibold">Order ID:</strong> ${order.customOrderId || order._id}</p>
                     <p><strong class="font-semibold">PIN:</strong> ${order.pinId}</p>
                     <p><strong class="font-semibold">Customer Name:</strong> ${order.customerName}</p>
                     <p><strong class="font-semibold">Customer Phone:</strong> ${order.customerPhone}</p>
-                    <p><strong class="font-semibold">Delivery Address:</strong> ${order.deliveryAddress}</p>
+                    <p><strong class="font-semibold">Delivery Address:</strong> ${order.deliveryAddress || 'Not provided'}</p>
                     <p><strong class="font-semibold">Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
                     <p><strong class="font-semibold">Status:</strong> ${order.status}</p>
                     <p><strong class="font-semibold">Payment Method:</strong> ${order.paymentMethod}</p>
@@ -1178,6 +1182,14 @@
                     <ul class="list-disc list-inside ml-4">
                         ${order.items.map(item => `<li>${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)</li>`).join('')}
                     </ul>
+                </div>
+                <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-6">
+                    <a href="tel:${customerPhoneFormatted}"
+                        class="flex-1 inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-phone mr-2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-1.18 2.19l-.7.35a18.78 18.78 0 0 0 6.14 6.14l.35-.7a2 2 0 0 1 2.19-1.18 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>
+                        Call Customer
+                    </a>
+                    ${trackLocationButton}
                 </div>
             `;
             showModal('Order Details', contentHtml);
@@ -1302,6 +1314,7 @@
                     </div>
                 `;
                 modalBody.innerHTML = contentHtml; // Update modal body directly
+                lucide.createIcons(); // Re-render Lucide icons for dynamically added content
             } catch (err) {
                 modalBody.innerHTML = `<p class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md">Error: ${err.message}</p>`;
             }
@@ -1682,4 +1695,3 @@
     </script>
 </body>
 </html>
-
