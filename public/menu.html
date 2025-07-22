@@ -8,10 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-     integrity="sha256-p4NxAoJBhIIN+hmNHrzxH+iPxlL85dbTEQeUM3GSbPM="
-     crossorigin=""/>
     <style>
         /* Custom scrollbar for better aesthetics */
         ::-webkit-scrollbar {
@@ -55,13 +51,6 @@
         }
         .discount-badge svg {
             margin-right: 0.25rem;
-        }
-        /* Leaflet map container styling for modal */
-        #delivery-map-modal {
-            height: 300px; /* Adjust height as needed */
-            width: 100%;
-            border-radius: 0.5rem; /* rounded-md */
-            margin-bottom: 1rem; /* mb-4 */
         }
     </style>
 </head>
@@ -126,10 +115,6 @@
         </div>
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjJEQyIfEERF1GtLPXySngKCRagHfaIfsCECDiPFC2FuNjGfNFQ="
-     crossorigin=""></script>
     <script>
         // --- Global State ---
         const appState = {
@@ -183,10 +168,6 @@
         const modalCloseButton = document.getElementById('modal-close-button');
         const modalCloseFooterButton = document.getElementById('modal-close-footer-button');
 
-        // Leaflet Map Variables (now local to the modal function)
-        let mapInstance = null;
-        let markerInstance = null;
-
         // --- Utility Functions ---
         function showLoading(section) {
             if (section === 'menu') {
@@ -233,12 +214,6 @@
             }
             appState.modal.onClose = null;
             modalBody.innerHTML = ''; // Clear content
-            // Destroy map instance if it exists and is managed by this modal
-            if (mapInstance) {
-                mapInstance.remove();
-                mapInstance = null;
-                markerInstance = null;
-            }
         }
 
         modalCloseButton.addEventListener('click', hideModal);
@@ -496,7 +471,7 @@
             cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
         }
 
-        // --- Location Selection Modal ---
+        // --- Location Selection Modal (No Map) ---
         function showLocationSelectionModal() {
             const locationModalHtml = `
                 <div id="location-modal-message" class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-md mb-4 flex items-center">
@@ -504,59 +479,34 @@
                     <span id="location-message-text">Attempting to get your live GPS location...</span>
                 </div>
 
-                <div id="delivery-map-modal" class="rounded-md mb-4"></div>
-
                 <p id="selected-address-modal" class="text-lg font-semibold text-gray-800 mb-4 text-center">Selected Location: Loading...</p>
 
                 <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 justify-center">
-                    <button id="use-live-location-button"
+                    <button id="get-live-location-button"
                         class="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
-                        Use Live Location
-                    </button>
-                    <button id="pin-location-button"
-                        class="flex-1 sm:flex-none bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hand-grab mr-2"><path d="M18 11.5V9.14a2 2 0 0 0-2-2.06l-3.7-.5a2 2 0 0 1-1.87-2.12c.26-1.05.77-2.06 1.54-2.86A4 4 0 0 0 9 2.05L6.5 3.5 2 6.5l4.32 5.02a2 2 0 0 1 .15 2.76l-.73.82a2 2 0 0 0-.02 2.92l3.52 3.52a3 3 0 0 0 4.25 0l4.32-4.32a2 2 0 0 0 .02-2.92Z"/><path d="m18 11.5 1.52-1.52a2.12 2.12 0 0 1 3 3L18 17.5"/></svg>
-                        Pin Location on Map
+                        Get Live Location
                     </button>
                 </div>
 
                 <button id="confirm-location-button"
-                    class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center">
+                    class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center disabled:opacity-50" disabled>
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle mr-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
                     Confirm Location & Continue
                 </button>
             `;
-            showModal('Select Delivery Location', locationModalHtml, () => {
-                // This callback runs when the location modal is closed
-                // Ensure map instance is destroyed
-                if (mapInstance) {
-                    mapInstance.remove();
-                    mapInstance = null;
-                    markerInstance = null;
-                }
-            });
+            showModal('Select Delivery Location', locationModalHtml);
 
-            // Initialize map after the modal is shown
-            initializeMapInModal();
+            // Attempt to get live location immediately when modal opens
+            getLiveLocationModal();
 
-            // Event listeners for buttons within the location modal
-            document.getElementById('use-live-location-button').addEventListener('click', () => getLiveLocationModal(true));
-            document.getElementById('pin-location-button').addEventListener('click', () => {
-                if (markerInstance) {
-                    markerInstance.dragging.enable();
-                    const msgDiv = document.getElementById('location-modal-message');
-                    const msgText = document.getElementById('location-message-text');
-                    msgText.textContent = 'Drag the map pin to your exact delivery location.';
-                    msgDiv.classList.remove('bg-red-100', 'border-red-400', 'text-red-700');
-                    msgDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                }
-            });
+            // Event listener for the "Get Live Location" button
+            document.getElementById('get-live-location-button').addEventListener('click', getLiveLocationModal);
             document.getElementById('confirm-location-button').addEventListener('click', () => {
                 if (appState.customerLocation.latitude === null || appState.customerLocation.longitude === null) {
                     const msgDiv = document.getElementById('location-modal-message');
                     const msgText = document.getElementById('location-message-text');
-                    msgText.textContent = 'Please select a location on the map first.';
+                    msgText.textContent = 'Please get your location coordinates first.';
                     msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
                     msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
                     return;
@@ -566,69 +516,25 @@
             });
         }
 
-        function initializeMapInModal() {
-            const mapElement = document.getElementById('delivery-map-modal');
-            if (!mapElement) return;
-
-            // Default location (shop location or a general city)
-            const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
-            const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
-            const defaultZoom = 13;
-
-            // Initialize map after a small delay to ensure modal is fully rendered
-            setTimeout(() => {
-                if (mapInstance) { // Ensure no duplicate map instance
-                    mapInstance.remove();
-                }
-                mapInstance = L.map('delivery-map-modal').setView([defaultLat, defaultLng], defaultZoom);
-                // Satellite view tile layer
-                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                }).addTo(mapInstance);
-
-                markerInstance = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(mapInstance);
-
-                // Update appState with initial marker position
-                updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
-
-                // Try to get user's current GPS location immediately
-                getLiveLocationModal(false); // Do not re-enable buttons here initially
-
-                // Event listener for marker drag end
-                markerInstance.on('dragend', (event) => {
-                    const latlng = markerInstance.getLatLng();
-                    updateSelectedLocation(latlng.lat, latlng.lng, `Pinned Location (Lat: ${latlng.lat.toFixed(4)}, Lng: ${latlng.lng.toFixed(4)})`);
-                });
-
-                // Invalidate size to ensure map renders correctly in modal
-                mapInstance.invalidateSize();
-            }, 250); // Increased delay to ensure modal is fully visible
-        }
-
         function updateSelectedLocation(lat, lng, address) {
             appState.customerLocation.latitude = lat;
             appState.customerLocation.longitude = lng;
             appState.customerLocation.address = address;
             document.getElementById('selected-address-modal').textContent = `Selected Location: ${address}`;
+            document.getElementById('confirm-location-button').disabled = false; // Enable confirm button once location is set
         }
 
-        function getLiveLocationModal(re_enable_buttons = true) {
+        function getLiveLocationModal() {
             const msgDiv = document.getElementById('location-modal-message');
             const msgText = document.getElementById('location-message-text');
+            const confirmButton = document.getElementById('confirm-location-button');
+            const getLiveButton = document.getElementById('get-live-location-button');
+
             msgDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
             msgDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
             msgText.textContent = 'Attempting to get your live GPS location...';
-
-            const useLiveButton = document.getElementById('use-live-location-button');
-            const pinButton = document.getElementById('pin-location-button');
-            const confirmButton = document.getElementById('confirm-location-button');
-
-            if (re_enable_buttons) { // Only disable if explicitly triggered by button
-                useLiveButton.disabled = true;
-                pinButton.disabled = true;
-                confirmButton.disabled = true;
-            }
-
+            confirmButton.disabled = true;
+            getLiveButton.disabled = true;
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -637,32 +543,25 @@
                         const userLng = position.coords.longitude;
                         const userAccuracy = position.coords.accuracy; // in meters
 
-                        mapInstance.setView([userLat, userLng], Math.max(mapInstance.getZoom(), 16)); // Zoom in closer for live location
-                        markerInstance.setLatLng([userLat, userLng]);
-                        updateSelectedLocation(userLat, userLng, `GPS Location (Accuracy: ${userAccuracy.toFixed(0)}m)`);
+                        updateSelectedLocation(userLat, userLng, `GPS Location (Accuracy: ${userAccuracy.toFixed(0)}m, Lat: ${userLat.toFixed(4)}, Lng: ${userLng.toFixed(4)})`);
 
                         msgDiv.classList.add('hidden');
-                        if (re_enable_buttons) {
-                            useLiveButton.disabled = false;
-                            pinButton.disabled = false;
-                            confirmButton.disabled = false;
-                        }
+                        confirmButton.disabled = false;
+                        getLiveButton.disabled = false;
                     },
                     (error) => {
                         console.warn('Error getting GPS location:', error.message);
-                        msgText.textContent = 'Could not get your GPS location. Please drag the map pin to set your delivery address.';
+                        msgText.textContent = 'Could not get your GPS location. Please ensure location services are enabled and permissions granted.';
                         msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
                         msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
 
-                        // Fallback to current marker position (which defaults to shop)
-                        const currentLatlng = markerInstance.getLatLng();
-                        updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Default Shop Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lat.toFixed(4)})`); // Fixed typo: use currentLatlng.lng
+                        // Fallback to default shop location if GPS fails
+                        const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
+                        const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
+                        updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
                         
-                        if (re_enable_buttons) {
-                            useLiveButton.disabled = false;
-                            pinButton.disabled = false;
-                            confirmButton.disabled = false;
-                        }
+                        confirmButton.disabled = false; // Allow user to confirm fallback location
+                        getLiveButton.disabled = false;
                     },
                     {
                         enableHighAccuracy: true, // Request high accuracy GPS
@@ -671,19 +570,17 @@
                     }
                 );
             } else {
-                msgText.textContent = 'Geolocation is not supported by your browser. Please drag the map pin to set your delivery address.';
+                msgText.textContent = 'Geolocation is not supported by your browser. Cannot get live location.';
                 msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
                 msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
 
-                // Fallback to current marker position (which defaults to shop)
-                const currentLatlng = markerInstance.getLatLng();
-                updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Default Shop Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
-                
-                if (re_enable_buttons) {
-                    useLiveButton.disabled = false;
-                    pinButton.disabled = false;
-                    confirmButton.disabled = false;
-                }
+                // Fallback to default shop location if geolocation is not supported
+                const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
+                const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
+                updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+
+                confirmButton.disabled = false; // Allow user to confirm fallback location
+                getLiveButton.disabled = false;
             }
         }
 
