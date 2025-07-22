@@ -134,7 +134,7 @@
         // --- Global State ---
         const appState = {
             menuItems: [],
-            cart: [], // { _id: item._id, name: item.name, originalPrice: item.price, displayedOriginalPrice: calculated, discountedPrice: calculated, quantity: 1 }
+            cart: [], // { _id: item._id, name: item.name, originalPrice: item.price, displayedOriginalPrice: calculated, discountedPrice: calculated, quantity: 1, discountPercentage: calculated }
             shopSettings: null,
             customerLocation: {
                 latitude: null,
@@ -162,7 +162,8 @@
         const API_BASE_URL = ''; // Relative path, assumes same origin for backend
         // Default placeholder image if item.imageUrl is missing or broken
         const PLACEHOLDER_IMAGE = 'https://placehold.co/400x300/FEE2E2/EF4444?text=No+Image';
-        const DISCOUNT_PERCENTAGE = 0.30; // 30% discount
+        const MIN_DISCOUNT_PERCENTAGE = 0.10; // 10%
+        const MAX_DISCOUNT_PERCENTAGE = 0.50; // 50%
 
         // --- DOM Elements ---
         const shopTitle = document.getElementById('shop-title');
@@ -277,7 +278,20 @@
                     throw new Error('Failed to fetch menu items.');
                 }
                 const data = await response.json();
-                appState.menuItems = data;
+                // Process each item to add discount details
+                appState.menuItems = data.map(item => {
+                    const randomDiscount = Math.random() * (MAX_DISCOUNT_PERCENTAGE - MIN_DISCOUNT_PERCENTAGE) + MIN_DISCOUNT_PERCENTAGE;
+                    const actualPrice = item.price; // Price from dashboard
+                    const discountedPrice = actualPrice; // This is what the customer pays
+                    const displayedOriginalPrice = actualPrice / (1 - randomDiscount); // Inflated price for display
+
+                    return {
+                        ...item,
+                        discountPercentage: randomDiscount,
+                        displayedOriginalPrice: displayedOriginalPrice,
+                        discountedPrice: discountedPrice
+                    };
+                });
                 renderMenuItems();
             } catch (err) {
                 console.error('Error fetching menu items:', err);
@@ -295,10 +309,6 @@
             } else {
                 noMenuItemsMessage.classList.add('hidden');
                 appState.menuItems.forEach(item => {
-                    const actualPrice = item.price; // This is the price from the dashboard
-                    const discountedPrice = actualPrice; // The actual price is what the customer pays after "discount"
-                    const displayedOriginalPrice = actualPrice / (1 - DISCOUNT_PERCENTAGE); // Inflated price for display
-
                     const itemCard = document.createElement('div');
                     itemCard.className = 'bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 flex flex-col';
                     itemCard.innerHTML = `
@@ -312,11 +322,11 @@
                             <p class="text-gray-600 text-sm mb-3 flex-1">${item.description || 'No description available.'}</p>
                             <div class="flex justify-between items-center mt-auto pt-2 border-t border-gray-100">
                                 <div class="flex flex-col items-start">
-                                    <span class="text-gray-500 line-through text-sm">₹${displayedOriginalPrice.toFixed(2)}</span>
-                                    <span class="text-red-600 font-bold text-lg">₹${discountedPrice.toFixed(2)}</span>
+                                    <span class="text-gray-500 line-through text-sm">₹${item.displayedOriginalPrice.toFixed(2)}</span>
+                                    <span class="text-red-600 font-bold text-lg">₹${item.discountedPrice.toFixed(2)}</span>
                                     <span class="discount-badge">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-tag"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414L19 21l3-3Z"/><path d="M7 7h.01"/></svg>
-                                        30% OFF
+                                        ${(item.discountPercentage * 100).toFixed(0)}% OFF
                                     </span>
                                 </div>
                                 <button data-id="${item._id}" class="add-to-cart-button bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
@@ -354,6 +364,7 @@
                                 <p class="text-sm text-gray-600">
                                     <span class="line-through">₹${item.displayedOriginalPrice.toFixed(2)}</span>
                                     <span class="text-red-600 ml-1">₹${item.discountedPrice.toFixed(2)}</span> each
+                                    <span class="discount-badge">${(item.discountPercentage * 100).toFixed(0)}% OFF</span>
                                 </p>
                             </div>
                             <div class="flex items-center space-x-2">
@@ -459,19 +470,18 @@
             if (!menuItem) return;
 
             const existingItemIndex = appState.cart.findIndex(item => item._id === itemId);
-            const actualPrice = menuItem.price; // This is the price from the dashboard
-            const discountedPrice = actualPrice; // The actual price is what the customer pays after "discount"
-            const displayedOriginalPrice = actualPrice / (1 - DISCOUNT_PERCENTAGE); // Inflated for display
-
+            
             if (existingItemIndex > -1) {
                 appState.cart[existingItemIndex].quantity += 1;
             } else {
+                // Add all pre-calculated price/discount details to cart item
                 appState.cart.push({
                     _id: menuItem._id,
                     name: menuItem.name,
-                    originalPrice: actualPrice,
-                    displayedOriginalPrice: displayedOriginalPrice,
-                    discountedPrice: discountedPrice,
+                    originalPrice: menuItem.originalPrice,
+                    displayedOriginalPrice: menuItem.displayedOriginalPrice,
+                    discountedPrice: menuItem.discountedPrice,
+                    discountPercentage: menuItem.discountPercentage,
                     quantity: 1,
                 });
             }
@@ -496,13 +506,15 @@
             cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
         }
 
-        // --- Location Selection Modal (No Map) ---
+        // --- Location Selection Modal (with Map) ---
         function showLocationSelectionModal() {
             const locationModalHtml = `
                 <div id="location-modal-message" class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-md mb-4 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-2 animate-spin mr-2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
                     <span id="location-message-text">Attempting to get your live GPS location...</span>
                 </div>
+
+                <div id="delivery-map-modal" class="rounded-md mb-4"></div>
 
                 <p id="selected-address-modal" class="text-lg font-semibold text-gray-800 mb-4 text-center">Selected Location: Loading...</p>
 
@@ -512,6 +524,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
                         Get Live Location
                     </button>
+                    <!-- "Pin Location on Map" is now implicit by dragging the marker -->
                 </div>
 
                 <button id="confirm-location-button"
@@ -520,18 +533,27 @@
                     Confirm Location & Continue
                 </button>
             `;
-            showModal('Select Delivery Location', locationModalHtml);
+            showModal('Select Delivery Location', locationModalHtml, () => {
+                // This callback runs when the location modal is closed
+                // Ensure map instance is destroyed
+                if (mapInstance) {
+                    mapInstance.remove();
+                    mapInstance = null;
+                    markerInstance = null;
+                }
+            });
 
-            // Attempt to get live location immediately when modal opens
-            getLiveLocationModal();
+            // Initialize map after the modal is shown
+            initializeMapInModal();
 
             // Event listener for the "Get Live Location" button
-            document.getElementById('get-live-location-button').addEventListener('click', getLiveLocationModal);
+            document.getElementById('get-live-location-button').addEventListener('click', () => getLiveLocationModal(true));
+            
             document.getElementById('confirm-location-button').addEventListener('click', () => {
-                if (appState.customerLocation.latitude === null || appState.customerLocation.longitude === null) {
+                if (appState.customerLocation.latitude === null || appState.customerLocation.longitude === null || appState.customerLocation.address === 'Location not set.') {
                     const msgDiv = document.getElementById('location-modal-message');
                     const msgText = document.getElementById('location-message-text');
-                    msgText.textContent = 'Please get your location coordinates first.';
+                    msgText.textContent = 'Please select a location on the map or get your live location.';
                     msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
                     msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
                     return;
@@ -541,15 +563,75 @@
             });
         }
 
+        function initializeMapInModal() {
+            const mapElement = document.getElementById('delivery-map-modal');
+            if (!mapElement) return;
+
+            // Default location (shop location or a general city)
+            const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399; // Hyderabad coordinates
+            const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
+            const defaultZoom = 13;
+
+            // Initialize map after a small delay to ensure modal is fully rendered
+            setTimeout(() => {
+                if (mapInstance) { // Ensure no duplicate map instance
+                    mapInstance.remove();
+                }
+                mapInstance = L.map('delivery-map-modal').setView([defaultLat, defaultLng], defaultZoom);
+                // OpenStreetMap standard tiles
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(mapInstance);
+
+                markerInstance = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(mapInstance);
+
+                // Update appState with initial marker position and get address
+                updateSelectedLocation(defaultLat, defaultLng, 'Default Shop Location'); // Initial placeholder
+                reverseGeocode(defaultLat, defaultLng).then(address => {
+                    updateSelectedLocation(defaultLat, defaultLng, address || `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+                    document.getElementById('confirm-location-button').disabled = false;
+                }).catch(() => {
+                    updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+                    document.getElementById('confirm-location-button').disabled = false;
+                });
+                
+                // Try to get user's current GPS location immediately
+                getLiveLocationModal(false); // Do not re-enable buttons here initially
+
+                // Event listener for marker drag end
+                markerInstance.on('dragend', async (event) => {
+                    const latlng = markerInstance.getLatLng();
+                    document.getElementById('location-modal-message').classList.remove('hidden');
+                    document.getElementById('location-modal-message').classList.remove('bg-red-100', 'border-red-400', 'text-red-700');
+                    document.getElementById('location-modal-message').classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                    document.getElementById('location-message-text').textContent = 'Getting address for pinned location...';
+                    document.getElementById('confirm-location-button').disabled = true;
+
+                    let address = `Pinned Location (Lat: ${latlng.lat.toFixed(4)}, Lng: ${latlng.lng.toFixed(4)})`;
+                    try {
+                        const geocodedAddress = await reverseGeocode(latlng.lat, latlng.lng);
+                        address = geocodedAddress || address;
+                    } catch (geoError) {
+                        console.error('Reverse geocoding failed on drag:', geoError);
+                    }
+                    updateSelectedLocation(latlng.lat, latlng.lng, address);
+                    document.getElementById('location-modal-message').classList.add('hidden');
+                    document.getElementById('confirm-location-button').disabled = false;
+                });
+
+                // Invalidate size to ensure map renders correctly in modal
+                mapInstance.invalidateSize();
+            }, 250); // Increased delay to ensure modal is fully visible
+        }
+
         function updateSelectedLocation(lat, lng, address) {
             appState.customerLocation.latitude = lat;
             appState.customerLocation.longitude = lng;
             appState.customerLocation.address = address;
             document.getElementById('selected-address-modal').textContent = `Selected Location: ${address}`;
-            document.getElementById('confirm-location-button').disabled = false; // Enable confirm button once location is set
         }
 
-        async function getLiveLocationModal() {
+        async function getLiveLocationModal(re_enable_buttons = true) {
             const msgDiv = document.getElementById('location-modal-message');
             const msgText = document.getElementById('location-message-text');
             const confirmButton = document.getElementById('confirm-location-button');
@@ -559,7 +641,9 @@
             msgDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
             msgText.textContent = 'Attempting to get your live GPS location...';
             confirmButton.disabled = true;
-            getLiveButton.disabled = true;
+            if (re_enable_buttons) {
+                getLiveButton.disabled = true;
+            }
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -567,6 +651,9 @@
                         const userLat = position.coords.latitude;
                         const userLng = position.coords.longitude;
                         const userAccuracy = position.coords.accuracy; // in meters
+
+                        mapInstance.setView([userLat, userLng], Math.max(mapInstance.getZoom(), 16)); // Zoom in closer for live location
+                        markerInstance.setLatLng([userLat, userLng]);
 
                         msgText.textContent = 'Getting address for your location...'; // New message for geocoding
                         let address = `GPS Location (Accuracy: ${userAccuracy.toFixed(0)}m, Lat: ${userLat.toFixed(4)}, Lng: ${userLng.toFixed(4)})`;
@@ -582,21 +669,24 @@
                         updateSelectedLocation(userLat, userLng, address);
                         msgDiv.classList.add('hidden');
                         confirmButton.disabled = false;
-                        getLiveButton.disabled = false;
+                        if (re_enable_buttons) {
+                            getLiveButton.disabled = false;
+                        }
                     },
                     (error) => {
                         console.warn('Error getting GPS location:', error.message);
-                        msgText.textContent = 'Could not get your GPS location. Please ensure location services are enabled and permissions granted.';
+                        msgText.textContent = 'Could not get your GPS location. Please ensure location services are enabled and permissions granted, or drag the pin on the map.';
                         msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
                         msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
 
-                        // Fallback to default shop location if GPS fails
-                        const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
-                        const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
-                        updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+                        // Fallback to current marker position (which defaults to shop or last pinned)
+                        const currentLatlng = markerInstance.getLatLng();
+                        updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
                         
                         confirmButton.disabled = false; // Allow user to confirm fallback location
-                        getLiveButton.disabled = false;
+                        if (re_enable_buttons) {
+                            getLiveButton.disabled = false;
+                        }
                     },
                     {
                         enableHighAccuracy: true, // Request high accuracy GPS
@@ -605,17 +695,18 @@
                     }
                 );
             } else {
-                msgText.textContent = 'Geolocation is not supported by your browser. Cannot get live location.';
+                msgText.textContent = 'Geolocation is not supported by your browser. Please drag the pin on the map to set your delivery address.';
                 msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
                 msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
 
-                // Fallback to default shop location if geolocation is not supported
-                const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
-                const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
-                updateSelectedLocation(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
-
+                // Fallback to current marker position (which defaults to shop)
+                const currentLatlng = markerInstance.getLatLng();
+                updateSelectedLocation(currentLatlng.lat, currentLatlng.lng, `Location (Lat: ${currentLatlng.lat.toFixed(4)}, Lng: ${currentLatlng.lng.toFixed(4)})`);
+                
                 confirmButton.disabled = false; // Allow user to confirm fallback location
-                getLiveButton.disabled = false;
+                if (re_enable_buttons) {
+                    getLiveButton.disabled = false;
+                }
             }
         }
 
@@ -626,7 +717,8 @@
                 const response = await fetch(nominatimUrl, {
                     headers: {
                         // Provide a User-Agent to comply with Nominatim's usage policy
-                        'User-Agent': 'WhatsAppBotAdminDashboard/1.0 (your_email@example.com)' // Replace with your actual email
+                        // IMPORTANT: Replace 'your_email@example.com' with your actual email address
+                        'User-Agent': 'WhatsAppBotAdminDashboard/1.0 (your_email@example.com)' 
                     }
                 });
                 if (!response.ok) {
@@ -807,28 +899,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             fetchShopSettings();
             fetchMenuItems();
-
-            // Check if we need to open the final checkout modal directly (e.g., if user navigated back from location page)
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('openCheckoutModal') === 'true') {
-                // Ensure cart and location are restored from session storage if they exist
-                const storedCart = sessionStorage.getItem('currentCart');
-                if (storedCart) {
-                    appState.cart = JSON.parse(storedCart);
-                    cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
-                }
-                const storedLocation = sessionStorage.getItem('selectedCustomerLocation');
-                if (storedLocation) {
-                    appState.customerLocation = JSON.parse(storedLocation);
-                }
-
-                showFinalCheckoutModal();
-                // Clean up URL to prevent re-opening on refresh
-                const newUrl = new URL(window.location.href);
-                newUrl.searchParams.delete('openCheckoutModal');
-                window.history.replaceState({}, document.title, newUrl.toString());
-            }
-
 
             // Event delegation for Add to Cart buttons
             menuItemsContainer.addEventListener('click', (e) => {
