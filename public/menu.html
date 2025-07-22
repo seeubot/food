@@ -59,7 +59,7 @@
             width: 100%;
             border-radius: 0.5rem; /* rounded-md */
             margin-bottom: 1rem; /* mb-4 */
-            position: relative; /* Needed for absolute positioning of controls */
+            /* Removed position: relative as floating-ui is now outside */
         }
 
         /* Custom Map Marker - animated pulse effect */
@@ -85,18 +85,17 @@
             100% { box-shadow: 0 0 0 0 rgba(241, 85, 85, 0);}
         }
 
-        /* Floating UI for map controls - BOTTOM RIGHT */
+        /* Floating UI for map controls - NOW BELOW THE MAP */
         .floating-ui {
-            position: absolute;
-            z-index: 1000;
-            bottom: 12px; /* Position at bottom */
-            right: 12px; /* Position at right */
+            /* Removed position, z-index, bottom, right */
             display: flex;
             gap: 8px;
-            background: rgba(255,255,255,0.95);
-            border-radius: 16px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-            padding: 8px 14px;
+            background: none; /* No background needed, it's not floating */
+            border-radius: 0;
+            box-shadow: none;
+            padding: 0;
+            margin-top: 1rem; /* Space below the map */
+            justify-content: center; /* Center buttons */
         }
         .floating-ui button {
             background: #ef4444; /* red-500 */
@@ -118,43 +117,17 @@
             color: #dc2626; /* red-600 */
         }
 
-        /* Address Display - BOTTOM LEFT */
-        .address-display {
-            position: absolute;
-            bottom: 12px; /* Position at bottom */
-            left: 12px; /* Position at left */
-            padding: 10px 16px;
-            border-radius: 14px;
-            min-width: 200px;
-            background: rgba(255,255,255,0.98);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.10);
-            font-size: 0.9rem;
-            color: #222;
-            z-index: 1000;
-            text-align: left; /* Aligned left */
-            max-width: calc(100% - 130px); /* Adjust max-width to not overlap buttons */
-            word-break: break-word;
-            font-weight: 500;
-        }
+        /* Removed .address-display as it's no longer needed */
 
         @media (max-width: 600px) {
             .floating-ui {
-                flex-direction: column;
-                bottom: 7px;
-                right: 7px;
-                padding: 6px 10px;
+                flex-direction: row; /* Keep row for mobile, but adjust spacing */
+                padding: 0;
                 gap: 6px;
             }
             .floating-ui button {
                 padding: 5px 12px;
                 font-size: 0.85rem;
-            }
-            .address-display {
-                font-size: 0.8rem;
-                padding: 6px 6px;
-                bottom: 7px;
-                left: 7px;
-                max-width: calc(100% - 100px); /* Adjust for smaller screens */
             }
         }
     </style>
@@ -606,15 +579,14 @@
                     <span id="location-message-text">Initializing map...</span>
                 </div>
 
-                <div id="delivery-map-modal" class="rounded-md mb-4 relative">
-                    <div class="floating-ui">
-                        <button id="liveBtn" class="active">Live Location</button>
-                        <button id="pinBtn">Pin Location</button>
-                    </div>
-                    <div id="address" class="address-display">Loading location…</div>
+                <div id="delivery-map-modal" class="rounded-md mb-4"></div>
+
+                <div class="floating-ui">
+                    <button id="liveBtn" class="active">Live Location</button>
+                    <button id="pinBtn">Pin Location</button>
                 </div>
 
-                <p id="selected-address-modal" class="text-lg font-semibold text-gray-800 mb-4 text-center">Selected Location: Loading...</p>
+                <p id="selected-address-modal" class="text-lg font-semibold text-gray-800 mb-4 text-center mt-4">Selected Location: Loading...</p>
 
                 <button id="confirm-location-button"
                     class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center disabled:opacity-50" disabled>
@@ -656,9 +628,17 @@
 
         // --- Custom Marker Icons for Leaflet ---
         function getLiveIcon() {
+            // New SVG icon based on user's image (map pin with signal waves)
             return L.divIcon({
                 className: 'custom-marker',
-                html: "<i class='fas fa-crosshairs'></i>",
+                html: `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s-8-4-8-10c0-4.42 3.58-8 8-8s8 3.58 8 8c0 6-8 10-8 10z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                        <path d="M4.93 10.93a10.06 10.06 0 0 1 0-13.86"/>
+                        <path d="M2.05 7.05a14.5 14.5 0 0 1 0-20.1"/>
+                    </svg>
+                `,
                 iconSize: [32, 32],
                 iconAnchor: [16, 32] // Anchor at the bottom-center
             });
@@ -677,12 +657,14 @@
             const mapElement = document.getElementById('delivery-map-modal');
             if (!mapElement) return;
 
-            const addressDisplay = document.getElementById('address');
+            // Removed addressDisplay
             const liveBtn = document.getElementById('liveBtn');
             const pinBtn = document.getElementById('pinBtn');
             const confirmButton = document.getElementById('confirm-location-button');
             const locationMessageDiv = document.getElementById('location-modal-message');
             const locationMessageText = document.getElementById('location-message-text');
+            const selectedAddressModal = document.getElementById('selected-address-modal');
+
 
             // Default location (shop location or a general city like Hyderabad, India)
             const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
@@ -691,9 +673,10 @@
 
             // Update address display with current coordinates and address
             function updateAddressDisplay(lat, lon, address) {
-                addressDisplay.innerHTML = `<div><b>Lat:</b> ${lat.toFixed(6)}<br><b>Lng:</b> ${lon.toFixed(6)}</div>
-                <div style="margin-top:7px;color:#555;"><span style="font-size:0.97em;">🔎 </span>${address}</div>`;
-                updateSelectedLocation(lat, lon, address); // Update appState and selected-address-modal
+                appState.customerLocation.latitude = lat;
+                appState.customerLocation.longitude = lon;
+                appState.customerLocation.address = address;
+                selectedAddressModal.textContent = `Selected Location: ${address}`;
                 confirmButton.disabled = false; // Enable confirm button once a location is set
             }
 
@@ -755,9 +738,9 @@
                 confirmButton.disabled = true;
 
                 watchId = navigator.geolocation.watchPosition(centerToLiveLocation, onGeoError, {
-                    enableHighAccuracy: true,
+                    enableHighAccuracy: true, // Request high accuracy
                     timeout: 10000,
-                    maximumAge: 0
+                    maximumAge: 0 // No cached position, get fresh one
                 });
                 mapInstance.off('click'); // Disable click for pinning in live mode
             }
@@ -995,7 +978,7 @@
                 placeOrderButton.textContent = 'Place Order';
                 placeOrderButton.disabled = false;
                 return;
-            }
+                }
 
             const orderPayload = {
                 items: appState.cart.map(item => ({
