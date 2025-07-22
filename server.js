@@ -1,4 +1,4 @@
-const express = require('express');
+Const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
@@ -343,8 +343,11 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         console.log(`[WhatsApp] Message received from ${msg.from}: ${msg.body}`);
         io.emit('whatsapp_log', `Message from ${msg.from}: ${msg.body}`);
 
+        // Define text here at the very beginning of the message handler
+        const text = msg.body ? msg.body.toLowerCase().trim() : '';
+
         // Extract and strictly validate customerPhone
-        let customerPhone = ''; // Initialize to empty string
+        let customerPhone = '';
         const rawChatId = msg.from;
 
         if (typeof rawChatId === 'string' && rawChatId.length > 0) {
@@ -359,14 +362,34 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
             return; // Exit if customerPhone is invalid
         }
 
-        const customerName = msg._data.notifyName;
+        const customerName = msg._data.notifyName; // This can be null/undefined
 
-        try { // Added try-catch for the entire message processing logic
+        try {
+            // Find or create customer first
+            let customer = await Customer.findOne({ customerPhone: customerPhone });
+            if (!customer) {
+                console.log(`[WhatsApp] Creating new customer with validated phone: ${customerPhone}`);
+                io.emit('whatsapp_log', `Creating new customer: ${customerPhone}`);
+                customer = new Customer({ customerPhone: customerPhone, customerName: customerName || 'Unknown' }); // Provide a default name
+                await customer.save();
+                console.log(`[WhatsApp] Successfully created new customer: ${customerPhone}`);
+            } else {
+                // Only update customerName if it's different and not null/empty
+                if (customerName && customer.customerName !== customerName) {
+                    console.log(`[WhatsApp] Updating customer name for ${customerPhone}`);
+                    io.emit('whatsapp_log', `Updating customer name for ${customerPhone}`);
+                    customer.customerName = customerName;
+                    await customer.save();
+                    console.log(`[WhatsApp] Successfully updated customer name for ${customerPhone}`);
+                }
+            }
+
+            // Now process the message body (text)
             if (msg.hasMedia && msg.type === 'location' && msg.location) {
                 console.log(`[WhatsApp] Received location from ${customerPhone}`);
                 io.emit('whatsapp_log', `Received location from ${customerPhone}`);
                 await Customer.findOneAndUpdate(
-                    { customerPhone: customerPhone }, // Use the validated customerPhone
+                    { customerPhone: customerPhone },
                     {
                         $set: {
                             lastKnownLocation: {
@@ -383,31 +406,11 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 return;
             }
 
-            // Log the customerPhone right before the database operation
-            console.log(`[WhatsApp Message Handler] Attempting DB operation for customerPhone: '${customerPhone}' (original msg.from: '${rawChatId}')`);
-
-            let customer = await Customer.findOne({ customerPhone: customerPhone });
-            if (!customer) {
-                console.log(`[WhatsApp] Creating new customer with validated phone: ${customerPhone}`);
-                io.emit('whatsapp_log', `Creating new customer: ${customerPhone}`);
-                customer = new Customer({ customerPhone: customerPhone, customerName: customerName });
-                await customer.save(); // This is where the error occurs
-                console.log(`[WhatsApp] Successfully created new customer: ${customerPhone}`); // Log success
-            } else {
-                if (customer.customerName !== customerName) {
-                    console.log(`[WhatsApp] Updating customer name for ${customerPhone}`);
-                    io.emit('whatsapp_log', `Updating customer name for ${customerPhone}`);
-                    customer.customerName = customerName;
-                    await customer.save();
-                    console.log(`[WhatsApp] Successfully updated customer name for ${customerPhone}`); // Log success
-                }
-            }
-
             switch (text) {
                 case 'hi':
                 case 'hello':
                 case 'namaste':
-                case 'menu':
+                case 'menu': // Added 'menu' as a keyword for the welcome message as per the prompt
                     console.log(`[WhatsApp] Sending welcome message to ${customerPhone}`);
                     io.emit('whatsapp_log', `Sending welcome message to ${customerPhone}`);
                     await sendWelcomeMessage(rawChatId, customerName);
