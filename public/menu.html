@@ -8,10 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-     integrity="sha256-p4NxAoJBhIIN+hmNHrzxH+iPxlL85dbTEQeUM3GSbPM="
-     crossorigin=""/>
+
+    <!-- Mapbox GL JS CSS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <!-- Font Awesome for custom markers -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
@@ -58,7 +57,7 @@
         .discount-badge svg {
             margin-right: 0.25rem;
         }
-        /* Leaflet map container styling for modal */
+        /* Mapbox map container styling for modal */
         #delivery-map-modal {
             height: 300px; /* Adjust height as needed */
             width: 100%;
@@ -214,10 +213,8 @@
         </div>
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjJEQyIfEERF1GtLPXySngKCRagHfaIfsCECDiPFC2FuNjGfNFQ="
-     crossorigin=""></script>
+    <!-- Mapbox GL JS -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script>
         // --- Global State ---
         const appState = {
@@ -253,6 +250,10 @@
         const MIN_DISCOUNT_PERCENTAGE = 0.10; // 10%
         const MAX_DISCOUNT_PERCENTAGE = 0.50; // 50%
 
+        // IMPORTANT: Replace 'YOUR_MAPBOX_ACCESS_TOKEN' with your actual Mapbox Public Access Token
+        // You can get one from https://account.mapbox.com/access-tokens/
+        mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+
         // --- DOM Elements ---
         const shopTitle = document.getElementById('shop-title');
         const headerShopName = document.getElementById('header-shop-name');
@@ -272,7 +273,7 @@
         const modalCloseButton = document.getElementById('modal-close-button');
         const modalCloseFooterButton = document.getElementById('modal-close-footer-button');
 
-        // Leaflet Map Variables (now local to the modal function)
+        // Mapbox Map Variables
         let mapInstance = null;
         let liveMarker = null;
         let pinMarker = null;
@@ -659,24 +660,20 @@
             });
         }
 
-        // --- Custom Marker as DivIcon ---
-        function getLiveIcon() {
-            return L.divIcon({
-                className: '', // No default class, custom styles applied
-                html: "<div class='custom-marker'><i class='fas fa-crosshairs'></i></div>",
-                iconSize: [32, 32],
-                iconAnchor: [16, 16],
-                popupAnchor: [0, -16]
-            });
+        // --- Custom Marker HTML Elements ---
+        function createLiveMarkerElement() {
+            const el = document.createElement('div');
+            el.className = 'custom-marker';
+            el.innerHTML = "<i class='fas fa-crosshairs'></i>";
+            return el;
         }
-        function getPinIcon() {
-            return L.divIcon({
-                className: '',
-                html: "<div class='custom-marker' style='background:#f15555;'><i class='fas fa-map-pin'></i></div>",
-                iconSize: [32, 32],
-                iconAnchor: [16, 16],
-                popupAnchor: [0, -16]
-            });
+
+        function createPinMarkerElement() {
+            const el = document.createElement('div');
+            el.className = 'custom-marker';
+            el.style.background = '#f15555'; // Red background for pin
+            el.innerHTML = "<i class='fas fa-map-pin'></i>";
+            return el;
         }
 
         function initializeMapInModal() {
@@ -711,14 +708,17 @@
 
                 if (!mapInstance) return;
 
-                mapInstance.setView([lat, lon], Math.max(mapInstance.getZoom(), 16), { animate: true });
+                mapInstance.setCenter([lon, lat]); // Mapbox uses [longitude, latitude]
+                mapInstance.setZoom(Math.max(mapInstance.getZoom(), 16)); // Zoom in closer for live location
 
                 if (liveMarker) {
-                    liveMarker.setLatLng([lat, lon]);
+                    liveMarker.setLngLat([lon, lat]);
                 } else {
-                    liveMarker = L.marker([lat, lon], {icon: getLiveIcon()}).addTo(mapInstance);
+                    liveMarker = new mapboxgl.Marker({ element: createLiveMarkerElement() })
+                        .setLngLat([lon, lat])
+                        .addTo(mapInstance);
                 }
-                if (pinMarker) { mapInstance.removeLayer(pinMarker); pinMarker = null; }
+                if (pinMarker) { pinMarker.remove(); pinMarker = null; } // Remove pin marker if live mode is active
 
                 locationMessageText.textContent = 'Getting address for your live location...';
                 locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
@@ -777,6 +777,7 @@
                 liveBtn.classList.add('bg-gray-200', 'text-gray-800');
 
                 if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+                if (liveMarker) { liveMarker.remove(); liveMarker = null; } // Remove live marker if pin mode is active
                 
                 locationMessageText.textContent = 'Tap on the map to pin a delivery location.';
                 locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
@@ -784,14 +785,41 @@
                 confirmButton.disabled = true;
 
                 mapInstance.once('click', async function(e){
-                    const lat = e.latlng.lat;
-                    const lon = e.latlng.lng;
+                    const lat = e.lngLat.lat;
+                    const lon = e.lngLat.lng;
 
-                    if (pinMarker) pinMarker.setLatLng([lat, lon]);
-                    else pinMarker = L.marker([lat, lon], {icon: getPinIcon()}).addTo(mapInstance);
-                    if (liveMarker) { mapInstance.removeLayer(liveMarker); liveMarker = null; }
+                    if (pinMarker) {
+                        pinMarker.setLngLat([lon, lat]);
+                    } else {
+                        pinMarker = new mapboxgl.Marker({ element: createPinMarkerElement(), draggable: true })
+                            .setLngLat([lon, lat])
+                            .addTo(mapInstance);
+                        
+                        // Add dragend listener for the pin marker
+                        pinMarker.on('dragend', async (event) => {
+                            const newLngLat = pinMarker.getLngLat();
+                            const newLat = newLngLat.lat;
+                            const newLon = newLngLat.lng;
 
-                    mapInstance.setView([lat, lon], Math.max(mapInstance.getZoom(), 16), { animate: true });
+                            locationMessageText.textContent = 'Getting address for pinned location...';
+                            locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
+                            locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                            confirmButton.disabled = true;
+
+                            try {
+                                let addr = await reverseGeocode(newLat, newLon);
+                                updateAddressDisplay(newLat, newLon, addr || `Pinned Location (Lat: ${newLat.toFixed(4)}, Lng: ${newLon.toFixed(4)})`);
+                            } catch (geoError) {
+                                console.error('Reverse geocoding failed on drag:', geoError);
+                                updateAddressDisplay(newLat, newLon, `Pinned Location (Lat: ${newLat.toFixed(4)}, Lng: ${newLon.toFixed(4)})`);
+                            } finally {
+                                locationMessageDiv.classList.add('hidden');
+                            }
+                        });
+                    }
+
+                    mapInstance.setCenter([lon, lat]);
+                    mapInstance.setZoom(Math.max(mapInstance.getZoom(), 16));
 
                     locationMessageText.textContent = 'Getting address for pinned location...';
                     locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
@@ -814,24 +842,31 @@
                 if (mapInstance) { // Ensure no duplicate map instance
                     mapInstance.remove();
                 }
-                mapInstance = L.map('delivery-map-modal', { zoomControl: true }).setView([defaultLat, defaultLng], defaultZoom);
-                
-                // ESRI World Imagery tile layer for satellite view
-                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-                    maxZoom: 20
-                }).addTo(mapInstance);
-                
+                mapInstance = new mapboxgl.Map({
+                    container: 'delivery-map-modal',
+                    style: 'mapbox://styles/mapbox/satellite-v9', // Satellite style
+                    center: [defaultLng, defaultLat], // Mapbox uses [longitude, latitude]
+                    zoom: defaultZoom,
+                    attributionControl: false // Hide default Mapbox attribution
+                });
+
+                // Add custom attribution to comply with Mapbox policy
+                mapInstance.addControl(new mapboxgl.AttributionControl({
+                    customAttribution: '© Mapbox © OpenStreetMap'
+                }), 'bottom-right');
+
                 // Set initial location to shop default and try to activate live mode
-                updateAddressDisplay(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
-                activateLiveMode(); // Automatically try to get live location
+                mapInstance.on('load', () => {
+                    updateAddressDisplay(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
+                    activateLiveMode(); // Automatically try to get live location
+                });
 
                 // Event listeners for mode buttons
                 liveBtn.onclick = activateLiveMode;
                 pinBtn.onclick = activatePinMode;
 
-                // Invalidate size to ensure map renders correctly in modal
-                mapInstance.invalidateSize();
+                // Handle map resize if modal changes size (though not directly implemented here)
+                // mapInstance.resize(); // Can be called if modal size changes dynamically
             }, 250); // Increased delay to ensure modal is fully visible
         }
 
