@@ -39,7 +39,11 @@ mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
-.then(() => console.log('MongoDB connected'))
+.then(() => {
+    console.log('MongoDB connected');
+    // Seed default menu items after successful connection
+    seedMenuItems();
+})
 .catch(err => console.error('MongoDB connection error:', err));
 
 // Mongoose Schemas
@@ -140,6 +144,69 @@ async function generateUniquePinId() {
         }
     }
     return pin;
+}
+
+// --- New: Function to seed default menu items ---
+async function seedMenuItems() {
+    try {
+        const itemCount = await Item.countDocuments();
+        if (itemCount === 0) {
+            console.log('Seeding default menu items...');
+            const defaultItems = [
+                {
+                    name: 'Classic Burger',
+                    description: 'Juicy patty, fresh lettuce, tomato, and special sauce.',
+                    price: 150.00,
+                    imageUrl: 'https://placehold.co/400x200/FF5733/FFFFFF?text=Classic+Burger',
+                    category: 'Burgers',
+                    isAvailable: true,
+                    isTrending: true
+                },
+                {
+                    name: 'Veggie Pizza',
+                    description: 'Loaded with fresh vegetables and mozzarella cheese.',
+                    price: 250.00,
+                    imageUrl: 'https://placehold.co/400x200/33FF57/FFFFFF?text=Veggie+Pizza',
+                    category: 'Pizzas',
+                    isAvailable: true,
+                    isTrending: false
+                },
+                {
+                    name: 'Chocolate Shake',
+                    description: 'Rich and creamy chocolate milkshake.',
+                    price: 80.00,
+                    imageUrl: 'https://placehold.co/400x200/3357FF/FFFFFF?text=Chocolate+Shake',
+                    category: 'Beverages',
+                    isAvailable: true,
+                    isTrending: true
+                },
+                {
+                    name: 'French Fries',
+                    description: 'Crispy golden fries, perfectly salted.',
+                    price: 70.00,
+                    imageUrl: 'https://placehold.co/400x200/FF33FF/FFFFFF?text=French+Fries',
+                    category: 'Sides',
+                    isAvailable: true,
+                    isTrending: false
+                },
+                {
+                    name: 'Chicken Biryani',
+                    description: 'Aromatic basmati rice cooked with tender chicken and spices.',
+                    price: 220.00,
+                    imageUrl: 'https://placehold.co/400x200/33FFFF/FFFFFF?text=Chicken+Biryani',
+                    category: 'Main Course',
+                    isAvailable: true,
+                    isTrending: true
+                }
+            ];
+            await Item.insertMany(defaultItems);
+            console.log('Default menu items seeded successfully.');
+        } else {
+            console.log('Menu items already exist. Skipping seeding.');
+        }
+    } catch (error) {
+        console.error('Error seeding menu items:', error);
+    }
 }
 
 
@@ -1421,3 +1488,4 @@ server.listen(PORT, () => {
     console.log(`Default Admin Password (for initial setup): ${DEFAULT_ADMIN_PASSWORD}`);
     console.log('REMEMBER TO ENABLE 2FA FROM THE DASHBOARD AFTER FIRST LOGIN FOR SECURITY.');
 });
+
