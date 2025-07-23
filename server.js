@@ -82,7 +82,7 @@ const OrderSchema = new mongoose.Schema({
 });
 
 const CustomerSchema = new mongoose.Schema({
-    customerPhone: { type: String, required: true, unique: true },
+    customerPhone: { type: String, required: true, unique: true }, // Ensure this is unique
     customerName: String,
     totalOrders: { type: Number, default: 0 },
     lastOrderDate: Date,
@@ -150,7 +150,7 @@ let qrExpiryTimer = null; // Timer for QR code expiry
 let isInitializing = false; // Flag to prevent multiple concurrent initializations
 let currentInitializationAttempt = 0; // Tracks attempts for current client.initialize() call
 const MAX_INITIALIZATION_ATTEMPTS = 5; // Increased max retries for client.initialize()
-const RETRY_DELAY_MS = 10000; // Increased delay before retrying initialization (10 seconds)
+const RETRY_DELAY_MS = 10000; // Increased delay before retying initialization (10 seconds)
 const QR_EXPIRY_TIME_MS = 300000; // Increased QR expiry time to 5 minutes (300 seconds)
 
 const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
@@ -1189,7 +1189,10 @@ app.post('/api/order', async (req, res) => {
     try {
         const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, totalAmount, paymentMethod } = req.body;
 
+        console.log('[API] /api/order received request body:', JSON.stringify(req.body, null, 2)); // Log incoming request
+
         if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || !totalAmount) {
+            console.error('[API] /api/order: Missing required order details.');
             return res.status(400).json({ message: 'Missing required order details.' });
         }
 
@@ -1201,8 +1204,9 @@ app.post('/api/order', async (req, res) => {
 
         const itemDetails = [];
         for (const item of items) {
-            const product = await Item.findById(item.productId);
+            const product = await Item.findById(item.productId); // Ensure productId matches _id in Item collection
             if (!product || !product.isAvailable) {
+                console.error(`[API] /api/order: Item ${item.name || item.productId} is not available or not found.`);
                 return res.status(400).json({ message: `Item ${item.name || item.productId} is not available.` });
             }
             itemDetails.push({
@@ -1233,6 +1237,7 @@ app.post('/api/order', async (req, res) => {
         });
 
         await newOrder.save();
+        console.log('[API] /api/order: Order saved successfully.', newOrder._id);
 
         await Customer.findOneAndUpdate(
             { customerPhone: cleanedCustomerPhone },
@@ -1246,6 +1251,8 @@ app.post('/api/order', async (req, res) => {
             },
             { upsert: true, new: true }
         );
+        console.log('[API] /api/order: Customer updated/created successfully.');
+
 
         if (whatsappReady) {
             io.emit('new_order', newOrder);
