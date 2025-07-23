@@ -229,12 +229,16 @@
             try {
                 const response = await fetch(`${API_BASE_URL}/api/menu`);
                 if (!response.ok) {
-                    throw new Error('Failed to fetch menu items.');
+                    // Log the full response status and text for debugging
+                    const errorText = await response.text();
+                    console.error(`Error fetching menu items: ${response.status} ${response.statusText} - ${errorText}`);
+                    throw new Error(`Failed to fetch menu items: ${response.status} ${response.statusText}`);
                 }
                 const data = await response.json();
                 appState.menuItems = data;
                 renderMenuItems();
             } catch (error) {
+                console.error('Detailed error during menu fetch:', error); // Added detailed console error
                 showMessage(`Error loading menu: ${error.message}`);
                 noMenuItemsMessage.classList.remove('hidden');
             } finally {
@@ -461,7 +465,7 @@
             }
 
             const discountMessageHtml = subtotal >= MIN_SUBTOTAL_FOR_DISCOUNT ?
-                `<p class="bg-green-100 text-green-700 text-sm font-semibold p-2 rounded-md mb-2">🎉 *${DEFAULT_SHOP_NAME}* Discount: You get ${DISCOUNT_PERCENTAGE * 100}% off on your order!</p>` :
+                `<p class="bg-green-100 text-green-700 text-sm font-semibold p-2 rounded-md mb-2">🎉 *${DEFAULT_SHOP_NAME}* Discount: You get ${DISCOUNT_PERCENTAGE * 100}% off on orders above ₹${MIN_SUBTOTAL_FOR_DISCOUNT.toFixed(2)}!</p>` :
                 `<p class="bg-blue-100 text-blue-700 text-sm p-2 rounded-md mb-2">Spend ₹${(MIN_SUBTOTAL_FOR_DISCOUNT - subtotal).toFixed(2)} more at *${DEFAULT_SHOP_NAME}* to get ${DISCOUNT_PERCENTAGE * 100}% off!</p>`;
 
 
