@@ -8,6 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzxH+iQ/Y5ZMHAjAV+B/cVQL8y="
+     crossorigin=""/>
     <style>
         body {
             font-family: "Inter", sans-serif;
@@ -36,6 +40,14 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+        /* Leaflet map container style */
+        #mapid {
+            height: 300px; /* Adjust height as needed */
+            width: 100%;
+            border-radius: 0.5rem; /* rounded-lg */
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -50,7 +62,8 @@
                     <span id="cart-count" class="absolute top-0 right-0 bg-yellow-400 text-red-900 rounded-full text-xs w-5 h-5 flex items-center justify-center font-bold">0</span>
                 </button>
                 <button id="track-order-button" class="p-2 rounded-full hover:bg-red-700 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M10 18H7"/><path d="M18 18h2a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-7.5"/><path d="M14 14h1.5c.7 0 1.3-.3 1.7-.8l2.9-3.4c.4-.5.6-1.1.6-1.8V6.5c0-.8-.7-1.5-1.5-1.5H14"/></svg>
+                    <!-- Changed icon from truck to compass -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-compass"><path d="M12 16L12.5 17.5L13.5 14.5L16 12L12.5 10.5L11.5 13.5L9 16L12 16Z"/><circle cx="12" cy="12" r="10"/></svg>
                 </button>
             </div>
         </div>
@@ -78,6 +91,21 @@
                 <!-- Menu items will be loaded here -->
             </div>
             <p id="no-menu-items-message" class="text-center text-gray-600 mt-8 hidden">No menu items available at the moment. Please check back later!</p>
+        </section>
+
+        <!-- New Section for Shop Location -->
+        <section id="shop-location-section" class="bg-white rounded-lg shadow-md p-6 mb-8 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Our Location</h2>
+            <div class="text-center">
+                <p id="shop-location-name" class="text-xl font-semibold text-red-600 mb-2"></p>
+                <p class="text-gray-700 mb-4">Find us easily on the map!</p>
+                <a id="shop-map-link" href="#" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
+                    View on Google Maps
+                </a>
+                <p class="text-sm text-gray-500 mt-4">For precise directions, click the button above.</p>
+            </div>
         </section>
     </main>
 
@@ -109,6 +137,10 @@
         </div>
     </div>
 
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjGwZZXzSPdmBgfQ+mwWgeg+/GmfkQ="
+     crossorigin=""></script>
     <script>
         // --- Global State ---
         const appState = {
@@ -124,12 +156,18 @@
                 content: '',
                 onClose: null,
             },
-            currentLocation: null, // Stores {latitude, longitude, address}
+            currentLocation: null, // Stores {latitude, longitude, accuracy, address}
         };
 
         // --- Constants ---
         const API_BASE_URL = ''; // Relative path, assumes same origin for backend
         const DEFAULT_SHOP_NAME = 'Delicious Bites';
+        const DEFAULT_MAP_CENTER = [17.3850, 78.4867]; // Hyderabad, India (example default)
+        const DEFAULT_MAP_ZOOM = 13;
+
+        // Discount Constants
+        const MIN_SUBTOTAL_FOR_DISCOUNT = 500; // Minimum subtotal for discount to apply
+        const DISCOUNT_PERCENTAGE = 0.10; // 10% discount
 
         // --- DOM Elements ---
         const shopNameHeader = document.getElementById('shop-name-header');
@@ -145,12 +183,21 @@
         const menuItemsContainer = document.getElementById('menu-items-container');
         const noMenuItemsMessage = document.getElementById('no-menu-items-message');
 
+        // Shop Location Elements
+        const shopLocationSection = document.getElementById('shop-location-section');
+        const shopLocationName = document.getElementById('shop-location-name');
+        const shopMapLink = document.getElementById('shop-map-link');
+
         // Modal Elements
         const modalBackdrop = document.getElementById('modal-backdrop');
         const modalTitle = document.getElementById('modal-title');
         const modalBody = document.getElementById('modal-body');
         const modalCloseButton = document.getElementById('modal-close-button');
         const modalCloseFooterButton = document.getElementById('modal-close-footer-button');
+
+        // Leaflet Map Variables
+        let map = null;
+        let marker = null;
 
         // --- Utility Functions ---
         function showLoadingSpinner() {
@@ -185,12 +232,44 @@
             modalBackdrop.classList.remove('hidden');
             appState.modal.isOpen = true;
             lucide.createIcons(); // Render Lucide icons in modal content
+
+            // If the modal contains the map, ensure it's initialized after the modal is visible
+            if (contentHtml.includes('id="mapid"')) {
+                // Use a small delay to ensure the map container is fully rendered
+                setTimeout(() => {
+                    initMap();
+                    if (appState.currentLocation && appState.currentLocation.latitude && appState.currentLocation.longitude) {
+                        // If we have a current location, set the map and marker to it
+                        const { latitude, longitude } = appState.currentLocation;
+                        map.setView([latitude, longitude], DEFAULT_MAP_ZOOM);
+                        marker.setLatLng([latitude, longitude]);
+                        reverseGeocode(latitude, longitude); // Get address for the GPS location
+                    } else if (appState.shopSettings && appState.shopSettings.shopLocation && appState.shopSettings.shopLocation.latitude && appState.shopSettings.shopLocation.longitude) {
+                         // Otherwise, center on shop location if available
+                        const { latitude, longitude } = appState.shopSettings.shopLocation;
+                        map.setView([latitude, longitude], DEFAULT_MAP_ZOOM);
+                        marker.setLatLng([latitude, longitude]);
+                        reverseGeocode(latitude, longitude); // Get address for the shop location
+                    } else {
+                        // Fallback to default center if no specific location
+                        map.setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
+                        marker.setLatLng(DEFAULT_MAP_CENTER);
+                        reverseGeocode(DEFAULT_MAP_CENTER[0], DEFAULT_MAP_CENTER[1]);
+                    }
+                }, 100);
+            }
         }
 
         function hideModal() {
             modalBackdrop.classList.add('hidden');
             appState.modal.isOpen = false;
             modalBody.innerHTML = ''; // Clear content
+            // Destroy map instance to prevent issues if modal is reopened
+            if (map) {
+                map.remove();
+                map = null;
+                marker = null;
+            }
         }
 
         modalCloseButton.addEventListener('click', hideModal);
@@ -247,6 +326,7 @@
                 appState.shopSettings = data;
                 shopNameHeader.textContent = data.shopName || DEFAULT_SHOP_NAME;
                 shopNameFooter.textContent = data.shopName || DEFAULT_SHOP_NAME;
+                renderShopLocation(); // Render shop location after fetching settings
             } catch (error) {
                 console.error('Error fetching shop settings:', error);
                 shopNameHeader.textContent = DEFAULT_SHOP_NAME;
@@ -314,6 +394,19 @@
             }
         }
 
+        // --- Render Shop Location ---
+        function renderShopLocation() {
+            if (appState.shopSettings && appState.shopSettings.shopLocation &&
+                appState.shopSettings.shopLocation.latitude && appState.shopSettings.shopLocation.longitude) {
+                const { shopName, shopLocation } = appState.shopSettings;
+                shopLocationSection.classList.remove('hidden');
+                shopLocationName.textContent = shopName || DEFAULT_SHOP_NAME;
+                shopMapLink.href = `https://www.google.com/maps/search/?api=1&query=${shopLocation.latitude},${shopLocation.longitude}`;
+            } else {
+                shopLocationSection.classList.add('hidden');
+            }
+        }
+
         // --- Cart Management ---
         function addToCart(itemId) {
             const item = appState.menuItems.find(i => i._id === itemId);
@@ -360,15 +453,97 @@
         }
 
         function calculateCartTotals() {
-            const subtotal = appState.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            // For now, transport tax is 0 as it depends on location and settings
+            let subtotal = appState.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            let discountAmount = 0;
+
+            if (subtotal >= MIN_SUBTOTAL_FOR_DISCOUNT) {
+                discountAmount = subtotal * DISCOUNT_PERCENTAGE;
+            }
+
             const transportTax = 0; // You would calculate this based on deliveryRates from shopSettings and customerLocation
-            const totalAmount = subtotal + transportTax;
-            return { subtotal, transportTax, totalAmount };
+            const totalAmount = subtotal - discountAmount + transportTax;
+            return { subtotal, transportTax, discountAmount, totalAmount };
         }
 
+        // --- Leaflet Map Functions ---
+        function initMap() {
+            if (map) { // If map already exists, destroy it first
+                map.remove();
+            }
+            map = L.map('mapid').setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            marker = L.marker(DEFAULT_MAP_CENTER, { draggable: true }).addTo(map);
+
+            // Event listener for marker drag end
+            marker.on('dragend', function(e) {
+                const latlng = marker.getLatLng();
+                updateLocationFields(latlng.lat, latlng.lng);
+                reverseGeocode(latlng.lat, latlng.lng);
+            });
+
+            // Event listener for map click
+            map.on('click', function(e) {
+                marker.setLatLng(e.latlng);
+                updateLocationFields(e.latlng.lat, e.latlng.lng);
+                reverseGeocode(e.latlng.lat, e.latlng.lng);
+            });
+
+            // Invalidate map size to ensure it renders correctly within the modal
+            map.invalidateSize();
+        }
+
+        async function reverseGeocode(lat, lon) {
+            const deliveryAddressTextarea = document.getElementById('delivery-address');
+            deliveryAddressTextarea.value = 'Getting address...'; // Show loading state
+
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+                if (!response.ok) {
+                    throw new Error('Failed to reverse geocode location.');
+                }
+                const data = await response.json();
+                const address = data.display_name || `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
+                deliveryAddressTextarea.value = address;
+                // Update appState.currentLocation.address if it exists, otherwise create it
+                if (appState.currentLocation) {
+                    appState.currentLocation.address = address;
+                } else {
+                    appState.currentLocation = { latitude: lat, longitude: lon, address: address };
+                }
+            } catch (error) {
+                console.error('Reverse geocoding error:', error);
+                deliveryAddressTextarea.value = `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)} (Address lookup failed)`;
+                if (appState.currentLocation) {
+                    appState.currentLocation.address = `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
+                } else {
+                    appState.currentLocation = { latitude: lat, longitude: lon, address: `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}` };
+                }
+                showMessage('Could not get detailed address. Please verify location on map.', 'error');
+            }
+        }
+
+        function updateLocationFields(lat, lon, accuracy = null) {
+            const customerLatitudeInput = document.getElementById('customer-latitude');
+            const customerLongitudeInput = document.getElementById('customer-longitude');
+            const locationStatusSpan = document.getElementById('location-status');
+
+            customerLatitudeInput.value = lat;
+            customerLongitudeInput.value = lon;
+            appState.currentLocation = { latitude: lat, longitude: lon, accuracy: accuracy };
+
+            locationStatusSpan.textContent = `Selected: Lat ${lat.toFixed(4)}, Lon ${lon.toFixed(4)}`;
+            if (accuracy !== null) {
+                locationStatusSpan.textContent += ` (GPS Accuracy: ${accuracy.toFixed(0)}m)`;
+            }
+        }
+
+
         function renderCartModal() {
-            const { subtotal, transportTax, totalAmount } = calculateCartTotals();
+            const { subtotal, transportTax, discountAmount, totalAmount } = calculateCartTotals();
 
             let cartItemsHtml = '';
             if (appState.cart.length === 0) {
@@ -400,17 +575,29 @@
                 `;
             }
 
+            const discountMessageHtml = discountAmount > 0 ?
+                `<p class="text-green-700 text-sm font-semibold mb-2">🎉 Discount Applied: ${DISCOUNT_PERCENTAGE * 100}% off!</p>` :
+                `<p class="text-gray-600 text-sm mb-2">Spend ₹${MIN_SUBTOTAL_FOR_DISCOUNT - subtotal.toFixed(2)} more to get ${DISCOUNT_PERCENTAGE * 100}% off!</p>`;
+
+
             const cartModalContent = `
                 <div id="cart-modal-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
                     <strong class="font-bold">Error!</strong>
                     <span class="block sm:inline ml-2" id="cart-modal-error-text"></span>
                 </div>
+                ${appState.cart.length > 0 ? discountMessageHtml : ''}
                 ${cartItemsHtml}
                 <div class="mt-6 pt-4 border-t border-gray-200 space-y-2">
                     <div class="flex justify-between text-lg font-semibold text-gray-800">
                         <span>Subtotal:</span>
                         <span>₹${subtotal.toFixed(2)}</span>
                     </div>
+                    ${discountAmount > 0 ? `
+                    <div class="flex justify-between text-lg font-semibold text-green-600">
+                        <span>Discount:</span>
+                        <span>-₹${discountAmount.toFixed(2)}</span>
+                    </div>
+                    ` : ''}
                     <div class="flex justify-between text-lg font-semibold text-gray-800">
                         <span>Transport Tax:</span>
                         <span>₹${transportTax.toFixed(2)}</span>
@@ -431,18 +618,24 @@
                         <input type="tel" id="customer-phone" name="customerPhone" pattern="[0-9]{10,12}" required
                             class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
                     </div>
+
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Delivery Location on Map:</label>
+                        <div id="mapid" class="z-0"></div> <!-- Map container -->
+                        <div class="flex items-center space-x-2 mt-2">
+                            <button type="button" id="get-location-button"
+                                class="flex-shrink-0 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-semibold transition-colors flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
+                                Use My Current GPS Location
+                            </button>
+                            <span id="location-status" class="text-sm text-gray-600"></span>
+                        </div>
+                    </div>
+
                     <div>
-                        <label for="delivery-address" class="block text-sm font-medium text-gray-700">Delivery Address</label>
+                        <label for="delivery-address" class="block text-sm font-medium text-gray-700">Delivery Address (Auto-filled from map or enter manually)</label>
                         <textarea id="delivery-address" name="deliveryAddress" rows="3" required
                             class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"></textarea>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <button type="button" id="get-location-button"
-                            class="flex-shrink-0 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-semibold transition-colors flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
-                            Get My Current Location
-                        </button>
-                        <span id="location-status" class="text-sm text-gray-600"></span>
                     </div>
                     <input type="hidden" id="customer-latitude" name="latitude">
                     <input type="hidden" id="customer-longitude" name="longitude">
@@ -480,6 +673,17 @@
             const customerLongitudeInput = document.getElementById('customer-longitude');
             const deliveryAddressTextarea = document.getElementById('delivery-address');
 
+            // Populate fields if location was previously obtained
+            if (appState.currentLocation) {
+                updateLocationFields(appState.currentLocation.latitude, appState.currentLocation.longitude, appState.currentLocation.accuracy);
+                // Also update map and marker if map is already initialized
+                if (map && marker) {
+                    map.setView([appState.currentLocation.latitude, appState.currentLocation.longitude], DEFAULT_MAP_ZOOM);
+                    marker.setLatLng([appState.currentLocation.latitude, appState.currentLocation.longitude]);
+                    reverseGeocode(appState.currentLocation.latitude, appState.currentLocation.longitude);
+                }
+            }
+
             getLocationButton.addEventListener('click', async () => {
                 locationStatusSpan.textContent = 'Getting location...';
                 getLocationButton.disabled = true;
@@ -487,22 +691,31 @@
                     const position = await new Promise((resolve, reject) => {
                         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
                     });
-                    appState.currentLocation = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        address: 'Location from device GPS' // Placeholder, reverse geocoding would be needed for actual address
-                    };
-                    customerLatitudeInput.value = appState.currentLocation.latitude;
-                    customerLongitudeInput.value = appState.currentLocation.longitude;
-                    deliveryAddressTextarea.value = `Lat: ${appState.currentLocation.latitude.toFixed(4)}, Lon: ${appState.currentLocation.longitude.toFixed(4)} (Approximate Location)`;
-                    locationStatusSpan.textContent = 'Location obtained!';
+                    const { latitude, longitude, accuracy } = position.coords;
+                    updateLocationFields(latitude, longitude, accuracy);
+                    reverseGeocode(latitude, longitude);
+
+                    // Update map and marker
+                    if (map && marker) {
+                        map.setView([latitude, longitude], DEFAULT_MAP_ZOOM);
+                        marker.setLatLng([latitude, longitude]);
+                    }
                     showMessage('Location successfully retrieved!', 'success');
                 } catch (error) {
                     appState.currentLocation = null;
                     customerLatitudeInput.value = '';
                     customerLongitudeInput.value = '';
+                    deliveryAddressTextarea.value = ''; // Clear address if location fails
                     locationStatusSpan.textContent = 'Failed to get location.';
-                    showMessage(`Could not get location: ${error.message}. Please enter address manually.`, 'error');
+                    let errorMessage = 'Please ensure location services are enabled and permissions are granted.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMessage = 'Location access denied. Please allow location access in your browser settings.';
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        errorMessage = 'Location information is unavailable. Try again in a different area.';
+                    } else if (error.code === error.TIMEOUT) {
+                        errorMessage = 'The request to get user location timed out.';
+                    }
+                    showMessage(`Could not get location: ${errorMessage}`, 'error');
                 } finally {
                     getLocationButton.disabled = false;
                 }
@@ -537,15 +750,21 @@
                 return;
             }
 
-            // Basic phone number validation (e.g., 10-12 digits, starts with 91 if Indian)
+            // Basic phone number validation (e.g., 10-15 digits, starts with + for international)
             if (!/^\+?[0-9]{10,15}$/.test(customerPhone)) {
-                modalErrorText.textContent = 'Please enter a valid phone number (e.g., 91XXXXXXXXXX).';
+                modalErrorText.textContent = 'Please enter a valid phone number (e.g., +91XXXXXXXXXX or XXXXXXXXXX).';
+                modalErrorDiv.classList.remove('hidden');
+                return;
+            }
+
+            if (isNaN(customerLatitude) || isNaN(customerLongitude)) {
+                modalErrorText.textContent = 'Please select your delivery location on the map or use GPS.';
                 modalErrorDiv.classList.remove('hidden');
                 return;
             }
 
 
-            const { subtotal, transportTax, totalAmount } = calculateCartTotals();
+            const { subtotal, transportTax, discountAmount, totalAmount } = calculateCartTotals(); // Get discountAmount here
 
             const orderPayload = {
                 items: appState.cart.map(item => ({
@@ -557,13 +776,14 @@
                 customerName: customerName,
                 customerPhone: customerPhone,
                 deliveryAddress: deliveryAddress,
-                customerLocation: (appState.currentLocation && !isNaN(customerLatitude) && !isNaN(customerLongitude)) ? {
+                customerLocation: {
                     latitude: customerLatitude,
                     longitude: customerLongitude,
-                    address: appState.currentLocation.address || deliveryAddress // Use captured address or manual
-                } : null,
+                    address: deliveryAddress // Use the human-readable address from the textarea
+                },
                 subtotal: subtotal,
                 transportTax: transportTax,
+                discountAmount: discountAmount, // Include discount amount in payload
                 totalAmount: totalAmount,
                 paymentMethod: 'Cash on Delivery', // Hardcoded as per backend
             };
@@ -628,6 +848,7 @@
                     <p><strong class="font-medium">Total:</strong> <span id="display-total"></span></p>
                     <p><strong class="font-medium">Items:</strong> <span id="display-items"></span></p>
                     <p><strong class="font-medium">Order Date:</strong> <span id="display-order-date"></span></p>
+                    <p><strong class="font-medium">Delivery Address:</strong> <span id="display-delivery-address"></span></p>
                 </div>
             `;
             showModal('Track Your Order', trackingModalContent);
@@ -668,6 +889,7 @@
                     document.getElementById('display-total').textContent = `₹${data.totalAmount.toFixed(2)}`;
                     document.getElementById('display-items').textContent = data.items.map(item => `${item.name} x ${item.quantity}`).join(', ');
                     document.getElementById('display-order-date').textContent = new Date(data.orderDate).toLocaleString();
+                    document.getElementById('display-delivery-address').textContent = data.deliveryAddress || 'N/A';
                     orderDetailsDisplay.classList.remove('hidden');
 
                 } catch (error) {
