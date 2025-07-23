@@ -3,1695 +3,1656 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Bot Admin Dashboard</title>
+    <title>Admin Dashboard - Delicious Bites</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons CDN -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Socket.io Client CDN -->
-    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-    <!-- jwt-decode CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/jwt-decode@4.0.0/build/jwt-decode.min.js"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Custom scrollbar for better aesthetics */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #ef4444; /* red-500 */
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #dc2626; /* red-600 */
-        }
         body {
-            font-family: "Inter", sans-serif;
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
         }
-        /* Hide scrollbar for specific elements if needed, e.g., for modal content if it overflows */
-        .modal-content-scrollable::-webkit-scrollbar {
-            display: none;
+        /* Custom scrollbar for log area */
+        .log-area::-webkit-scrollbar {
+            width: 8px;
         }
-        .modal-content-scrollable {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
+        .log-area::-webkit-scrollbar-track {
+            background: #e0e0e0;
+            border-radius: 10px;
+        }
+        .log-area::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .log-area::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .tab-button.active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .table-header th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background-color: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .table-row td {
+            padding: 1rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .table-row:last-child td {
+            border-bottom: none;
+        }
+        .table-row:hover {
+            background-color: #f3f4f6;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .status-pending { background-color: #fef3c7; color: #92400e; }
+        .status-confirmed { background-color: #dbeafe; color: #1e40af; }
+        .status-preparing { background-color: #bfdbfe; color: #1d4ed8; }
+        .status-out-for-delivery { background-color: #d1fae5; color: #065f46; }
+        .status-delivered { background-color: #dcfce7; color: #16a34a; }
+        .status-cancelled { background-color: #fee2e2; color: #dc2626; }
+
+        /* General button styling */
+        .btn {
+            @apply px-4 py-2 rounded-lg font-medium transition duration-150 ease-in-out;
+        }
+        .btn-primary {
+            @apply bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2;
+        }
+        .btn-secondary {
+            @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+        }
+        .btn-danger {
+            @apply bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+        }
+        .btn-success {
+            @apply bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2;
+        }
+        .btn-info {
+            @apply bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+        }
+        .input-field {
+            @apply mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm;
+        }
+        .form-label {
+            @apply block text-sm font-medium text-gray-700;
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+<body class="bg-gray-100 flex h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white shadow-lg p-6 flex flex-col">
+        <div class="text-2xl font-bold text-indigo-600 mb-8">Delicious Bites Admin</div>
+        <nav class="flex-grow">
+            <ul class="space-y-2">
+                <li>
+                    <a href="#dashboard" class="sidebar-link flex items-center p-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors duration-200" data-section="dashboard">
+                        <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="#menu" class="sidebar-link flex items-center p-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors duration-200" data-section="menu">
+                        <i class="fas fa-hamburger mr-3"></i> Menu
+                    </a>
+                </li>
+                <li>
+                    <a href="#orders" class="sidebar-link flex items-center p-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors duration-200" data-section="orders">
+                        <i class="fas fa-clipboard-list mr-3"></i> Orders
+                    </a>
+                </li>
+                <li>
+                    <a href="#customers" class="sidebar-link flex items-center p-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors duration-200" data-section="customers">
+                        <i class="fas fa-users mr-3"></i> Customers
+                    </a>
+                </li>
+                <li>
+                    <a href="#settings" class="sidebar-link flex items-center p-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors duration-200" data-section="settings">
+                        <i class="fas fa-cog mr-3"></i> Settings
+                    </a>
+                </li>
+                <li>
+                    <a href="#whatsapp-bot" class="sidebar-link flex items-center p-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors duration-200" data-section="whatsapp-bot">
+                        <i class="fab fa-whatsapp mr-3"></i> WhatsApp Bot
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        <div class="mt-auto">
+            <button id="logout-button" class="w-full btn btn-secondary flex items-center justify-center">
+                <i class="fas fa-sign-out-alt mr-2"></i> Logout
+            </button>
+        </div>
+    </aside>
 
-    <!-- Login Page Container -->
-    <div id="login-page" class="min-h-screen flex items-center justify-center p-4 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md border-t-4 border-red-600">
-            <div class="text-center mb-8">
-                <h1 class="text-3xl font-extrabold text-red-600 mb-2">Admin Login</h1>
-                <p class="text-gray-600">Access your WhatsApp Bot Dashboard</p>
+    <!-- Main Content Area -->
+    <main class="flex-1 p-8 overflow-y-auto">
+        <!-- Header for Main Content -->
+        <header class="flex justify-between items-center mb-8">
+            <h1 id="page-title" class="text-3xl font-semibold text-gray-800">Dashboard</h1>
+            <div class="flex items-center space-x-4">
+                <button id="2fa-settings-button" class="btn btn-info">
+                    <i class="fas fa-shield-alt mr-2"></i> 2FA Settings
+                </button>
+                <button id="view-logs-button" class="btn btn-secondary">
+                    <i class="fas fa-file-alt mr-2"></i> View Logs
+                </button>
+            </div>
+        </header>
+
+        <!-- Dynamic Content Area -->
+        <div id="content-area" class="bg-white p-6 rounded-lg shadow-md">
+            <!-- Content will be loaded here dynamically -->
+            <div id="dashboard-section" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-blue-500 text-white p-5 rounded-lg shadow-md flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-medium opacity-80">Total Orders</div>
+                            <div id="total-orders-stat" class="text-3xl font-bold">0</div>
+                        </div>
+                        <i class="fas fa-shopping-cart text-4xl opacity-50"></i>
+                    </div>
+                    <div class="bg-yellow-500 text-white p-5 rounded-lg shadow-md flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-medium opacity-80">Pending Orders</div>
+                            <div id="pending-orders-stat" class="text-3xl font-bold">0</div>
+                        </div>
+                        <i class="fas fa-hourglass-half text-4xl opacity-50"></i>
+                    </div>
+                    <div class="bg-green-500 text-white p-5 rounded-lg shadow-md flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-medium opacity-80">Delivered Orders</div>
+                            <div id="delivered-orders-stat" class="text-3xl font-bold">0</div>
+                        </div>
+                        <i class="fas fa-check-circle text-4xl opacity-50"></i>
+                    </div>
+                    <div class="bg-purple-500 text-white p-5 rounded-lg shadow-md flex items-center justify-between">
+                        <div>
+                            <div class="text-sm font-medium opacity-80">Total Customers</div>
+                            <div id="total-customers-stat" class="text-3xl font-bold">0</div>
+                        </div>
+                        <i class="fas fa-users text-4xl opacity-50"></i>
+                    </div>
+                </div>
+
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Recent Orders</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white rounded-lg shadow-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Items</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboard-recent-orders-table-body">
+                            <!-- Recent orders will be loaded here -->
+                            <tr><td colspan="7" class="text-center py-4">No recent orders.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div id="login-error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
-                <strong class="font-bold">Error!</strong>
-                <span class="block sm:inline ml-2" id="login-error-text"></span>
-            </div>
-
-            <form id="login-form" class="space-y-6">
-                <div>
-                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-                    <input type="text" id="username" name="username" required
-                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                </div>
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="password" name="password" required
-                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                </div>
-                <div>
-                    <label for="totpCode" class="block text-sm font-medium text-gray-700">2FA Code (if enabled)</label>
-                    <input type="text" id="totpCode" name="totpCode" maxlength="6"
-                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                </div>
-                <div>
-                    <button type="submit" id="login-button"
-                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50">
-                        Login
+            <div id="menu-section" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold text-gray-800">Menu Management</h2>
+                    <button id="add-menu-item-button" class="btn btn-primary">
+                        <i class="fas fa-plus mr-2"></i> Add New Item
                     </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white rounded-lg shadow-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th>Image</th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Price</th>
+                                <th>Category</th>
+                                <th>Available</th>
+                                <th>Trending</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="menu-table-body">
+                            <!-- Menu items will be loaded here -->
+                            <tr><td colspan="8" class="text-center py-4">No menu items.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="orders-section" class="hidden">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Order Management</h2>
+                <div class="mb-4 flex space-x-4">
+                    <select id="order-status-filter" class="input-field w-48">
+                        <option value="">All Statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Preparing">Preparing</option>
+                        <option value="Out for Delivery">Out for Delivery</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                    <input type="text" id="order-search" placeholder="Search by Order ID or Customer Phone" class="input-field flex-grow">
+                    <button id="apply-order-filter" class="btn btn-primary">Apply Filter</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white rounded-lg shadow-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th>Order ID</th>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Items</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Payment</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body">
+                            <!-- Orders will be loaded here -->
+                            <tr><td colspan="9" class="text-center py-4">No orders.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="customers-section" class="hidden">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Customer Management</h2>
+                <div class="mb-4 flex space-x-4">
+                    <input type="text" id="customer-search" placeholder="Search by Phone or Name" class="input-field flex-grow">
+                    <button id="apply-customer-filter" class="btn btn-primary">Apply Filter</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white rounded-lg shadow-sm">
+                        <thead>
+                            <tr class="table-header">
+                                <th>Phone</th>
+                                <th>Name</th>
+                                <th>Total Orders</th>
+                                <th>Last Order Date</th>
+                                <th>Last Location</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customers-table-body">
+                            <!-- Customers will be loaded here -->
+                            <tr><td colspan="6" class="text-center py-4">No customers.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="settings-section" class="hidden">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">General Settings</h2>
+                <form id="general-settings-form" class="space-y-4">
+                    <div>
+                        <label for="shop-name" class="form-label">Shop Name</label>
+                        <input type="text" id="shop-name" name="shopName" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="shop-latitude" class="form-label">Shop Location Latitude</label>
+                        <input type="number" step="0.000001" id="shop-latitude" name="shopLocation.latitude" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="shop-longitude" class="form-label">Shop Location Longitude</label>
+                        <input type="number" step="0.000001" id="shop-longitude" name="shopLocation.longitude" class="input-field" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save General Settings</button>
+                </form>
+
+                <h2 class="text-xl font-semibold text-gray-800 mt-8 mb-4">Delivery Rates</h2>
+                <div id="delivery-rates-container" class="space-y-4">
+                    <!-- Delivery rate inputs will be added here -->
+                </div>
+                <button id="add-delivery-rate-button" class="btn btn-secondary mt-4">
+                    <i class="fas fa-plus mr-2"></i> Add Delivery Rate
+                </button>
+                <button id="save-delivery-rates-button" class="btn btn-primary mt-4">Save Delivery Rates</button>
+
+                <h2 class="text-xl font-semibold text-gray-800 mt-8 mb-4">Discount Settings</h2>
+                <form id="discount-settings-form" class="space-y-4">
+                    <div>
+                        <label for="min-subtotal-discount" class="form-label">Minimum Subtotal for Discount (₹)</label>
+                        <input type="number" step="0.01" id="min-subtotal-discount" name="minSubtotalForDiscount" class="input-field" required>
+                    </div>
+                    <div>
+                        <label for="discount-percentage" class="form-label">Discount Percentage (0.00 - 1.00)</label>
+                        <input type="number" step="0.01" min="0" max="1" id="discount-percentage" name="discountPercentage" class="input-field" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Discount Settings</button>
+                </form>
+            </div>
+
+            <div id="whatsapp-bot-section" class="hidden">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">WhatsApp Bot Status</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-indigo-100 p-6 rounded-lg shadow-md">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-indigo-800">Connection Status</h3>
+                            <span id="whatsapp-status-badge" class="status-badge">Loading...</span>
+                        </div>
+                        <p class="text-gray-700">Last Authenticated: <span id="last-authenticated-at">N/A</span></p>
+                        <div class="mt-4 flex space-x-2">
+                            <button id="load-session-button" class="btn btn-primary">
+                                <i class="fas fa-redo mr-2"></i> Load New Session / Get QR
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bg-gray-100 p-6 rounded-lg shadow-md flex flex-col items-center justify-center">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Scan QR Code</h3>
+                        <div id="qr-code-container" class="w-48 h-48 bg-white p-2 rounded-lg shadow-inner flex items-center justify-center">
+                            <p id="qr-message" class="text-gray-500 text-center">QR code will appear here</p>
+                            <img id="qr-code-image" src="" alt="QR Code" class="hidden w-full h-full object-contain">
+                        </div>
+                        <p class="text-sm text-gray-600 mt-2">Scan this QR code with your WhatsApp app.</p>
+                    </div>
+                </div>
+
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">WhatsApp Logs</h2>
+                <div id="whatsapp-logs" class="log-area bg-gray-800 text-green-400 p-4 rounded-lg h-64 overflow-y-scroll text-sm">
+                    <!-- Logs will be appended here -->
+                    <p>Waiting for logs...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Message Modal -->
+    <div id="message-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden modal-overlay">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+            <h3 id="message-modal-title" class="text-xl font-semibold mb-4 text-gray-800">Message</h3>
+            <p id="message-modal-content" class="text-gray-700 mb-6"></p>
+            <div class="flex justify-end">
+                <button id="message-modal-close" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2FA Settings Modal -->
+    <div id="two-factor-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden modal-overlay">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h3 class="text-xl font-semibold mb-4 text-gray-800">Two-Factor Authentication Settings</h3>
+            <div id="2fa-status-display" class="mb-4 text-center">
+                <p class="text-lg font-medium">Status: <span id="current-2fa-status" class="font-bold">Loading...</span></p>
+            </div>
+
+            <div id="2fa-enable-section" class="hidden">
+                <p class="text-gray-700 mb-4">Scan the QR code with your authenticator app (e.g., Google Authenticator) or manually enter the secret key.</p>
+                <div class="flex flex-col items-center justify-center mb-4">
+                    <img id="2fa-qr-code" src="" alt="2FA QR Code" class="w-48 h-48 border border-gray-300 p-2 rounded-lg mb-2">
+                    <p class="font-mono text-sm text-gray-600 break-all" id="2fa-secret-key"></p>
+                </div>
+                <form id="2fa-verify-form" class="space-y-4">
+                    <div>
+                        <label for="2fa-code-input" class="form-label">Enter 6-digit Code</label>
+                        <input type="text" id="2fa-code-input" class="input-field" placeholder="XXXXXX" maxlength="6" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full">Enable 2FA</button>
+                </form>
+            </div>
+
+            <div id="2fa-disable-section" class="hidden">
+                <p class="text-gray-700 mb-4">Two-Factor Authentication is currently enabled. You can disable it below.</p>
+                <button id="disable-2fa-button" class="btn btn-danger w-full">Disable 2FA</button>
+            </div>
+
+            <div class="flex justify-end mt-6">
+                <button id="close-2fa-modal" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Details Modal -->
+    <div id="order-details-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden modal-overlay">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 class="text-xl font-semibold mb-4 text-gray-800">Order Details</h3>
+            <div id="order-details-content" class="space-y-3 text-gray-700">
+                <p><strong>Order ID:</strong> <span id="modal-order-id"></span></p>
+                <p><strong>PIN:</strong> <span id="modal-order-pin"></span></p>
+                <p><strong>Customer Name:</strong> <span id="modal-customer-name"></span></p>
+                <p><strong>Customer Phone:</strong> <span id="modal-customer-phone"></span></p>
+                <p><strong>Delivery Address:</strong> <span id="modal-delivery-address"></span></p>
+                <p><strong>Customer Location:</strong> <span id="modal-customer-location"></span></p>
+                <p><strong>Items:</strong></p>
+                <ul id="modal-order-items" class="list-disc pl-5"></ul>
+                <p><strong>Subtotal:</strong> ₹<span id="modal-subtotal"></span></p>
+                <p><strong>Transport Tax:</strong> ₹<span id="modal-transport-tax"></span></p>
+                <p><strong>Discount:</strong> ₹<span id="modal-discount-amount"></span></p>
+                <p><strong>Total Amount:</strong> ₹<span id="modal-total-amount"></span></p>
+                <p><strong>Payment Method:</strong> <span id="modal-payment-method"></span></p>
+                <p><strong>Status:</strong> <span id="modal-status"></span></p>
+                <p><strong>Order Date:</strong> <span id="modal-order-date"></span></p>
+            </div>
+            <div class="flex justify-end mt-6">
+                <button id="close-order-details-modal" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Menu Item Modal -->
+    <div id="edit-menu-item-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden modal-overlay">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h3 id="edit-modal-title" class="text-xl font-semibold mb-4 text-gray-800">Edit Menu Item</h3>
+            <form id="menu-item-form" class="space-y-4">
+                <input type="hidden" id="edit-item-id">
+                <div>
+                    <label for="edit-item-name" class="form-label">Name</label>
+                    <input type="text" id="edit-item-name" name="name" class="input-field" required>
+                </div>
+                <div>
+                    <label for="edit-item-description" class="form-label">Description</label>
+                    <textarea id="edit-item-description" name="description" class="input-field"></textarea>
+                </div>
+                <div>
+                    <label for="edit-item-price" class="form-label">Price</label>
+                    <input type="number" step="0.01" id="edit-item-price" name="price" class="input-field" required>
+                </div>
+                <div>
+                    <label for="edit-item-image-url" class="form-label">Image URL</label>
+                    <input type="url" id="edit-item-image-url" name="imageUrl" class="input-field">
+                </div>
+                <div>
+                    <label for="edit-item-category" class="form-label">Category</label>
+                    <input type="text" id="edit-item-category" name="category" class="input-field">
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="edit-item-is-available" name="isAvailable" class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                    <label for="edit-item-is-available" class="ml-2 block text-sm text-gray-900">Is Available</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="edit-item-is-trending" name="isTrending" class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                    <label for="edit-item-is-trending" class="ml-2 block text-sm text-gray-900">Is Trending</label>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-edit-item" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Item</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Dashboard Layout Container -->
-    <div id="dashboard-layout" class="min-h-screen flex bg-gray-100 font-sans hidden">
-        <!-- Mobile Sidebar Toggle -->
-        <div class="md:hidden fixed top-0 left-0 z-40 p-4">
-            <button id="sidebar-toggle" class="text-red-600 focus:outline-none">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
-            </button>
-        </div>
 
-        <!-- Sidebar - Desktop and Mobile -->
-        <div id="sidebar"
-            class="fixed inset-y-0 left-0 z-30 w-64 bg-red-600 text-white shadow-lg transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col">
-            <div class="flex items-center justify-center h-20 bg-red-700 text-2xl font-bold">
-                Admin Panel
-            </div>
-            <nav class="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
-                <button id="nav-bot-status" data-view="bot-status"
-                    class="nav-button flex items-center w-full px-4 py-2 rounded-md text-base font-medium transition-colors duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-qr-code mr-3"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h6v6H3V9Z"/><path d="M12 9h6v6h-6V9Z"/><path d="M3 3h6v6H3V3Z"/><path d="M12 3h6v6h-6V3Z"/><path d="M12 12h6v6h-6V12Z"/></svg>
-                    Bot Status
-                </button>
-                <button id="nav-menu-management" data-view="menu-management"
-                    class="nav-button flex items-center w-full px-4 py-2 rounded-md text-base font-medium transition-colors duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils mr-3"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2c0-1.1-.9-2-2-2h-4a2 2 0 0 0-2 2v13"/><path d="M17 2v20"/></svg>
-                    Menu
-                </button>
-                <button id="nav-order-management" data-view="order-management"
-                    class="nav-button flex items-center w-full px-4 py-2 rounded-md text-base font-medium transition-colors duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shopping-bag mr-3"><path d="M6 2L3 7v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-3-5Z"/><path d="M3 7h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                    Orders
-                </button>
-                <button id="nav-customer-management" data-view="customer-management"
-                    class="nav-button flex items-center w-full px-4 py-2 rounded-md text-base font-medium transition-colors duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users mr-3"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    Customers
-                </button>
-                <button id="nav-settings" data-view="settings"
-                    class="nav-button flex items-center w-full px-4 py-2 rounded-md text-base font-medium transition-colors duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings mr-3"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.08.15a2 2 0 0 1 0 2.73l-.08.15a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.08-.15a2 2 0 0 1 0-2.73l.08-.15a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                    Settings
-                </button>
-                <button id="nav-two-factor-auth" data-view="two-factor-auth"
-                    class="nav-button flex items-center w-full px-4 py-2 rounded-md text-base font-medium transition-colors duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock mr-3"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    2FA
-                </button>
-            </nav>
-            <div class="p-4 border-t border-red-500">
-                <button id="logout-button"
-                    class="flex items-center w-full px-4 py-2 rounded-md text-base font-medium text-white bg-red-700 hover:bg-red-800 transition-colors duration-200">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out mr-3"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="17 16 22 12 17 8"/><line x1="22" x2="10" y1="12" y2="12"/></svg>
-                    Logout
-                </button>
-            </div>
-        </div>
-
-        <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col overflow-hidden md:ml-64">
-            <!-- Top Bar -->
-            <header class="bg-white shadow-sm p-4 md:p-6 flex items-center justify-between">
-                <h1 id="current-view-title" class="text-xl md:text-2xl font-semibold text-gray-800">Dashboard</h1>
-            </header>
-
-            <!-- Content Area -->
-            <main class="flex-1 p-4 md:p-6 overflow-y-auto">
-                <div id="loading-spinner" class="flex justify-center items-center py-8 hidden">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-                    <p class="ml-4 text-gray-700">Loading...</p>
-                </div>
-
-                <div id="global-error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
-                    <strong class="font-bold">Error!</strong>
-                    <span class="block sm:inline ml-2" id="global-error-text"></span>
-                </div>
-
-                <div id="global-success-message" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md relative mb-4" role="alert">
-                    <strong class="font-bold">Success!</strong>
-                    <span class="block sm:inline ml-2" id="global-success-text"></span>
-                </div>
-
-                <!-- Bot Status Section -->
-                <div id="bot-status-section" class="content-section hidden p-4 md:p-6 bg-white rounded-lg shadow-md h-full overflow-y-auto">
-                    <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">WhatsApp Bot Status</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        <div class="bg-red-50 p-4 rounded-lg shadow-sm flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-qr-code mr-3" id="status-icon"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h6v6H3V9Z"/><path d="M12 9h6v6h-6V9Z"/><path d="M3 3h6v6H3V3Z"/><path d="M12 3h6v6h-6V3Z"/><path d="M12 12h6v6h-6V12Z"/></svg>
-                            <div>
-                                <p class="text-gray-600 text-sm">Connection Status:</p>
-                                <p id="bot-status-text" class="font-semibold text-lg text-gray-800">Loading...</p>
-                            </div>
-                        </div>
-                        <div class="bg-red-50 p-4 rounded-lg shadow-sm flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock mr-3 text-gray-600"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            <div>
-                                <p class="text-gray-600 text-sm">Last Authenticated:</p>
-                                <p id="last-authenticated-at" class="font-semibold text-lg text-gray-800">N/A</p>
-                            </div>
-                        </div>
-                        <div class="bg-red-50 p-4 rounded-lg shadow-sm flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info mr-3 text-gray-600"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                            <div>
-                                <p class="text-gray-600 text-sm">QR Code Available:</p>
-                                <p id="qr-code-available" class="font-semibold text-lg text-gray-800">NO</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-8">
-                        <button id="load-session-button"
-                            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out disabled:opacity-50">
-                            Force New Session / Generate QR
-                        </button>
-                        <p id="action-message" class="mt-2 text-sm text-green-600"></p>
-                    </div>
-                    <div id="qr-code-display" class="hidden bg-white p-6 rounded-lg shadow-lg text-center mb-8 border border-red-200">
-                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Scan QR Code to Connect WhatsApp</h3>
-                        <img id="qr-code-img" src="" alt="QR Code" class="mx-auto w-48 h-48 sm:w-64 sm:h-64 rounded-md border border-gray-200 p-2" />
-                        <p class="mt-4 text-gray-600 text-sm">Please scan this QR code with your WhatsApp mobile app within 5 minutes.</p>
-                    </div>
-                    <div class="mt-8">
-                        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">WhatsApp Logs</h3>
-                        <div id="whatsapp-logs" class="bg-gray-50 p-4 rounded-lg shadow-inner max-h-64 overflow-y-auto text-sm text-gray-700 font-mono">
-                            <p>No logs yet.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Menu Management Section -->
-                <div id="menu-management-section" class="content-section hidden p-4 md:p-6 bg-white rounded-lg shadow-md h-full overflow-y-auto">
-                    <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Menu Management</h2>
-                    <div class="mb-6 flex justify-end">
-                        <button id="add-menu-item-button"
-                            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus mr-2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                            Add New Item
-                        </button>
-                    </div>
-                    <div id="menu-items-table-container" class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-red-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trending</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="menu-items-table-body" class="bg-white divide-y divide-gray-200">
-                                <!-- Menu items will be rendered here by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <p id="no-menu-items-message" class="text-center text-gray-600 mt-4 hidden">No menu items found. Add some!</p>
-                </div>
-
-                <!-- Order Management Section -->
-                <div id="order-management-section" class="content-section hidden p-4 md:p-6 bg-white rounded-lg shadow-md h-full overflow-y-auto">
-                    <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Order Management</h2>
-                    <div class="mb-6 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                        <div class="w-full sm:w-1/3">
-                            <label for="order-status-filter" class="sr-only">Filter by Status</label>
-                            <select id="order-status-filter"
-                                class="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                                <option value="All">All</option>
-                                <option value="Pending">Pending</option>
-                                <option value="Confirmed">Confirmed</option>
-                                <option value="Preparing">Preparing</option>
-                                <option value="Out for Delivery">Out for Delivery</option>
-                                <option value="Delivered">Delivered</option>
-                                <option value="Cancelled">Cancelled</option>
-                            </select>
-                        </div>
-                        <div class="w-full sm:w-2/3 relative">
-                            <input type="text" id="order-search-term" placeholder="Search by Order ID, PIN, Customer Name/Phone..."
-                                class="block w-full border border-gray-300 rounded-md shadow-sm py-2 pl-10 pr-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                        </div>
-                    </div>
-                    <div id="orders-table-container" class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-red-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="orders-table-body" class="bg-white divide-y divide-gray-200">
-                                <!-- Orders will be rendered here by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <p id="no-orders-message" class="text-center text-gray-600 mt-4 hidden">No orders found matching your criteria.</p>
-                </div>
-
-                <!-- Customer Management Section -->
-                <div id="customer-management-section" class="content-section hidden p-4 md:p-6 bg-white rounded-lg shadow-md h-full overflow-y-auto">
-                    <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Customer Management</h2>
-                    <div class="mb-6 relative">
-                        <input type="text" id="customer-search-term" placeholder="Search by Customer Name or Phone..."
-                            class="block w-full border border-gray-300 rounded-md shadow-sm py-2 pl-10 pr-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                    </div>
-                    <div id="customers-table-container" class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-red-50">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Order Date</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="customers-table-body" class="bg-white divide-y divide-gray-200">
-                                <!-- Customers will be rendered here by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <p id="no-customers-message" class="text-center text-gray-600 mt-4 hidden">No customers found matching your criteria.</p>
-                </div>
-
-                <!-- Settings Section -->
-                <div id="settings-section" class="content-section hidden p-4 md:p-6 bg-white rounded-lg shadow-md h-full overflow-y-auto">
-                    <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Shop Settings</h2>
-                    <form id="settings-form" class="space-y-6">
-                        <div>
-                            <label for="shopName" class="block text-sm font-medium text-gray-700">Shop Name</label>
-                            <input type="text" name="shopName" id="shopName" required
-                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label for="shopLatitude" class="block text-sm font-medium text-gray-700">Shop Latitude</label>
-                                <input type="number" name="shopLatitude" id="shopLatitude" step="any"
-                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                            </div>
-                            <div>
-                                <label for="shopLongitude" class="block text-sm font-medium text-gray-700">Shop Longitude</label>
-                                <input type="number" name="shopLongitude" id="shopLongitude" step="any"
-                                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                            </div>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-medium text-gray-900 mb-3">Delivery Rates</h3>
-                            <div id="delivery-rates-container" class="space-y-4 mb-4">
-                                <!-- Delivery rates will be rendered here by JS -->
-                            </div>
-                            <button type="button" id="add-delivery-rate-button"
-                                class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus mr-2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                                Add Rate
-                            </button>
-                        </div>
-                        <div class="pt-6 border-t border-gray-200">
-                            <button type="submit" id="save-settings-button"
-                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm">
-                                Save Settings
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- 2FA Section -->
-                <div id="two-factor-auth-section" class="content-section hidden p-4 md:p-6 bg-white rounded-lg shadow-md h-full overflow-y-auto">
-                    <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Two-Factor Authentication</h2>
-                    <div class="mb-6">
-                        <p class="text-lg text-gray-800 flex items-center">
-                            Status: <span id="2fa-status" class="ml-2 font-semibold flex items-center">Loading...</span>
-                        </p>
-                    </div>
-                    <button id="toggle-2fa-button"
-                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock mr-2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        Enable 2FA
-                    </button>
-                </div>
-            </main>
-        </div>
-    </div>
-
-    <!-- Modals -->
-    <div id="modal-backdrop" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex justify-center items-center z-50 p-4 hidden">
-        <div id="modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-lg md:max-w-2xl lg:max-w-3xl overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:w-full">
-            <div class="bg-red-600 px-4 py-3 sm:px-6 flex justify-between items-center rounded-t-lg">
-                <h3 id="modal-title" class="text-lg leading-6 font-medium text-white"></h3>
-                <button type="button" id="modal-close-button" class="text-white hover:text-red-100 focus:outline-none">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x-circle"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
-                </button>
-            </div>
-            <div id="modal-body" class="p-6 modal-content-scrollable max-h-[80vh] overflow-y-auto">
-                <!-- Modal content will be injected here by JS -->
-            </div>
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-lg">
-                <button type="button" id="modal-close-footer-button"
-                    class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                    Close
-                </button>
-            </div>
-        </div>
-    </div>
-
+    <!-- Socket.io CDN -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
-        // --- Global State ---
-        const appState = {
-            isAuthenticated: false,
-            currentView: 'bot-status', // Default view after login
-            botStatus: {
-                status: 'disconnected',
-                lastAuthenticatedAt: null,
-                qrCode: null,
-                logs: [],
-                actionMessage: null,
-            },
-            menuItems: [],
-            orders: [],
-            customers: [],
-            settings: null,
-            twoFactorAuth: {
-                enabled: false,
-                qrCodeUrl: null,
-                secret: null,
-            },
-            loading: false,
-            error: null,
-            successMessage: null,
-            modal: {
-                isOpen: false,
-                title: '',
-                content: '',
-                onClose: null,
-            },
-            orderFilters: {
-                status: 'All',
-                searchTerm: '',
-            },
-            customerFilters: {
-                searchTerm: '',
-            }
-        };
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebarLinks = document.querySelectorAll('.sidebar-link');
+            const contentSections = document.querySelectorAll('#content-area > div');
+            const pageTitle = document.getElementById('page-title');
+            const logoutButton = document.getElementById('logout-button');
+            const twoFactorSettingsButton = document.getElementById('2fa-settings-button');
+            const viewLogsButton = document.getElementById('view-logs-button');
 
-        // --- Constants ---
-        const API_BASE_URL = ''; // Relative path, assumes same origin for backend
-        const WEB_MENU_URL = 'http://localhost:3000/menu'; // Hardcoded for this example
+            // Modals
+            const messageModal = document.getElementById('message-modal');
+            const messageModalTitle = document.getElementById('message-modal-title');
+            const messageModalContent = document.getElementById('message-modal-content');
+            const messageModalCloseButton = document.getElementById('message-modal-close');
 
-        // --- DOM Elements ---
-        const loginPage = document.getElementById('login-page');
-        const dashboardLayout = document.getElementById('dashboard-layout');
-        const loginForm = document.getElementById('login-form');
-        const loginButton = document.getElementById('login-button');
-        const loginErrorMessage = document.getElementById('login-error-message');
-        const loginErrorText = document.getElementById('login-error-text');
+            const twoFactorModal = document.getElementById('two-factor-modal');
+            const current2faStatus = document.getElementById('current-2fa-status');
+            const enable2faSection = document.getElementById('2fa-enable-section');
+            const disable2faSection = document.getElementById('2fa-disable-section');
+            const twoFaQrCode = document.getElementById('2fa-qr-code');
+            const twoFaSecretKey = document.getElementById('2fa-secret-key');
+            const twoFaVerifyForm = document.getElementById('2fa-verify-form');
+            const twoFaCodeInput = document.getElementById('2fa-code-input');
+            const disable2faButton = document.getElementById('disable-2fa-button');
+            const close2faModalButton = document.getElementById('close-2fa-modal');
 
-        const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebar-toggle');
-        const navButtons = document.querySelectorAll('.nav-button');
-        const logoutButton = document.getElementById('logout-button');
-        const currentViewTitle = document.getElementById('current-view-title');
+            const orderDetailsModal = document.getElementById('order-details-modal');
+            const closeOrderDetailsModalButton = document.getElementById('close-order-details-modal');
 
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const globalErrorMessage = document.getElementById('global-error-message');
-        const globalErrorText = document.getElementById('global-error-text');
-        const globalSuccessMessage = document.getElementById('global-success-message');
-        const globalSuccessText = document.getElementById('global-success-text');
+            const editMenuItemModal = document.getElementById('edit-menu-item-modal');
+            const editModalTitle = document.getElementById('edit-modal-title');
+            const menuItemForm = document.getElementById('menu-item-form');
+            const editItemId = document.getElementById('edit-item-id');
+            const editItemName = document.getElementById('edit-item-name');
+            const editItemDescription = document.getElementById('edit-item-description');
+            const editItemPrice = document.getElementById('edit-item-price');
+            const editItemImageUrl = document.getElementById('edit-item-image-url');
+            const editItemCategory = document.getElementById('edit-item-category');
+            const editItemIsAvailable = document.getElementById('edit-item-is-available');
+            const editItemIsTrending = document.getElementById('edit-item-is-trending');
+            const cancelEditItemButton = document.getElementById('cancel-edit-item');
 
-        const contentSections = document.querySelectorAll('.content-section');
+            // WhatsApp Bot Elements
+            const whatsappStatusBadge = document.getElementById('whatsapp-status-badge');
+            const lastAuthenticatedAt = document.getElementById('last-authenticated-at');
+            const qrCodeContainer = document.getElementById('qr-code-container');
+            const qrCodeImage = document.getElementById('qr-code-image');
+            const qrMessage = document.getElementById('qr-message');
+            const loadSessionButton = document.getElementById('load-session-button');
+            const whatsappLogs = document.getElementById('whatsapp-logs');
 
-        // Bot Status Elements
-        const botStatusSection = document.getElementById('bot-status-section');
-        const botStatusText = document.getElementById('bot-status-text');
-        const statusIcon = document.getElementById('status-icon');
-        const lastAuthenticatedAt = document.getElementById('last-authenticated-at');
-        const qrCodeAvailable = document.getElementById('qr-code-available');
-        const loadSessionButton = document.getElementById('load-session-button');
-        const actionMessageElement = document.getElementById('action-message');
-        const qrCodeDisplay = document.getElementById('qr-code-display');
-        const qrCodeImg = document.getElementById('qr-code-img');
-        const whatsappLogs = document.getElementById('whatsapp-logs');
+            // Settings Elements
+            const generalSettingsForm = document.getElementById('general-settings-form');
+            const shopNameInput = document.getElementById('shop-name');
+            const shopLatitudeInput = document.getElementById('shop-latitude');
+            const shopLongitudeInput = document.getElementById('shop-longitude');
+            const deliveryRatesContainer = document.getElementById('delivery-rates-container');
+            const addDeliveryRateButton = document.getElementById('add-delivery-rate-button');
+            const saveDeliveryRatesButton = document.getElementById('save-delivery-rates-button');
+            const discountSettingsForm = document.getElementById('discount-settings-form');
+            const minSubtotalDiscountInput = document.getElementById('min-subtotal-discount');
+            const discountPercentageInput = document.getElementById('discount-percentage');
 
-        // Menu Management Elements
-        const menuManagementSection = document.getElementById('menu-management-section');
-        const addMenuItemButton = document.getElementById('add-menu-item-button');
-        const menuItemsTableBody = document.getElementById('menu-items-table-body');
-        const noMenuItemsMessage = document.getElementById('no-menu-items-message');
 
-        // Order Management Elements
-        const orderManagementSection = document.getElementById('order-management-section');
-        const orderStatusFilter = document.getElementById('order-status-filter');
-        const orderSearchTerm = document.getElementById('order-search-term');
-        const ordersTableBody = document.getElementById('orders-table-body');
-        const noOrdersMessage = document.getElementById('no-orders-message');
+            let current2faSecret = null; // Temporarily holds the generated secret for verification
 
-        // Customer Management Elements
-        const customerManagementSection = document.getElementById('customer-management-section');
-        const customerSearchTerm = document.getElementById('customer-search-term');
-        const customersTableBody = document.getElementById('customers-table-body');
-        const noCustomersMessage = document.getElementById('no-customers-message');
-
-        // Settings Elements
-        const settingsSection = document.getElementById('settings-section');
-        const settingsForm = document.getElementById('settings-form');
-        const shopNameInput = document.getElementById('shopName');
-        const shopLatitudeInput = document.getElementById('shopLatitude');
-        const shopLongitudeInput = document.getElementById('shopLongitude');
-        const deliveryRatesContainer = document.getElementById('delivery-rates-container');
-        const addDeliveryRateButton = document.getElementById('add-delivery-rate-button');
-        const saveSettingsButton = document.getElementById('save-settings-button');
-
-        // 2FA Elements
-        const twoFactorAuthSection = document.getElementById('two-factor-auth-section');
-        const twoFaStatusSpan = document.getElementById('2fa-status');
-        const toggle2FaButton = document.getElementById('toggle-2fa-button');
-
-        // Modal Elements
-        const modalBackdrop = document.getElementById('modal-backdrop');
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalCloseButton = document.getElementById('modal-close-button');
-        const modalCloseFooterButton = document.getElementById('modal-close-footer-button');
-
-        // --- Socket.io Instance ---
-        let socket;
-
-        // --- Utility Functions ---
-        function showLoadingSpinner() {
-            loadingSpinner.classList.remove('hidden');
-        }
-
-        function hideLoadingSpinner() {
-            loadingSpinner.classList.add('hidden');
-        }
-
-        function showErrorMessage(message, targetElement = globalErrorMessage, targetTextElement = globalErrorText) {
-            targetTextElement.textContent = message;
-            targetElement.classList.remove('hidden');
-            setTimeout(() => {
-                targetElement.classList.add('hidden');
-            }, 5000); // Hide after 5 seconds
-        }
-
-        function showSuccessMessage(message, targetElement = globalSuccessMessage, targetTextElement = globalSuccessText) {
-            targetTextElement.textContent = message;
-            targetElement.classList.remove('hidden');
-            setTimeout(() => {
-                targetElement.classList.add('hidden');
-            }, 5000); // Hide after 5 seconds
-        }
-
-        function clearMessages() {
-            globalErrorMessage.classList.add('hidden');
-            globalSuccessMessage.classList.add('hidden');
-            actionMessageElement.textContent = '';
-        }
-
-        function showModal(title, contentHtml, onCloseCallback = null) {
-            modalTitle.textContent = title;
-            modalBody.innerHTML = contentHtml;
-            modalBackdrop.classList.remove('hidden');
-            appState.modal.isOpen = true;
-            appState.modal.onClose = onCloseCallback;
-            // Ensure icons are rendered in modal content
-            lucide.createIcons();
-        }
-
-        function hideModal() {
-            modalBackdrop.classList.add('hidden');
-            appState.modal.isOpen = false;
-            appState.modal.onClose = null;
-            modalBody.innerHTML = ''; // Clear content
-        }
-
-        modalCloseButton.addEventListener('click', hideModal);
-        modalCloseFooterButton.addEventListener('click', hideModal);
-        modalBackdrop.addEventListener('click', (e) => {
-            if (e.target === modalBackdrop) {
-                hideModal();
-            }
-        });
-
-        // --- API Utility Function ---
-        async function fetchWithAuth(url, options = {}) {
-            const token = localStorage.getItem('jwtToken');
-            const headers = {
-                'Content-Type': 'application/json',
-                ...options.headers,
-            };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
+            // --- Utility Functions ---
+            function showMessageModal(title, content) {
+                messageModalTitle.textContent = title;
+                messageModalContent.textContent = content;
+                messageModal.classList.remove('hidden');
             }
 
-            const response = await fetch(`${API_BASE_URL}${url}`, { ...options, headers });
-
-            if (response.status === 401 || response.status === 403) {
-                showErrorMessage('Session expired or unauthorized. Please log in again.');
-                logout(); // Call logout to clear token and redirect
-                throw new Error('Unauthorized or Forbidden');
+            function hideMessageModal() {
+                messageModal.classList.add('hidden');
             }
 
-            return response;
-        }
+            messageModalCloseButton.addEventListener('click', hideMessageModal);
 
-        // --- Authentication ---
-        async function handleLogin(e) {
-            e.preventDefault();
-            const username = loginForm.username.value;
-            const password = loginForm.password.value;
-            const totpCode = loginForm.totpCode.value;
+            function formatTimestamp(timestamp) {
+                if (!timestamp) return 'N/A';
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) return 'Invalid Date';
+                return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
+            }
 
-            loginButton.textContent = 'Logging in...';
-            loginButton.disabled = true;
-            loginErrorMessage.classList.add('hidden');
+            function getStatusBadgeClass(status) {
+                switch (status) {
+                    case 'Pending': return 'status-pending';
+                    case 'Confirmed': return 'status-confirmed';
+                    case 'Preparing': return 'status-preparing';
+                    case 'Out for Delivery': return 'status-out-for-delivery';
+                    case 'Delivered': return 'status-delivered';
+                    case 'Cancelled': return 'status-cancelled';
+                    case 'ready': return 'bg-green-200 text-green-800';
+                    case 'qr_received': return 'bg-yellow-200 text-yellow-800';
+                    case 'authenticated': return 'bg-blue-200 text-blue-800';
+                    case 'disconnected': return 'bg-red-200 text-red-800';
+                    case 'auth_failure': return 'bg-red-200 text-red-800';
+                    case 'initializing': return 'bg-gray-200 text-gray-800';
+                    case 'qr_error': return 'bg-red-200 text-red-800';
+                    default: return 'bg-gray-200 text-gray-800';
+                }
+            }
 
-            try {
-                const response = await fetch('/admin/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password, totpCode }),
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.message || 'Login failed');
+            // --- Authentication Check ---
+            async function checkAuth() {
+                const token = localStorage.getItem('jwtToken');
+                if (!token) {
+                    window.location.href = '/admin/login';
+                    return false;
                 }
 
-                localStorage.setItem('jwtToken', data.token);
-                appState.isAuthenticated = true;
-                render(); // Re-render the app to show dashboard
-            } catch (err) {
-                loginErrorText.textContent = err.message;
-                loginErrorMessage.classList.remove('hidden');
-            } finally {
-                loginButton.textContent = 'Login';
-                loginButton.disabled = false;
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('jwtToken');
-            appState.isAuthenticated = false;
-            if (socket) {
-                socket.disconnect();
-                socket = null;
-            }
-            render(); // Re-render to show login page
-        }
-
-        function checkAuth() {
-            const token = localStorage.getItem('jwtToken');
-            if (token) {
                 try {
-                    const decoded = jwtDecode(token);
-                    if (decoded.exp * 1000 < Date.now()) {
-                        console.log('Token expired.');
+                    // Make a lightweight authenticated API call to verify token
+                    const response = await fetch('/api/admin/bot-status', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.status === 401 || response.status === 403) {
                         localStorage.removeItem('jwtToken');
-                        appState.isAuthenticated = false;
+                        window.location.href = '/admin/login';
+                        return false;
+                    }
+                    if (!response.ok) {
+                        throw new Error('Authentication check failed.');
+                    }
+                    return true;
+                } catch (error) {
+                    console.error('Authentication check error:', error);
+                    localStorage.removeItem('jwtToken');
+                    window.location.href = '/admin/login';
+                    return false;
+                }
+            }
+
+            // --- Navigation and Section Switching ---
+            function showSection(sectionId) {
+                contentSections.forEach(section => {
+                    section.classList.add('hidden');
+                });
+                document.getElementById(sectionId).classList.remove('hidden');
+                pageTitle.textContent = sectionId.replace('-', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+                sidebarLinks.forEach(link => {
+                    link.classList.remove('bg-indigo-50', 'text-indigo-600');
+                    link.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-600');
+                    if (link.dataset.section === sectionId) {
+                        link.classList.add('bg-indigo-50', 'text-indigo-600');
+                        link.classList.remove('text-gray-700');
+                    }
+                });
+
+                // Load data for the active section
+                switch (sectionId) {
+                    case 'dashboard-section':
+                        fetchDashboardStats();
+                        fetchRecentOrders();
+                        break;
+                    case 'menu-section':
+                        fetchMenuItems();
+                        break;
+                    case 'orders-section':
+                        fetchOrders();
+                        break;
+                    case 'customers-section':
+                        fetchCustomers();
+                        break;
+                    case 'settings-section':
+                        fetchSettings();
+                        fetchDiscountSettings();
+                        break;
+                    case 'whatsapp-bot-section':
+                        fetchWhatsappStatus();
+                        break;
+                }
+            }
+
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const sectionId = link.dataset.section + '-section';
+                    window.location.hash = link.dataset.section;
+                    showSection(sectionId);
+                });
+            });
+
+            // Handle initial hash or default to dashboard
+            if (window.location.hash) {
+                const initialSection = window.location.hash.substring(1);
+                showSection(initialSection + '-section');
+            } else {
+                showSection('dashboard-section');
+            }
+
+            // --- Logout ---
+            logoutButton.addEventListener('click', () => {
+                localStorage.removeItem('jwtToken');
+                window.location.href = '/admin/login';
+            });
+
+            // --- Modals Event Listeners ---
+            twoFactorSettingsButton.addEventListener('click', async () => {
+                twoFactorModal.classList.remove('hidden');
+                await fetch2faStatus();
+            });
+
+            close2faModalButton.addEventListener('click', () => {
+                twoFactorModal.classList.add('hidden');
+                // Reset sections
+                enable2faSection.classList.add('hidden');
+                disable2faSection.classList.add('hidden');
+                twoFaQrCode.classList.add('hidden');
+                twoFaQrCode.src = '';
+                twoFaSecretKey.textContent = '';
+                twoFaCodeInput.value = '';
+                current2faSecret = null;
+            });
+
+            closeOrderDetailsModalButton.addEventListener('click', () => {
+                orderDetailsModal.classList.add('hidden');
+            });
+
+            cancelEditItemButton.addEventListener('click', () => {
+                editMenuItemModal.classList.add('hidden');
+                menuItemForm.reset();
+            });
+
+            // --- 2FA Logic ---
+            async function fetch2faStatus() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/2fa/status', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+
+                    enable2faSection.classList.add('hidden');
+                    disable2faSection.classList.add('hidden');
+                    twoFaQrCode.classList.add('hidden');
+                    twoFaQrCode.src = '';
+                    twoFaSecretKey.textContent = '';
+                    twoFaCodeInput.value = '';
+                    current2faSecret = null;
+
+                    if (data.twoFactorEnabled) {
+                        current2faStatus.textContent = 'Enabled';
+                        current2faStatus.classList.remove('text-red-600', 'text-yellow-600');
+                        current2faStatus.classList.add('text-green-600');
+                        disable2faSection.classList.remove('hidden');
                     } else {
-                        appState.isAuthenticated = true;
+                        current2faStatus.textContent = 'Disabled';
+                        current2faStatus.classList.remove('text-green-600', 'text-yellow-600');
+                        current2faStatus.classList.add('text-red-600');
+                        enable2faSection.classList.remove('hidden');
+                        await generate2faQrCode(); // Generate QR if 2FA is disabled
                     }
                 } catch (error) {
-                    console.error('Failed to decode token:', error);
-                    localStorage.removeItem('jwtToken');
-                    appState.isAuthenticated = false;
+                    console.error('Error fetching 2FA status:', error);
+                    showMessageModal('Error', 'Failed to fetch 2FA status.');
                 }
-            } else {
-                appState.isAuthenticated = false;
             }
-        }
 
-        // --- Navigation ---
-        function navigateTo(view) {
-            appState.currentView = view;
-            renderContentSection();
-            // Close sidebar on mobile when a navigation button is clicked
-            if (window.innerWidth < 768) { // md breakpoint in Tailwind
-                sidebar.classList.add('-translate-x-full');
-            }
-        }
-
-        function renderSidebar() {
-            navButtons.forEach(button => {
-                const view = button.dataset.view;
-                if (view === appState.currentView) {
-                    button.classList.add('bg-red-800', 'shadow-md');
-                    button.classList.remove('hover:bg-red-500', 'hover:text-white');
-                } else {
-                    button.classList.remove('bg-red-800', 'shadow-md');
-                    button.classList.add('hover:bg-red-500', 'hover:text-white');
+            async function generate2faQrCode() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/2fa/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        twoFaQrCode.src = data.qrCodeUrl;
+                        twoFaQrCode.classList.remove('hidden');
+                        twoFaSecretKey.textContent = `Secret: ${data.secret}`;
+                        current2faSecret = data.secret; // Store the secret temporarily
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to generate 2FA QR code.');
+                    }
+                } catch (error) {
+                    console.error('Error generating 2FA QR code:', error);
+                    showMessageModal('Error', 'Failed to generate 2FA QR code.');
                 }
-            });
-            const activeNav = Array.from(navButtons).find(btn => btn.dataset.view === appState.currentView);
-            currentViewTitle.textContent = activeNav ? activeNav.textContent.trim() : 'Dashboard';
-        }
-
-        // --- Content Section Rendering ---
-        function renderContentSection() {
-            clearMessages();
-            contentSections.forEach(section => {
-                section.classList.add('hidden');
-            });
-
-            switch (appState.currentView) {
-                case 'bot-status':
-                    botStatusSection.classList.remove('hidden');
-                    renderBotStatus();
-                    break;
-                case 'menu-management':
-                    menuManagementSection.classList.remove('hidden');
-                    fetchMenuItems(); // Fetch data when navigating to this section
-                    break;
-                case 'order-management':
-                    orderManagementSection.classList.remove('hidden');
-                    fetchOrders(); // Fetch data when navigating to this section
-                    break;
-                case 'customer-management':
-                    customerManagementSection.classList.remove('hidden');
-                    fetchCustomers(); // Fetch data when navigating to this section
-                    break;
-                case 'settings':
-                    settingsSection.classList.remove('hidden');
-                    fetchSettings(); // Fetch data when navigating to this section
-                    break;
-                case 'two-factor-auth':
-                    twoFactorAuthSection.classList.remove('hidden');
-                    fetch2FAStatus(); // Fetch data when navigating to this section
-                    break;
-                default:
-                    botStatusSection.classList.remove('hidden');
-                    renderBotStatus();
-                    break;
-            }
-            renderSidebar(); // Update sidebar active state
-        }
-
-        // --- Bot Status Functions ---
-        async function fetchBotStatus() {
-            showLoadingSpinner();
-            try {
-                const response = await fetchWithAuth('/api/admin/bot-status');
-                const data = await response.json();
-                appState.botStatus.status = data.status;
-                appState.botStatus.lastAuthenticatedAt = data.lastAuthenticatedAt;
-                appState.botStatus.qrCode = data.qrCodeAvailable ? appState.botStatus.qrCode : null; // Clear QR if not available
-                renderBotStatus();
-            } catch (err) {
-                showErrorMessage(err.message);
-            } finally {
-                hideLoadingSpinner();
-            }
-        }
-
-        function getStatusColorClass(status) {
-            switch (status) {
-                case 'ready': return 'text-green-600';
-                case 'qr_received': return 'text-yellow-600';
-                case 'authenticated': return 'text-blue-600';
-                case 'initializing': return 'text-indigo-600';
-                case 'auth_failure':
-                case 'qr_error':
-                case 'disconnected': return 'text-red-600';
-                default: return 'text-gray-600';
-            }
-        }
-
-        function renderBotStatus() {
-            const status = appState.botStatus.status;
-            botStatusText.textContent = status.replace(/_/g, ' ').toUpperCase();
-            statusIcon.className = `lucide lucide-qr-code mr-3 ${getStatusColorClass(status)}`;
-            lastAuthenticatedAt.textContent = appState.botStatus.lastAuthenticatedAt ? new Date(appState.botStatus.lastAuthenticatedAt).toLocaleString() : 'N/A';
-            qrCodeAvailable.textContent = appState.botStatus.qrCode ? 'YES' : 'NO';
-            qrCodeAvailable.className = `font-semibold text-lg ${appState.botStatus.qrCode ? 'text-green-600' : 'text-red-600'}`;
-
-            if (appState.botStatus.qrCode && status === 'qr_received') {
-                qrCodeImg.src = appState.botStatus.qrCode;
-                qrCodeDisplay.classList.remove('hidden');
-            } else {
-                qrCodeDisplay.classList.add('hidden');
             }
 
-            actionMessageElement.textContent = appState.botStatus.actionMessage || '';
-            loadSessionButton.disabled = status === 'initializing';
-            loadSessionButton.textContent = status === 'initializing' ? 'Initializing...' : 'Force New Session / Generate QR';
-
-            whatsappLogs.innerHTML = '';
-            if (appState.botStatus.logs.length === 0) {
-                whatsappLogs.innerHTML = '<p>No logs yet.</p>';
-            } else {
-                appState.botStatus.logs.forEach(log => {
-                    const p = document.createElement('p');
-                    p.className = 'mb-1 last:mb-0';
-                    p.textContent = log;
-                    whatsappLogs.appendChild(p);
-                });
-            }
-        }
-
-        async function handleLoadSession() {
-            appState.botStatus.actionMessage = 'Requesting new session/QR code...';
-            renderBotStatus();
-            try {
-                const response = await fetchWithAuth('/api/admin/load-session', { method: 'POST' });
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(errData.message || 'Failed to request new session.');
-                }
-                const data = await response.json();
-                appState.botStatus.actionMessage = data.message;
-            } catch (err) {
-                showErrorMessage(err.message);
-                appState.botStatus.actionMessage = null;
-            } finally {
-                renderBotStatus();
-            }
-        }
-
-        // --- Menu Management Functions ---
-        async function fetchMenuItems() {
-            showLoadingSpinner();
-            try {
-                const response = await fetchWithAuth('/api/admin/menu');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch menu items');
-                }
-                const data = await response.json();
-                appState.menuItems = data;
-                renderMenuItems();
-            } catch (err) {
-                showErrorMessage(err.message);
-            } finally {
-                hideLoadingSpinner();
-            }
-        }
-
-        function renderMenuItems() {
-            menuItemsTableBody.innerHTML = '';
-            if (appState.menuItems.length === 0) {
-                noMenuItemsMessage.classList.remove('hidden');
-                menuItemsTableBody.innerHTML = ''; // Ensure empty table
-            } else {
-                noMenuItemsMessage.classList.add('hidden');
-                appState.menuItems.forEach(item => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.name}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.category || 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹${item.price.toFixed(2)}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <button data-id="${item._id}" data-prop="isAvailable" data-value="${item.isAvailable}"
-                                class="toggle-boolean-button px-3 py-1 rounded-full text-xs font-semibold ${item.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                                ${item.isAvailable ? 'Yes' : 'No'}
-                            </button>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <button data-id="${item._id}" data-prop="isTrending" data-value="${item.isTrending}"
-                                class="toggle-boolean-button px-3 py-1 rounded-full text-xs font-semibold ${item.isTrending ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}">
-                                ${item.isTrending ? 'Yes' : 'No'}
-                            </button>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button data-id="${item._id}" class="edit-menu-item-button text-red-600 hover:text-red-900 mr-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                            </button>
-                            <button data-id="${item._id}" class="delete-menu-item-button text-red-600 hover:text-red-900">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                            </button>
-                        </td>
-                    `;
-                    menuItemsTableBody.appendChild(row);
-                });
-            }
-        }
-
-        function showMenuItemFormModal(item = null) {
-            const title = item ? 'Edit Menu Item' : 'Add New Menu Item';
-            const formHtml = `
-                <form id="menu-item-form" class="space-y-4">
-                    <div id="form-error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
-                        <strong class="font-bold">Error!</strong>
-                        <span class="block sm:inline ml-2" id="form-error-text"></span>
-                    </div>
-                    <div>
-                        <label for="item-name" class="block text-sm font-medium text-gray-700">Name</label>
-                        <input type="text" id="item-name" name="name" value="${item ? item.name : ''}" required
-                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="item-description" class="block text-sm font-medium text-gray-700">Description</label>
-                        <textarea id="item-description" name="description" rows="3"
-                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">${item ? item.description : ''}</textarea>
-                    </div>
-                    <div>
-                        <label for="item-price" class="block text-sm font-medium text-gray-700">Price (₹)</label>
-                        <input type="number" id="item-price" name="price" value="${item ? item.price : ''}" required min="0.01" step="0.01"
-                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="item-imageUrl" class="block text-sm font-medium text-gray-700">Image URL</label>
-                        <input type="url" id="item-imageUrl" name="imageUrl" value="${item ? item.imageUrl : ''}"
-                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                    </div>
-                    <div>
-                        <label for="item-category" class="block text-sm font-medium text-gray-700">Category</label>
-                        <input type="text" id="item-category" name="category" value="${item ? item.category : ''}"
-                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                    </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" id="item-isAvailable" name="isAvailable" ${item && item.isAvailable ? 'checked' : ''}
-                            class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
-                        <label for="item-isAvailable" class="ml-2 block text-sm text-gray-900">Is Available</label>
-                    </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" id="item-isTrending" name="isTrending" ${item && item.isTrending ? 'checked' : ''}
-                            class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
-                        <label for="item-isTrending" class="ml-2 block text-sm text-gray-900">Is Trending</label>
-                    </div>
-                    <div class="pt-4 border-t border-gray-200">
-                        <button type="submit" id="save-menu-item-button"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm">
-                            ${item ? 'Update Item' : 'Add Item'}
-                        </button>
-                    </div>
-                </form>
-            `;
-            showModal(title, formHtml, () => { /* No specific action on close */ });
-
-            document.getElementById('menu-item-form').addEventListener('submit', async (e) => {
+            twoFaVerifyForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const formData = {
-                    name: document.getElementById('item-name').value,
-                    description: document.getElementById('item-description').value,
-                    price: parseFloat(document.getElementById('item-price').value),
-                    imageUrl: document.getElementById('item-imageUrl').value,
-                    category: document.getElementById('item-category').value,
-                    isAvailable: document.getElementById('item-isAvailable').checked,
-                    isTrending: document.getElementById('item-isTrending').checked,
+                const totpCode = twoFaCodeInput.value;
+                if (!totpCode || totpCode.length !== 6) {
+                    showMessageModal('Error', 'Please enter a valid 6-digit code.');
+                    return;
+                }
+                if (!current2faSecret) {
+                    showMessageModal('Error', 'No 2FA secret available. Please regenerate QR.');
+                    return;
+                }
+
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/2fa/verify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ totpCode, secret: current2faSecret })
+                    });
+                    const data = await response.json();
+                    if (response.ok && data.verified) {
+                        showMessageModal('Success', '2FA enabled successfully!');
+                        twoFactorModal.classList.add('hidden');
+                        fetch2faStatus(); // Refresh status
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to verify 2FA code.');
+                    }
+                } catch (error) {
+                    console.error('Error verifying 2FA code:', error);
+                    showMessageModal('Error', 'Failed to verify 2FA code.');
+                }
+            });
+
+            disable2faButton.addEventListener('click', async () => {
+                if (confirm('Are you sure you want to disable Two-Factor Authentication?')) {
+                    try {
+                        const token = localStorage.getItem('jwtToken');
+                        const response = await fetch('/api/admin/2fa/disable', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                            showMessageModal('Success', '2FA disabled successfully!');
+                            twoFactorModal.classList.add('hidden');
+                            fetch2faStatus(); // Refresh status
+                        } else {
+                            showMessageModal('Error', data.message || 'Failed to disable 2FA.');
+                        }
+                    } catch (error) {
+                        console.error('Error disabling 2FA:', error);
+                        showMessageModal('Error', 'Failed to disable 2FA.');
+                    }
+                }
+            });
+
+            // --- WhatsApp Bot Logic ---
+            const socket = io();
+
+            socket.on('status', (status) => {
+                console.log('Socket: WhatsApp Status received:', status);
+                whatsappStatusBadge.textContent = status.replace('_', ' ').toUpperCase();
+                whatsappStatusBadge.className = `status-badge ${getStatusBadgeClass(status)}`;
+                if (status === 'qr_received') {
+                    qrMessage.textContent = 'Please scan the QR code above.';
+                    qrCodeImage.classList.remove('hidden');
+                } else if (status === 'ready') {
+                    qrMessage.textContent = 'WhatsApp client is connected!';
+                    qrCodeImage.classList.add('hidden');
+                    qrCodeImage.src = '';
+                } else {
+                    qrMessage.textContent = 'QR code will appear here';
+                    qrCodeImage.classList.add('hidden');
+                    qrCodeImage.src = '';
+                }
+            });
+
+            socket.on('qrCode', (qrData) => {
+                console.log('Socket: QR Code received.');
+                if (qrData) {
+                    qrCodeImage.src = qrData;
+                    qrCodeImage.classList.remove('hidden');
+                    qrMessage.textContent = 'Scan this QR code.';
+                } else {
+                    qrCodeImage.src = '';
+                    qrCodeImage.classList.add('hidden');
+                    qrMessage.textContent = 'QR code will appear here';
+                }
+            });
+
+            socket.on('sessionInfo', (info) => {
+                console.log('Socket: Session Info received:', info);
+                lastAuthenticatedAt.textContent = info.lastAuthenticatedAt ? formatTimestamp(info.lastAuthenticatedAt) : 'N/A';
+            });
+
+            socket.on('whatsapp_log', (logMessage) => {
+                const p = document.createElement('p');
+                p.textContent = `[${formatTimestamp(new Date())}] ${logMessage}`;
+                whatsappLogs.appendChild(p);
+                whatsappLogs.scrollTop = whatsappLogs.scrollHeight; // Auto-scroll to bottom
+            });
+
+            socket.on('new_order', (order) => {
+                console.log('Socket: New order received:', order);
+                showMessageModal('New Order!', `New order received from ${order.customerName} (ID: ${order.customOrderId}). Total: ₹${order.totalAmount.toFixed(2)}`);
+                // Refresh orders list if currently on orders section
+                if (!document.getElementById('orders-section').classList.contains('hidden')) {
+                    fetchOrders();
+                }
+                // Refresh dashboard stats and recent orders
+                if (!document.getElementById('dashboard-section').classList.contains('hidden')) {
+                    fetchDashboardStats();
+                    fetchRecentOrders();
+                }
+            });
+
+            loadSessionButton.addEventListener('click', async () => {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/load-session', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to initiate session load.');
+                    }
+                } catch (error) {
+                    console.error('Error loading session:', error);
+                    showMessageModal('Error', 'Failed to load session.');
+                }
+            });
+
+            viewLogsButton.addEventListener('click', () => {
+                // This button now simply navigates to the WhatsApp Bot section
+                window.location.hash = 'whatsapp-bot';
+                showSection('whatsapp-bot-section');
+            });
+
+
+            async function fetchWhatsappStatus() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/bot-status', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        whatsappStatusBadge.textContent = data.status.replace('_', ' ').toUpperCase();
+                        whatsappStatusBadge.className = `status-badge ${getStatusBadgeClass(data.status)}`;
+                        lastAuthenticatedAt.textContent = data.lastAuthenticatedAt ? formatTimestamp(data.lastAuthenticatedAt) : 'N/A';
+                        if (data.qrCodeAvailable) {
+                            qrMessage.textContent = 'QR code is available. Please scan.';
+                            // QR image will be populated by socket.io 'qrCode' event
+                        } else if (data.status === 'ready') {
+                            qrMessage.textContent = 'WhatsApp client is connected!';
+                            qrCodeImage.classList.add('hidden');
+                        } else {
+                            qrMessage.textContent = 'QR code will appear here';
+                            qrCodeImage.classList.add('hidden');
+                        }
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to fetch WhatsApp status.');
+                    }
+                } catch (error) {
+                    console.error('Error fetching WhatsApp status:', error);
+                    showMessageModal('Error', 'Failed to fetch WhatsApp status.');
+                }
+            }
+
+            // --- Dashboard Stats & Recent Orders ---
+            async function fetchDashboardStats() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const ordersResponse = await fetch('/api/admin/orders', { headers: { 'Authorization': `Bearer ${token}` } });
+                    const customersResponse = await fetch('/api/admin/customers', { headers: { 'Authorization': `Bearer ${token}` } });
+
+                    if (!ordersResponse.ok || !customersResponse.ok) {
+                        throw new Error('Failed to fetch dashboard stats.');
+                    }
+
+                    const orders = await ordersResponse.json();
+                    const customers = await customersResponse.json();
+
+                    document.getElementById('total-orders-stat').textContent = orders.length;
+                    document.getElementById('pending-orders-stat').textContent = orders.filter(o => o.status === 'Pending').length;
+                    document.getElementById('delivered-orders-stat').textContent = orders.filter(o => o.status === 'Delivered').length;
+                    document.getElementById('total-customers-stat').textContent = customers.length;
+
+                } catch (error) {
+                    console.error('Error fetching dashboard stats:', error);
+                    showMessageModal('Error', 'Failed to load dashboard statistics.');
+                }
+            }
+
+            async function fetchRecentOrders() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/orders', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch recent orders.');
+                    }
+                    const orders = await response.json();
+                    const recentOrders = orders.slice(0, 5); // Get top 5 recent orders
+
+                    const tableBody = document.getElementById('dashboard-recent-orders-table-body');
+                    tableBody.innerHTML = ''; // Clear existing rows
+
+                    if (recentOrders.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-500">No recent orders.</td></tr>';
+                        return;
+                    }
+
+                    recentOrders.forEach(order => {
+                        const row = tableBody.insertRow();
+                        row.className = 'table-row';
+                        row.innerHTML = `
+                            <td>${order.customOrderId || order._id.substring(0, 8)}</td>
+                            <td>${order.customerName}</td>
+                            <td>${order.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}</td>
+                            <td>₹${order.totalAmount.toFixed(2)}</td>
+                            <td><span class="status-badge ${getStatusBadgeClass(order.status)}">${order.status}</span></td>
+                            <td>${formatTimestamp(order.orderDate)}</td>
+                            <td>
+                                <button class="btn btn-info btn-sm view-order-details" data-id="${order._id}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </td>
+                        `;
+                    });
+                    addOrderDetailsEventListeners();
+                } catch (error) {
+                    console.error('Error fetching recent orders:', error);
+                    showMessageModal('Error', 'Failed to load recent orders.');
+                }
+            }
+
+            // --- Menu Management ---
+            async function fetchMenuItems() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/menu', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch menu items.');
+                    }
+                    const items = await response.json();
+                    const tableBody = document.getElementById('menu-table-body');
+                    tableBody.innerHTML = '';
+
+                    if (items.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">No menu items. Click "Add New Item" to add some.</td></tr>';
+                        return;
+                    }
+
+                    items.forEach(item => {
+                        const row = tableBody.insertRow();
+                        row.className = 'table-row';
+                        row.innerHTML = `
+                            <td class="w-20 h-20"><img src="${item.imageUrl || 'https://placehold.co/80x80/cccccc/333333?text=No+Image'}" alt="${item.name}" class="w-full h-full object-cover rounded-md"></td>
+                            <td>${item.name}</td>
+                            <td>${item.description || '-'}</td>
+                            <td>₹${item.price.toFixed(2)}</td>
+                            <td>${item.category || '-'}</td>
+                            <td><i class="fas ${item.isAvailable ? 'fa-check-circle text-green-500' : 'fa-times-circle text-red-500'}"></i></td>
+                            <td><i class="fas ${item.isTrending ? 'fa-star text-yellow-500' : 'fa-minus-circle text-gray-400'}"></i></td>
+                            <td class="whitespace-nowrap">
+                                <button class="btn btn-primary btn-sm edit-menu-item-button mr-2" data-id="${item._id}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm delete-menu-item-button" data-id="${item._id}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        `;
+                    });
+                    addMenuItemEventListeners();
+                } catch (error) {
+                    console.error('Error fetching menu items:', error);
+                    showMessageModal('Error', 'Failed to load menu items.');
+                }
+            }
+
+            function addMenuItemEventListeners() {
+                document.querySelectorAll('.edit-menu-item-button').forEach(button => {
+                    button.addEventListener('click', (e) => openEditMenuItemModal(e.currentTarget.dataset.id));
+                });
+                document.querySelectorAll('.delete-menu-item-button').forEach(button => {
+                    button.addEventListener('click', (e) => deleteMenuItem(e.currentTarget.dataset.id));
+                });
+            }
+
+            document.getElementById('add-menu-item-button').addEventListener('click', () => {
+                editModalTitle.textContent = 'Add New Menu Item';
+                menuItemForm.reset();
+                editItemId.value = ''; // Clear ID for new item
+                editMenuItemModal.classList.remove('hidden');
+            });
+
+            async function openEditMenuItemModal(itemId) {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch(`/api/admin/menu/${itemId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch menu item for editing.');
+                    }
+                    const item = await response.json();
+                    editModalTitle.textContent = 'Edit Menu Item';
+                    editItemId.value = item._id;
+                    editItemName.value = item.name;
+                    editItemDescription.value = item.description || '';
+                    editItemPrice.value = item.price;
+                    editItemImageUrl.value = item.imageUrl || '';
+                    editItemCategory.value = item.category || '';
+                    editItemIsAvailable.checked = item.isAvailable;
+                    editItemIsTrending.checked = item.isTrending;
+                    editMenuItemModal.classList.remove('hidden');
+                } catch (error) {
+                    console.error('Error opening edit modal:', error);
+                    showMessageModal('Error', 'Failed to load item details for editing.');
+                }
+            }
+
+            menuItemForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const itemId = editItemId.value;
+                const method = itemId ? 'PUT' : 'POST';
+                const url = itemId ? `/api/admin/menu/${itemId}` : '/api/admin/menu';
+
+                const itemData = {
+                    name: editItemName.value,
+                    description: editItemDescription.value,
+                    price: parseFloat(editItemPrice.value),
+                    imageUrl: editItemImageUrl.value,
+                    category: editItemCategory.value,
+                    isAvailable: editItemIsAvailable.checked,
+                    isTrending: editItemIsTrending.checked
                 };
 
-                const formErrorMessageDiv = document.getElementById('form-error-message');
-                const formErrorText = document.getElementById('form-error-text');
-
-                if (isNaN(formData.price) || formData.price <= 0) {
-                    formErrorText.textContent = 'Price must be a positive number.';
-                    formErrorMessageDiv.classList.remove('hidden');
-                    return;
-                } else {
-                    formErrorMessageDiv.classList.add('hidden');
-                }
-
                 try {
-                    let response;
-                    if (item) { // Editing existing item
-                        response = await fetchWithAuth(`/api/admin/menu/${item._id}`, {
-                            method: 'PUT',
-                            body: JSON.stringify(formData),
-                        });
-                    } else { // Adding new item
-                        response = await fetchWithAuth('/api/admin/menu', {
-                            method: 'POST',
-                            body: JSON.stringify(formData),
-                        });
-                    }
-                    if (!response.ok) {
-                        const errorData = await response.json(); // Assuming backend sends JSON for errors
-                        throw new Error(errorData.message || 'Failed to save item');
-                    }
-                    showSuccessMessage(`Menu item ${item ? 'updated' : 'added'} successfully!`);
-                    hideModal();
-                    fetchMenuItems();
-                } catch (err) {
-                    formErrorText.textContent = err.message;
-                    formErrorMessageDiv.classList.remove('hidden');
-                }
-            });
-        }
-
-        async function handleMenuItemAction(e) {
-            const button = e.target.closest('button');
-            if (!button) return;
-
-            const itemId = button.dataset.id;
-
-            if (button.classList.contains('edit-menu-item-button')) {
-                const itemToEdit = appState.menuItems.find(item => item._id === itemId);
-                if (itemToEdit) showMenuItemFormModal(itemToEdit);
-            } else if (button.classList.contains('delete-menu-item-button')) {
-                // Use a custom modal for confirmation instead of browser's confirm()
-                showModal('Confirm Deletion', `
-                    <p class="text-gray-700 mb-4">Are you sure you want to delete this menu item?</p>
-                    <div class="flex justify-end space-x-3">
-                        <button id="cancel-delete-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md">Cancel</button>
-                        <button id="confirm-delete-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md">Delete</button>
-                    </div>
-                `);
-                document.getElementById('confirm-delete-button').addEventListener('click', async () => {
-                    try {
-                        const response = await fetchWithAuth(`/api/admin/menu/${itemId}`, { method: 'DELETE' });
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.message || 'Failed to delete item');
-                        }
-                        showSuccessMessage('Menu item deleted successfully!');
-                        hideModal();
-                        fetchMenuItems();
-                    } catch (err) {
-                        showErrorMessage(err.message);
-                        hideModal(); // Close modal even on error
-                    }
-                });
-                document.getElementById('cancel-delete-button').addEventListener('click', hideModal);
-
-            } else if (button.classList.contains('toggle-boolean-button')) {
-                const propName = button.dataset.prop;
-                const currentValue = button.dataset.value === 'true';
-                try {
-                    const response = await fetchWithAuth(`/api/admin/menu/${itemId}`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ [propName]: !currentValue }),
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(itemData)
                     });
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.message || `Failed to toggle ${propName}`);
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                        editMenuItemModal.classList.add('hidden');
+                        fetchMenuItems();
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to save menu item.');
                     }
-                    showSuccessMessage(`${propName} toggled successfully!`);
-                    fetchMenuItems();
-                } catch (err) {
-                    showErrorMessage(err.message);
+                } catch (error) {
+                    console.error('Error saving menu item:', error);
+                    showMessageModal('Error', 'Failed to save menu item.');
                 }
-            }
-        }
-
-        // --- Order Management Functions ---
-        async function fetchOrders() {
-            showLoadingSpinner();
-            try {
-                const response = await fetchWithAuth('/api/admin/orders');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch orders');
-                }
-                const data = await response.json();
-                appState.orders = data;
-                renderOrders();
-            } catch (err) {
-                showErrorMessage(err.message);
-            } finally {
-                hideLoadingSpinner();
-            }
-        }
-
-        function getOrderStatusColorClass(status) {
-            switch (status) {
-                case 'Pending': return 'bg-yellow-100 text-yellow-800';
-                case 'Confirmed': return 'bg-blue-100 text-blue-800';
-                case 'Preparing': return 'bg-indigo-100 text-indigo-800';
-                case 'Out for Delivery': return 'bg-purple-100 text-purple-800';
-                case 'Delivered': return 'bg-green-100 text-green-800';
-                case 'Cancelled': return 'bg-red-100 text-red-800';
-                default: return 'bg-gray-100 text-gray-800';
-            }
-        }
-
-        function renderOrders() {
-            ordersTableBody.innerHTML = '';
-            const filteredOrders = appState.orders.filter(order => {
-                const matchesStatus = appState.orderFilters.status === 'All' || order.status === appState.orderFilters.status;
-                const searchTerm = appState.orderFilters.searchTerm.toLowerCase();
-                const matchesSearch = searchTerm === '' ||
-                    order.customOrderId?.toLowerCase().includes(searchTerm) ||
-                    order.pinId?.toLowerCase().includes(searchTerm) ||
-                    order.customerName?.toLowerCase().includes(searchTerm) ||
-                    order.customerPhone?.toLowerCase().includes(searchTerm);
-                return matchesStatus && matchesSearch;
             });
 
-            if (filteredOrders.length === 0) {
-                noOrdersMessage.classList.remove('hidden');
-            } else {
-                noOrdersMessage.classList.add('hidden');
-                filteredOrders.forEach(order => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            ${order.customOrderId || order._id.substring(0, 6) + '...'}
-                            ${order.pinId ? `<span class="block text-xs text-gray-500">PIN: ${order.pinId}</span>` : ''}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ${order.customerName} <span class="block text-xs text-gray-400">${order.customerPhone}</span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹${order.totalAmount.toFixed(2)}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <select data-id="${order._id}" class="order-status-select px-2 py-1 rounded-md text-xs font-semibold ${getOrderStatusColorClass(order.status)}">
-                                <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                                <option value="Confirmed" ${order.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
-                                <option value="Preparing" ${order.status === 'Preparing' ? 'selected' : ''}>Preparing</option>
-                                <option value="Out for Delivery" ${order.status === 'Out for Delivery' ? 'selected' : ''}>Out for Delivery</option>
-                                <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
-                                <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-                            </select>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ${new Date(order.orderDate).toLocaleDateString()}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button data-id="${order._id}" class="view-order-details-button text-blue-600 hover:text-blue-900 mr-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                                View Details
-                            </button>
-                            <button data-id="${order._id}" class="delete-order-button text-red-600 hover:text-red-900">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                            </button>
-                        </td>
-                    `;
-                    ordersTableBody.appendChild(row);
-                });
-            }
-        }
-
-        async function handleOrderStatusChange(e) {
-            const selectElement = e.target;
-            const orderId = selectElement.dataset.id;
-            const newStatus = selectElement.value;
-            try {
-                const response = await fetchWithAuth(`/api/admin/orders/${orderId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ status: newStatus }),
-                });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to update order status');
+            async function deleteMenuItem(itemId) {
+                if (!confirm('Are you sure you want to delete this menu item?')) {
+                    return;
                 }
-                showSuccessMessage('Order status updated successfully!');
-                fetchOrders(); // Re-fetch to update UI
-            } catch (err) {
-                showErrorMessage(err.message);
-            }
-        }
-
-        async function handleDeleteOrder(e) {
-            const button = e.target.closest('button');
-            if (!button) return;
-            const orderId = button.dataset.id;
-            
-            showModal('Confirm Deletion', `
-                <p class="text-gray-700 mb-4">Are you sure you want to delete this order? This action cannot be undone.</p>
-                <div class="flex justify-end space-x-3">
-                    <button id="cancel-delete-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md">Cancel</button>
-                    <button id="confirm-delete-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md">Delete</button>
-                </div>
-            `);
-            document.getElementById('confirm-delete-button').addEventListener('click', async () => {
                 try {
-                    const response = await fetchWithAuth(`/api/admin/orders/${orderId}`, { method: 'DELETE' });
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.message || 'Failed to delete order');
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch(`/api/admin/menu/${itemId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                        fetchMenuItems();
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to delete menu item.');
                     }
-                    showSuccessMessage('Order deleted successfully!');
-                    hideModal();
+                } catch (error) {
+                    console.error('Error deleting menu item:', error);
+                    showMessageModal('Error', 'Failed to delete menu item.');
+                }
+            }
+
+            // --- Order Management ---
+            async function fetchOrders() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/orders', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch orders.');
+                    }
+                    let orders = await response.json();
+
+                    const statusFilter = document.getElementById('order-status-filter').value;
+                    const searchFilter = document.getElementById('order-search').value.toLowerCase();
+
+                    if (statusFilter) {
+                        orders = orders.filter(order => order.status === statusFilter);
+                    }
+                    if (searchFilter) {
+                        orders = orders.filter(order =>
+                            order.customOrderId?.toLowerCase().includes(searchFilter) ||
+                            order.customerPhone.toLowerCase().includes(searchFilter) ||
+                            order.customerName?.toLowerCase().includes(searchFilter)
+                        );
+                    }
+
+                    const tableBody = document.getElementById('orders-table-body');
+                    tableBody.innerHTML = '';
+
+                    if (orders.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-gray-500">No orders found.</td></tr>';
+                        return;
+                    }
+
+                    orders.forEach(order => {
+                        const row = tableBody.insertRow();
+                        row.className = 'table-row';
+                        row.innerHTML = `
+                            <td>${order.customOrderId || order._id.substring(0, 8)}</td>
+                            <td>${order.customerName || 'N/A'}</td>
+                            <td>${order.customerPhone}</td>
+                            <td>${order.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}</td>
+                            <td>₹${order.totalAmount.toFixed(2)}</td>
+                            <td>
+                                <select class="input-field order-status-select" data-id="${order._id}">
+                                    <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                    <option value="Confirmed" ${order.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
+                                    <option value="Preparing" ${order.status === 'Preparing' ? 'selected' : ''}>Preparing</option>
+                                    <option value="Out for Delivery" ${order.status === 'Out for Delivery' ? 'selected' : ''}>Out for Delivery</option>
+                                    <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                                    <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                                </select>
+                            </td>
+                            <td>${order.paymentMethod}</td>
+                            <td>${formatTimestamp(order.orderDate)}</td>
+                            <td class="whitespace-nowrap">
+                                <button class="btn btn-info btn-sm view-order-details mr-2" data-id="${order._id}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm delete-order-button" data-id="${order._id}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        `;
+                    });
+                    addOrderDetailsEventListeners();
+                    addOrderActionsEventListeners();
+                } catch (error) {
+                    console.error('Error fetching orders:', error);
+                    showMessageModal('Error', 'Failed to load orders.');
+                }
+            }
+
+            document.getElementById('apply-order-filter').addEventListener('click', fetchOrders);
+            document.getElementById('order-search').addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
                     fetchOrders();
-                } catch (err) {
-                    showErrorMessage(err.message);
-                    hideModal();
                 }
             });
-            document.getElementById('cancel-delete-button').addEventListener('click', hideModal);
-        }
 
-        function showOrderDetailModal(order) {
-            const customerPhoneFormatted = order.customerPhone.startsWith('+') ? order.customerPhone : `+91${order.customerPhone}`; // Assuming Indian numbers, adjust as needed
-
-            const trackLocationButton = (order.customerLocation && order.customerLocation.latitude && order.customerLocation.longitude) ?
-                `<a href="https://www.google.com/maps/search/?api=1&query=${order.customerLocation.latitude},${order.customerLocation.longitude}" target="_blank"
-                    class="flex-1 inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
-                    Track Location
-                </a>` :
-                `<button disabled class="flex-1 inline-flex justify-center items-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-gray-200 text-base font-medium text-gray-700 cursor-not-allowed sm:text-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
-                    Location N/A
-                </button>`;
-
-            const contentHtml = `
-                <div class="space-y-4 text-gray-700">
-                    <p><strong class="font-semibold">Order ID:</strong> ${order.customOrderId || order._id}</p>
-                    <p><strong class="font-semibold">PIN:</strong> ${order.pinId}</p>
-                    <p><strong class="font-semibold">Customer Name:</strong> ${order.customerName}</p>
-                    <p><strong class="font-semibold">Customer Phone:</strong> ${order.customerPhone}</p>
-                    <p><strong class="font-semibold">Delivery Address:</strong> ${order.deliveryAddress || 'Not provided'}</p>
-                    <p><strong class="font-semibold">Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
-                    <p><strong class="font-semibold">Status:</strong> ${order.status}</p>
-                    <p><strong class="font-semibold">Payment Method:</strong> ${order.paymentMethod}</p>
-                    <p><strong class="font-semibold">Order Date:</strong> ${new Date(order.orderDate).toLocaleString()}</p>
-                    <h4 class="font-semibold text-gray-800 mt-4">Items:</h4>
-                    <ul class="list-disc list-inside ml-4">
-                        ${order.items.map(item => `<li>${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)</li>`).join('')}
-                    </ul>
-                </div>
-                <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-6">
-                    <a href="tel:${customerPhoneFormatted}"
-                        class="flex-1 inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:text-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-phone mr-2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-1.18 2.19l-.7.35a18.78 18.78 0 0 0 6.14 6.14l.35-.7a2 2 0 0 1 2.19-1.18 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92Z"/></svg>
-                        Call Customer
-                    </a>
-                    ${trackLocationButton}
-                </div>
-            `;
-            showModal('Order Details', contentHtml);
-        }
-
-        // --- Customer Management Functions ---
-        async function fetchCustomers() {
-            showLoadingSpinner();
-            try {
-                const response = await fetchWithAuth('/api/admin/customers');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch customers');
-                }
-                const data = await response.json();
-                appState.customers = data;
-                renderCustomers();
-            } catch (err) {
-                showErrorMessage(err.message);
-            } finally {
-                hideLoadingSpinner();
-            }
-        }
-
-        function renderCustomers() {
-            customersTableBody.innerHTML = '';
-            const filteredCustomers = appState.customers.filter(customer => {
-                const searchTerm = appState.customerFilters.searchTerm.toLowerCase();
-                const matchesSearch = searchTerm === '' ||
-                    customer.customerName?.toLowerCase().includes(searchTerm) ||
-                    customer.customerPhone?.toLowerCase().includes(searchTerm);
-                return matchesSearch;
-            });
-
-            if (filteredCustomers.length === 0) {
-                noCustomersMessage.classList.remove('hidden');
-            } else {
-                noCustomersMessage.classList.add('hidden');
-                filteredCustomers.forEach(customer => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${customer.customerName || 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.customerPhone}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.totalOrders}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ${customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString() : 'N/A'}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button data-phone="${customer.customerPhone}" class="view-latest-order-button text-blue-600 hover:text-blue-900 mr-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                                View Latest Order
-                            </button>
-                            <button data-id="${customer._id}" class="delete-customer-button text-red-600 hover:text-red-900">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                            </button>
-                        </td>
-                    `;
-                    customersTableBody.appendChild(row);
+            function addOrderDetailsEventListeners() {
+                document.querySelectorAll('.view-order-details').forEach(button => {
+                    button.addEventListener('click', (e) => viewOrderDetails(e.currentTarget.dataset.id));
                 });
             }
-        }
 
-        async function handleDeleteCustomer(e) {
-            const button = e.target.closest('button');
-            if (!button) return;
-            const customerId = button.dataset.id;
+            function addOrderActionsEventListeners() {
+                document.querySelectorAll('.order-status-select').forEach(select => {
+                    select.addEventListener('change', (e) => updateOrderStatus(e.currentTarget.dataset.id, e.currentTarget.value));
+                });
+                document.querySelectorAll('.delete-order-button').forEach(button => {
+                    button.addEventListener('click', (e) => deleteOrder(e.currentTarget.dataset.id));
+                });
+            }
 
-            showModal('Confirm Deletion', `
-                <p class="text-gray-700 mb-4">Are you sure you want to delete this customer? This will not delete their orders.</p>
-                <div class="flex justify-end space-x-3">
-                    <button id="cancel-delete-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md">Cancel</button>
-                    <button id="confirm-delete-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md">Delete</button>
-                </div>
-            `);
-            document.getElementById('confirm-delete-button').addEventListener('click', async () => {
+            async function viewOrderDetails(orderId) {
                 try {
-                    const response = await fetchWithAuth(`/api/admin/customers/${customerId}`, { method: 'DELETE' });
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch(`/api/admin/orders/${orderId}`, { headers: { 'Authorization': `Bearer ${token}` } });
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.message || 'Failed to delete customer');
+                        throw new Error('Failed to fetch order details.');
                     }
-                    showSuccessMessage('Customer deleted successfully!');
-                    hideModal();
+                    const order = await response.json();
+
+                    document.getElementById('modal-order-id').textContent = order.customOrderId || order._id;
+                    document.getElementById('modal-order-pin').textContent = order.pinId || 'N/A';
+                    document.getElementById('modal-customer-name').textContent = order.customerName || 'N/A';
+                    document.getElementById('modal-customer-phone').textContent = order.customerPhone;
+                    document.getElementById('modal-delivery-address').textContent = order.deliveryAddress || 'N/A';
+                    document.getElementById('modal-customer-location').textContent = order.customerLocation ? `Lat: ${order.customerLocation.latitude}, Lon: ${order.customerLocation.longitude} (${order.customerLocation.address || 'Unknown Address'})` : 'N/A';
+
+                    const itemsList = document.getElementById('modal-order-items');
+                    itemsList.innerHTML = '';
+                    order.items.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = `${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)`;
+                        itemsList.appendChild(li);
+                    });
+
+                    document.getElementById('modal-subtotal').textContent = order.subtotal ? order.subtotal.toFixed(2) : '0.00';
+                    document.getElementById('modal-transport-tax').textContent = order.transportTax ? order.transportTax.toFixed(2) : '0.00';
+                    document.getElementById('modal-discount-amount').textContent = order.discountAmount ? order.discountAmount.toFixed(2) : '0.00';
+                    document.getElementById('modal-total-amount').textContent = order.totalAmount.toFixed(2);
+                    document.getElementById('modal-payment-method').textContent = order.paymentMethod;
+                    document.getElementById('modal-status').textContent = order.status;
+                    document.getElementById('modal-order-date').textContent = formatTimestamp(order.orderDate);
+
+                    orderDetailsModal.classList.remove('hidden');
+                } catch (error) {
+                    console.error('Error viewing order details:', error);
+                    showMessageModal('Error', 'Failed to load order details.');
+                }
+            }
+
+            async function updateOrderStatus(orderId, newStatus) {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch(`/api/admin/orders/${orderId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ status: newStatus })
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                        fetchOrders(); // Refresh the list
+                        fetchDashboardStats(); // Update dashboard stats
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to update order status.');
+                    }
+                } catch (error) {
+                    console.error('Error updating order status:', error);
+                    showMessageModal('Error', 'Failed to update order status.');
+                }
+            }
+
+            async function deleteOrder(orderId) {
+                if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+                    return;
+                }
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch(`/api/admin/orders/${orderId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                        fetchOrders();
+                        fetchDashboardStats();
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to delete order.');
+                    }
+                } catch (error) {
+                    console.error('Error deleting order:', error);
+                    showMessageModal('Error', 'Failed to delete order.');
+                }
+            }
+
+            // --- Customer Management ---
+            async function fetchCustomers() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/customers', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch customers.');
+                    }
+                    let customers = await response.json();
+
+                    const searchFilter = document.getElementById('customer-search').value.toLowerCase();
+                    if (searchFilter) {
+                        customers = customers.filter(customer =>
+                            customer.customerPhone.toLowerCase().includes(searchFilter) ||
+                            customer.customerName?.toLowerCase().includes(searchFilter)
+                        );
+                    }
+
+                    const tableBody = document.getElementById('customers-table-body');
+                    tableBody.innerHTML = '';
+
+                    if (customers.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No customers found.</td></tr>';
+                        return;
+                    }
+
+                    customers.forEach(customer => {
+                        const row = tableBody.insertRow();
+                        row.className = 'table-row';
+                        row.innerHTML = `
+                            <td>${customer.customerPhone}</td>
+                            <td>${customer.customerName || 'N/A'}</td>
+                            <td>${customer.totalOrders}</td>
+                            <td>${customer.lastOrderDate ? formatTimestamp(customer.lastOrderDate) : 'N/A'}</td>
+                            <td>${customer.lastKnownLocation ? `${customer.lastKnownLocation.address || 'Unknown Address'}` : 'N/A'}</td>
+                            <td>
+                                <button class="btn btn-danger btn-sm delete-customer-button" data-id="${customer._id}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        `;
+                    });
+                    addCustomerActionsEventListeners();
+                } catch (error) {
+                    console.error('Error fetching customers:', error);
+                    showMessageModal('Error', 'Failed to load customers.');
+                }
+            }
+
+            document.getElementById('apply-customer-filter').addEventListener('click', fetchCustomers);
+            document.getElementById('customer-search').addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
                     fetchCustomers();
-                } catch (err) {
-                    showErrorMessage(err.message);
-                    hideModal();
                 }
             });
-            document.getElementById('cancel-delete-button').addEventListener('click', hideModal);
-        }
 
-        async function handleViewLatestOrder(e) {
-            const button = e.target.closest('button');
-            if (!button) return;
-            const customerPhone = button.dataset.phone;
-
-            let contentHtml = '<p class="text-center text-gray-600">Loading latest order...</p>';
-            showModal('Latest Order for Customer', contentHtml);
-
-            try {
-                const response = await fetchWithAuth(`/api/admin/customers/${customerPhone}/latest-order`);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to fetch latest order.');
-                }
-                const order = await response.json();
-                contentHtml = `
-                    <div class="space-y-4 text-gray-700">
-                        <p><strong class="font-semibold">Order ID:</strong> ${order.customOrderId || order._id}</p>
-                        <p><strong class="font-semibold">PIN:</strong> ${order.pinId}</p>
-                        <p><strong class="font-semibold">Customer Name:</strong> ${order.customerName}</p>
-                        <p><strong class="font-semibold">Customer Phone:</strong> ${order.customerPhone}</p>
-                        <p><strong class="font-semibold">Delivery Address:</strong> ${order.deliveryAddress}</p>
-                        <p><strong class="font-semibold">Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
-                        <p><strong class="font-semibold">Status:</strong> ${order.status}</p>
-                        <p><strong class="font-semibold">Payment Method:</strong> ${order.paymentMethod}</p>
-                        <p><strong class="font-semibold">Order Date:</strong> ${new Date(order.orderDate).toLocaleString()}</p>
-                        <h4 class="font-semibold text-gray-800 mt-4">Items:</h4>
-                        <ul class="list-disc list-inside ml-4">
-                            ${order.items.map(item => `<li>${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)</li>`).join('')}
-                        </ul>
-                    </div>
-                `;
-                modalBody.innerHTML = contentHtml; // Update modal body directly
-                lucide.createIcons(); // Re-render Lucide icons for dynamically added content
-            } catch (err) {
-                modalBody.innerHTML = `<p class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md">Error: ${err.message}</p>`;
+            function addCustomerActionsEventListeners() {
+                document.querySelectorAll('.delete-customer-button').forEach(button => {
+                    button.addEventListener('click', (e) => deleteCustomer(e.currentTarget.dataset.id));
+                });
             }
-        }
 
-        // --- Settings Functions ---
-        async function fetchSettings() {
-            showLoadingSpinner();
-            try {
-                const response = await fetchWithAuth('/api/admin/settings');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch settings');
+            async function deleteCustomer(customerId) {
+                if (!confirm('Are you sure you want to delete this customer? This will not delete their past orders, but will remove their customer record.')) {
+                    return;
                 }
-                const data = await response.json();
-                appState.settings = data;
-                renderSettingsForm();
-            } catch (err) {
-                showErrorMessage(err.message);
-            } finally {
-                hideLoadingSpinner();
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch(`/api/admin/customers/${customerId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                        fetchCustomers();
+                        fetchDashboardStats();
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to delete customer.');
+                    }
+                } catch (error) {
+                    console.error('Error deleting customer:', error);
+                    showMessageModal('Error', 'Failed to delete customer.');
+                }
             }
-        }
 
-        function renderSettingsForm() {
-            if (!appState.settings) return;
+            // --- Settings Management ---
+            async function fetchSettings() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/settings', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch settings.');
+                    }
+                    const settings = await response.json();
 
-            shopNameInput.value = appState.settings.shopName || '';
-            shopLatitudeInput.value = appState.settings.shopLocation.latitude || '';
-            shopLongitudeInput.value = appState.settings.shopLocation.longitude || '';
+                    shopNameInput.value = settings.shopName || '';
+                    shopLatitudeInput.value = settings.shopLocation?.latitude || '';
+                    shopLongitudeInput.value = settings.shopLocation?.longitude || '';
 
-            deliveryRatesContainer.innerHTML = '';
-            if (appState.settings.deliveryRates && appState.settings.deliveryRates.length > 0) {
-                appState.settings.deliveryRates.forEach((rate, index) => {
+                    renderDeliveryRates(settings.deliveryRates || []);
+                } catch (error) {
+                    console.error('Error fetching settings:', error);
+                    showMessageModal('Error', 'Failed to load general settings.');
+                }
+            }
+
+            generalSettingsForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const settingsData = {
+                    shopName: shopNameInput.value,
+                    shopLocation: {
+                        latitude: parseFloat(shopLatitudeInput.value),
+                        longitude: parseFloat(shopLongitudeInput.value)
+                    }
+                };
+
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/settings', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(settingsData)
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to save general settings.');
+                    }
+                } catch (error) {
+                    console.error('Error saving general settings:', error);
+                    showMessageModal('Error', 'Failed to save general settings.');
+                }
+            });
+
+            function renderDeliveryRates(rates) {
+                deliveryRatesContainer.innerHTML = '';
+                if (rates.length === 0) {
+                    deliveryRatesContainer.innerHTML = '<p class="text-gray-500">No delivery rates configured.</p>';
+                }
+                rates.forEach((rate, index) => {
                     const div = document.createElement('div');
-                    div.className = 'flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 bg-gray-50 p-3 rounded-md border border-gray-200';
+                    div.className = 'flex items-center space-x-3';
                     div.innerHTML = `
-                        <div class="w-full sm:w-1/2">
-                            <label for="kms-${index}" class="block text-xs font-medium text-gray-700">Distance (KMs)</label>
-                            <input type="number" id="kms-${index}" value="${rate.kms}" min="0" step="0.1"
-                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                        </div>
-                        <div class="w-full sm:w-1/2">
-                            <label for="amount-${index}" class="block text-xs font-medium text-gray-700">Amount (₹)</label>
-                            <input type="number" id="amount-${index}" value="${rate.amount}" min="0" step="0.01"
-                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                        </div>
-                        <button type="button" data-index="${index}" class="remove-delivery-rate-button mt-2 sm:mt-0 text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        <input type="number" step="0.01" placeholder="KMs" value="${rate.kms}" class="input-field w-24 delivery-kms" data-index="${index}" required>
+                        <input type="number" step="0.01" placeholder="Amount (₹)" value="${rate.amount}" class="input-field w-32 delivery-amount" data-index="${index}" required>
+                        <button type="button" class="btn btn-danger btn-sm remove-delivery-rate" data-index="${index}">
+                            <i class="fas fa-times"></i>
                         </button>
                     `;
                     deliveryRatesContainer.appendChild(div);
-
-                    // Add event listeners for inputs
-                    div.querySelector(`#kms-${index}`).addEventListener('input', (e) => handleDeliveryRateChange(index, 'kms', e.target.value));
-                    div.querySelector(`#amount-${index}`).addEventListener('input', (e) => handleDeliveryRateChange(index, 'amount', e.target.value));
-                    div.querySelector('.remove-delivery-rate-button').addEventListener('click', () => removeDeliveryRate(index));
                 });
-            } else {
-                deliveryRatesContainer.innerHTML = '<p class="text-gray-600">No delivery rates configured.</p>';
+                addRemoveDeliveryRateListeners();
             }
-        }
 
-        function handleDeliveryRateChange(index, field, value) {
-            const newRates = [...appState.settings.deliveryRates];
-            newRates[index][field] = parseFloat(value) || 0;
-            appState.settings.deliveryRates = newRates;
-            // No re-render here, will be saved on form submit
-        }
+            function addRemoveDeliveryRateListeners() {
+                document.querySelectorAll('.remove-delivery-rate').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        e.target.closest('div').remove();
+                    });
+                });
+            }
 
-        function addDeliveryRate() {
-            appState.settings.deliveryRates.push({ kms: 0, amount: 0 });
-            renderSettingsForm(); // Re-render to show new input fields
-        }
+            addDeliveryRateButton.addEventListener('click', () => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center space-x-3';
+                div.innerHTML = `
+                    <input type="number" step="0.01" placeholder="KMs" class="input-field w-24 delivery-kms" required>
+                    <input type="number" step="0.01" placeholder="Amount (₹)" class="input-field w-32 delivery-amount" required>
+                    <button type="button" class="btn btn-danger btn-sm remove-delivery-rate">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                deliveryRatesContainer.appendChild(div);
+                addRemoveDeliveryRateListeners(); // Re-add listeners for new buttons
+            });
 
-        function removeDeliveryRate(index) {
-            appState.settings.deliveryRates.splice(index, 1);
-            renderSettingsForm(); // Re-render to remove fields
-        }
+            saveDeliveryRatesButton.addEventListener('click', async () => {
+                const rates = [];
+                let isValid = true;
+                document.querySelectorAll('#delivery-rates-container > div').forEach(div => {
+                    const kmsInput = div.querySelector('.delivery-kms');
+                    const amountInput = div.querySelector('.delivery-amount');
+                    const kms = parseFloat(kmsInput.value);
+                    const amount = parseFloat(amountInput.value);
 
-        async function handleSaveSettings(e) {
-            e.preventDefault();
-            showLoadingSpinner();
-            try {
-                const updatedSettings = {
-                    shopName: shopNameInput.value,
-                    shopLocation: {
-                        latitude: parseFloat(shopLatitudeInput.value) || 0,
-                        longitude: parseFloat(shopLongitudeInput.value) || 0,
-                    },
-                    deliveryRates: appState.settings.deliveryRates.map(rate => ({
-                        kms: parseFloat(rate.kms) || 0,
-                        amount: parseFloat(rate.amount) || 0
-                    }))
+                    if (isNaN(kms) || isNaN(amount) || kms < 0 || amount < 0) {
+                        isValid = false;
+                        showMessageModal('Validation Error', 'Please enter valid non-negative numbers for KMs and Amount.');
+                        return;
+                    }
+                    rates.push({ kms, amount });
+                });
+
+                if (!isValid) return;
+
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/settings', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ deliveryRates: rates })
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                        fetchSettings(); // Re-fetch to confirm
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to save delivery rates.');
+                    }
+                } catch (error) {
+                    console.error('Error saving delivery rates:', error);
+                    showMessageModal('Error', 'Failed to save delivery rates.');
+                }
+            });
+
+            async function fetchDiscountSettings() {
+                try {
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/discount-settings', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch discount settings.');
+                    }
+                    const settings = await response.json();
+                    minSubtotalDiscountInput.value = settings.minSubtotalForDiscount;
+                    discountPercentageInput.value = settings.discountPercentage;
+                } catch (error) {
+                    console.error('Error fetching discount settings:', error);
+                    showMessageModal('Error', 'Failed to load discount settings.');
+                }
+            }
+
+            discountSettingsForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const discountData = {
+                    minSubtotalForDiscount: parseFloat(minSubtotalDiscountInput.value),
+                    discountPercentage: parseFloat(discountPercentageInput.value)
                 };
 
-                const response = await fetchWithAuth('/api/admin/settings', {
-                    method: 'PUT',
-                    body: JSON.stringify(updatedSettings),
-                });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to update settings');
-                }
-                showSuccessMessage('Settings updated successfully!');
-                appState.settings = updatedSettings; // Update local state
-            } catch (err) {
-                showErrorMessage(err.message);
-            } finally {
-                hideLoadingSpinner();
-            }
-        }
-
-        // --- 2FA Functions ---
-        async function fetch2FAStatus() {
-            showLoadingSpinner();
-            try {
-                const response = await fetchWithAuth('/api/admin/2fa/status');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch 2FA status');
-                }
-                const data = await response.json();
-                appState.twoFactorAuth.enabled = data.twoFactorEnabled;
-                renderTwoFactorAuth();
-            } catch (err) {
-                showErrorMessage(err.message);
-            } finally {
-                hideLoadingSpinner();
-            }
-        }
-
-        function renderTwoFactorAuth() {
-            if (appState.twoFactorAuth.enabled) {
-                twoFaStatusSpan.innerHTML = `<span class="text-green-600 font-semibold flex items-center"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle mr-1"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg> Enabled</span>`;
-                toggle2FaButton.classList.remove('bg-red-600', 'hover:bg-red-700');
-                toggle2FaButton.classList.add('bg-gray-600', 'hover:bg-gray-700');
-                toggle2FaButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock mr-2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Disable 2FA`;
-                toggle2FaButton.onclick = handleDisable2FA;
-            } else {
-                twoFaStatusSpan.innerHTML = `<span class="text-red-600 font-semibold flex items-center"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x-circle mr-1"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> Disabled</span>`;
-                toggle2FaButton.classList.remove('bg-gray-600', 'hover:bg-gray-700');
-                toggle2FaButton.classList.add('bg-red-600', 'hover:bg-red-700');
-                toggle2FaButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lock mr-2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Enable 2FA`;
-                toggle2FaButton.onclick = handleGenerate2FA;
-            }
-        }
-
-        async function handleGenerate2FA() {
-            showLoadingSpinner();
-            try {
-                const response = await fetchWithAuth('/api/admin/2fa/generate', { method: 'POST' });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Failed to generate 2FA secret');
-                }
-                const data = await response.json();
-                appState.twoFactorAuth.qrCodeUrl = data.qrCodeUrl;
-                appState.twoFactorAuth.secret = data.secret;
-                show2FASetupModal();
-            } catch (err) {
-                showErrorMessage(err.message);
-            } finally {
-                hideLoadingSpinner();
-            }
-        }
-
-        function show2FASetupModal() {
-            const contentHtml = `
-                <div class="text-center">
-                    <p class="text-gray-700 mb-4">Scan the QR code below with your authenticator app (e.g., Google Authenticator, Authy).</p>
-                    <img src="${appState.twoFactorAuth.qrCodeUrl}" alt="2FA QR Code" class="mx-auto w-48 h-48 sm:w-64 sm:h-64 rounded-md border border-gray-200 p-2 mb-6" />
-                    <p class="text-gray-700 mb-4">Or manually enter this secret key:</p>
-                    <p class="font-mono text-sm bg-gray-100 p-2 rounded-md inline-block select-all mb-6 break-all">${appState.twoFactorAuth.secret}</p>
-                    <form id="2fa-verify-form" class="mt-4 space-y-4">
-                        <div>
-                            <label for="modal-totpCode" class="block text-sm font-medium text-gray-700">Enter 6-digit code from your app:</label>
-                            <input type="text" id="modal-totpCode" maxlength="6" required
-                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-center text-lg tracking-widest focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
-                        </div>
-                        <button type="submit" id="verify-2fa-button"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm disabled:opacity-50">
-                            Verify & Enable
-                        </button>
-                        <div id="2fa-modal-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mt-4" role="alert">
-                            <strong class="font-bold">Error!</strong>
-                            <span class="block sm:inline ml-2" id="2fa-modal-error-text"></span>
-                        </div>
-                    </form>
-                </div>
-            `;
-            showModal('Enable Two-Factor Authentication', contentHtml);
-
-            document.getElementById('2fa-verify-form').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const totpCode = document.getElementById('modal-totpCode').value;
-                const verifyButton = document.getElementById('verify-2fa-button');
-                const modalErrorDiv = document.getElementById('2fa-modal-error');
-                const modalErrorText = document.getElementById('2fa-modal-error-text');
-
-                verifyButton.textContent = 'Verifying...';
-                verifyButton.disabled = true;
-                modalErrorDiv.classList.add('hidden');
-
                 try {
-                    const response = await fetchWithAuth('/api/admin/2fa/verify', {
-                        method: 'POST',
-                        body: JSON.stringify({ totpCode, secret: appState.twoFactorAuth.secret }),
+                    const token = localStorage.getItem('jwtToken');
+                    const response = await fetch('/api/admin/discount-settings', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(discountData)
                     });
-                    if (!response.ok) {
-                        const errData = await response.json();
-                        throw new Error(errData.message || 'Failed to verify 2FA code');
+                    const data = await response.json();
+                    if (response.ok) {
+                        showMessageModal('Success', data.message);
+                    } else {
+                        showMessageModal('Error', data.message || 'Failed to save discount settings.');
                     }
-                    showSuccessMessage('Two-Factor Authentication enabled successfully!');
-                    hideModal();
-                    fetch2FAStatus(); // Re-fetch status to update UI
-                } catch (err) {
-                    modalErrorText.textContent = err.message;
-                    modalErrorDiv.classList.remove('hidden');
-                } finally {
-                    verifyButton.textContent = 'Verify & Enable';
-                    verifyButton.disabled = false;
+                } catch (error) {
+                    console.error('Error saving discount settings:', error);
+                    showMessageModal('Error', 'Failed to save discount settings.');
                 }
             });
-        }
 
-        async function handleDisable2FA() {
-            showModal('Confirm Disable 2FA', `
-                <p class="text-gray-700 mb-4">Are you sure you want to disable Two-Factor Authentication?</p>
-                <div class="flex justify-end space-x-3">
-                    <button id="cancel-disable-2fa-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md">Cancel</button>
-                    <button id="confirm-disable-2fa-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md">Disable 2FA</button>
-                </div>
-            `);
-            document.getElementById('confirm-disable-2fa-button').addEventListener('click', async () => {
-                try {
-                    const response = await fetchWithAuth('/api/admin/2fa/disable', { method: 'POST' });
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.message || 'Failed to disable 2FA');
+
+            // --- Initial Load ---
+            checkAuth().then(isAuthenticated => {
+                if (isAuthenticated) {
+                    // If authenticated, ensure the correct section is shown based on hash or default
+                    if (window.location.hash) {
+                        const initialSection = window.location.hash.substring(1);
+                        showSection(initialSection + '-section');
+                    } else {
+                        showSection('dashboard-section');
                     }
-                    showSuccessMessage('Two-Factor Authentication disabled successfully!');
-                    hideModal();
-                    fetch2FAStatus(); // Re-fetch status to update UI
-                } catch (err) {
-                    showErrorMessage(err.message);
-                    hideModal();
                 }
             });
-            document.getElementById('cancel-disable-2fa-button').addEventListener('click', hideModal);
-        }
-
-        // --- Main Render Function ---
-        function render() {
-            if (appState.isAuthenticated) {
-                loginPage.classList.add('hidden');
-                dashboardLayout.classList.remove('hidden');
-                renderContentSection(); // Render the current dashboard view
-                // Initialize socket.io if not already
-                if (!socket) {
-                    socket = io();
-                    socket.on('connect', () => {
-                        console.log('Socket.io connected');
-                    });
-                    socket.on('disconnect', () => {
-                        console.log('Socket.io disconnected');
-                        appState.botStatus.logs.unshift('Socket.io disconnected. Real-time updates paused.');
-                        renderBotStatus();
-                    });
-                    socket.on('status', (newStatus) => {
-                        appState.botStatus.status = newStatus;
-                        appState.botStatus.logs.unshift(`Status changed to: ${newStatus}`);
-                        appState.botStatus.actionMessage = null; // Clear action message on status change
-                        renderBotStatus();
-                    });
-                    socket.on('qrCode', (qrData) => {
-                        appState.botStatus.qrCode = qrData;
-                        appState.botStatus.logs.unshift('New QR code received. Scan to connect!');
-                        appState.botStatus.actionMessage = null;
-                        renderBotStatus();
-                    });
-                    socket.on('sessionInfo', (info) => {
-                        appState.botStatus.lastAuthenticatedAt = info.lastAuthenticatedAt;
-                        appState.botStatus.logs.unshift(`Session info updated. Last authenticated: ${new Date(info.lastAuthenticatedAt).toLocaleString()}`);
-                        renderBotStatus();
-                    });
-                    socket.on('whatsapp_log', (logMsg) => {
-                        appState.botStatus.logs.unshift(logMsg); // Add to beginning
-                        if (appState.botStatus.logs.length > 50) { // Keep last 50 logs
-                            appState.botStatus.logs = appState.botStatus.logs.slice(0, 50);
-                        }
-                        renderBotStatus(); // Re-render logs
-                    });
-                    socket.on('new_order', (newOrder) => {
-                        appState.orders.unshift(newOrder); // Add to beginning
-                        showSuccessMessage(`New order received! Order ID: ${newOrder.customOrderId || newOrder._id.substring(0, 6)}`);
-                        renderOrders(); // Re-render orders table
-                    });
-                    fetchBotStatus(); // Initial fetch for bot status
-                    // Other fetches are now triggered by navigateTo in renderContentSection
-                }
-            } else {
-                loginPage.classList.remove('hidden');
-                dashboardLayout.classList.add('hidden');
-            }
-            // Ensure icons are rendered
-            lucide.createIcons();
-        }
-
-        // --- Event Listeners ---
-        document.addEventListener('DOMContentLoaded', () => {
-            checkAuth();
-            render();
-
-            loginForm.addEventListener('submit', handleLogin);
-            logoutButton.addEventListener('click', logout);
-
-            sidebarToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('-translate-x-full');
-            });
-
-            navButtons.forEach(button => {
-                button.addEventListener('click', (e) => {
-                    navigateTo(e.currentTarget.dataset.view);
-                });
-            });
-
-            // Bot Status Listeners
-            loadSessionButton.addEventListener('click', handleLoadSession);
-
-            // Menu Management Listeners
-            addMenuItemButton.addEventListener('click', () => showMenuItemFormModal());
-            // Use event delegation for dynamically added menu item action buttons
-            menuItemsTableBody.addEventListener('click', handleMenuItemAction);
-
-            // Order Management Listeners
-            orderStatusFilter.addEventListener('change', (e) => {
-                appState.orderFilters.status = e.target.value;
-                renderOrders();
-            });
-            orderSearchTerm.addEventListener('input', (e) => {
-                appState.orderFilters.searchTerm = e.target.value;
-                renderOrders();
-            });
-            // Event delegation for order table actions
-            ordersTableBody.addEventListener('change', (e) => {
-                if (e.target.classList.contains('order-status-select')) {
-                    handleOrderStatusChange(e);
-                }
-            });
-            ordersTableBody.addEventListener('click', (e) => {
-                if (e.target.closest('.delete-order-button')) {
-                    handleDeleteOrder(e);
-                } else if (e.target.closest('.view-order-details-button')) {
-                    const orderId = e.target.closest('.view-order-details-button').dataset.id;
-                    const order = appState.orders.find(o => o._id === orderId);
-                    if (order) showOrderDetailModal(order);
-                }
-            });
-
-            // Customer Management Listeners
-            customerSearchTerm.addEventListener('input', (e) => {
-                appState.customerFilters.searchTerm = e.target.value;
-                renderCustomers();
-            });
-            customersTableBody.addEventListener('click', (e) => {
-                if (e.target.closest('.delete-customer-button')) {
-                    handleDeleteCustomer(e);
-                } else if (e.target.closest('.view-latest-order-button')) {
-                    handleViewLatestOrder(e);
-                }
-            });
-
-            // Settings Listeners
-            settingsForm.addEventListener('submit', handleSaveSettings);
-            addDeliveryRateButton.addEventListener('click', addDeliveryRate);
-            // Event delegation for dynamically added remove delivery rate buttons is handled in renderSettingsForm
-            // Inputs for shopName, latitude, longitude are directly bound to form submit.
         });
     </script>
 </body>
 </html>
+
