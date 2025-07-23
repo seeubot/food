@@ -336,6 +336,7 @@
                     name: item.name,
                     price: item.price,
                     quantity: 1,
+                    description: item.description // Store description for the "coupon" view
                 });
             }
             saveCart();
@@ -383,6 +384,7 @@
             deliveryAddressTextarea.value = 'Getting address...'; // Show loading state
 
             try {
+                // Using OpenStreetMap Nominatim API for reverse geocoding
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
                 if (!response.ok) {
                     throw new Error('Failed to reverse geocode location.');
@@ -438,6 +440,7 @@
                                 <div>
                                     <p class="font-semibold text-gray-800">${item.name}</p>
                                     <p class="text-sm text-gray-600">₹${item.price.toFixed(2)} x ${item.quantity}</p>
+                                    <p class="text-xs text-gray-500 italic">${item.description || 'No description'}</p> <!-- Display item description -->
                                 </div>
                                 <div class="flex items-center space-x-2">
                                     <button data-id="${item.productId}" data-action="decrease" class="cart-quantity-button text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50">
@@ -458,8 +461,8 @@
             }
 
             const discountMessageHtml = subtotal >= MIN_SUBTOTAL_FOR_DISCOUNT ?
-                `<p class="bg-green-100 text-green-700 text-sm font-semibold p-2 rounded-md mb-2">🎉 *Delicious Bites* Discount: You get ${DISCOUNT_PERCENTAGE * 100}% off on your order!</p>` :
-                `<p class="bg-blue-100 text-blue-700 text-sm p-2 rounded-md mb-2">Spend ₹${(MIN_SUBTOTAL_FOR_DISCOUNT - subtotal).toFixed(2)} more at *Delicious Bites* to get ${DISCOUNT_PERCENTAGE * 100}% off!</p>`;
+                `<p class="bg-green-100 text-green-700 text-sm font-semibold p-2 rounded-md mb-2">🎉 *${DEFAULT_SHOP_NAME}* Discount: You get ${DISCOUNT_PERCENTAGE * 100}% off on your order!</p>` :
+                `<p class="bg-blue-100 text-blue-700 text-sm p-2 rounded-md mb-2">Spend ₹${(MIN_SUBTOTAL_FOR_DISCOUNT - subtotal).toFixed(2)} more at *${DEFAULT_SHOP_NAME}* to get ${DISCOUNT_PERCENTAGE * 100}% off!</p>`;
 
 
             const cartModalContent = `
@@ -565,6 +568,7 @@
                 getLocationButton.disabled = true;
                 try {
                     const position = await new Promise((resolve, reject) => {
+                        // Using Geolocation API with high accuracy
                         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
                     });
                     const { latitude, longitude, accuracy } = position.coords;
@@ -773,9 +777,9 @@
 
             // Check URL for orderId parameter on page load
             const urlParams = new URLSearchParams(window.location.search);
-            const orderIdFromUrl = urlParams.get('orderId');
-            if (orderIdFromUrl) {
-                document.getElementById('order-pin-input').value = orderIdFromUrl;
+            const orderIdParam = urlParams.get('orderId');
+            if (orderIdParam) {
+                document.getElementById('order-pin-input').value = orderIdParam;
                 document.getElementById('track-order-form').dispatchEvent(new Event('submit')); // Auto-submit
             }
         });
