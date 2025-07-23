@@ -3,13 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="shop-title">Delicious Bites Menu</title>
+    <title>Delicious Bites - Online Menu</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f3f4f6; /* gray-100 */
+        }
         /* Custom scrollbar for better aesthetics */
         ::-webkit-scrollbar {
             width: 8px;
@@ -26,150 +29,68 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #dc2626; /* red-600 */
         }
-        body {
-            font-family: "Inter", sans-serif;
-        }
-        /* Hide scrollbar for specific elements if it overflows */
         .modal-content-scrollable::-webkit-scrollbar {
             display: none;
         }
         .modal-content-scrollable {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
-        }
-        /* Discount Badge Styling */
-        .discount-badge {
-            display: inline-flex;
-            align-items: center;
-            background-color: #fef2f2; /* red-50 */
-            color: #dc2626; /* red-600 */
-            font-size: 0.75rem; /* text-xs */
-            font-weight: 600; /* font-semibold */
-            padding: 0.25rem 0.5rem; /* px-2 py-1 */
-            border-radius: 0.375rem; /* rounded-md */
-            border: 1px solid #ef4444; /* red-500 */
-            margin-left: 0.5rem;
-        }
-        .discount-badge svg {
-            margin-right: 0.25rem;
-        }
-        /* Map container styling for modal */
-        #delivery-map-modal {
-            height: 300px; /* Adjust height as needed */
-            width: 100%;
-            border-radius: 0.5rem; /* rounded-md */
-            margin-bottom: 1rem; /* mb-4 */
-            /* Removed position: relative as floating-ui is now outside */
-        }
-
-        /* Custom Map Marker - animated pulse effect */
-        .custom-marker {
-            width: 32px; height: 32px; border-radius: 50%; background: #28a5a5; box-shadow: 0 0 0 rgba(40,165,165,0.6); animation: pulse 1.8s infinite;
-            display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.2em; border: 2px solid #fff;
-        }
-        /* Pin marker specific style */
-        .custom-marker.pin-marker {
-            background: #f15555; /* Red background for pin */
-            box-shadow: 0 0 0 rgba(241, 85, 85, 0.6);
-            animation: pulse-red 1.8s infinite;
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(40,165,165,0.3);}
-            70% { box-shadow: 0 0 0 14px rgba(40,165,165,0);}
-            100% { box-shadow: 0 0 0 0 rgba(40,165,165,0);}
-        }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(241, 85, 85, 0.3);}
-            70% { box-shadow: 0 0 0 14px rgba(241, 85, 85, 0);}
-            100% { box-shadow: 0 0 0 0 rgba(241, 85, 85, 0);}
-        }
-
-        /* Floating UI for map controls - NOW BELOW THE MAP */
-        .floating-ui {
-            /* Removed position, z-index, bottom, right */
-            display: flex;
-            gap: 8px;
-            background: none; /* No background needed, it's not floating */
-            border-radius: 0;
-            box-shadow: none;
-            padding: 0;
-            margin-top: 1rem; /* Space below the map */
-            justify-content: center; /* Center buttons */
-        }
-        .floating-ui button {
-            background: #ef4444; /* red-500 */
-            color: #fff;
-            border: none;
-            border-radius: 18px;
-            padding: 6px 16px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: background 0.2s;
-            box-shadow: 0 2px 6px rgba(239,68,68,0.15);
-            font-weight: 600;
-        }
-        .floating-ui button.active {
-            background: #dc2626; /* red-600 */
-        }
-        .floating-ui button:hover:not(.active) {
-            background: #fca5a5; /* red-300 */
-            color: #dc2626; /* red-600 */
-        }
-
-        /* Removed .address-display as it's no longer needed */
-
-        @media (max-width: 600px) {
-            .floating-ui {
-                flex-direction: row; /* Keep row for mobile, but adjust spacing */
-                padding: 0;
-                gap: 6px;
-            }
-            .floating-ui button {
-                padding: 5px 12px;
-                font-size: 0.85rem;
-            }
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col">
 
+    <!-- Header -->
     <header class="bg-red-600 text-white p-4 shadow-md sticky top-0 z-10">
-        <div class="container mx-auto flex justify-between items-center flex-wrap">
-            <h1 class="text-2xl font-bold" id="header-shop-name">Delicious Bites</h1>
-            <div class="flex items-center space-x-4 mt-2 sm:mt-0">
-                <button id="view-cart-button" class="bg-red-700 hover:bg-red-800 text-white font-semibold py-2 px-4 rounded-md flex items-center shadow-sm transition duration-300 ease-in-out">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shopping-cart mr-2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
-                    Cart (<span id="cart-item-count">0</span>)
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 id="shop-name-header" class="text-2xl font-bold">Delicious Bites</h1>
+            <div class="flex items-center space-x-4">
+                <button id="cart-button" class="relative p-2 rounded-full hover:bg-red-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shopping-cart"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                    <span id="cart-count" class="absolute top-0 right-0 bg-yellow-400 text-red-900 rounded-full text-xs w-5 h-5 flex items-center justify-center font-bold">0</span>
+                </button>
+                <button id="track-order-button" class="p-2 rounded-full hover:bg-red-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-truck"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M10 18H7"/><path d="M18 18h2a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-7.5"/><path d="M14 14h1.5c.7 0 1.3-.3 1.7-.8l2.9-3.4c.4-.5.6-1.1.6-1.8V6.5c0-.8-.7-1.5-1.5-1.5H14"/></svg>
                 </button>
             </div>
         </div>
     </header>
 
-    <main class="flex-1 container mx-auto p-4 md:p-6 grid grid-cols-1 gap-6">
+    <!-- Main Content -->
+    <main class="container mx-auto p-4 flex-1">
+        <div id="loading-spinner" class="flex justify-center items-center py-8 hidden">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+            <p class="ml-4 text-gray-700">Loading menu...</p>
+        </div>
 
-        <section class="bg-white rounded-lg shadow-md p-4 md:p-6">
-            <h2 class="text-2xl font-bold text-red-600 mb-6 border-b pb-3">Our Delicious Menu</h2>
+        <div id="global-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span class="block sm:inline ml-2" id="global-message-text"></span>
+        </div>
+        <div id="global-success-message" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md relative mb-4" role="alert">
+            <strong class="font-bold">Success!</strong>
+            <span class="block sm:inline ml-2" id="global-success-message-text"></span>
+        </div>
 
-            <div id="loading-spinner" class="flex justify-center items-center py-8 hidden">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
-                <p class="ml-4 text-gray-700">Loading menu...</p>
+        <section id="menu-section" class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Our Delicious Menu</h2>
+            <div id="menu-items-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Menu items will be loaded here -->
             </div>
-
-            <div id="menu-error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
-                <strong class="font-bold">Error!</strong>
-                <span class="block sm:inline ml-2" id="menu-error-text"></span>
-            </div>
-
-            <div id="menu-items-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                </div>
             <p id="no-menu-items-message" class="text-center text-gray-600 mt-8 hidden">No menu items available at the moment. Please check back later!</p>
         </section>
-
     </main>
 
+    <!-- Footer (optional) -->
+    <footer class="bg-gray-800 text-white p-4 text-center mt-auto">
+        <div class="container mx-auto">
+            <p>&copy; <span id="current-year"></span> <span id="shop-name-footer">Delicious Bites</span>. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Modals -->
     <div id="modal-backdrop" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex justify-center items-center z-50 p-4 hidden">
-        <div id="modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-lg md:max-w-2xl lg:max-w-3xl overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:w-full">
+        <div id="modal-content" class="bg-white rounded-lg shadow-xl w-full max-w-lg md:max-w-xl lg:max-w-2xl overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:w-full">
             <div class="bg-red-600 px-4 py-3 sm:px-6 flex justify-between items-center rounded-t-lg">
                 <h3 id="modal-title" class="text-lg leading-6 font-medium text-white"></h3>
                 <button type="button" id="modal-close-button" class="text-white hover:text-red-100 focus:outline-none">
@@ -177,7 +98,8 @@
                 </button>
             </div>
             <div id="modal-body" class="p-6 modal-content-scrollable max-h-[80vh] overflow-y-auto">
-                </div>
+                <!-- Modal content will be injected here by JS -->
+            </div>
             <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse rounded-b-lg">
                 <button type="button" id="modal-close-footer-button"
                     class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
@@ -187,51 +109,39 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         // --- Global State ---
         const appState = {
             menuItems: [],
-            cart: [], // { _id: item._id, name: item.name, originalPrice: item.price, displayedOriginalPrice: calculated, discountedPrice: calculated, quantity: 1, discountPercentage: calculated }
+            cart: [],
             shopSettings: null,
-            customerLocation: {
-                latitude: null,
-                longitude: null,
-                address: 'Location not set.'
-            },
-            loading: {
-                menu: false,
-                settings: false,
-                order: false,
-            },
-            messages: {
-                error: null,
-                success: null,
-            },
+            loading: false,
+            error: null,
+            successMessage: null,
             modal: {
                 isOpen: false,
                 title: '',
                 content: '',
-                onClose: null, // Callback to run when modal closes
+                onClose: null,
             },
+            currentLocation: null, // Stores {latitude, longitude, address}
         };
 
         // --- Constants ---
         const API_BASE_URL = ''; // Relative path, assumes same origin for backend
-        // Default placeholder image if item.imageUrl is missing or broken
-        const PLACEHOLDER_IMAGE = 'https://placehold.co/400x300/FEE2E2/EF4444?text=No+Image';
-        const MIN_DISCOUNT_PERCENTAGE = 0.10; // 10%
-        const MAX_DISCOUNT_PERCENTAGE = 0.50; // 50%
+        const DEFAULT_SHOP_NAME = 'Delicious Bites';
 
         // --- DOM Elements ---
-        const shopTitle = document.getElementById('shop-title');
-        const headerShopName = document.getElementById('header-shop-name');
-        const viewCartButton = document.getElementById('view-cart-button');
-        const cartItemCount = document.getElementById('cart-item-count');
-
+        const shopNameHeader = document.getElementById('shop-name-header');
+        const shopNameFooter = document.getElementById('shop-name-footer');
+        const cartButton = document.getElementById('cart-button');
+        const cartCountSpan = document.getElementById('cart-count');
+        const trackOrderButton = document.getElementById('track-order-button');
         const loadingSpinner = document.getElementById('loading-spinner');
-        const menuErrorMessage = document.getElementById('menu-error-message');
-        const menuErrorText = document.getElementById('menu-error-text');
+        const globalMessage = document.getElementById('global-message');
+        const globalMessageText = document.getElementById('global-message-text');
+        const globalSuccessMessage = document.getElementById('global-success-message');
+        const globalSuccessMessageText = document.getElementById('global-success-message-text');
         const menuItemsContainer = document.getElementById('menu-items-container');
         const noMenuItemsMessage = document.getElementById('no-menu-items-message');
 
@@ -242,69 +152,38 @@
         const modalCloseButton = document.getElementById('modal-close-button');
         const modalCloseFooterButton = document.getElementById('modal-close-footer-button');
 
-        // Leaflet Map Variables
-        let mapInstance = null;
-        let liveMarker = null;
-        let pinMarker = null;
-        let watchId = null; // For geolocation watch
-
         // --- Utility Functions ---
-        function showLoading(section) {
-            if (section === 'menu') {
-                loadingSpinner.classList.remove('hidden');
-            }
-            appState.loading[section] = true;
+        function showLoadingSpinner() {
+            loadingSpinner.classList.remove('hidden');
         }
 
-        function hideLoading(section) {
-            if (section === 'menu') {
-                loadingSpinner.classList.add('hidden');
-            }
-            appState.loading[section] = false;
+        function hideLoadingSpinner() {
+            loadingSpinner.classList.add('hidden');
         }
 
-        function showMessage(type, message) {
-            // For general messages, use the modal
-            showModal(type === 'success' ? 'Success!' : 'Information', `<p class="text-gray-700">${message}</p>`);
-        }
+        function showMessage(message, type = 'error') {
+            const targetElement = type === 'success' ? globalSuccessMessage : globalMessage;
+            const targetTextElement = type === 'success' ? globalSuccessMessageText : globalMessageText;
 
-        function showMenuErrorMessage(message) {
-            menuErrorText.textContent = message;
-            menuErrorMessage.classList.remove('hidden');
+            targetTextElement.textContent = message;
+            targetElement.classList.remove('hidden');
             setTimeout(() => {
-                menuErrorMessage.classList.add('hidden');
-            }, 5000);
+                targetElement.classList.add('hidden');
+            }, 5000); // Hide after 5 seconds
         }
 
-        function showModal(title, contentHtml, onCloseCallback = null) {
+        function showModal(title, contentHtml) {
             modalTitle.textContent = title;
             modalBody.innerHTML = contentHtml;
             modalBackdrop.classList.remove('hidden');
             appState.modal.isOpen = true;
-            appState.modal.onClose = onCloseCallback;
-            // Ensure icons are rendered in modal content
-            lucide.createIcons();
+            lucide.createIcons(); // Render Lucide icons in modal content
         }
 
         function hideModal() {
             modalBackdrop.classList.add('hidden');
             appState.modal.isOpen = false;
-            if (appState.modal.onClose) {
-                appState.modal.onClose(); // Execute callback if provided
-            }
-            appState.modal.onClose = null;
             modalBody.innerHTML = ''; // Clear content
-            // Destroy map instance and clear watch if they exist
-            if (mapInstance) {
-                mapInstance.remove();
-                mapInstance = null;
-            }
-            if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-            }
-            liveMarker = null;
-            pinMarker = null;
         }
 
         modalCloseButton.addEventListener('click', hideModal);
@@ -315,9 +194,43 @@
             }
         });
 
-        // --- Data Fetching ---
+        // --- Local Storage for Cart ---
+        function saveCart() {
+            localStorage.setItem('cart', JSON.stringify(appState.cart));
+            updateCartCount();
+        }
+
+        function loadCart() {
+            const storedCart = localStorage.getItem('cart');
+            appState.cart = storedCart ? JSON.parse(storedCart) : [];
+            updateCartCount();
+        }
+
+        function updateCartCount() {
+            const totalItems = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
+            cartCountSpan.textContent = totalItems;
+        }
+
+        // --- Fetch Data from Backend ---
+        async function fetchMenuItems() {
+            showLoadingSpinner();
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/menu`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch menu items.');
+                }
+                const data = await response.json();
+                appState.menuItems = data;
+                renderMenuItems();
+            } catch (error) {
+                showMessage(`Error loading menu: ${error.message}`);
+                noMenuItemsMessage.classList.remove('hidden');
+            } finally {
+                hideLoadingSpinner();
+            }
+        }
+
         async function fetchShopSettings() {
-            showLoading('settings');
             try {
                 const response = await fetch(`${API_BASE_URL}/api/public/settings`);
                 if (!response.ok) {
@@ -325,589 +238,178 @@
                 }
                 const data = await response.json();
                 appState.shopSettings = data;
-                shopTitle.textContent = data.shopName || 'Delicious Bites Menu';
-                headerShopName.textContent = data.shopName || 'Delicious Bites';
-            } catch (err) {
-                console.error('Error fetching shop settings:', err);
-                showMenuErrorMessage(`Failed to load shop details: ${err.message}`);
-            } finally {
-                hideLoading('settings');
+                shopNameHeader.textContent = data.shopName || DEFAULT_SHOP_NAME;
+                shopNameFooter.textContent = data.shopName || DEFAULT_SHOP_NAME;
+            } catch (error) {
+                console.error('Error fetching shop settings:', error);
+                shopNameHeader.textContent = DEFAULT_SHOP_NAME;
+                shopNameFooter.textContent = DEFAULT_SHOP_NAME;
             }
         }
 
-        async function fetchMenuItems() {
-            showLoading('menu');
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/menu`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch menu items.');
-                }
-                const data = await response.json();
-                // Process each item to add discount details
-                appState.menuItems = data.map(item => {
-                    const randomDiscount = Math.random() * (MAX_DISCOUNT_PERCENTAGE - MIN_DISCOUNT_PERCENTAGE) + MIN_DISCOUNT_PERCENTAGE;
-                    const actualPrice = item.price; // Price from dashboard
-                    const discountedPrice = actualPrice; // This is what the customer pays
-                    const displayedOriginalPrice = actualPrice / (1 - randomDiscount); // Inflated price for display
-
-                    return {
-                        ...item,
-                        discountPercentage: randomDiscount,
-                        displayedOriginalPrice: displayedOriginalPrice,
-                        discountedPrice: discountedPrice
-                    };
-                });
-                renderMenuItems();
-            } catch (err) {
-                console.error('Error fetching menu items:', err);
-                showMenuErrorMessage(`Failed to load menu: ${err.message}`);
-            } finally {
-                hideLoading('menu');
-            }
-        }
-
-        // --- Rendering Functions ---
+        // --- Render Menu Items ---
         function renderMenuItems() {
             menuItemsContainer.innerHTML = '';
             if (appState.menuItems.length === 0) {
                 noMenuItemsMessage.classList.remove('hidden');
-            } else {
-                noMenuItemsMessage.classList.add('hidden');
-                appState.menuItems.forEach(item => {
+                return;
+            }
+            noMenuItemsMessage.classList.add('hidden');
+
+            // Group items by category
+            const categories = {};
+            appState.menuItems.forEach(item => {
+                const category = item.category || 'Uncategorized';
+                if (!categories[category]) {
+                    categories[category] = [];
+                }
+                categories[category].push(item);
+            });
+
+            for (const categoryName in categories) {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'col-span-full'; // Make category title span full width
+                categoryDiv.innerHTML = `<h3 class="text-2xl font-semibold text-gray-700 mb-4 mt-6 border-b pb-2">${categoryName}</h3>`;
+                menuItemsContainer.appendChild(categoryDiv);
+
+                categories[categoryName].forEach(item => {
                     const itemCard = document.createElement('div');
-                    itemCard.className = 'bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 flex flex-col';
+                    itemCard.className = `bg-white rounded-lg shadow-md overflow-hidden flex flex-col ${item.isAvailable ? '' : 'opacity-50 grayscale'}`;
                     itemCard.innerHTML = `
-                        <img src="${item.imageUrl || PLACEHOLDER_IMAGE}" alt="${item.name}"
-                            class="w-full h-48 object-cover object-center"
-                            onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';">
+                        <div class="relative h-48 w-full overflow-hidden">
+                            <img src="${item.imageUrl || 'https://placehold.co/400x200/FF0000/FFFFFF?text=No+Image'}" alt="${item.name}"
+                                class="w-full h-full object-cover" onerror="this.onerror=null;this.src='https://placehold.co/400x200/FF0000/FFFFFF?text=Image+Error';">
+                            ${item.isTrending ? '<span class="absolute top-2 left-2 bg-yellow-400 text-red-900 text-xs font-bold px-2 py-1 rounded-full">Trending ✨</span>' : ''}
+                            ${!item.isAvailable ? '<span class="absolute top-2 right-2 bg-gray-700 text-white text-xs font-bold px-2 py-1 rounded-full">Unavailable</span>' : ''}
+                        </div>
                         <div class="p-4 flex-1 flex flex-col">
-                            <h3 class="text-xl font-semibold text-gray-800 mb-2">${item.name}
-                                ${item.isTrending ? '<span class="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">TRENDING ✨</span>' : ''}
-                            </h3>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-1">${item.name}</h3>
                             <p class="text-gray-600 text-sm mb-3 flex-1">${item.description || 'No description available.'}</p>
-                            <div class="flex justify-between items-center mt-auto pt-2 border-t border-gray-100">
-                                <div class="flex flex-col items-start">
-                                    <span class="text-gray-500 line-through text-sm">₹${item.displayedOriginalPrice.toFixed(2)}</span>
-                                    <span class="text-red-600 font-bold text-lg">₹${item.discountedPrice.toFixed(2)}</span>
-                                    <span class="discount-badge">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-tag"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414L19 21l3-3Z"/><path d="M7 7h.01"/></svg>
-                                        ${(item.discountPercentage * 100).toFixed(0)}% OFF
-                                    </span>
-                                </div>
-                                <button data-id="${item._id}" class="add-to-cart-button bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus mr-1 inline-block"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                            <div class="flex justify-between items-center mt-auto">
+                                <span class="text-xl font-bold text-red-600">₹${item.price.toFixed(2)}</span>
+                                ${item.isAvailable ? `
+                                <button data-id="${item._id}"
+                                    class="add-to-cart-button bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-semibold transition-colors flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus mr-1"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
                                     Add
                                 </button>
+                                ` : `
+                                <button disabled
+                                    class="bg-gray-400 text-white px-4 py-2 rounded-md font-semibold cursor-not-allowed">
+                                    Unavailable
+                                </button>
+                                `}
                             </div>
                         </div>
                     `;
-                    itemCard.onclick = (e) => { // Add click listener to card for mobile touch
-                        const button = e.target.closest('.add-to-cart-button');
-                        if (button) {
-                            addToCart(button.dataset.id);
-                        }
-                    };
                     menuItemsContainer.appendChild(itemCard);
                 });
             }
-            lucide.createIcons(); // Re-render Lucide icons for new elements
         }
 
-        function renderCartContentInModal() {
-            let cartItemsHtml = '';
-            let subtotal = 0;
+        // --- Cart Management ---
+        function addToCart(itemId) {
+            const item = appState.menuItems.find(i => i._id === itemId);
+            if (!item || !item.isAvailable) {
+                showMessage('Item is not available!', 'error');
+                return;
+            }
 
-            if (appState.cart.length === 0) {
-                cartItemsHtml = '<p class="text-center text-gray-600">Your cart is empty. Add some delicious food!</p>';
+            const existingCartItem = appState.cart.find(cartItem => cartItem.productId === itemId);
+            if (existingCartItem) {
+                existingCartItem.quantity++;
             } else {
-                appState.cart.forEach(item => {
-                    subtotal += item.discountedPrice * item.quantity;
-                    cartItemsHtml += `
-                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-md shadow-sm border border-gray-200">
-                            <div class="flex-1">
-                                <p class="font-semibold text-gray-800">${item.name}</p>
-                                <p class="text-sm text-gray-600">
-                                    <span class="line-through">₹${item.displayedOriginalPrice.toFixed(2)}</span>
-                                    <span class="text-red-600 ml-1">₹${item.discountedPrice.toFixed(2)}</span> each
-                                    <span class="discount-badge">${(item.discountPercentage * 100).toFixed(0)}% OFF</span>
-                                </p>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <button data-id="${item._id}" class="quantity-decrease-button text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus"><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                                </button>
-                                <span class="font-bold text-gray-800">${item.quantity}</span>
-                                <button data-id="${item._id}" class="quantity-increase-button text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                                </button>
-                                <button data-id="${item._id}" class="remove-from-cart-button text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-gray-200 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                                </button>
-                            </div>
-                        </div>
-                    `;
+                appState.cart.push({
+                    productId: item._id,
+                    name: item.name,
+                    price: item.price,
+                    quantity: 1,
                 });
             }
+            saveCart();
+            showMessage(`${item.name} added to cart!`, 'success');
+        }
 
-            // Calculate transport tax based on subtotal (simplified)
-            let transportTax = 0;
-            if (appState.shopSettings && appState.shopSettings.deliveryRates && appState.shopSettings.deliveryRates.length > 0) {
-                if (subtotal > 0) {
-                    // For simplicity, take the lowest delivery rate if any items are in cart
-                    transportTax = Math.min(...appState.shopSettings.deliveryRates.map(r => r.amount));
+        function removeFromCart(productId) {
+            appState.cart = appState.cart.filter(item => item.productId !== productId);
+            saveCart();
+            renderCartModal(); // Re-render if modal is open
+        }
+
+        function updateCartItemQuantity(productId, newQuantity) {
+            const item = appState.cart.find(cartItem => cartItem.productId === productId);
+            if (item) {
+                item.quantity = Math.max(0, newQuantity); // Ensure quantity is not negative
+                if (item.quantity === 0) {
+                    removeFromCart(productId);
                 }
+                saveCart();
+                renderCartModal(); // Re-render if modal is open
+            }
+        }
+
+        function calculateCartTotals() {
+            const subtotal = appState.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            // For now, transport tax is 0 as it depends on location and settings
+            const transportTax = 0;
+            const totalAmount = subtotal + transportTax;
+            return { subtotal, transportTax, totalAmount };
+        }
+
+        function renderCartModal() {
+            const { subtotal, transportTax, totalAmount } = calculateCartTotals();
+
+            let cartItemsHtml = '';
+            if (appState.cart.length === 0) {
+                cartItemsHtml = '<p class="text-center text-gray-600">Your cart is empty.</p>';
             } else {
-                transportTax = subtotal > 0 ? 30.00 : 0.00; // Example fixed tax if no settings
+                cartItemsHtml = `
+                    <ul class="divide-y divide-gray-200">
+                        ${appState.cart.map(item => `
+                            <li class="py-3 flex justify-between items-center">
+                                <div>
+                                    <p class="font-semibold text-gray-800">${item.name}</p>
+                                    <p class="text-sm text-gray-600">₹${item.price.toFixed(2)} x ${item.quantity}</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button data-id="${item.productId}" data-action="decrease" class="cart-quantity-button text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-minus"><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                    </button>
+                                    <span class="font-bold text-gray-800">${item.quantity}</span>
+                                    <button data-id="${item.productId}" data-action="increase" class="cart-quantity-button text-green-600 hover:text-green-800 p-1 rounded-full hover:bg-green-50">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                    </button>
+                                    <button data-id="${item.productId}" data-action="remove" class="cart-quantity-button text-gray-500 hover:text-red-600 p-1 rounded-full hover:bg-red-50">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                    </button>
+                                </div>
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
             }
 
-            const total = subtotal + transportTax;
-
-            const cartModalHtml = `
+            const cartModalContent = `
                 <div id="cart-modal-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
                     <strong class="font-bold">Error!</strong>
                     <span class="block sm:inline ml-2" id="cart-modal-error-text"></span>
                 </div>
-                <div id="cart-items-list-modal" class="space-y-4 mb-6 max-h-64 overflow-y-auto pr-2">
-                    ${cartItemsHtml}
-                </div>
-
-                <div id="cart-summary-modal" class="border-t border-gray-200 pt-4 space-y-2 text-gray-700">
-                    <div class="flex justify-between">
+                ${cartItemsHtml}
+                <div class="mt-6 pt-4 border-t border-gray-200 space-y-2">
+                    <div class="flex justify-between text-lg font-semibold text-gray-800">
                         <span>Subtotal:</span>
-                        <span class="font-semibold">₹<span id="cart-subtotal-modal">${subtotal.toFixed(2)}</span></span>
+                        <span>₹${subtotal.toFixed(2)}</span>
                     </div>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between text-lg font-semibold text-gray-800">
                         <span>Transport Tax:</span>
-                        <span class="font-semibold">₹<span id="cart-transport-tax-modal">${transportTax.toFixed(2)}</span></span>
+                        <span>₹${transportTax.toFixed(2)}</span>
                     </div>
-                    <div class="flex justify-between text-lg font-bold text-red-600">
+                    <div class="flex justify-between text-xl font-bold text-red-600">
                         <span>Total:</span>
-                        <span>₹<span id="cart-total-modal">${total.toFixed(2)}</span></span>
+                        <span>₹${totalAmount.toFixed(2)}</span>
                     </div>
                 </div>
-
-                <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-6">
-                    <button id="proceed-to-checkout-button"
-                        class="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center ${appState.cart.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
-                        ${appState.cart.length === 0 ? 'disabled' : ''}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle mr-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
-                        Proceed to Checkout
-                    </button>
-                    <button id="continue-shopping-button"
-                        class="flex-1 sm:flex-none bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-md shadow-sm transition duration-300 ease-in-out">
-                        Continue Shopping
-                    </button>
-                </div>
-            `;
-            showModal('Your Shopping Cart', cartModalHtml);
-
-            // Add event listeners for cart actions within the modal
-            const cartItemsListModal = document.getElementById('cart-items-list-modal');
-            if (cartItemsListModal) {
-                cartItemsListModal.addEventListener('click', (e) => {
-                    const decreaseButton = e.target.closest('.quantity-decrease-button');
-                    const increaseButton = e.target.closest('.quantity-increase-button');
-                    const removeButton = e.target.closest('.remove-from-cart-button');
-
-                    if (decreaseButton) {
-                        updateCartQuantity(decreaseButton.dataset.id, -1);
-                        renderCartContentInModal(); // Re-render modal content
-                    } else if (increaseButton) {
-                        updateCartQuantity(increaseButton.dataset.id, 1);
-                        renderCartContentInModal(); // Re-render modal content
-                    } else if (removeButton) {
-                        removeFromCart(removeButton.dataset.id);
-                        renderCartContentInModal(); // Re-render modal content
-                    }
-                });
-            }
-
-            document.getElementById('proceed-to-checkout-button').addEventListener('click', () => {
-                hideModal(); // Hide cart modal first
-                showLocationSelectionModal(); // Open location modal
-            });
-            document.getElementById('continue-shopping-button').addEventListener('click', hideModal);
-        }
-
-        // --- Cart Actions ---
-        function addToCart(itemId) {
-            const menuItem = appState.menuItems.find(item => item._id === itemId);
-            if (!menuItem) return;
-
-            const existingItemIndex = appState.cart.findIndex(item => item._id === itemId);
-            
-            if (existingItemIndex > -1) {
-                appState.cart[existingItemIndex].quantity += 1;
-            } else {
-                // Add all pre-calculated price/discount details to cart item
-                appState.cart.push({
-                    _id: menuItem._id,
-                    name: menuItem.name,
-                    originalPrice: menuItem.originalPrice,
-                    displayedOriginalPrice: menuItem.displayedOriginalPrice,
-                    discountedPrice: menuItem.discountedPrice,
-                    discountPercentage: menuItem.discountPercentage,
-                    quantity: 1,
-                });
-            }
-            // Only update the header cart count here, full cart render happens in modal
-            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
-            showMessage('success', `${menuItem.name} added to cart!`);
-        }
-
-        function updateCartQuantity(itemId, change) {
-            const itemIndex = appState.cart.findIndex(item => item._id === itemId);
-            if (itemIndex > -1) {
-                appState.cart[itemIndex].quantity += change;
-                if (appState.cart[itemIndex].quantity <= 0) {
-                    appState.cart.splice(itemIndex, 1); // Remove if quantity is 0 or less
-                }
-            }
-            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
-        }
-
-        function removeFromCart(itemId) {
-            appState.cart = appState.cart.filter(item => item._id !== itemId);
-            cartItemCount.textContent = appState.cart.reduce((sum, item) => sum + item.quantity, 0);
-        }
-
-        // --- Location Selection Modal (with Map) ---
-        function showLocationSelectionModal() {
-            const locationModalHtml = `
-                <div id="location-modal-message" class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-md mb-4 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-2 animate-spin mr-2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                    <span id="location-message-text">Initializing map...</span>
-                </div>
-
-                <div id="delivery-map-modal" class="rounded-md mb-4"></div>
-
-                <div class="floating-ui">
-                    <button id="liveBtn" class="active">Live Location</button>
-                    <button id="pinBtn">Pin Location</button>
-                </div>
-
-                <p id="selected-address-modal" class="text-lg font-semibold text-gray-800 mb-4 text-center mt-4">Selected Location: Loading...</p>
-
-                <button id="confirm-location-button"
-                    class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md shadow-md transition duration-300 ease-in-out flex items-center justify-center disabled:opacity-50" disabled>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle mr-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
-                    Confirm Location & Continue
-                </button>
-            `;
-            showModal('Select Delivery Location', locationModalHtml, () => {
-                // This callback runs when the location modal is closed
-                // Ensure map instance and watch are destroyed
-                if (mapInstance) {
-                    mapInstance.remove();
-                    mapInstance = null;
-                }
-                if (watchId) {
-                    navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                }
-                liveMarker = null;
-                pinMarker = null;
-            });
-
-            // Initialize map after the modal is shown
-            initializeMapInModal();
-
-            document.getElementById('confirm-location-button').addEventListener('click', () => {
-                if (appState.customerLocation.latitude === null || appState.customerLocation.longitude === null || appState.customerLocation.address === 'Location not set.') {
-                    const msgDiv = document.getElementById('location-modal-message');
-                    const msgText = document.getElementById('location-message-text');
-                    msgText.textContent = 'Please select a location on the map or get your live location.';
-                    msgDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                    msgDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
-                    return;
-                }
-                hideModal(); // Close location modal
-                showFinalCheckoutModal(); // Open final checkout modal
-            });
-        }
-
-        // --- Custom Marker Icons for Leaflet ---
-        function getLiveIcon() {
-            // New SVG icon based on user's image (map pin with signal waves)
-            return L.divIcon({
-                className: 'custom-marker',
-                html: `
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 22s-8-4-8-10c0-4.42 3.58-8 8-8s8 3.58 8 8c0 6-8 10-8 10z"/>
-                        <circle cx="12" cy="10" r="3"/>
-                        <path d="M4.93 10.93a10.06 10.06 0 0 1 0-13.86"/>
-                        <path d="M2.05 7.05a14.5 14.5 0 0 1 0-20.1"/>
-                    </svg>
-                `,
-                iconSize: [32, 32],
-                iconAnchor: [16, 32] // Anchor at the bottom-center
-            });
-        }
-
-        function getPinIcon() {
-            return L.divIcon({
-                className: 'custom-marker pin-marker', // Added 'pin-marker' class
-                html: "<i class='fas fa-map-pin'></i>",
-                iconSize: [32, 32],
-                iconAnchor: [16, 32] // Anchor at the bottom-center
-            });
-        }
-
-        function initializeMapInModal() {
-            const mapElement = document.getElementById('delivery-map-modal');
-            if (!mapElement) return;
-
-            // Removed addressDisplay
-            const liveBtn = document.getElementById('liveBtn');
-            const pinBtn = document.getElementById('pinBtn');
-            const confirmButton = document.getElementById('confirm-location-button');
-            const locationMessageDiv = document.getElementById('location-modal-message');
-            const locationMessageText = document.getElementById('location-message-text');
-            const selectedAddressModal = document.getElementById('selected-address-modal');
-
-
-            // Default location (shop location or a general city like Hyderabad, India)
-            const defaultLat = appState.shopSettings?.shopLocation?.latitude || 17.4399;
-            const defaultLng = appState.shopSettings?.shopLocation?.longitude || 78.4983;
-            const defaultZoom = 13; // Good starting zoom
-
-            // Update address display with current coordinates and address
-            function updateAddressDisplay(lat, lon, address) {
-                appState.customerLocation.latitude = lat;
-                appState.customerLocation.longitude = lon;
-                appState.customerLocation.address = address;
-                selectedAddressModal.textContent = `Selected Location: ${address}`;
-                confirmButton.disabled = false; // Enable confirm button once a location is set
-            }
-
-            // Center and update marker/address for live location
-            function centerToLiveLocation(position) {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                const accuracy = position.coords.accuracy; // Accuracy in meters
-
-                if (!mapInstance) return;
-
-                mapInstance.setView([lat, lon], Math.max(mapInstance.getZoom(), 16)); // Leaflet uses [lat, lon]
-
-                if (liveMarker) {
-                    liveMarker.setLatLng([lat, lon]);
-                } else {
-                    liveMarker = L.marker([lat, lon], { icon: getLiveIcon() }).addTo(mapInstance);
-                }
-                if (pinMarker) { pinMarker.remove(); pinMarker = null; } // Remove pin marker if live mode is active
-
-                locationMessageText.textContent = 'Getting address for your live location...';
-                locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
-                locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
-
-                reverseGeocode(lat, lon).then(addr => {
-                    updateAddressDisplay(lat, lon, addr || `Live Location (Accuracy: ${accuracy.toFixed(0)}m)`);
-                    locationMessageDiv.classList.add('hidden');
-                }).catch(() => {
-                    updateAddressDisplay(lat, lon, `Live Location (Accuracy: ${accuracy.toFixed(0)}m)`);
-                    locationMessageDiv.classList.add('hidden');
-                });
-            }
-
-            function onGeoError(error) {
-                console.warn('Error getting GPS location:', error.message);
-                locationMessageText.textContent = 'Could not get your GPS location. Please ensure location services are enabled and permissions granted, or tap on the map to pin a location.';
-                locationMessageDiv.classList.remove('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                locationMessageDiv.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
-                
-                // If geolocation fails, ensure a fallback location is set (e.g., default shop location)
-                if (appState.customerLocation.latitude === null || appState.customerLocation.longitude === null) {
-                    updateAddressDisplay(defaultLat, defaultLng, `Default Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
-                }
-            }
-
-            function activateLiveMode() {
-                liveBtn.classList.add('active');
-                liveBtn.classList.remove('bg-gray-200', 'text-gray-800');
-                liveBtn.classList.add('bg-red-600', 'text-white');
-
-                pinBtn.classList.remove('active', 'bg-red-600', 'text-white');
-                pinBtn.classList.add('bg-gray-200', 'text-gray-800');
-
-                if (watchId) navigator.geolocation.clearWatch(watchId);
-                
-                locationMessageText.textContent = 'Attempting to get your live GPS location...';
-                locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
-                locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                confirmButton.disabled = true;
-
-                watchId = navigator.geolocation.watchPosition(centerToLiveLocation, onGeoError, {
-                    enableHighAccuracy: true, // Request high accuracy
-                    timeout: 10000,
-                    maximumAge: 0 // No cached position, get fresh one
-                });
-                mapInstance.off('click'); // Disable click for pinning in live mode
-            }
-
-            function activatePinMode() {
-                pinBtn.classList.add('active');
-                pinBtn.classList.remove('bg-gray-200', 'text-gray-800');
-                pinBtn.classList.add('bg-red-600', 'text-white');
-
-                liveBtn.classList.remove('active', 'bg-red-600', 'text-white');
-                liveBtn.classList.add('bg-gray-200', 'text-gray-800');
-
-                if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-                if (liveMarker) { liveMarker.remove(); liveMarker = null; } // Remove live marker if pin mode is active
-                
-                locationMessageText.textContent = 'Tap on the map to pin a delivery location.';
-                locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
-                locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                confirmButton.disabled = true;
-
-                // Add click listener for pinning. Use 'once' to get one click, then rely on drag.
-                mapInstance.once('click', async function(e){
-                    const lat = e.latlng.lat;
-                    const lon = e.latlng.lng;
-
-                    if (pinMarker) {
-                        pinMarker.setLatLng([lat, lon]);
-                    } else {
-                        pinMarker = L.marker([lat, lon], { icon: getPinIcon(), draggable: true }).addTo(mapInstance);
-                        
-                        // Add dragend listener for the pin marker
-                        pinMarker.on('dragend', async (event) => {
-                            const newLatLng = pinMarker.getLatLng();
-                            const newLat = newLatLng.lat;
-                            const newLon = newLatLng.lng;
-
-                            locationMessageText.textContent = 'Getting address for pinned location...';
-                            locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
-                            locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                            confirmButton.disabled = true;
-
-                            try {
-                                let addr = await reverseGeocode(newLat, newLon);
-                                updateAddressDisplay(newLat, newLon, addr || `Pinned Location (Lat: ${newLat.toFixed(4)}, Lng: ${newLon.toFixed(4)})`);
-                            } catch (geoError) {
-                                console.error('Reverse geocoding failed on drag:', geoError);
-                                updateAddressDisplay(newLat, newLon, `Pinned Location (Lat: ${newLat.toFixed(4)}, Lng: ${newLon.toFixed(4)})`);
-                            } finally {
-                                locationMessageDiv.classList.add('hidden');
-                            }
-                        });
-                    }
-
-                    mapInstance.setView([lat, lon], Math.max(mapInstance.getZoom(), 16));
-
-                    locationMessageText.textContent = 'Getting address for pinned location...';
-                    locationMessageDiv.classList.remove('hidden', 'bg-red-100', 'border-red-400', 'text-red-700');
-                    locationMessageDiv.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
-                    
-                    try {
-                        let addr = await reverseGeocode(lat, lon);
-                        updateAddressDisplay(lat, lon, addr || `Pinned Location (Lat: ${lat.toFixed(4)}, Lng: ${lon.toFixed(4)})`);
-                    } catch (geoError) {
-                        console.error('Reverse geocoding failed on pin:', geoError);
-                        updateAddressDisplay(lat, lon, `Pinned Location (Lat: ${lat.toFixed(4)}, Lng: ${lon.toFixed(4)})`);
-                    } finally {
-                        locationMessageDiv.classList.add('hidden');
-                    }
-                });
-            }
-
-            // Initialize map after a small delay to ensure modal is fully rendered
-            setTimeout(() => {
-                if (mapInstance) { // Ensure no duplicate map instance
-                    mapInstance.remove();
-                }
-                mapInstance = L.map('delivery-map-modal', {
-                    center: [defaultLat, defaultLng],
-                    zoom: defaultZoom,
-                    zoomControl: false, // You can add custom zoom controls if needed
-                    attributionControl: false // Hide default Leaflet attribution
-                });
-
-                // Add Esri World Imagery satellite tile layer
-                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    maxZoom: 19,
-                    // Optionally, add a custom attribution for Esri
-                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                }).addTo(mapInstance);
-
-                // Invalidate size to ensure map renders correctly within the modal
-                mapInstance.invalidateSize();
-
-                // Set initial location to shop default and try to activate live mode
-                updateAddressDisplay(defaultLat, defaultLng, `Default Shop Location (Lat: ${defaultLat.toFixed(4)}, Lng: ${defaultLng.toFixed(4)})`);
-                activateLiveMode(); // Automatically try to get live location
-
-                // Event listeners for mode buttons
-                liveBtn.onclick = activateLiveMode;
-                pinBtn.onclick = activatePinMode;
-
-            }, 250); // Delay to ensure modal is fully visible
-        }
-
-        function updateSelectedLocation(lat, lng, address) {
-            appState.customerLocation.latitude = lat;
-            appState.customerLocation.longitude = lng;
-            appState.customerLocation.address = address;
-            document.getElementById('selected-address-modal').textContent = `Selected Location: ${address}`;
-        }
-
-        // --- Reverse Geocoding Function using Nominatim ---
-        async function reverseGeocode(lat, lng) {
-            const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
-            try {
-                const response = await fetch(nominatimUrl, {
-                    headers: {
-                        // Provide a User-Agent to comply with Nominatim's usage policy
-                        'User-Agent': 'DeliciousBitesApp/1.0 (your_email@example.com)' // Replace with your actual email
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                if (data && data.display_name) {
-                    return data.display_name;
-                } else {
-                    return null; // No human-readable address found
-                }
-            } catch (error) {
-                console.error('Error during reverse geocoding:', error);
-                return null; // Return null on error
-            }
-        }
-
-
-        // --- Final Checkout Modal (after location selection) ---
-        function showFinalCheckoutModal() {
-            // Cart and customerLocation are already in appState
-            if (appState.cart.length === 0) {
-                showMessage('Information', 'Your cart is empty. Please add items before checking out.');
-                return;
-            }
-
-            // Recalculate summary based on cart items
-            let subtotal = 0;
-            appState.cart.forEach(item => {
-                subtotal += item.discountedPrice * item.quantity;
-            });
-
-            let transportTax = 0;
-            if (appState.shopSettings && appState.shopSettings.deliveryRates && appState.shopSettings.deliveryRates.length > 0) {
-                if (subtotal > 0) {
-                    transportTax = Math.min(...appState.shopSettings.deliveryRates.map(r => r.amount));
-                }
-            } else {
-                transportTax = subtotal > 0 ? 30.00 : 0.00;
-            }
-            const total = subtotal + transportTax;
-
-            const checkoutFormHtml = `
-                <div id="checkout-modal-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
-                    <strong class="font-bold">Error!</strong>
-                    <span class="block sm:inline ml-2" id="checkout-modal-error-text"></span>
-                </div>
-                <form id="checkout-form" class="space-y-4">
+                <form id="checkout-form" class="mt-6 space-y-4">
                     <div>
                         <label for="customer-name" class="block text-sm font-medium text-gray-700">Your Name</label>
                         <input type="text" id="customer-name" name="customerName" required
@@ -915,91 +417,149 @@
                     </div>
                     <div>
                         <label for="customer-phone" class="block text-sm font-medium text-gray-700">Your Phone Number (e.g., 91XXXXXXXXXX)</label>
-                        <input type="tel" id="customer-phone" name="customerPhone" pattern="[0-9]{10,15}" required
+                        <input type="tel" id="customer-phone" name="customerPhone" pattern="[0-9]{10,12}" required
                             class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Location</label>
-                        <p id="final-delivery-address" class="text-gray-700 font-semibold mb-2">${appState.customerLocation.address}</p>
-                        <p class="text-sm text-gray-500">Lat: ${appState.customerLocation.latitude ? appState.customerLocation.latitude.toFixed(4) : 'N/A'}, Lng: ${appState.customerLocation.longitude ? appState.customerLocation.longitude.toFixed(4) : 'N/A'}</p>
-                        <button type="button" id="change-location-button" class="mt-2 text-blue-600 hover:underline text-sm flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-1"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
-                            Change Location
+                        <label for="delivery-address" class="block text-sm font-medium text-gray-700">Delivery Address</label>
+                        <textarea id="delivery-address" name="deliveryAddress" rows="3" required
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm"></textarea>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button type="button" id="get-location-button"
+                            class="flex-shrink-0 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-semibold transition-colors flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pin mr-2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M12 22s8-4 8-10V7l-8-8-8 8v5.5c0 6 8 10 8 10Z"/></svg>
+                            Get My Current Location
                         </button>
+                        <span id="location-status" class="text-sm text-gray-600"></span>
                     </div>
-                    <div class="border-t border-gray-200 pt-4 mt-4 space-y-2">
-                        <p class="flex justify-between"><span>Order Subtotal:</span> <span class="font-semibold">₹${subtotal.toFixed(2)}</span></p>
-                        <p class="flex justify-between"><span>Transport Tax:</span> <span class="font-semibold">₹${transportTax.toFixed(2)}</span></p>
-                        <p class="flex justify-between text-lg font-bold text-red-600"><span>Total Payable:</span> <span>₹${total.toFixed(2)}</span></p>
-                        <p class="text-sm text-gray-600">Payment Method: <span class="font-semibold">Cash on Delivery (COD)</span></p>
-                    </div>
-                    <div class="pt-4 border-t border-gray-200">
-                        <button type="submit" id="place-order-button"
-                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm disabled:opacity-50">
-                            Place Order
-                        </button>
-                    </div>
+                    <input type="hidden" id="customer-latitude" name="latitude">
+                    <input type="hidden" id="customer-longitude" name="longitude">
+
+                    <button type="submit" id="place-order-button"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm disabled:opacity-50">
+                        Place Order (Cash on Delivery)
+                    </button>
                 </form>
             `;
-            showModal('Confirm Your Order', checkoutFormHtml);
+            showModal('Your Cart & Checkout', cartModalContent);
 
-            document.getElementById('checkout-form').addEventListener('submit', handlePlaceOrder);
-            document.getElementById('change-location-button').addEventListener('click', () => {
-                hideModal(); // Hide current modal
-                showLocationSelectionModal(); // Go back to location selection
+            // Add event listeners for cart quantity buttons
+            modalBody.querySelectorAll('.cart-quantity-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const productId = e.currentTarget.dataset.id;
+                    const action = e.currentTarget.dataset.action;
+                    const item = appState.cart.find(cartItem => cartItem.productId === productId);
+                    if (item) {
+                        if (action === 'increase') {
+                            updateCartItemQuantity(productId, item.quantity + 1);
+                        } else if (action === 'decrease') {
+                            updateCartItemQuantity(productId, item.quantity - 1);
+                        } else if (action === 'remove') {
+                            removeFromCart(productId);
+                        }
+                    }
+                });
             });
+
+            // Initialize location button
+            const getLocationButton = document.getElementById('get-location-button');
+            const locationStatusSpan = document.getElementById('location-status');
+            const customerLatitudeInput = document.getElementById('customer-latitude');
+            const customerLongitudeInput = document.getElementById('customer-longitude');
+            const deliveryAddressTextarea = document.getElementById('delivery-address');
+
+            getLocationButton.addEventListener('click', async () => {
+                locationStatusSpan.textContent = 'Getting location...';
+                getLocationButton.disabled = true;
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                    });
+                    appState.currentLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        address: 'Location from device GPS' // Placeholder, reverse geocoding would be needed for actual address
+                    };
+                    customerLatitudeInput.value = appState.currentLocation.latitude;
+                    customerLongitudeInput.value = appState.currentLocation.longitude;
+                    deliveryAddressTextarea.value = `Lat: ${appState.currentLocation.latitude.toFixed(4)}, Lon: ${appState.currentLocation.longitude.toFixed(4)} (Approximate Location)`;
+                    locationStatusSpan.textContent = 'Location obtained!';
+                    showMessage('Location successfully retrieved!', 'success');
+                } catch (error) {
+                    appState.currentLocation = null;
+                    customerLatitudeInput.value = '';
+                    customerLongitudeInput.value = '';
+                    locationStatusSpan.textContent = 'Failed to get location.';
+                    showMessage(`Could not get location: ${error.message}. Please enter address manually.`, 'error');
+                } finally {
+                    getLocationButton.disabled = false;
+                }
+            });
+
+            // Handle checkout form submission
+            document.getElementById('checkout-form').addEventListener('submit', handlePlaceOrder);
         }
 
         async function handlePlaceOrder(e) {
             e.preventDefault();
-            const placeOrderButton = document.getElementById('place-order-button');
-            const modalErrorDiv = document.getElementById('checkout-modal-error');
-            const modalErrorText = document.getElementById('checkout-modal-error-text');
 
-            placeOrderButton.textContent = 'Placing Order...';
-            placeOrderButton.disabled = true;
-            modalErrorDiv.classList.add('hidden');
+            const modalErrorDiv = document.getElementById('cart-modal-error');
+            const modalErrorText = document.getElementById('cart-modal-error-text');
+            modalErrorDiv.classList.add('hidden'); // Hide previous errors
 
-            const customerName = document.getElementById('customer-name').value;
-            const customerPhone = document.getElementById('customer-phone').value;
-            const deliveryAddress = appState.customerLocation.address; // From selected location
-
-            // Basic validation
-            if (!customerName || !customerPhone || !deliveryAddress || appState.customerLocation.latitude === null || appState.customerLocation.longitude === null) {
-                modalErrorText.textContent = 'Please fill in all required fields and ensure your delivery location is set.';
+            if (appState.cart.length === 0) {
+                modalErrorText.textContent = 'Your cart is empty. Please add items before placing an order.';
                 modalErrorDiv.classList.remove('hidden');
-                placeOrderButton.textContent = 'Place Order';
-                placeOrderButton.disabled = false;
                 return;
             }
-            if (!customerPhone.match(/^[0-9]{10,15}$/)) {
-                modalErrorText.textContent = 'Please enter a valid phone number (10-15 digits).';
+
+            const customerName = document.getElementById('customer-name').value.trim();
+            const customerPhone = document.getElementById('customer-phone').value.trim();
+            const deliveryAddress = document.getElementById('delivery-address').value.trim();
+            const customerLatitude = parseFloat(document.getElementById('customer-latitude').value);
+            const customerLongitude = parseFloat(document.getElementById('customer-longitude').value);
+
+            if (!customerName || !customerPhone || !deliveryAddress) {
+                modalErrorText.textContent = 'Please fill in all required customer and delivery details.';
                 modalErrorDiv.classList.remove('hidden');
-                placeOrderButton.textContent = 'Place Order';
-                placeOrderButton.disabled = false;
                 return;
-                }
+            }
+
+            // Basic phone number validation (e.g., 10-12 digits, starts with 91 if Indian)
+            if (!/^\+?[0-9]{10,15}$/.test(customerPhone)) {
+                modalErrorText.textContent = 'Please enter a valid phone number (e.g., 91XXXXXXXXXX).';
+                modalErrorDiv.classList.remove('hidden');
+                return;
+            }
+
+
+            const { subtotal, transportTax, totalAmount } = calculateCartTotals();
 
             const orderPayload = {
                 items: appState.cart.map(item => ({
-                    productId: item._id,
-                    name: item.name,
-                    price: item.originalPrice, // Send original price to backend
+                    productId: item.productId, // Backend expects itemId, but here we use productId for clarity
                     quantity: item.quantity,
+                    name: item.name, // Include name and price for backend to store snapshot
+                    price: item.price
                 })),
                 customerName: customerName,
                 customerPhone: customerPhone,
                 deliveryAddress: deliveryAddress,
-                customerLocation: {
-                    latitude: appState.customerLocation.latitude,
-                    longitude: appState.customerLocation.longitude,
-                    address: appState.customerLocation.address
-                },
-                subtotal: parseFloat(document.getElementById('cart-subtotal-modal').textContent), // Discounted subtotal
-                transportTax: parseFloat(document.getElementById('cart-transport-tax-modal').textContent),
-                totalAmount: parseFloat(document.getElementById('cart-total-modal').textContent),
-                paymentMethod: 'Cash on Delivery',
+                customerLocation: (appState.currentLocation && !isNaN(customerLatitude) && !isNaN(customerLongitude)) ? {
+                    latitude: customerLatitude,
+                    longitude: customerLongitude,
+                    address: appState.currentLocation.address || deliveryAddress // Use captured address or manual
+                } : null,
+                subtotal: subtotal,
+                transportTax: transportTax,
+                totalAmount: totalAmount,
+                paymentMethod: 'Cash on Delivery', // Hardcoded as per backend
             };
+
+            const placeOrderButton = document.getElementById('place-order-button');
+            placeOrderButton.disabled = true;
+            placeOrderButton.textContent = 'Placing Order...';
 
             try {
                 const response = await fetch(`${API_BASE_URL}/api/order`, {
@@ -1014,44 +574,134 @@
                     throw new Error(data.message || 'Failed to place order.');
                 }
 
-                hideModal(); // Hide the checkout modal
-                showModal('Order Placed Successfully!', `
-                    <p class="text-gray-700 mb-4">Thank you for your order! Your order has been placed successfully.</p>
-                    <p class="text-gray-700 mb-2"><strong class="font-semibold">Order ID:</strong> ${data.orderId}</p>
-                    <p class="text-gray-700 mb-4"><strong class="font-semibold">Tracking PIN:</strong> ${data.pinId}</p>
-                    <p class="text-gray-600 text-sm">You can track your order status using this PIN.</p>
-                    <a href="/track?orderId=${data.pinId}" class="block text-center mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out">Track Your Order</a>
-                `);
+                showMessage(`Order placed successfully! Your Order ID is: ${data.orderId} and PIN is: ${data.pinId}.`, 'success');
+                appState.cart = []; // Clear cart on successful order
+                saveCart();
+                hideModal();
 
-                // Clear cart after successful order
-                appState.cart = [];
-                cartItemCount.textContent = 0; // Update header count
+                // Optionally show order tracking modal immediately
+                showOrderTrackingModal(data.pinId);
 
-            } catch (err) {
-                modalErrorText.textContent = err.message;
+            } catch (error) {
+                modalErrorText.textContent = `Order placement failed: ${error.message}`;
                 modalErrorDiv.classList.remove('hidden');
             } finally {
-                placeOrderButton.textContent = 'Place Order';
                 placeOrderButton.disabled = false;
+                placeOrderButton.textContent = 'Place Order (Cash on Delivery)';
             }
         }
 
-        // --- Initial Load & Event Listeners ---
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchShopSettings();
-            fetchMenuItems();
+        // --- Order Tracking ---
+        function showOrderTrackingModal(initialPin = '') {
+            const trackingModalContent = `
+                <div id="track-order-modal-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md relative mb-4" role="alert">
+                    <strong class="font-bold">Error!</strong>
+                    <span class="block sm:inline ml-2" id="track-order-modal-error-text"></span>
+                </div>
+                <form id="track-order-form" class="space-y-4">
+                    <div>
+                        <label for="order-pin-input" class="block text-sm font-medium text-gray-700">Enter your 10-digit Order PIN:</label>
+                        <input type="text" id="order-pin-input" value="${initialPin}" maxlength="10" pattern="[0-9]{10}" required
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm">
+                    </div>
+                    <button type="submit" id="track-order-submit-button"
+                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm">
+                        Track Order
+                    </button>
+                </form>
+                <div id="order-details-display" class="mt-6 p-4 bg-gray-50 rounded-md hidden">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">Order Details:</h4>
+                    <p><strong class="font-medium">Order ID:</strong> <span id="display-order-id"></span></p>
+                    <p><strong class="font-medium">PIN:</strong> <span id="display-pin-id"></span></p>
+                    <p><strong class="font-medium">Status:</strong> <span id="display-status"></span></p>
+                    <p><strong class="font-medium">Total:</strong> <span id="display-total"></span></p>
+                    <p><strong class="font-medium">Items:</strong> <span id="display-items"></span></p>
+                    <p><strong class="font-medium">Order Date:</strong> <span id="display-order-date"></span></p>
+                </div>
+            `;
+            showModal('Track Your Order', trackingModalContent);
 
-            // Event delegation for Add to Cart buttons
-            menuItemsContainer.addEventListener('click', (e) => {
-                const button = e.target.closest('.add-to-cart-button');
-                if (button) {
-                    const itemId = button.dataset.id;
-                    addToCart(itemId);
+            document.getElementById('track-order-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const orderPinInput = document.getElementById('order-pin-input');
+                const pin = orderPinInput.value.trim();
+                const trackOrderSubmitButton = document.getElementById('track-order-submit-button');
+                const orderDetailsDisplay = document.getElementById('order-details-display');
+                const trackModalErrorDiv = document.getElementById('track-order-modal-error');
+                const trackModalErrorText = document.getElementById('track-order-modal-error-text');
+
+                trackModalErrorDiv.classList.add('hidden');
+                orderDetailsDisplay.classList.add('hidden');
+                trackOrderSubmitButton.disabled = true;
+                trackOrderSubmitButton.textContent = 'Tracking...';
+
+                if (!pin || pin.length !== 10 || isNaN(pin)) {
+                    trackModalErrorText.textContent = 'Please enter a valid 10-digit PIN.';
+                    trackModalErrorDiv.classList.remove('hidden');
+                    trackOrderSubmitButton.disabled = false;
+                    trackOrderSubmitButton.textContent = 'Track Order';
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/order/${pin}`);
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || 'Order not found or an error occurred.');
+                    }
+
+                    document.getElementById('display-order-id').textContent = data.customOrderId || data._id.substring(0, 6) + '...';
+                    document.getElementById('display-pin-id').textContent = data.pinId;
+                    document.getElementById('display-status').textContent = data.status;
+                    document.getElementById('display-total').textContent = `₹${data.totalAmount.toFixed(2)}`;
+                    document.getElementById('display-items').textContent = data.items.map(item => `${item.name} x ${item.quantity}`).join(', ');
+                    document.getElementById('display-order-date').textContent = new Date(data.orderDate).toLocaleString();
+                    orderDetailsDisplay.classList.remove('hidden');
+
+                } catch (error) {
+                    trackModalErrorText.textContent = `Tracking failed: ${error.message}`;
+                    trackModalErrorDiv.classList.remove('hidden');
+                } finally {
+                    trackOrderSubmitButton.disabled = false;
+                    trackOrderSubmitButton.textContent = 'Track Order';
                 }
             });
 
-            // View Cart Button (opens the cart modal)
-            viewCartButton.addEventListener('click', renderCartContentInModal);
+            // Check URL for orderId parameter on page load
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderIdFromUrl = urlParams.get('orderId');
+            if (orderIdFromUrl) {
+                document.getElementById('order-pin-input').value = orderIdFromUrl;
+                document.getElementById('track-order-form').dispatchEvent(new Event('submit')); // Auto-submit
+            }
+        }
+
+
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchShopSettings();
+            fetchMenuItems();
+            loadCart(); // Load cart from local storage
+
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+
+            menuItemsContainer.addEventListener('click', (e) => {
+                const addButton = e.target.closest('.add-to-cart-button');
+                if (addButton) {
+                    addToCart(addButton.dataset.id);
+                }
+            });
+
+            cartButton.addEventListener('click', renderCartModal);
+            trackOrderButton.addEventListener('click', () => showOrderTrackingModal());
+
+            // Handle initial orderId from URL for tracking
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderIdParam = urlParams.get('orderId');
+            if (orderIdParam) {
+                showOrderTrackingModal(orderIdParam);
+            }
         });
     </script>
 </body>
