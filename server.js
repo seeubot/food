@@ -116,7 +116,10 @@ const SettingsSchema = new mongoose.Schema({
         amount: { type: Number, required: true }
     }],
     whatsappStatus: { type: String, default: 'disconnected', enum: ['disconnected', 'qr_received', 'authenticated', 'ready', 'auth_failure', 'initializing', 'qr_error'] },
-    lastAuthenticatedAt: Date
+    lastAuthenticatedAt: Date,
+    // New fields for discount settings
+    minSubtotalForDiscount: { type: Number, default: 200 },
+    discountPercentage: { type: Number, default: 0.20 } // Stored as a decimal (0.20 for 20%)
 });
 
 const Item = mongoose.model('Item', ItemSchema);
@@ -1194,6 +1197,7 @@ app.get('/api/admin/settings', authenticateToken, async (req, res) => {
     try {
         let settings = await Settings.findOne({});
         if (!settings) {
+            // Create default settings if none exist
             settings = new Settings();
             await settings.save();
         }
@@ -1213,6 +1217,47 @@ app.put('/api/admin/settings', authenticateToken, async (req, res) => {
     }
 });
 
+// New: Admin API for Discount Settings
+app.get('/api/admin/discount-settings', authenticateToken, async (req, res) => {
+    try {
+        const settings = await Settings.findOne({});
+        if (!settings) {
+            return res.status(404).json({ message: 'Discount settings not found. Please create default settings first.' });
+        }
+        res.json({
+            minSubtotalForDiscount: settings.minSubtotalForDiscount,
+            discountPercentage: settings.discountPercentage
+        });
+    } catch (error) {
+        console.error('Error fetching discount settings:', error);
+        res.status(500).json({ message: 'Error fetching discount settings', error: error.message });
+    }
+});
+
+app.put('/api/admin/discount-settings', authenticateToken, async (req, res) => {
+    try {
+        const { minSubtotalForDiscount, discountPercentage } = req.body;
+
+        if (typeof minSubtotalForDiscount !== 'number' || minSubtotalForDiscount < 0) {
+            return res.status(400).json({ message: 'minSubtotalForDiscount must be a non-negative number.' });
+        }
+        if (typeof discountPercentage !== 'number' || discountPercentage < 0 || discountPercentage > 1) {
+            return res.status(400).json({ message: 'discountPercentage must be a number between 0 and 1 (e.g., 0.1 for 10%).' });
+        }
+
+        const updatedSettings = await Settings.findOneAndUpdate(
+            {},
+            { $set: { minSubtotalForDiscount, discountPercentage } },
+            { new: true, upsert: true, runValidators: true }
+        );
+        res.json({ message: 'Discount settings updated successfully', settings: updatedSettings });
+    } catch (error) {
+        console.error('Error updating discount settings:', error);
+        res.status(400).json({ message: 'Error updating discount settings', error: error.message });
+    }
+});
+
+
 // --- Public API Routes (no authentication needed) ---
 app.get('/api/menu', async (req, res) => {
     try {
@@ -1228,12 +1273,21 @@ app.get('/api/public/settings', async (req, res) => {
     try {
         const settings = await Settings.findOne();
         if (!settings) {
-            return res.status(404).json({ message: 'Settings not found.' });
+            // If no settings exist, return default public settings
+            return res.json({
+                shopName: 'Delicious Bites',
+                shopLocation: { latitude: 17.4399, longitude: 78.4983 },
+                deliveryRates: [],
+                minSubtotalForDiscount: 200, // Default for public
+                discountPercentage: 0.20 // Default for public
+            });
         }
         res.json({
             shopName: settings.shopName,
             shopLocation: settings.shopLocation,
             deliveryRates: settings.deliveryRates,
+            minSubtotalForDiscount: settings.minSubtotalForDiscount,
+            discountPercentage: settings.discountPercentage
         });
     } catch (err) {
         console.error('Error fetching public settings:', err);
@@ -1488,4 +1542,3 @@ server.listen(PORT, () => {
     console.log(`Default Admin Password (for initial setup): ${DEFAULT_ADMIN_PASSWORD}`);
     console.log('REMEMBER TO ENABLE 2FA FROM THE DASHBOARD AFTER FIRST LOGIN FOR SECURITY.');
 });
-
