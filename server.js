@@ -11,7 +11,7 @@ const moment = require('moment-timezone');
 const cron = require('node-cron');
 const speakeasy = require('speakeasy');
 const fs = require('fs');
-const crypto = require('crypto');
+const crypto = require('crypto'); // Import crypto for generating unique IDs
 
 require('dotenv').config();
 
@@ -195,7 +195,7 @@ async function seedMenuItems() {
                 {
                     name: 'Chicken Biryani',
                     description: 'Aromatic basmati rice cooked with tender chicken and spices.',
-                    price: 220.00,
+                    price: 220,
                     imageUrl: 'https://placehold.co/400x200/33FFFF/FFFFFF?text=Chicken+Biryani',
                     category: 'Main Course',
                     isAvailable: true,
@@ -269,12 +269,12 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
             console.log('[WhatsApp] Destroying previous client instance...');
             io.emit('whatsapp_log', 'Destroying previous client instance...');
             await client.destroy();
-            client = null;
+            client = null; // Set client to null AFTER successful destroy
             whatsappReady = false; // Reset ready state
         } catch (e) {
             console.error('[WhatsApp] Error destroying old client:', e);
             io.emit('whatsapp_log', `Error destroying old client: ${e.message}`);
-            client = null;
+            client = null; // Ensure client is null even if destroy fails
             whatsappReady = false;
         }
     }
@@ -373,6 +373,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
         console.log('[WhatsApp] Reinitializing client due to auth_failure (forcing new session)...');
         isInitializing = false; // Allow re-initialization
+        client = null; // Ensure client is null before forcing new session
         initializeWhatsappClient(true); // Force a new session after auth failure
     });
 
@@ -387,6 +388,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
         isInitializing = false; // Allow re-initialization
+        client = null; // Ensure client is null on disconnection
 
         // Decide whether to force a new session or try to reconnect with existing one
         if (reason === 'LOGOUT' || reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNEXPECTED_LOGOUT') {
@@ -426,9 +428,10 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
             customerPhone = customerPhone.trim(); // Ensure no leading/trailing whitespace
         }
 
-        // Final check for validity: customerPhone must be a non-empty string
+        // If customerPhone is empty after processing, assign a unique placeholder
+        // and then skip processing this message to prevent invalid data in DB.
         if (customerPhone.length === 0) {
-            console.error(`[WhatsApp Message Handler] Invalid or empty customerPhone derived from msg.from: '${rawChatId}'. Skipping message processing for this message.`);
+            console.error(`[WhatsApp Message Handler] Invalid or empty customerPhone derived from msg.from: '${rawChatId}'. Skipping message processing.`);
             io.emit('whatsapp_log', `Skipping message: Invalid phone number from ${rawChatId}`);
             return; // Exit if customerPhone is invalid
         }
@@ -436,7 +439,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         const customerName = msg._data.notifyName; // This can be null/undefined
 
         try {
-            console.log(`[WhatsApp Message Handler] Attempting to find/create customer: ${customerPhone}`);
+            console.log(`[WhatsApp Message Handler] Attempting to find/create customer for phone: '${customerPhone}'`); // Added log for clarity
             let customer = await Customer.findOne({ customerPhone: customerPhone });
 
             if (!customer) {
@@ -451,7 +454,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                     io.emit('whatsapp_log', `Successfully created new customer: ${customerPhone}`);
                 } catch (saveError) {
                     if (saveError.code === 11000) {
-                        console.warn(`[WhatsApp Message Handler] Duplicate key error during customer creation for ${customerPhone}. Attempting to find and update instead.`);
+                        console.warn(`[WhatsApp Message Handler] Duplicate key error during customer creation for ${customerPhone}. Key Pattern: ${JSON.stringify(saveError.keyPattern)}, Key Value: ${JSON.stringify(saveError.keyValue)}`);
                         io.emit('whatsapp_log', `Duplicate customer found for ${customerPhone}. Attempting update.`);
                         customer = await Customer.findOne({ customerPhone: customerPhone });
                         if (customer) {
@@ -620,12 +623,16 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
+        // If client.initialize() fails, ensure the 'client' instance is completely discarded
+        // so that the next attempt creates a fresh one.
+        client = null; // Set client to null immediately after a failed initialization
+
         // If initialization fails, retry if max attempts not reached
         if (currentInitializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
             console.log(`[WhatsApp] Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
             io.emit('whatsapp_log', `Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
             isInitializing = false; // Allow retry
-            setTimeout(() => initializeWhatsappClient(forceNewSession), RETRY_DELAY_MS);
+            setTimeout(() => initializeWhatsappClient(false), RETRY_DELAY_MS);
         } else {
             console.error('[WhatsApp] Max initialization attempts reached. WhatsApp client failed to initialize.');
             io.emit('whatsapp_log', 'Max initialization attempts reached. WhatsApp client failed to initialize.');
@@ -1005,13 +1012,13 @@ app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
             window: 1
         });
 
-        if (verified) {
-            admin.totpSecret = secret; // Save the secret to DB only upon successful verification
-            await admin.save();
-            res.json({ verified: true, message: '2FA successfully enabled.' });
-        } else {
-            res.status(401).json({ verified: false, message: 'Invalid 2FA code.' });
+        if (!verified) {
+            return res.status(401).json({ verified: false, message: 'Invalid 2FA code.' });
         }
+
+        admin.totpSecret = secret; // Save the secret to DB only upon successful verification
+        await admin.save();
+        res.json({ verified: true, message: '2FA successfully enabled.' });
     } catch (error) {
         console.error('Error verifying 2FA code:', error);
         res.status(500).json({ message: 'Error verifying 2FA code.' });
@@ -1306,11 +1313,21 @@ app.post('/api/order', async (req, res) => {
             return res.status(400).json({ message: 'Missing required order details.' });
         }
 
-        const cleanedCustomerPhone = customerPhone.trim();
+        // --- START: Improved customerPhone formatting for WhatsApp ---
+        let cleanedCustomerPhone = customerPhone.trim().replace(/\D/g, ''); // Strip non-digits
+        // Assuming Indian numbers (10 digits), prepend '91' if not already present
+        if (cleanedCustomerPhone.length === 10 && !cleanedCustomerPhone.startsWith('91')) {
+            cleanedCustomerPhone = '91' + cleanedCustomerPhone;
+        }
+        const customerChatId = cleanedCustomerPhone + '@c.us';
+        // --- END: Improved customerPhone formatting ---
+
         if (typeof cleanedCustomerPhone !== 'string' || cleanedCustomerPhone === '') {
             console.error('Invalid customerPhone received for order:', customerPhone);
             return res.status(400).json({ message: 'Invalid phone number provided for customer.' });
         }
+        // --- Added logging for cleanedCustomerPhone before findOneAndUpdate ---
+        console.log(`[API] /api/order: Attempting to find/update customer with phone: '${cleanedCustomerPhone}'`);
 
         const itemDetails = [];
         for (const item of items) {
@@ -1350,38 +1367,73 @@ app.post('/api/order', async (req, res) => {
         await newOrder.save();
         console.log('[API] /api/order: Order saved successfully.', newOrder._id);
 
-        await Customer.findOneAndUpdate(
-            { customerPhone: cleanedCustomerPhone },
-            {
-                $set: {
-                    customerName: customerName,
-                    lastKnownLocation: customerLocation,
-                    lastOrderDate: new Date()
+        try {
+            await Customer.findOneAndUpdate(
+                { customerPhone: cleanedCustomerPhone },
+                {
+                    $set: {
+                        customerName: customerName,
+                        lastKnownLocation: customerLocation,
+                        lastOrderDate: new Date()
+                    },
+                    $inc: { totalOrders: 1 }
                 },
-                $inc: { totalOrders: 1 }
-            },
-            { upsert: true, new: true }
-        );
-        console.log('[API] /api/order: Customer updated/created successfully.');
-
-
-        if (whatsappReady) {
-            io.emit('new_order', newOrder);
-            // Ensure customerPhone is in the correct format for whatsapp-web.js
-            const customerChatId = cleanedCustomerPhone.includes('@c.us') ? cleanedCustomerPhone : cleanedCustomerPhone + '@c.us';
-            try {
-                await client.sendMessage(customerChatId, `Your order (ID: ${newOrder.customOrderId}, PIN: ${newOrder.pinId}) has been placed successfully via the web menu! We will notify you of its status updates. You can also view your orders by typing "My Orders" or by sending your PIN: ${newOrder.pinId}.`);
-                io.emit('whatsapp_log', `Sent order confirmation to ${customerChatId}`);
-            } catch (sendError) {
-                console.error(`[WhatsApp] Failed to send order confirmation to ${customerChatId}:`, sendError);
-                io.emit('whatsapp_log', `Failed to send order confirmation to ${customerChatId}: ${sendError.message}`);
+                { upsert: true, new: true }
+            );
+            console.log('[API] /api/order: Customer updated/created successfully.');
+        } catch (customerUpdateError) {
+            if (customerUpdateError.code === 11000 && customerUpdateError.keyPattern && customerUpdateError.keyPattern.customerPhone && customerUpdateError.keyValue && customerUpdateError.keyValue.customerPhone === null) {
+                console.error(`[API] /api/order: Duplicate key error (customerPhone: null) during customer update/creation. This indicates a pre-existing null phone entry in DB. Please clean your 'customers' collection: ${customerUpdateError.message}`);
+                return res.status(500).json({ message: 'Failed to update customer record due to a database conflict (duplicate null phone number). Please contact support.' });
+            } else {
+                console.error('[API] /api/order: Error updating/creating customer:', customerUpdateError);
+                return res.status(500).json({ message: 'Failed to update customer record due to a server error.' });
             }
         }
+
+
+        // --- START: Send order confirmation to customer via WhatsApp ---
+        if (whatsappReady && client) { // Ensure client is ready and initialized
+            io.emit('new_order', newOrder); // Still emit to admin dashboard
+
+            console.log(`[WhatsApp] Attempting to send order confirmation to customerChatId: ${customerChatId}`); // Log target ID
+            try {
+                // Construct the detailed order confirmation message for the customer
+                let customerConfirmationMessage = `🎉 Your order from Delicious Bites has been placed successfully!\n\n`;
+                customerConfirmationMessage += `*Order ID:* ${newOrder.customOrderId}\n`;
+                customerConfirmationMessage += `*PIN:* ${newOrder.pinId}\n\n`;
+                customerConfirmationMessage += `*Your Items:*\n`;
+                newOrder.items.forEach(item => {
+                    customerConfirmationMessage += `- ${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)\n`;
+                });
+                customerConfirmationMessage += `\n*Subtotal:* ₹${newOrder.subtotal.toFixed(2)}\n`;
+                customerConfirmationMessage += `*Transport Tax:* ₹${newOrder.transportTax.toFixed(2)}\n`;
+                if (newOrder.discountAmount > 0) {
+                    customerConfirmationMessage += `*Discount:* -₹${newOrder.discountAmount.toFixed(2)}\n`;
+                }
+                customerConfirmationMessage += `*Total Amount:* ₹${newOrder.totalAmount.toFixed(2)}\n`;
+                customerConfirmationMessage += `*Payment Method:* ${newOrder.paymentMethod}\n`;
+                customerConfirmationMessage += `*Delivery Address:* ${newOrder.deliveryAddress}\n\n`;
+                customerConfirmationMessage += `We will notify you of its status updates. You can also view your orders by typing "My Orders" or by sending your PIN: ${newOrder.pinId}. Thank you for your order! 🥳`;
+
+                await client.sendMessage(customerChatId, customerConfirmationMessage);
+                console.log(`[WhatsApp] Sent detailed order confirmation to ${customerChatId}`);
+                io.emit('whatsapp_log', `Sent detailed order confirmation to ${customerChatId}`);
+            } catch (sendError) {
+                console.error(`[WhatsApp] Failed to send detailed order confirmation to ${customerChatId}:`, sendError);
+                io.emit('whatsapp_log', `Failed to send detailed order confirmation to ${customerChatId}: ${sendError.message}`);
+            }
+        } else {
+            console.warn(`[WhatsApp] WhatsApp client not ready or not initialized. Cannot send order confirmation to ${customerChatId}. whatsappReady: ${whatsappReady}, client exists: ${!!client}`); // Added warning
+            io.emit('whatsapp_log', `WhatsApp client not ready. Order confirmation not sent to ${customerChatId}.`);
+        }
+        // --- END: Send order confirmation to customer via WhatsApp ---
 
         res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder.customOrderId, pinId: newOrder.pinId, order: newOrder });
 
     } catch (err) {
         console.error('Error placing order:', err);
+        // This catch block will now primarily handle errors from newOrder.save() or initial validation
         if (err.code === 11000 && err.keyPattern && err.keyPattern.customerPhone) {
             res.status(409).json({ message: 'A customer with this phone number already exists or an internal data issue occurred. Please try again with a valid phone number.' });
         } else {
