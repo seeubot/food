@@ -917,49 +917,28 @@ app.get('/admin/logout', (req, res) => {
     res.send('Logged out successfully');
 });
 
-// Authentication Middleware for Admin APIs and Dashboard HTML
+// Authentication Middleware for Admin APIs
+// This middleware will ONLY check the Authorization header for API calls.
+// HTML routes like /dashboard will NOT use this middleware for their initial load.
 const authenticateToken = (req, res, next) => {
-    let token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
-    const isHtmlRequest = ['/dashboard'].includes(req.path);
-
-    // If it's an HTML request and no Authorization header, check query parameter
-    if (isHtmlRequest && !token) {
-        token = req.query.token;
-    }
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (token == null) {
-        console.log('Unauthorized: No token provided. (Request to ' + req.path + ')');
-        if (isHtmlRequest) {
-            return res.redirect('/admin/login');
-        }
-        return res.status(401).json({ message: 'Unauthorized: No token provided.' });
+        console.log('Unauthorized: No token provided. (API Request to ' + req.path + ')');
+        return res.status(401).json({ message: 'Unauthorized: No token provided.' }); // For API calls
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
-            console.error('JWT Verification Error:', err.message, '(Token received for ' + req.path + ')');
+            console.error('JWT Verification Error:', err.message, '(API Token received for ' + req.path + ')');
             if (err.name === 'TokenExpiredError') {
-                if (isHtmlRequest) {
-                    return res.redirect('/admin/login');
-                }
                 return res.status(401).json({ message: 'Unauthorized: Session expired. Please log in again.' });
-            }
-            if (isHtmlRequest) {
-                return res.redirect('/admin/login');
             }
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
         }
         req.user = user;
-
-        // If it was an HTML request and token came from query, redirect to clean URL
-        if (isHtmlRequest && req.query.token) {
-            // This redirect happens *after* successful verification,
-            // so the client will get the HTML without the token in the URL.
-            // The client-side JS in dashboard.html will then store it in localStorage.
-            const newUrl = req.path; // Remove query params
-            return res.redirect(302, newUrl); // Use 302 for temporary redirect
-        }
-        next(); // Proceed to serve content or API response
+        next(); // Proceed to serve API response
     });
 };
 
@@ -1513,8 +1492,9 @@ app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
-// Protected Dashboard Route
-app.get('/dashboard', authenticateToken, (req, res) => {
+// Dashboard Route - NOT protected by authenticateToken middleware yet.
+// Client-side JS in dashboard.html will handle initial token check.
+app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
