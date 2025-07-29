@@ -215,6 +215,7 @@
             flex-direction: column;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
             padding: 15px; /* Padding inside the card */
+            cursor: pointer; /* Make the whole card clickable */
         }
 
         .menu-item-card:hover {
@@ -247,13 +248,14 @@
             font-weight: 600; /* Semi-bold */
         }
 
-        .item-details p {
-            font-size: 0.85em; /* Smaller description */
+        /* Description is removed from card, only shown in modal */
+        /* .item-details p {
+            font-size: 0.85em;
             color: var(--text-light);
-            margin-bottom: 10px; /* Reduced margin */
+            margin-bottom: 10px;
             flex-grow: 1;
-            opacity: 0.8; /* Slightly faded description */
-        }
+            opacity: 0.8;
+        } */
 
         .item-price-add {
             display: flex;
@@ -800,6 +802,44 @@
             font-weight: 500;
         }
 
+        /* Item Details Modal */
+        #itemDetailsModal .modal-content {
+            max-width: 500px;
+            text-align: center;
+        }
+        #itemDetailsModal .item-modal-content img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        #itemDetailsModal .item-modal-content h3 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        #itemDetailsModal .item-modal-content p {
+            font-size: 1em;
+            color: var(--text-light);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        #itemDetailsModal .item-modal-content .item-price {
+            font-size: 1.8em;
+            margin-bottom: 25px;
+            display: block; /* Ensure it takes full width */
+        }
+        #itemDetailsModal .item-modal-content .add-to-cart-btn {
+            width: 80%; /* Make button wider in modal */
+            margin: 0 auto;
+            padding: 15px 25px;
+            font-size: 1.1em;
+        }
+
+
         /* Responsive Adjustments */
         @media (max-width: 992px) {
             .menu-container {
@@ -950,7 +990,7 @@
 <body>
     <!-- Lottie Loading Spinner -->
     <div id="loadingSpinner">
-        <lottie-player src="https://lottie.host/17498c8c-1e6a-4b95-a22c-a2b647065c71/f15u0F4hLd.json" background="transparent" speed="1" style="width: 150px; height: 150px;" loop autoplay></lottie-player>
+        <lottie-player src="https://lottie.host/87082729-28c0-4f51-a968-3e4210e1906a/h7Gq0462wX.json" background="transparent" speed="1" style="width: 150px; height: 150px;" loop autoplay></lottie-player>
         <p>Loading deliciousness...</p>
     </div>
 
@@ -1085,7 +1125,7 @@
     <div id="orderConfirmationModal" class="modal">
         <div class="modal-content">
             <span class="close-button" data-modal-id="orderConfirmationModal">&times;</span>
-            <lottie-player id="orderPlacedLottie" src="https://lottie.host/57539f37-142f-488f-a316-568379c65637/1z7tT71y1N.json" background="transparent" speed="1" loop="false" autoplay></lottie-player>
+            <lottie-player id="orderPlacedLottie" src="https://lottie.host/e211e031-6e3e-436f-b27e-850d51459a03/P0w652t11n.json" background="transparent" speed="1" loop="false" autoplay></lottie-player>
             <h3>Order Placed Successfully!</h3>
             <p>Your Order ID: <strong><span id="confirmedOrderId"></span></strong></p>
             <p>Your Tracking PIN: <strong><span id="confirmedPinId"></span></strong></p>
@@ -1107,7 +1147,24 @@
             <p id="mapLocationStatus" style="font-size: 0.9em; color: var(--text-light); margin-top: 10px;">No location pinned yet.</p>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-modal-id="locationMapModal">Cancel</button>
+                <button type="button" class="btn" id="usePresentLocationBtn"><i class="fas fa-location-arrow"></i> Use Present Location</button>
                 <button type="button" class="btn" id="confirmLocationBtn"><i class="fas fa-check-circle"></i> Confirm Location</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Details Modal -->
+    <div id="itemDetailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" data-modal-id="itemDetailsModal">&times;</span>
+            <div class="item-modal-content">
+                <img id="modalItemImage" src="" alt="Item Image">
+                <h3 id="modalItemName"></h3>
+                <p id="modalItemDescription"></p>
+                <span id="modalItemPrice" class="item-price"></span>
+                <button class="add-to-cart-btn" id="modalAddToCartBtn">
+                    <i class="fas fa-cart-plus"></i> Add to Cart
+                </button>
             </div>
         </div>
     </div>
@@ -1185,6 +1242,15 @@
         const mapDiv = document.getElementById('map');
         const mapLocationStatusP = document.getElementById('mapLocationStatus');
         const confirmLocationBtn = document.getElementById('confirmLocationBtn');
+        const usePresentLocationBtn = document.getElementById('usePresentLocationBtn'); // New button
+
+        // Item Details Modal
+        const itemDetailsModal = document.getElementById('itemDetailsModal');
+        const modalItemImage = document.getElementById('modalItemImage');
+        const modalItemName = document.getElementById('modalItemName');
+        const modalItemDescription = document.getElementById('modalItemDescription');
+        const modalItemPrice = document.getElementById('modalItemPrice');
+        const modalAddToCartBtn = document.getElementById('modalAddToCartBtn');
 
 
         // --- Global State ---
@@ -1493,6 +1559,28 @@
             }
         });
 
+        usePresentLocationBtn.addEventListener('click', () => {
+            if (navigator.geolocation) {
+                showToast('Attempting to get your current location...', 'info');
+                navigator.geolocation.getCurrentPosition(async (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    await setMapMarker(lat, lng, 'Your current location');
+                    map.setView([lat, lng], 16); // Zoom to detected location
+                    showToast('Map centered to your current location!', 'success');
+                }, (error) => {
+                    console.error('Error getting current location for map:', error);
+                    showToast('Failed to get current location. Please ensure location services are enabled.', 'error');
+                }, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+            } else {
+                showToast('Geolocation not supported by your browser.', 'error');
+            }
+        });
+
 
         // --- Menu Rendering ---
 
@@ -1517,11 +1605,11 @@
                 filteredItems.forEach(item => {
                     const card = document.createElement('div');
                     card.classList.add('menu-item-card');
+                    card.dataset.itemId = item._id; // Store item ID on the card
                     card.innerHTML = `
                         <img src="${item.imageUrl || 'https://placehold.co/100x100/E0E0E0/666666?text=No+Image'}" alt="${item.name}" onerror="this.onerror=null;this.src='https://placehold.co/100x100/E0E0E0/666666?text=No+Image';">
                         <div class="item-details">
                             <h3>${item.name} ${item.isTrending ? '<i class="fas fa-fire" style="color: var(--warning-orange); font-size: 0.8em;"></i>' : ''}</h3>
-                            <p>${item.description || 'No description available.'}</p>
                             <div class="item-price-add">
                                 <span class="item-price">₹${item.price.toFixed(2)}</span>
                                 <button class="add-to-cart-btn" data-item-id="${item._id}">
@@ -1533,12 +1621,25 @@
                     menuGrid.appendChild(card);
                 });
 
-                document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+                // Event listener for adding to cart directly from the card (if user prefers not to open modal)
+                document.querySelectorAll('.menu-item-card .add-to-cart-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent card click event from firing
                         const itemId = e.currentTarget.dataset.itemId;
                         const item = menuItems.find(i => i._id === itemId);
                         if (item) {
                             addToCart(item);
+                        }
+                    });
+                });
+
+                // Event listener for opening item details modal when card is clicked
+                document.querySelectorAll('.menu-item-card').forEach(card => {
+                    card.addEventListener('click', (e) => {
+                        const itemId = e.currentTarget.dataset.itemId;
+                        const item = menuItems.find(i => i._id === itemId);
+                        if (item) {
+                            showItemDetailsModal(item);
                         }
                     });
                 });
@@ -1557,6 +1658,27 @@
                 categoryNav.appendChild(button);
             });
         }
+
+        function showItemDetailsModal(item) {
+            modalItemImage.src = item.imageUrl || 'https://placehold.co/150x150/E0E0E0/666666?text=No+Image';
+            modalItemImage.alt = item.name;
+            modalItemName.textContent = item.name;
+            modalItemDescription.textContent = item.description || 'No description available for this item.';
+            modalItemPrice.textContent = `₹${item.price.toFixed(2)}`;
+            modalAddToCartBtn.dataset.itemId = item._id; // Set item ID for add to cart button in modal
+            openModal(itemDetailsModal);
+        }
+
+        // Add to cart from item details modal
+        modalAddToCartBtn.addEventListener('click', (e) => {
+            const itemId = e.currentTarget.dataset.itemId;
+            const item = menuItems.find(i => i._id === itemId);
+            if (item) {
+                addToCart(item);
+                closeModal(itemDetailsModal); // Close modal after adding to cart
+            }
+        });
+
 
         // --- Cart Management ---
 
@@ -1905,3 +2027,4 @@
     </script>
 </body>
 </html>
+
