@@ -1,156 +1,209 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - Delicious Bites</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Delicious Bites - Admin Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8f8f8; /* Light grey background */
-        }
-        .login-container {
-            min-height: 100vh;
+            margin: 0;
+            background-color: #F5F5F5;
+            color: #333;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 1rem;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%); /* Light blue gradient */
         }
-        .form-input {
-            @apply block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 sm:text-sm;
+
+        .login-container {
+            background-color: #FFFFFF;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            animation: fadeInScale 0.5s ease-out;
         }
-        .form-label {
-            @apply block text-sm font-medium text-gray-700 mb-1;
+
+        .login-container h2 {
+            color: #4A90E2;
+            margin-bottom: 30px;
+            font-size: 2em;
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="password"] {
+            width: calc(100% - 24px); /* Account for padding */
+            padding: 12px;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .form-group input:focus {
+            border-color: #2196F3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+            outline: none;
+        }
+
+        .login-btn {
+            width: 100%;
+            background-color: #4A90E2;
+            color: #FFFFFF;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+        }
+
+        .login-btn:hover {
+            background-color: #2196F3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(74, 144, 226, 0.4);
+        }
+
+        .error-message {
+            color: #F44336;
+            margin-top: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+            display: none; /* Hidden by default */
+        }
+
+        /* Animations */
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-container {
+                margin: 20px;
+                padding: 30px;
+            }
+            .login-container h2 {
+                font-size: 1.8em;
+            }
+            .form-group input {
+                padding: 10px;
+            }
+            .login-btn {
+                padding: 12px;
+                font-size: 1em;
+            }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md border-t-4 border-red-500">
-            <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Admin Login</h2>
-            <form id="loginForm" class="space-y-5">
-                <div>
-                    <label for="username" class="form-label">Username</label>
-                    <input type="text" id="username" name="username" required class="form-input">
-                </div>
-                <div>
-                    <label for="password" class="form-label">Password</label>
-                    <input type="password" id="password" name="password" required class="form-input">
-                </div>
-                <div id="totpField" class="hidden">
-                    <label for="totpCode" class="form-label">Two-Factor Code</label>
-                    <input type="text" id="totpCode" name="totpCode" class="form-input" placeholder="Enter 6-digit code">
-                </div>
-                <div id="errorMessage" class="text-red-600 text-sm text-center hidden"></div>
-                <button type="submit" class="w-full bg-red-500 text-white py-3 px-4 rounded-md hover:bg-red-600 transition-colors duration-300 font-semibold shadow-md">
-                    Login
-                </button>
-            </form>
-            <p class="text-center text-sm text-gray-500 mt-6">
-                Forgot password? Please contact support.
-            </p>
-        </div>
+        <h2>Admin Login</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username"><i class="fas fa-user"></i> Username</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group" id="totpGroup" style="display: none;">
+                <label for="totpCode"><i class="fas fa-shield-alt"></i> 2FA Code (Optional)</label>
+                <input type="text" id="totpCode" name="totpCode" maxlength="6" pattern="\d{6}" placeholder="Enter 6-digit code">
+            </div>
+            <button type="submit" class="login-btn">Login</button>
+            <p class="error-message" id="errorMessage"></p>
+        </form>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const loginForm = document.getElementById('loginForm');
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
-            const totpField = document.getElementById('totpField');
-            const totpCodeInput = document.getElementById('totpCode');
-            const errorMessage = document.getElementById('errorMessage');
+        const loginForm = document.getElementById('loginForm');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const totpCodeInput = document.getElementById('totpCode');
+        const totpGroup = document.getElementById('totpGroup');
+        const errorMessage = document.getElementById('errorMessage');
 
-            // Function to set a cookie
-            function setCookie(name, value, days) {
-                const date = new Date();
-                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-                const expires = `expires=${date.toUTCString()}`;
-                document.cookie = `${name}=${value};${expires};path=/;SameSite=Lax`;
+        const API_BASE_URL = window.location.origin;
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorMessage.style.display = 'none'; // Hide previous errors
+
+            const username = usernameInput.value;
+            const password = passwordInput.value;
+            const totpCode = totpCodeInput.value;
+
+            const payload = { username, password };
+            if (totpCode) {
+                payload.totpCode = totpCode;
             }
 
-            // Function to get a cookie
-            function getCookie(name) {
-                const value = `; ${document.cookie}`;
-                const parts = value.split(`; ${name}=`);
-                if (parts.length === 2) return parts.pop().split(';').shift();
-                return null;
-            }
-
-            // Check if user is already logged in (has token)
-            if (getCookie('token')) {
-                // Attempt to verify token with a simple API call
-                fetch('/api/admin/bot-status', {
-                    method: 'GET',
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/login`, {
+                    method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${getCookie('token')}`
-                    }
-                }).then(response => {
-                    if (response.ok) {
-                        window.location.href = '/dashboard'; // Redirect to dashboard if token is valid
-                    } else {
-                        // Token invalid or expired, clear it and proceed to login form
-                        setCookie('token', '', -1); // Clear expired/invalid token
-                        console.log('Existing token invalid or expired. Please log in.');
-                    }
-                }).catch(error => {
-                    console.error('Network error during token verification:', error);
-                    setCookie('token', '', -1); // Clear token on network error
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
                 });
-            }
 
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                errorMessage.classList.add('hidden'); // Hide previous errors
-                errorMessage.textContent = '';
+                const data = await response.json();
 
-                const username = usernameInput.value;
-                const password = passwordInput.value;
-                const totpCode = totpCodeInput.value;
-
-                try {
-                    const response = await fetch('/admin/login', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ username, password, totpCode: totpField.classList.contains('hidden') ? undefined : totpCode })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        if (data.twoFactorEnabled === false) {
-                            // If 2FA is not enabled, directly store token and redirect
-                            setCookie('token', data.token, 7); // Store token for 7 days
-                            window.location.href = '/dashboard';
-                        } else if (data.twoFactorEnabled === true) {
-                            // If 2FA is enabled, and we just passed it, store token and redirect
-                            setCookie('token', data.token, 7); // Store token for 7 days
-                            window.location.href = '/dashboard';
-                        }
-                    } else {
-                        // Handle errors from the server
-                        if (response.status === 401 && data.message === 'Two-Factor Authentication code required.') {
-                            totpField.classList.remove('hidden');
-                            errorMessage.textContent = 'Two-Factor Authentication code required.';
-                            errorMessage.classList.remove('hidden');
-                        } else {
-                            errorMessage.textContent = data.message || 'Login failed. Please try again.';
-                            errorMessage.classList.remove('hidden');
-                        }
-                    }
-                } catch (error) {
-                    console.error('Network error during login:', error);
-                    errorMessage.textContent = 'Network error. Please try again later.';
-                    errorMessage.classList.remove('hidden');
+                if (response.ok) {
+                    localStorage.setItem('jwtToken', data.token);
+                    // Redirect to dashboard on successful login
+                    window.location.href = '/dashboard';
+                } else if (response.status === 401 && data.message.includes('Two-Factor Authentication code required')) {
+                    // Show 2FA input if required
+                    totpGroup.style.display = 'block';
+                    errorMessage.textContent = data.message;
+                    errorMessage.style.display = 'block';
+                } else {
+                    errorMessage.textContent = data.message || 'Login failed. Please try again.';
+                    errorMessage.style.display = 'block';
                 }
-            });
+            } catch (error) {
+                console.error('Network error during login:', error);
+                errorMessage.textContent = 'Network error. Please check your connection.';
+                errorMessage.style.display = 'block';
+            }
+        });
+
+        // Check if a token exists on page load (e.g., after session expiry)
+        // If a token exists, try to navigate to dashboard directly
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('jwtToken');
+            if (token) {
+                // Attempt to go to dashboard. The dashboard route will verify the token.
+                window.location.href = '/dashboard';
+            }
         });
     </script>
 </body>
 </html>
+
