@@ -176,8 +176,9 @@
 
                 if (response.ok) {
                     localStorage.setItem('jwtToken', data.token);
-                    // Redirect to dashboard on successful login, passing token in URL
-                    window.location.href = '/dashboard?token=' + data.token;
+                    // Redirect to dashboard without token in URL.
+                    // The dashboard's client-side JS will handle checking localStorage.
+                    window.location.href = '/dashboard';
                 } else if (response.status === 401 && data.message.includes('Two-Factor Authentication code required')) {
                     // Show 2FA input if required
                     totpGroup.style.display = 'block';
@@ -194,14 +195,11 @@
             }
         });
 
-        // Check if a token exists on page load (e.g., after session expiry)
-        // If a token exists, try to navigate to dashboard directly
+        // On page load, if a token exists, attempt to go to dashboard.
+        // The dashboard's client-side JS will then verify the token.
         document.addEventListener('DOMContentLoaded', () => {
             const token = localStorage.getItem('jwtToken');
             if (token) {
-                // Attempt to go to dashboard. The dashboard route will verify the token.
-                // If the token is valid, server will redirect to /dashboard (clean URL)
-                // If invalid, server will redirect to /admin/login
                 window.location.href = '/dashboard';
             }
         });
