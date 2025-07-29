@@ -112,6 +112,7 @@
         }
         input:focus + .slider {
             box-shadow: 0 0 1px #2196F3;
+            outline: none; /* Remove default outline */
         }
         input:checked + .slider:before {
             -webkit-transform: translateX(26px);
@@ -144,6 +145,49 @@
         #messageBox.error {
             background-color: #f44336; /* Red */
         }
+
+        /* Table Styling */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .data-table th, .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .data-table th {
+            background-color: #f8f8f8;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+        .data-table tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+        .action-btn {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        .action-btn.edit {
+            background-color: #3498db;
+            color: white;
+        }
+        .action-btn.edit:hover {
+            background-color: #2186c8;
+        }
+        .action-btn.delete {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .action-btn.delete:hover {
+            background-color: #c0392b;
+        }
     </style>
 </head>
 <body class="flex">
@@ -151,7 +195,7 @@
     <div class="sidebar">
         <h1 class="text-2xl font-bold mb-8 text-center">Admin Panel</h1>
         <nav>
-            <a href="/dashboard" class="active">
+            <a href="#" id="dashboardLink" class="active">
                 <i class="fas fa-tachometer-alt"></i> Dashboard
             </a>
             <a href="#" id="menuLink">
@@ -163,7 +207,7 @@
             <a href="#" id="customersLink">
                 <i class="fas fa-users"></i> Customer Management
             </a>
-            <a href="#" id="settingsLink">
+            <a href="#" id="generalSettingsLink">
                 <i class="fas fa-cog"></i> General Settings
             </a>
             <a href="#" id="logoutButton" class="mt-8">
@@ -176,7 +220,7 @@
     <div class="flex-1 flex flex-col">
         <!-- Header -->
         <header class="header">
-            <h2 class="text-2xl font-semibold text-gray-800">Dashboard Overview</h2>
+            <h2 id="pageTitle" class="text-2xl font-semibold text-gray-800">Dashboard Overview</h2>
             <div class="flex items-center">
                 <span class="text-gray-600 mr-4">Welcome, Admin!</span>
                 <button id="logoutButtonHeader" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out">
@@ -187,7 +231,8 @@
 
         <!-- Page Content -->
         <main class="p-8 flex-1 overflow-y-auto">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Dashboard Section -->
+            <section id="dashboardSection" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <!-- WhatsApp Bot Status Card -->
                 <div class="card col-span-1 md:col-span-2 lg:col-span-1">
                     <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fab fa-whatsapp text-green-500 mr-2"></i>WhatsApp Bot Status</h3>
@@ -206,30 +251,7 @@
                     </div>
                 </div>
 
-                <!-- Discount Settings Card -->
-                <div class="card col-span-1 md:col-span-2 lg:col-span-1">
-                    <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-tags text-purple-500 mr-2"></i>Discount Settings</h3>
-                    <div class="mb-4">
-                        <label for="minSubtotalForDiscount" class="block text-gray-700 text-sm font-bold mb-2">Minimum Subtotal for Discount (₹):</label>
-                        <input type="number" id="minSubtotalForDiscount" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0" min="0">
-                    </div>
-                    <div class="mb-4">
-                        <label for="discountPercentage" class="block text-gray-700 text-sm font-bold mb-2">Discount Percentage (0.0 - 1.0):</label>
-                        <input type="number" id="discountPercentage" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0.0" min="0" max="1" step="0.01">
-                    </div>
-                    <div class="flex items-center justify-between mb-4">
-                        <label for="isDiscountEnabled" class="block text-gray-700 text-sm font-bold">Enable Discount:</label>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="isDiscountEnabled">
-                            <span class="slider round"></span>
-                        </label>
-                    </div>
-                    <button id="saveDiscountSettingsBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out w-full">
-                        <i class="fas fa-save mr-2"></i>Save Discount Settings
-                    </button>
-                </div>
-
-                <!-- Placeholder Card (can be used for analytics, quick stats etc.) -->
+                <!-- Quick Stats Card -->
                 <div class="card col-span-1 md:col-span-2 lg:col-span-1">
                     <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-chart-line text-blue-500 mr-2"></i>Quick Stats</h3>
                     <p class="text-gray-600">More content coming soon!</p>
@@ -239,7 +261,156 @@
                         <p class="text-sm text-gray-700">Revenue (This Month): <span class="font-semibold">₹50,000</span></p>
                     </div>
                 </div>
-            </div>
+            </section>
+
+            <!-- Menu Management Section -->
+            <section id="menuManagementSection" class="hidden">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800"><i class="fas fa-utensils text-orange-500 mr-2"></i>Menu Management</h2>
+                <div class="card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-700">All Menu Items</h3>
+                        <button id="addMenuItemBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out">
+                            <i class="fas fa-plus mr-2"></i>Add New Item
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Price</th>
+                                    <th>Available</th>
+                                    <th>Trending</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="menuItemsTableBody">
+                                <!-- Menu items will be loaded here -->
+                                <tr><td colspan="6" class="text-center py-4 text-gray-500">Loading menu items...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Order Management Section -->
+            <section id="orderManagementSection" class="hidden">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800"><i class="fas fa-clipboard-list text-teal-500 mr-2"></i>Order Management</h2>
+                <div class="card">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Recent Orders</h3>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Customer</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody">
+                                <!-- Orders will be loaded here -->
+                                <tr><td colspan="6" class="text-center py-4 text-gray-500">Loading orders...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Customer Management Section -->
+            <section id="customerManagementSection" class="hidden">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800"><i class="fas fa-users text-indigo-500 mr-2"></i>Customer Management</h2>
+                <div class="card">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">All Customers</h3>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Total Orders</th>
+                                    <th>Last Order Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersTableBody">
+                                <!-- Customers will be loaded here -->
+                                <tr><td colspan="5" class="text-center py-4 text-gray-500">Loading customers...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- General Settings Section -->
+            <section id="generalSettingsSection" class="hidden">
+                <h2 class="text-2xl font-semibold mb-6 text-gray-800"><i class="fas fa-cog text-gray-600 mr-2"></i>General Settings</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Discount Settings Card (Moved from Dashboard Overview) -->
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-tags text-purple-500 mr-2"></i>Discount Settings</h3>
+                        <div class="mb-4">
+                            <label for="minSubtotalForDiscount" class="block text-gray-700 text-sm font-bold mb-2">Minimum Subtotal for Discount (₹):</label>
+                            <input type="number" id="minSubtotalForDiscount" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0" min="0">
+                        </div>
+                        <div class="mb-4">
+                            <label for="discountPercentage" class="block text-gray-700 text-sm font-bold mb-2">Discount Percentage (0.0 - 1.0):</label>
+                            <input type="number" id="discountPercentage" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0.0" min="0" max="1" step="0.01">
+                        </div>
+                        <div class="flex items-center justify-between mb-4">
+                            <label for="isDiscountEnabled" class="block text-gray-700 text-sm font-bold">Enable Discount:</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="isDiscountEnabled">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <button id="saveDiscountSettingsBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out w-full">
+                            <i class="fas fa-save mr-2"></i>Save Discount Settings
+                        </button>
+                    </div>
+
+                    <!-- Other General Settings Placeholder -->
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-store text-red-500 mr-2"></i>Shop Information</h3>
+                        <div class="mb-4">
+                            <label for="shopName" class="block text-gray-700 text-sm font-bold mb-2">Shop Name:</label>
+                            <input type="text" id="shopName" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="Delicious Bites">
+                        </div>
+                        <div class="mb-4">
+                            <label for="shopLatitude" class="block text-gray-700 text-sm font-bold mb-2">Shop Latitude:</label>
+                            <input type="number" id="shopLatitude" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0.0">
+                        </div>
+                        <div class="mb-4">
+                            <label for="shopLongitude" class="block text-gray-700 text-sm font-bold mb-2">Shop Longitude:</label>
+                            <input type="number" id="shopLongitude" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0.0">
+                        </div>
+                        <button id="saveShopInfoBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out w-full">
+                            <i class="fas fa-save mr-2"></i>Save Shop Info
+                        </button>
+                    </div>
+
+                    <!-- Delivery Rates Placeholder -->
+                    <div class="card col-span-1 md:col-span-2">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-truck text-blue-500 mr-2"></i>Delivery Rates</h3>
+                        <div id="deliveryRatesContainer" class="mb-4">
+                            <div class="flex items-center mb-2">
+                                <input type="number" placeholder="KMs" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/2 mr-2">
+                                <input type="number" placeholder="Amount (₹)" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/2">
+                            </div>
+                            <!-- More rate inputs can be added dynamically -->
+                        </div>
+                        <button id="addDeliveryRateBtn" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out mr-2">
+                            <i class="fas fa-plus mr-2"></i>Add Rate
+                        </button>
+                        <button id="saveDeliveryRatesBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out">
+                            <i class="fas fa-save mr-2"></i>Save Rates
+                        </button>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -251,6 +422,25 @@
         const API_BASE_URL = window.location.origin;
         const socket = io();
 
+        // UI Elements
+        const pageTitle = document.getElementById('pageTitle');
+        const dashboardLink = document.getElementById('dashboardLink');
+        const menuLink = document.getElementById('menuLink');
+        const ordersLink = document.getElementById('ordersLink');
+        const customersLink = document.getElementById('customersLink');
+        const generalSettingsLink = document.getElementById('generalSettingsLink');
+        const logoutButton = document.getElementById('logoutButton');
+        const logoutButtonHeader = document.getElementById('logoutButtonHeader');
+        const messageBox = document.getElementById('messageBox');
+
+        // Sections
+        const dashboardSection = document.getElementById('dashboardSection');
+        const menuManagementSection = document.getElementById('menuManagementSection');
+        const orderManagementSection = document.getElementById('orderManagementSection');
+        const customerManagementSection = document.getElementById('customerManagementSection');
+        const generalSettingsSection = document.getElementById('generalSettingsSection');
+
+        // Dashboard specific elements
         const botStatusText = document.getElementById('botStatusText');
         const lastAuthenticatedAt = document.getElementById('lastAuthenticatedAt');
         const qrCodeContainer = document.getElementById('qrCodeContainer');
@@ -258,14 +448,33 @@
         const forceNewSessionBtn = document.getElementById('forceNewSessionBtn');
         const botLogs = document.getElementById('botLogs');
 
-        const minSubtotalForDiscountInput = document.getElementById('minSubtotalForDiscount');
-        const discountPercentageInput = document.getElementById('discountPercentage');
-        const isDiscountEnabledToggle = document.getElementById('isDiscountEnabled');
-        const saveDiscountSettingsBtn = document.getElementById('saveDiscountSettingsBtn');
+        // Discount Settings elements (now in General Settings section)
+        const minSubtotalForDiscountInput = document.querySelector('#generalSettingsSection #minSubtotalForDiscount');
+        const discountPercentageInput = document.querySelector('#generalSettingsSection #discountPercentage');
+        const isDiscountEnabledToggle = document.querySelector('#generalSettingsSection #isDiscountEnabled');
+        const saveDiscountSettingsBtn = document.querySelector('#generalSettingsSection #saveDiscountSettingsBtn');
 
-        const logoutButton = document.getElementById('logoutButton');
-        const logoutButtonHeader = document.getElementById('logoutButtonHeader');
-        const messageBox = document.getElementById('messageBox');
+        // Menu Management elements
+        const menuItemsTableBody = document.getElementById('menuItemsTableBody');
+        const addMenuItemBtn = document.getElementById('addMenuItemBtn');
+
+        // Order Management elements
+        const ordersTableBody = document.getElementById('ordersTableBody');
+
+        // Customer Management elements
+        const customersTableBody = document.getElementById('customersTableBody');
+
+        // General Settings - Shop Info elements
+        const shopNameInput = document.getElementById('shopName');
+        const shopLatitudeInput = document.getElementById('shopLatitude');
+        const shopLongitudeInput = document.getElementById('shopLongitude');
+        const saveShopInfoBtn = document.getElementById('saveShopInfoBtn');
+
+        // General Settings - Delivery Rates elements
+        const deliveryRatesContainer = document.getElementById('deliveryRatesContainer');
+        const addDeliveryRateBtn = document.getElementById('addDeliveryRateBtn');
+        const saveDeliveryRatesBtn = document.getElementById('saveDeliveryRatesBtn');
+
 
         // --- Helper Function for displaying messages ---
         function showMessage(message, isError = false) {
@@ -314,11 +523,56 @@
             return response;
         }
 
+        // --- Section Switching Logic ---
+        const sections = {
+            dashboard: dashboardSection,
+            menu: menuManagementSection,
+            orders: orderManagementSection,
+            customers: customerManagementSection,
+            generalSettings: generalSettingsSection
+        };
+
+        const navLinks = {
+            dashboard: dashboardLink,
+            menu: menuLink,
+            orders: ordersLink,
+            customers: customersLink,
+            generalSettings: generalSettingsLink
+        };
+
+        function showSection(sectionName) {
+            // Hide all sections
+            Object.values(sections).forEach(section => section.classList.add('hidden'));
+            // Deactivate all nav links
+            Object.values(navLinks).forEach(link => link.classList.remove('active'));
+
+            // Show the requested section
+            sections[sectionName].classList.remove('hidden');
+            // Activate the corresponding nav link
+            navLinks[sectionName].classList.add('active');
+
+            // Update page title
+            switch (sectionName) {
+                case 'dashboard': pageTitle.textContent = 'Dashboard Overview'; break;
+                case 'menu': pageTitle.textContent = 'Menu Management'; fetchMenuItems(); break;
+                case 'orders': pageTitle.textContent = 'Order Management'; fetchOrders(); break;
+                case 'customers': pageTitle.textContent = 'Customer Management'; fetchCustomers(); break;
+                case 'generalSettings': pageTitle.textContent = 'General Settings'; fetchDiscountSettings(); fetchGeneralSettings(); break;
+            }
+        }
+
+        // --- Event Listeners for Sidebar Navigation ---
+        dashboardLink.addEventListener('click', (e) => { e.preventDefault(); showSection('dashboard'); });
+        menuLink.addEventListener('click', (e) => { e.preventDefault(); showSection('menu'); });
+        ordersLink.addEventListener('click', (e) => { e.preventDefault(); showSection('orders'); });
+        customersLink.addEventListener('click', (e) => { e.preventDefault(); showSection('customers'); });
+        generalSettingsLink.addEventListener('click', (e) => { e.preventDefault(); showSection('generalSettings'); });
+
+
         // --- Initial Authentication Check on Page Load ---
         document.addEventListener('DOMContentLoaded', async () => {
             const token = localStorage.getItem('jwtToken');
             if (!token) {
-                // If no token in localStorage, redirect to login
                 window.location.href = '/admin/login';
                 return;
             }
@@ -327,17 +581,15 @@
             try {
                 const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/bot-status`);
                 if (!response || !response.ok) {
-                    // fetchWithAuth already handles redirect for 401/403
-                    // If it's another error, log and redirect
                     console.error('Failed to verify token on dashboard load:', response ? response.status : 'No response');
                     localStorage.removeItem('jwtToken');
                     window.location.href = '/admin/login';
                     return;
                 }
                 console.log('Token validated. Dashboard loaded.');
-                // Proceed to load dashboard data
+                // Initial load: show dashboard section and fetch its data
+                showSection('dashboard');
                 fetchBotStatus();
-                fetchDiscountSettings();
             } catch (error) {
                 console.error('Error during initial token validation:', error);
                 localStorage.removeItem('jwtToken');
@@ -437,7 +689,7 @@
             }
         });
 
-        // --- Discount Settings Functions ---
+        // --- Discount Settings Functions (now part of General Settings) ---
         async function fetchDiscountSettings() {
             try {
                 const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/discount-settings`);
@@ -485,8 +737,7 @@
                 const data = await response.json();
                 if (response.ok) {
                     showMessage(data.message || 'Discount settings saved successfully!');
-                    // Re-fetch to ensure UI is in sync with saved data
-                    fetchDiscountSettings();
+                    fetchDiscountSettings(); // Re-fetch to ensure UI is in sync with saved data
                 } else {
                     showMessage(data.message || 'Failed to save discount settings.', true);
                 }
@@ -496,22 +747,303 @@
             }
         });
 
-        // Placeholder for other navigation links (will be implemented later)
-        document.getElementById('menuLink').addEventListener('click', (e) => {
-            e.preventDefault();
-            showMessage('Menu Management section coming soon!');
+        // --- Menu Management Functions ---
+        async function fetchMenuItems() {
+            menuItemsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Loading menu items...</td></tr>';
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu`);
+                const items = await response.json();
+                if (response.ok) {
+                    renderMenuItems(items);
+                } else {
+                    showMessage(items.message || 'Failed to fetch menu items.', true);
+                    menuItemsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading menu items.</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error fetching menu items:', error);
+                showMessage('Error fetching menu items.', true);
+                menuItemsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading menu items.</td></tr>';
+            }
+        }
+
+        function renderMenuItems(items) {
+            menuItemsTableBody.innerHTML = ''; // Clear existing rows
+            if (items.length === 0) {
+                menuItemsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No menu items found.</td></tr>';
+                return;
+            }
+            items.forEach(item => {
+                const row = `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>${item.category || 'N/A'}</td>
+                        <td>₹${item.price.toFixed(2)}</td>
+                        <td>${item.isAvailable ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-times-circle text-red-500"></i>'}</td>
+                        <td>${item.isTrending ? '<i class="fas fa-fire text-orange-500"></i>' : '-'}</td>
+                        <td>
+                            <button class="action-btn edit mr-2" data-id="${item._id}"><i class="fas fa-edit"></i> Edit</button>
+                            <button class="action-btn delete" data-id="${item._id}"><i class="fas fa-trash"></i> Delete</button>
+                        </td>
+                    </tr>
+                `;
+                menuItemsTableBody.insertAdjacentHTML('beforeend', row);
+            });
+
+            // Add event listeners to action buttons (placeholders)
+            menuItemsTableBody.querySelectorAll('.action-btn.edit').forEach(button => {
+                button.addEventListener('click', () => showMessage(`Edit item with ID: ${button.dataset.id} (Functionality to be implemented)`, false));
+            });
+            menuItemsTableBody.querySelectorAll('.action-btn.delete').forEach(button => {
+                button.addEventListener('click', () => showMessage(`Delete item with ID: ${button.dataset.id} (Functionality to be implemented)`, true));
+            });
+        }
+
+        addMenuItemBtn.addEventListener('click', () => {
+            showMessage('Add New Item functionality to be implemented.');
         });
-        document.getElementById('ordersLink').addEventListener('click', (e) => {
-            e.preventDefault();
-            showMessage('Order Management section coming soon!');
+
+
+        // --- Order Management Functions ---
+        async function fetchOrders() {
+            ordersTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Loading orders...</td></tr>';
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders`);
+                const orders = await response.json();
+                if (response.ok) {
+                    renderOrders(orders);
+                } else {
+                    showMessage(orders.message || 'Failed to fetch orders.', true);
+                    ordersTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading orders.</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error fetching orders:', error);
+                showMessage('Error fetching orders.', true);
+                ordersTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading orders.</td></tr>';
+            }
+        }
+
+        function renderOrders(orders) {
+            ordersTableBody.innerHTML = ''; // Clear existing rows
+            if (orders.length === 0) {
+                ordersTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No orders found.</td></tr>';
+                return;
+            }
+            orders.forEach(order => {
+                const orderDate = new Date(order.orderDate).toLocaleString();
+                const displayId = order.customOrderId || order._id.substring(0, 8);
+                const row = `
+                    <tr>
+                        <td>${displayId}</td>
+                        <td>${order.customerName || 'N/A'}</td>
+                        <td>₹${order.totalAmount.toFixed(2)}</td>
+                        <td>${order.status}</td>
+                        <td>${orderDate}</td>
+                        <td>
+                            <button class="action-btn edit mr-2" data-id="${order._id}"><i class="fas fa-eye"></i> View</button>
+                            <button class="action-btn delete" data-id="${order._id}"><i class="fas fa-sync-alt"></i> Update Status</button>
+                        </td>
+                    </tr>
+                `;
+                ordersTableBody.insertAdjacentHTML('beforeend', row);
+            });
+
+            // Add event listeners to action buttons (placeholders)
+            ordersTableBody.querySelectorAll('.action-btn.edit').forEach(button => {
+                button.addEventListener('click', () => showMessage(`View details for order ID: ${button.dataset.id} (Functionality to be implemented)`, false));
+            });
+            ordersTableBody.querySelectorAll('.action-btn.delete').forEach(button => {
+                button.addEventListener('click', () => showMessage(`Update status for order ID: ${button.dataset.id} (Functionality to be implemented)`, false));
+            });
+        }
+
+
+        // --- Customer Management Functions ---
+        async function fetchCustomers() {
+            customersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Loading customers...</td></tr>';
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/customers`);
+                const customers = await response.json();
+                if (response.ok) {
+                    renderCustomers(customers);
+                } else {
+                    showMessage(customers.message || 'Failed to fetch customers.', true);
+                    customersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-red-500">Error loading customers.</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error fetching customers:', error);
+                showMessage('Error fetching customers.', true);
+                customersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-red-500">Error loading customers.</td></tr>';
+            }
+        }
+
+        function renderCustomers(customers) {
+            customersTableBody.innerHTML = ''; // Clear existing rows
+            if (customers.length === 0) {
+                customersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No customers found.</td></tr>';
+                return;
+            }
+            customers.forEach(customer => {
+                const lastOrderDate = customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString() : 'N/A';
+                const row = `
+                    <tr>
+                        <td>${customer.customerName || 'Unknown'}</td>
+                        <td>${customer.customerPhone}</td>
+                        <td>${customer.totalOrders}</td>
+                        <td>${lastOrderDate}</td>
+                        <td>
+                            <button class="action-btn edit mr-2" data-id="${customer._id}"><i class="fas fa-eye"></i> View</button>
+                            <button class="action-btn delete" data-id="${customer._id}"><i class="fas fa-trash"></i> Delete</button>
+                        </td>
+                    </tr>
+                `;
+                customersTableBody.insertAdjacentHTML('beforeend', row);
+            });
+
+            // Add event listeners to action buttons (placeholders)
+            customersTableBody.querySelectorAll('.action-btn.edit').forEach(button => {
+                button.addEventListener('click', () => showMessage(`View details for customer ID: ${button.dataset.id} (Functionality to be implemented)`, false));
+            });
+            customersTableBody.querySelectorAll('.action-btn.delete').forEach(button => {
+                button.addEventListener('click', () => showMessage(`Delete customer with ID: ${button.dataset.id} (Functionality to be implemented)`, true));
+            });
+        }
+
+        // --- General Settings Functions (Shop Info & Delivery Rates) ---
+        async function fetchGeneralSettings() {
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/settings`);
+                const data = await response.json();
+                if (response.ok) {
+                    shopNameInput.value = data.shopName || '';
+                    shopLatitudeInput.value = data.shopLocation ? data.shopLocation.latitude : '';
+                    shopLongitudeInput.value = data.shopLocation ? data.shopLocation.longitude : '';
+                    renderDeliveryRates(data.deliveryRates || []);
+                } else {
+                    showMessage(data.message || 'Failed to fetch general settings.', true);
+                }
+            } catch (error) {
+                console.error('Error fetching general settings:', error);
+                showMessage('Error fetching general settings.', true);
+            }
+        }
+
+        saveShopInfoBtn.addEventListener('click', async () => {
+            const shopName = shopNameInput.value;
+            const latitude = parseFloat(shopLatitudeInput.value);
+            const longitude = parseFloat(shopLongitudeInput.value);
+
+            if (!shopName) {
+                showMessage('Shop name cannot be empty.', true);
+                return;
+            }
+            if (isNaN(latitude) || isNaN(longitude)) {
+                showMessage('Latitude and Longitude must be valid numbers.', true);
+                return;
+            }
+
+            try {
+                showMessage('Saving shop information...');
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/settings`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        shopName: shopName,
+                        shopLocation: { latitude, longitude }
+                    })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(data.message || 'Shop information saved successfully!');
+                    fetchGeneralSettings(); // Re-fetch to ensure UI is in sync
+                } else {
+                    showMessage(data.message || 'Failed to save shop information.', true);
+                }
+            } catch (error) {
+                console.error('Error saving shop information:', error);
+                showMessage('Error saving shop information.', true);
+            }
         });
-        document.getElementById('customersLink').addEventListener('click', (e) => {
-            e.preventDefault();
-            showMessage('Customer Management section coming soon!');
-        });
-        document.getElementById('settingsLink').addEventListener('click', (e) => {
-            e.preventDefault();
-            showMessage('General Settings section coming soon!');
+
+        function renderDeliveryRates(rates) {
+            deliveryRatesContainer.innerHTML = ''; // Clear existing inputs
+            if (rates.length === 0) {
+                addEmptyDeliveryRateRow(); // Add one empty row if no rates
+                return;
+            }
+            rates.forEach(rate => {
+                addDeliveryRateRow(rate.kms, rate.amount);
+            });
+        }
+
+        function addEmptyDeliveryRateRow() {
+            addDeliveryRateRow('', '');
+        }
+
+        function addDeliveryRateRow(kms, amount) {
+            const div = document.createElement('div');
+            div.className = 'flex items-center mb-2';
+            div.innerHTML = `
+                <input type="number" placeholder="KMs" value="${kms}" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/2 mr-2 delivery-kms">
+                <input type="number" placeholder="Amount (₹)" value="${amount}" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/2 delivery-amount">
+                <button class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg ml-2 remove-rate-btn"><i class="fas fa-trash"></i></button>
+            `;
+            deliveryRatesContainer.appendChild(div);
+
+            // Add event listener for remove button
+            div.querySelector('.remove-rate-btn').addEventListener('click', () => {
+                div.remove();
+            });
+        }
+
+        addDeliveryRateBtn.addEventListener('click', addEmptyDeliveryRateRow);
+
+        saveDeliveryRatesBtn.addEventListener('click', async () => {
+            const rateInputs = deliveryRatesContainer.querySelectorAll('.flex.items-center.mb-2');
+            const newRates = [];
+            let isValid = true;
+
+            rateInputs.forEach(row => {
+                const kmsInput = row.querySelector('.delivery-kms');
+                const amountInput = row.querySelector('.delivery-amount');
+                const kms = parseFloat(kmsInput.value);
+                const amount = parseFloat(amountInput.value);
+
+                if (isNaN(kms) || kms < 0 || isNaN(amount) || amount < 0) {
+                    isValid = false;
+                    return;
+                }
+                newRates.push({ kms, amount });
+            });
+
+            if (!isValid) {
+                showMessage('All delivery rates must be valid non-negative numbers.', true);
+                return;
+            }
+
+            try {
+                showMessage('Saving delivery rates...');
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/settings`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        deliveryRates: newRates
+                    })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(data.message || 'Delivery rates saved successfully!');
+                    fetchGeneralSettings(); // Re-fetch to ensure UI is in sync
+                } else {
+                    showMessage(data.message || 'Failed to save delivery rates.', true);
+                }
+            } catch (error) {
+                console.error('Error saving delivery rates:', error);
+                showMessage('Error saving delivery rates.', true);
+            }
         });
 
     </script>
