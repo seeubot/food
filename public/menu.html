@@ -543,6 +543,7 @@
             display: flex;
             justify-content: flex-end;
             gap: 15px;
+            flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
         }
 
         .close-button {
@@ -785,11 +786,14 @@
             max-width: 700px; /* Wider for map */
         }
         #map {
-            height: 400px; /* Larger map area */
+            height: 400px; /* Fixed height for map */
             width: 100%;
             border-radius: 8px;
             margin-top: 15px;
             border: 1px solid var(--border-light);
+            /* Added for responsiveness within its container */
+            max-width: 100%; 
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
         }
         .leaflet-container {
             border-radius: 8px;
@@ -940,6 +944,15 @@
                 padding: 15px;
                 font-size: 1.1em;
             }
+            /* Adjust button spacing for map modal footer on small screens */
+            #locationMapModal .modal-footer {
+                flex-direction: column; /* Stack buttons vertically */
+                gap: 10px; /* Reduce gap when stacked */
+            }
+            #locationMapModal .modal-footer .btn {
+                width: 100%; /* Full width for stacked buttons */
+                box-sizing: border-box;
+            }
         }
 
         @media (max-width: 480px) {
@@ -990,8 +1003,9 @@
 <body>
     <!-- Lottie Loading Spinner -->
     <div id="loadingSpinner">
+        <!-- New Lottie animation for "Just a Remedy" or similar concept -->
         <lottie-player src="https://lottie.host/87082729-28c0-4f51-a968-3e4210e1906a/h7Gq0462wX.json" background="transparent" speed="1" style="width: 150px; height: 150px;" loop autoplay></lottie-player>
-        <p>Loading deliciousness...</p>
+        <p>Just a Remedy: Preparing your order...</p>
     </div>
 
     <header class="header">
@@ -1462,9 +1476,9 @@
             const defaultLng = settings.shopLocation ? settings.shopLocation.longitude : 78.4983; // Hyderabad
 
             // Use customer's current location if available, otherwise default
-            const initialMapLat = customerLocation ? customerLocation.latitude : defaultLat;
-            const initialMapLng = customerLocation ? customerLocation.longitude : defaultLng;
-            const initialMapZoom = customerLocation ? 16 : 13; // Zoom in more if location is known
+            let initialMapLat = customerLocation ? customerLocation.latitude : defaultLat;
+            let initialMapLng = customerLocation ? customerLocation.longitude : defaultLng;
+            let initialMapZoom = customerLocation ? 16 : 13; // Zoom in more if location is known
 
             map = L.map('map', {
                 zoomControl: false // Hide default zoom controls
@@ -1494,22 +1508,31 @@
                 setMapMarker(e.latlng.lat, e.latlng.lng);
             });
 
-            // Set initial marker if customerLocation is already known or just detected
-            if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
-                setMapMarker(customerLocation.latitude, customerLocation.longitude, customerLocation.address);
+            // Attempt to get current location for map's initial center and marker
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    map.setView([lat, lng], 16); // Center map to current location
+                    setMapMarker(lat, lng, 'Your current location');
+                }, (error) => {
+                    console.warn('Geolocation failed for map initial center:', error);
+                    mapLocationStatusP.textContent = 'Click on the map to set your delivery pin or search for an address.';
+                    // If geolocation fails, set marker to customer's last known location or default
+                    if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
+                        setMapMarker(customerLocation.latitude, customerLocation.longitude, customerLocation.address);
+                    } else {
+                        setMapMarker(defaultLat, defaultLng, 'Default Location');
+                    }
+                });
             } else {
-                // If no customerLocation yet, try to get current location for map's initial marker
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition((position) => {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        setMapMarker(lat, lng, 'Your current location');
-                        map.setView([lat, lng], 16); // Zoom to detected location
-                    }, (error) => {
-                        console.warn('Geolocation failed for map initial marker:', error);
-                        mapLocationStatusP.textContent = 'Click on the map to set your delivery pin or search for an address.';
-                    });
+                // If geolocation not supported, set marker to customer's last known location or default
+                if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
+                    setMapMarker(customerLocation.latitude, customerLocation.longitude, customerLocation.address);
+                } else {
+                    setMapMarker(defaultLat, defaultLng, 'Default Location');
                 }
+                mapLocationStatusP.textContent = 'Geolocation not supported. Click on the map to set your delivery pin or search.';
             }
         }
 
@@ -1521,11 +1544,11 @@
 
             tempMapLocation = { latitude: lat, longitude: lng }; // Store temporarily
 
-            if (address) {
+            if (address && address !== 'Your current location' && address !== 'Default Location') { // Avoid setting generic strings as confirmed address
                 tempMapLocation.address = address;
                 mapLocationStatusP.textContent = `Pinned location: ${address}`;
             } else {
-                // Reverse geocode if address is not provided (e.g., direct map click)
+                // Reverse geocode if address is not provided (e.g., direct map click) or is a generic string
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
                     if (!response.ok) {
@@ -1549,13 +1572,13 @@
         }
 
         confirmLocationBtn.addEventListener('click', () => {
-            if (tempMapLocation && tempMapLocation.latitude && tempMapLocation.longitude && tempMapLocation.address && tempMapLocation.address !== 'Address not found' && tempMapLocation.address !== 'Your current location') {
+            if (tempMapLocation && tempMapLocation.latitude && tempMapLocation.longitude && tempMapLocation.address && tempMapLocation.address !== 'Address not found' && tempMapLocation.address !== 'Your current location' && tempMapLocation.address !== 'Default Location') {
                 customerLocation = { ...tempMapLocation }; // Confirm the location
                 updateLocationHeaderUI(); // Update the main UI
                 closeModal(locationMapModal);
                 showToast('Delivery location updated!', 'success');
             } else {
-                showToast('Please select a valid location on the map.', 'error');
+                showToast('Please select a valid location on the map or use your present location.', 'error');
             }
         });
 
@@ -1565,9 +1588,22 @@
                 navigator.geolocation.getCurrentPosition(async (position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
-                    await setMapMarker(lat, lng, 'Your current location');
+                    await setMapMarker(lat, lng, 'Your current location'); // Set generic text for immediate feedback
                     map.setView([lat, lng], 16); // Zoom to detected location
-                    showToast('Map centered to your current location!', 'success');
+                    // Immediately reverse geocode to get a proper address for confirmation
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+                        if (!response.ok) throw new Error('Reverse geocoding failed');
+                        const data = await response.json();
+                        tempMapLocation.address = data.display_name || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+                        mapLocationStatusP.textContent = `Pinned location: ${tempMapLocation.address}`;
+                        showToast('Map centered to your current location!', 'success');
+                    } catch (error) {
+                        console.error('Error during reverse geocoding for "Use Present Location":', error);
+                        tempMapLocation.address = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)} (Address not found)`;
+                        mapLocationStatusP.textContent = `Pinned location: ${tempMapLocation.address}`;
+                        showToast('Could not get address for current location, using coordinates.', 'warning');
+                    }
                 }, (error) => {
                     console.error('Error getting current location for map:', error);
                     showToast('Failed to get current location. Please ensure location services are enabled.', 'error');
@@ -1612,6 +1648,7 @@
                             <h3>${item.name} ${item.isTrending ? '<i class="fas fa-fire" style="color: var(--warning-orange); font-size: 0.8em;"></i>' : ''}</h3>
                             <div class="item-price-add">
                                 <span class="item-price">₹${item.price.toFixed(2)}</span>
+                                <!-- Add button here, but clicking the card also opens modal -->
                                 <button class="add-to-cart-btn" data-item-id="${item._id}">
                                     <i class="fas fa-cart-plus"></i> Add
                                 </button>
