@@ -12,12 +12,17 @@ const cron = require('node-cron');
 const speakeasy = require('speakeasy');
 const fs = require('fs');
 const crypto = require('crypto'); // Import crypto for generating unique IDs
+const cors = require('cors'); // NEW: Import the cors middleware
 
 require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+
+// NEW: Use CORS middleware - This allows all origins for simplicity in development.
+// For production, you should configure it to allow only your specific frontend origin(s).
+app.use(cors());
 
 // Middleware for parsing JSON and URL-encoded data
 app.use(express.json());
