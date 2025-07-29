@@ -327,7 +327,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 io.emit('whatsapp_log', 'QR code expired. Reinitializing...');
                 qrCodeData = null;
                 io.emit('qrCode', null);
-                await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
+                await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upspsert: true });
                 io.emit('status', 'qr_error');
                 isInitializing = false; // Allow re-initialization
                 initializeWhatsappClient(true); // Force a new session
@@ -661,13 +661,13 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 // --- Bot Logic Functions (kept separate for clarity, but called from message listener) ---
 const sendWelcomeMessage = async (chatId, customerName) => {
     const menuOptions = [
-        "1. 📜 View Our Delicious Menu",
-        "2. 📍 Get Our Shop Location",
-        "4. 📝 Check Your Recent Orders",
-        "5. ❓ Need Help? Ask Us Anything!"
+        "1. 📜 *Explore Our Menu*: Discover delicious dishes!",
+        "2. 📍 *Find Our Shop*: Get directions to satisfy your cravings!",
+        "4. 📝 *Track Your Orders*: Check the status of your recent meals!",
+        "5. ❓ *Need Assistance?*: We're here to help!"
     ];
     // Redesigned welcome message
-    const welcomeText = `🌟 Hello ${customerName || 'foodie'}! Welcome to *Delicious Bites*! 😋\n\nReady to order? Visit our easy-to-use web menu here: ${process.env.WEB_MENU_URL}\n\nOr, choose from the options below to get started:\n\n${menuOptions.join('\n')}\n\nSimply reply with the *number* or *keyword* for your choice!`;
+    const welcomeText = `🌟 Hey there, ${customerName || 'foodie'}! Welcome to *Delicious Bites*! 😋\n\nReady for a treat? Order effortlessly from our web menu: ${process.env.WEB_MENU_URL}\n\nOr, simply pick an option below to get started:\n\n${menuOptions.join('\n')}\n\nJust reply with the *number* or *keyword* for your choice! We're excited to serve you! ✨`;
     try {
         await client.sendMessage(chatId, welcomeText);
         io.emit('whatsapp_log', `Sent welcome message to ${chatId}`);
@@ -683,7 +683,7 @@ const sendShopLocation = async (chatId) => {
         const { latitude, longitude } = settings.shopLocation;
         const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
         try {
-            await client.sendMessage(chatId, `📍 Our shop location is here:\n${googleMapsLink}\n\nWe hope to see you soon!`);
+            await client.sendMessage(chatId, `📍 Craving our food? Find us here:\n${googleMapsLink}\n\nWe're excited to welcome you!`);
             io.emit('whatsapp_log', `Sent shop location to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send shop location to ${chatId}:`, error);
@@ -691,7 +691,7 @@ const sendShopLocation = async (chatId) => {
         }
     } else {
         try {
-            await client.sendMessage(chatId, 'Sorry, shop location is currently unavailable. Please contact the admin.');
+            await client.sendMessage(chatId, 'Oops! Our shop location is temporarily unavailable. Please contact our support team for assistance.');
             io.emit('whatsapp_log', `Sent shop location unavailable message to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send shop location unavailable message to ${chatId}:`, error);
@@ -704,7 +704,7 @@ const sendMenu = async (chatId) => {
     const items = await Item.find({ isAvailable: true });
     if (items.length === 0) {
         try {
-            await client.sendMessage(chatId, 'There are currently no items on the menu. Please try again later.');
+            await client.sendMessage(chatId, 'Our menu is currently being updated with fresh delights! Please check back a little later. 😊');
             io.emit('whatsapp_log', `Sent no menu items message to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send no menu items message to ${chatId}:`, error);
@@ -713,10 +713,10 @@ const sendMenu = async (chatId) => {
         return;
     }
 
-    let menuMessage = "📜 Our Menu:\n\n";
+    let menuMessage = "📜 *Our Irresistible Menu:*\n\n";
     const categories = {};
     items.forEach(item => {
-        const category = item.category || 'Other';
+        const category = item.category || 'Other Delights'; // Changed default category name
         if (!categories[category]) {
             categories[category] = [];
         }
@@ -726,14 +726,14 @@ const sendMenu = async (chatId) => {
     for (const category in categories) {
         menuMessage += `*${category}*\n`;
         categories[category].forEach((item, index) => {
-            menuMessage += `${index + 1}. ${item.name} - ₹${item.price.toFixed(2)}${item.isTrending ? ' ✨' : ''}\n`;
+            menuMessage += `${index + 1}. ${item.name} - ₹${item.price.toFixed(2)}${item.isTrending ? ' ✨ *Trending!*' : ''}\n`; // Added Trending text
             if (item.description) {
                 menuMessage += `   _(${item.description})_\n`;
             }
         });
         menuMessage += '\n';
     }
-    menuMessage += "To place an order, please visit our web menu: " + process.env.WEB_MENU_URL + "\n\nYou can also type 'Hi' to return to the main menu.";
+    menuMessage += "Ready to order? Head over to our full web menu for a seamless experience: " + process.env.WEB_MENU_URL + "\n\nOr, simply type 'Hi' to return to the main menu. Happy feasting! 🍽️";
     try {
         await client.sendMessage(chatId, menuMessage);
         io.emit('whatsapp_log', `Sent menu to ${chatId}`);
@@ -749,7 +749,7 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
 
     if (orders.length === 0) {
         try {
-            await client.sendMessage(chatId, 'You have not placed any orders yet.');
+            await client.sendMessage(chatId, 'It looks like you haven\'t placed any orders with us yet. Ready to start your delicious journey? Visit our web menu: ' + process.env.WEB_MENU_URL);
             io.emit('whatsapp_log', `Sent no orders message to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send no orders message to ${chatId}:`, error);
@@ -758,18 +758,19 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
         return;
     }
 
-    let orderListMessage = 'Your Past Orders:\n\n';
+    let orderListMessage = '📝 *Your Recent Orders:*\n\n';
     orders.forEach((order, index) => {
         const displayId = order.customOrderId || order._id.substring(0, 6) + '...';
         orderListMessage += `*Order ${index + 1} (ID: ${displayId})*\n`;
         if (order.pinId) {
-            orderListMessage += `  PIN: ${order.pinId}\n`;
+            orderListMessage += `  PIN: ${order.pinId} (Use this to track!)\n`;
         }
         orderListMessage += `  Total: ₹${order.totalAmount.toFixed(2)}\n`;
-        orderListMessage += `  Status: ${order.status}\n`;
+        orderListMessage += `  Status: *${order.status}*\n`;
         orderListMessage += `  Payment: ${order.paymentMethod}\n`;
         orderListMessage += `  Date: ${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n`;
     });
+    orderListMessage += "Want to track a specific order? Just send us its 10-digit PIN! 🚀\n\nType 'Hi' to return to the main menu.";
     try {
         await client.sendMessage(chatId, orderListMessage);
         io.emit('whatsapp_log', `Sent past orders to ${chatId}`);
@@ -780,12 +781,14 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
 };
 
 const sendHelpMessage = async (chatId) => {
-    const helpMessage = `How can I help you? You can try the following:\n
-*Hi* - To return to the main menu
-*View Menu* - To see our available items
-*My Orders* - To view your past orders
-*Shop Location* - To get our shop's location
-*Help* - To see this help message again\n\nTo place an order, please visit our web menu: ${process.env.WEB_MENU_URL}`;
+    const helpMessage = `👋 *How Can We Assist You?*\n\nI'm here to make your ordering experience delightful! Here are some quick commands:\n\n` +
+                        `*Hi* - Back to the main menu\n` +
+                        `*View Menu* - See all our tempting dishes\n` +
+                        `*My Orders* - Check your order history\n` +
+                        `*Shop Location* - Get our exact location\n` +
+                        `*Help* - Show this message again\n\n` +
+                        `For a full ordering experience, visit our web menu: ${process.env.WEB_MENU_URL}\n\n` +
+                        `Feel free to ask any other questions! We're happy to help. 😊`;
     try {
         await client.sendMessage(chatId, helpMessage);
         io.emit('whatsapp_log', `Sent help message to ${chatId}`);
@@ -866,13 +869,16 @@ console.log('Daily re-order notification job scheduled to run daily at 9:00 AM I
 
 
 // --- Admin API Routes ---
+// Admin Login Endpoint
 app.post('/admin/login', async (req, res) => {
     const { username, password, totpCode } = req.body;
 
     const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
 
     if (!admin) {
-        return res.status(500).json({ message: 'Admin user not found in database. Please restart server.' });
+        // This case should ideally be handled by ensureDefaultAdminExists on startup
+        console.error('Admin user not found in database during login attempt.');
+        return res.status(500).json({ message: 'Admin user not configured. Please contact server administrator.' });
     }
 
     // Verify password first
@@ -881,46 +887,49 @@ app.post('/admin/login', async (req, res) => {
         return res.status(401).json({ message: 'Invalid username or password.' });
     }
 
-    if (!admin.totpSecret) {
-        const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' });
-        return res.json({ token, twoFactorEnabled: false });
+    // If 2FA is enabled for this admin
+    if (admin.totpSecret) {
+        // If no TOTP code is provided, request it
+        if (!totpCode) {
+            return res.status(401).json({ message: 'Two-Factor Authentication code required.' });
+        }
+
+        // Verify TOTP code
+        const verified = speakeasy.totp.verify({
+            secret: admin.totpSecret,
+            encoding: 'base32',
+            token: totpCode,
+            window: 1 // Allows for 1 step (30 seconds) leeway
+        });
+
+        if (!verified) {
+            return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
+        }
     }
 
-    if (!totpCode) {
-        return res.status(401).json({ message: 'Two-Factor Authentication code required.' });
-    }
-
-    const verified = speakeasy.totp.verify({
-        secret: admin.totpSecret,
-        encoding: 'base32',
-        token: totpCode,
-        window: 1
-    });
-
-    if (!verified) {
-        return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
-    }
-
-    const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, twoFactorEnabled: true });
+    // If we reach here, authentication (and 2FA if applicable) is successful
+    const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' }); // Token valid for 7 days
+    res.json({ token, twoFactorEnabled: !!admin.totpSecret });
 });
+
 
 app.get('/admin/logout', (req, res) => {
     res.send('Logged out successfully');
 });
 
-// Authentication Middleware for Admin APIs
+// Authentication Middleware for Admin APIs and Dashboard HTML
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    // List of HTML routes that require authentication
-    // REMOVED: '/dashboard' from htmlAuthRoutes as it's now handled client-side
-    const htmlAuthRoutes = []; // Now, only API calls will use this middleware for 401/403 responses
+    // Determine if the request is for an HTML page that requires authentication
+    // This list should include all HTML dashboard routes
+    const htmlAuthRoutes = ['/dashboard']; 
+    const isHtmlRequest = htmlAuthRoutes.includes(req.path);
 
     if (token == null) {
         console.log('Unauthorized: No token provided. (Request to ' + req.path + ')');
-        if (htmlAuthRoutes.includes(req.path)) {
+        if (isHtmlRequest) {
             return res.redirect('/admin/login'); // Redirect to login for HTML pages
         }
         return res.status(401).json({ message: 'Unauthorized: No token provided.' }); // For API calls
@@ -930,12 +939,12 @@ const authenticateToken = (req, res, next) => {
         if (err) {
             console.error('JWT Verification Error:', err.message, '(Token received for ' + req.path + ')');
             if (err.name === 'TokenExpiredError') {
-                if (htmlAuthRoutes.includes(req.path)) {
+                if (isHtmlRequest) {
                     return res.redirect('/admin/login'); // Redirect to login if token expired for HTML pages
                 }
                 return res.status(401).json({ message: 'Unauthorized: Session expired. Please log in again.' });
             }
-            if (htmlAuthRoutes.includes(req.path)) {
+            if (isHtmlRequest) {
                 return res.redirect('/admin/login'); // Redirect to login for other auth errors on HTML pages
             }
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
@@ -1495,11 +1504,10 @@ app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
-// MODIFICATION START: Removed authenticateToken middleware from /dashboard route
-app.get('/dashboard', (req, res) => {
+// Protected Dashboard Route
+app.get('/dashboard', authenticateToken, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
-// MODIFICATION END
 
 app.get('/menu', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'menu.html'));
@@ -1594,3 +1602,4 @@ server.listen(PORT, () => {
     console.log(`Default Admin Password (for initial setup): ${DEFAULT_ADMIN_PASSWORD}`);
     console.log('REMEMBER TO ENABLE 2FA FROM THE DASHBOARD AFTER FIRST LOGIN FOR SECURITY.');
 });
+
