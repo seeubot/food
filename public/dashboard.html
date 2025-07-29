@@ -565,6 +565,7 @@
          * @param {'success'|'error'|'info'} type - The type of notification.
          */
         function showNotification(message, type) {
+            console.log(`[Notification] Type: ${type}, Message: ${message}`); // Debug log
             clearTimeout(notificationTimeout);
             notificationMessage.textContent = message;
             notificationToast.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 flex items-center justify-between animate-fade-in-up`;
@@ -595,6 +596,7 @@
          * @returns {Promise<Response>} The fetch response.
          */
         async function fetchWithAuth(url, options = {}) {
+            console.log(`[fetchWithAuth] Attempting to fetch: ${url}`); // Debug log
             const token = localStorage.getItem('adminToken');
             const headers = {
                 'Content-Type': 'application/json',
@@ -602,20 +604,37 @@
             };
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;
+                console.log('[fetchWithAuth] Authorization header included.'); // Debug log
+            } else {
+                console.log('[fetchWithAuth] No Authorization token found.'); // Debug log
             }
 
-            const response = await fetch(url, { ...options, headers });
+            try {
+                const response = await fetch(url, { ...options, headers });
+                console.log(`[fetchWithAuth] Response status for ${url}: ${response.status}`); // Debug log
 
-            if (response.status === 401 || response.status === 403) {
-                // If unauthorized or forbidden, clear token and redirect to login
-                localStorage.removeItem('adminToken');
-                isAuthenticated = false;
-                navigateTo('/admin/login'); // Redirect to login page
-                showNotification('Session expired or unauthorized. Please log in again.', 'error');
-                throw new Error('Authentication failed. Please log in again.');
+                if (response.status === 401 || response.status === 403) {
+                    console.error(`[fetchWithAuth] Authentication failed for ${url}. Status: ${response.status}`); // Debug log
+                    localStorage.removeItem('adminToken');
+                    isAuthenticated = false;
+                    navigateTo('/admin/login'); // Redirect to login page
+                    showNotification('Session expired or unauthorized. Please log in again.', 'error');
+                    throw new Error('Authentication failed. Please log in again.');
+                }
+
+                // Check for non-OK responses (e.g., 400, 500) that are not auth-related
+                if (!response.ok) {
+                    const errorBody = await response.json().catch(() => ({ message: 'Unknown error' }));
+                    console.error(`[fetchWithAuth] API error for ${url}. Status: ${response.status}, Message: ${errorBody.message}`);
+                    throw new Error(errorBody.message || `API request failed with status ${response.status}`);
+                }
+
+                return response;
+            } catch (error) {
+                console.error(`[fetchWithAuth] Network or unexpected error for ${url}:`, error); // Debug log
+                showNotification(`Network error or API issue: ${error.message}`, 'error');
+                throw error; // Re-throw to be caught by specific page logic
             }
-
-            return response;
         }
 
         /**
@@ -627,9 +646,8 @@
                 section.style.display = 'none';
             });
             sectionToShow.style.display = 'flex'; // Use flex for login, dashboard-layout
+            // Ensure dashboard-layout specifically uses flex for its internal layout
             if (sectionToShow.id === 'dashboard-layout') {
-                 sectionToShow.style.display = 'flex'; // Ensure dashboard layout is flex
-            } else {
                  sectionToShow.style.display = 'flex';
             }
         }
@@ -639,6 +657,7 @@
          * @param {string} path - The new path (e.g., '/dashboard/menu').
          */
         function navigateTo(path) {
+            console.log(`[Navigation] Navigating to: ${path}`); // Debug log
             window.location.hash = path;
             currentPath = path;
             renderPage();
@@ -662,7 +681,10 @@
          * Renders the appropriate page based on the current path.
          */
         async function renderPage() {
+            console.log(`[RenderPage] Current path: ${currentPath}, Is Authenticated: ${isAuthenticated}`); // Debug log
+
             if (!isAuthenticated && currentPath !== '/admin/login') {
+                console.log('[RenderPage] Not authenticated, redirecting to login.'); // Debug log
                 navigateTo('/admin/login');
                 return;
             }
@@ -702,7 +724,7 @@
                     // Fallback for unknown dashboard paths
                     templateId = 'dashboard-home-template';
                     navigateTo('/dashboard'); // Redirect to dashboard home
-                    break;
+                    return; // Important: return after navigateTo to prevent double rendering
             }
 
             const template = document.getElementById(templateId);
@@ -730,6 +752,9 @@
                         init2FAManagementPage();
                         break;
                 }
+            } else {
+                console.error(`[RenderPage] Template with ID "${templateId}" not found.`); // Debug log
+                showNotification('Error: Dashboard section not found.', 'error');
             }
             updateSidebarActiveLink();
         }
@@ -744,6 +769,8 @@
             const password = loginPasswordInput.value;
             const totpCode = loginTotpCodeInput.value;
 
+            console.log('[Login] Attempting login...'); // Debug log
+
             try {
                 const response = await fetch(LOGIN_URL, {
                     method: 'POST',
@@ -752,6 +779,7 @@
                 });
 
                 const data = await response.json();
+                console.log('[Login] Response received:', data); // Debug log
 
                 if (response.ok) {
                     if (data.twoFactorEnabled && !totpCode) {
@@ -760,6 +788,7 @@
                     } else {
                         localStorage.setItem('adminToken', data.token);
                         isAuthenticated = true;
+                        console.log('[Login] Token stored in localStorage:', data.token); // Debug log
                         showNotification('Login successful!', 'success');
                         navigateTo('/dashboard');
                     }
@@ -776,6 +805,7 @@
         }
 
         function handleLogout() {
+            console.log('[Logout] User logging out.'); // Debug log
             localStorage.removeItem('adminToken');
             isAuthenticated = false;
             showNotification('Logged out successfully.', 'success');
@@ -785,11 +815,14 @@
         function checkAuthentication() {
             const token = localStorage.getItem('adminToken');
             if (token) {
-                // Simple check: assume token is valid for now.
-                // In a real app, you'd verify with a backend endpoint.
+                // In a real app, you'd send this token to a /verify-token endpoint
+                // on the backend to ensure it's still valid and not expired.
+                // For this example, we'll assume if a token exists, it's valid for initial load.
                 isAuthenticated = true;
+                console.log('[Auth Check] Token found in localStorage. User is authenticated.');
             } else {
                 isAuthenticated = false;
+                console.log('[Auth Check] No token found in localStorage. User is not authenticated.');
             }
         }
 
@@ -852,32 +885,52 @@
 
             // Initialize Socket.io connection if not already connected
             if (!whatsappSocket) {
+                console.log('[WhatsAppStatus] Connecting to Socket.io...'); // Debug log
                 whatsappSocket = io('http://localhost:3000');
 
+                whatsappSocket.on('connect', () => {
+                    console.log('[WhatsAppStatus] Socket.io connected.'); // Debug log
+                });
+                whatsappSocket.on('disconnect', (reason) => {
+                    console.log('[WhatsAppStatus] Socket.io disconnected:', reason); // Debug log
+                });
+                whatsappSocket.on('connect_error', (error) => {
+                    console.error('[WhatsAppStatus] Socket.io connection error:', error); // Debug log
+                    showNotification('Socket.io connection error. Check backend.', 'error');
+                });
+
+
                 whatsappSocket.on('status', (newStatus) => {
+                    console.log('[WhatsAppStatus] Socket: status received', newStatus); // Debug log
                     whatsappStatusData.status = newStatus;
                     updateStatusUI();
                 });
 
                 whatsappSocket.on('qrCode', (qrDataUrl) => {
+                    console.log('[WhatsAppStatus] Socket: qrCode received'); // Debug log
                     whatsappStatusData.qrCodeUrl = qrDataUrl;
                     updateStatusUI();
                 });
 
                 whatsappSocket.on('sessionInfo', (info) => {
+                    console.log('[WhatsAppStatus] Socket: sessionInfo received', info); // Debug log
                     whatsappStatusData.lastAuthenticatedAt = info.lastAuthenticatedAt ? new Date(info.lastAuthenticatedAt).toLocaleString() : null;
                     updateStatusUI();
                 });
 
                 whatsappSocket.on('whatsapp_log', (logMessage) => {
+                    // console.log('[WhatsAppStatus] Socket: whatsapp_log received', logMessage); // Too verbose, uncomment if needed
                     whatsappStatusData.logs.push(`[${new Date().toLocaleTimeString()}] ${logMessage}`);
                     whatsappStatusData.logs = whatsappStatusData.logs.slice(-50); // Keep last 50 logs
                     updateStatusUI();
                 });
+            } else {
+                console.log('[WhatsAppStatus] Socket.io already connected.'); // Debug log
             }
 
             // Initial fetch of status when component mounts
             async function fetchInitialStatus() {
+                console.log('[WhatsAppStatus] Fetching initial bot status...'); // Debug log
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/bot-status`);
                     const data = await response.json();
@@ -887,6 +940,7 @@
                     // the backend might re-send on re-initialization.
                     // For now, we rely on socket.io for QR.
                     updateStatusUI();
+                    console.log('[WhatsAppStatus] Initial bot status fetched:', data); // Debug log
                 } catch (error) {
                     console.error('Error fetching initial bot status:', error);
                     showNotification('Failed to fetch bot status.', 'error');
@@ -896,6 +950,7 @@
 
             reinitializeButton.onclick = async () => {
                 showNotification('', ''); // Clear any previous notification
+                console.log('[WhatsAppStatus] Re-initialize session button clicked.'); // Debug log
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/load-session`, { method: 'POST' });
                     const data = await response.json();
@@ -929,11 +984,13 @@
             let currentEditingItem = null; // Stores the item object being edited
 
             async function fetchMenuItems() {
+                console.log('[MenuManagement] Fetching menu items...'); // Debug log
                 menuLoadingMessage.classList.remove('hidden');
                 menuItemsTableBody.innerHTML = ''; // Clear table
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/menu`);
                     const items = await response.json();
+                    console.log('[MenuManagement] Menu items fetched:', items); // Debug log
                     menuItemsTableBody.innerHTML = ''; // Clear existing rows
                     if (items.length === 0) {
                         menuItemsTableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No menu items found.</td></tr>';
@@ -980,32 +1037,21 @@
                 document.querySelectorAll('.edit-item-button').forEach(button => {
                     button.onclick = () => {
                         const itemId = button.dataset.id;
-                        const item = menuItemsTableBody.querySelector(`button[data-id="${itemId}"]`).closest('tr');
-                        currentEditingItem = {
-                            _id: itemId,
-                            name: item.children[1].textContent,
-                            description: '', // Desc not in table, will fetch or leave empty
-                            price: parseFloat(item.children[3].textContent.replace('₹', '')),
-                            imageUrl: item.children[0].querySelector('img').src,
-                            category: item.children[2].textContent,
-                            isAvailable: item.children[4].textContent.trim() === 'Yes',
-                            isTrending: item.children[5].textContent.trim() === 'Yes'
-                        };
-                        // Fetch full item details for description if needed, or leave empty for quick edit
-                        fetch(`${API_BASE_URL}/menu/${itemId}`, {
-                            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
-                        })
+                        console.log(`[MenuManagement] Edit button clicked for item ID: ${itemId}`); // Debug log
+                        // Fetch full item details for description and other fields not in table
+                        fetchWithAuth(`${API_BASE_URL}/menu/${itemId}`)
                         .then(res => res.json())
                         .then(data => {
                             if (data) {
-                                currentEditingItem.description = data.description || '';
+                                currentEditingItem = data;
+                                openMenuItemModal();
+                            } else {
+                                showNotification('Item details not found.', 'error');
                             }
-                            openMenuItemModal();
                         })
                         .catch(err => {
                             console.error('Error fetching full item details:', err);
                             showNotification('Failed to load full item details.', 'error');
-                            openMenuItemModal(); // Open modal with partial data
                         });
                     };
                 });
@@ -1055,6 +1101,8 @@
                 const method = currentEditingItem ? 'PUT' : 'POST';
                 const url = currentEditingItem ? `${API_BASE_URL}/menu/${currentEditingItem._id}` : `${API_BASE_URL}/menu`;
 
+                console.log(`[MenuManagement] Submitting item via ${method} to ${url} with data:`, formData); // Debug log
+
                 try {
                     const response = await fetchWithAuth(url, {
                         method,
@@ -1080,6 +1128,7 @@
 
             async function handleDeleteMenuItem(id) {
                 if (!confirm('Are you sure you want to delete this item?')) return;
+                console.log(`[MenuManagement] Deleting item ID: ${id}`); // Debug log
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/menu/${id}`, { method: 'DELETE' });
                     if (response.ok) {
@@ -1115,11 +1164,13 @@
             let allOrders = []; // Store all fetched orders for filtering
 
             async function fetchOrders() {
+                console.log('[OrderManagement] Fetching orders...'); // Debug log
                 orderLoadingMessage.classList.remove('hidden');
                 orderItemsTableBody.innerHTML = ''; // Clear table
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/orders`);
                     const data = await response.json();
+                    console.log('[OrderManagement] Orders fetched:', data); // Debug log
                     allOrders = data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate)); // Sort by date descending
                     renderFilteredOrders();
                 } catch (error) {
@@ -1204,6 +1255,7 @@
             }
 
             async function handleOrderStatusChange(orderId, newStatus) {
+                console.log(`[OrderManagement] Changing status for order ${orderId} to ${newStatus}`); // Debug log
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/orders/${orderId}`, {
                         method: 'PUT',
@@ -1225,6 +1277,7 @@
 
             async function handleDeleteOrder(orderId) {
                 if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
+                console.log(`[OrderManagement] Deleting order ID: ${orderId}`); // Debug log
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/orders/${orderId}`, { method: 'DELETE' });
                     if (response.ok) {
@@ -1249,6 +1302,7 @@
             }
             whatsappSocket.off('new_order'); // Remove previous listener to avoid duplicates
             whatsappSocket.on('new_order', (newOrder) => {
+                console.log('[OrderManagement] Socket: New order received', newOrder); // Debug log
                 showNotification(`New Order Received! ID: ${newOrder.customOrderId}`, 'success');
                 allOrders.unshift(newOrder); // Add to the beginning
                 allOrders.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate)); // Re-sort
@@ -1264,11 +1318,13 @@
             const customerItemsTableBody = document.getElementById('customer-items-table-body');
 
             async function fetchCustomers() {
+                console.log('[CustomerManagement] Fetching customers...'); // Debug log
                 customerLoadingMessage.classList.remove('hidden');
                 customerItemsTableBody.innerHTML = ''; // Clear table
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/customers`);
                     const customers = await response.json();
+                    console.log('[CustomerManagement] Customers fetched:', customers); // Debug log
                     customerItemsTableBody.innerHTML = ''; // Clear existing rows
                     if (customers.length === 0) {
                         customerItemsTableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No customers found.</td></tr>';
@@ -1311,6 +1367,7 @@
 
             async function handleDeleteCustomer(id) {
                 if (!confirm('Are you sure you want to delete this customer and their associated data?')) return;
+                console.log(`[CustomerManagement] Deleting customer ID: ${id}`); // Debug log
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/customers/${id}`, { method: 'DELETE' });
                     if (response.ok) {
@@ -1353,10 +1410,12 @@
             };
 
             async function fetchSettings() {
+                console.log('[SettingsManagement] Fetching settings...'); // Debug log
                 settingsLoadingMessage.classList.remove('hidden');
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/settings`);
                     const data = await response.json();
+                    console.log('[SettingsManagement] Settings fetched:', data); // Debug log
                     currentSettings = {
                         shopName: data.shopName || '',
                         shopLocation: {
@@ -1462,6 +1521,8 @@
                     isDiscountEnabled: isDiscountEnabledCheckbox.checked
                 };
 
+                console.log('[SettingsManagement] Saving settings with payload:', payload); // Debug log
+
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/settings`, {
                         method: 'PUT',
@@ -1509,12 +1570,14 @@
             let is2FAEnabled = false;
 
             async function fetch2FAStatus() {
+                console.log('[2FAManagement] Fetching 2FA status...'); // Debug log
                 enable2FaButton.disabled = true;
                 disable2FaButton.disabled = true;
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/2fa/status`);
                     const data = await response.json();
                     is2FAEnabled = data.twoFactorEnabled;
+                    console.log('[2FAManagement] 2FA status fetched:', data); // Debug log
                     update2FAUI();
                 } catch (error) {
                     console.error('Error fetching 2FA status:', error);
@@ -1544,6 +1607,7 @@
             async function handleGenerate2FA() {
                 enable2FaButton.disabled = true;
                 enable2FaButton.textContent = 'Generating...';
+                console.log('[2FAManagement] Generating 2FA secret...'); // Debug log
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/2fa/generate`, { method: 'POST' });
                     const data = await response.json();
@@ -1551,6 +1615,7 @@
                     twoFactorTempSecret = data.secret; // Store for verification
                     twoFaQrImage.classList.remove('hidden');
                     twoFaEnableModal.classList.remove('hidden');
+                    console.log('[2FAManagement] 2FA QR generated.'); // Debug log
                 } catch (error) {
                     console.error('Error generating 2FA:', error);
                     showNotification('Failed to generate 2FA QR code.', 'error');
@@ -1564,6 +1629,7 @@
                 verify2FaButton.disabled = true;
                 verify2FaButton.textContent = 'Verifying...';
                 const totpCode = twoFaTotpCodeVerifyInput.value;
+                console.log(`[2FAManagement] Verifying 2FA code: ${totpCode}`); // Debug log
                 if (totpCode.length !== 6) {
                     showNotification('Please enter a 6-digit code.', 'error');
                     verify2FaButton.disabled = false;
@@ -1585,6 +1651,7 @@
                         twoFaQrImage.classList.add('hidden');
                         twoFactorTempSecret = '';
                         fetch2FAStatus();
+                        console.log('[2FAManagement] 2FA verified and enabled.'); // Debug log
                     } else {
                         showNotification(data.message || '2FA verification failed.', 'error');
                     }
@@ -1601,11 +1668,13 @@
                 if (!confirm('Are you sure you want to disable Two-Factor Authentication?')) return;
                 disable2FaButton.disabled = true;
                 disable2FaButton.textContent = 'Disabling...';
+                console.log('[2FAManagement] Disabling 2FA...'); // Debug log
                 try {
                     const response = await fetchWithAuth(`${API_BASE_URL}/2fa/disable`, { method: 'POST' });
                     if (response.ok) {
                         showNotification('2FA disabled successfully!', 'success');
                         fetch2FAStatus();
+                        console.log('[2FAManagement] 2FA disabled.'); // Debug log
                     } else {
                         const errorData = await response.json();
                         showNotification(errorData.message || 'Failed to disable 2FA.', 'error');
@@ -1667,6 +1736,7 @@
             });
 
             // Redirect from old paths to new hash-based paths
+            // This ensures direct access to /admin/login.html etc. works by redirecting to #/admin/login
             if (window.location.pathname.startsWith('/admin/login.html') || window.location.pathname.startsWith('/admin_login.html')) {
                 navigateTo('/admin/login');
             } else if (window.location.pathname.startsWith('/dashboard.html') || window.location.pathname.startsWith('/admin_dashboard.html')) {
