@@ -4,1877 +4,516 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delicious Bites - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Leaflet CSS for Order Tracking Map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        /* General Styles */
         body {
             font-family: 'Inter', sans-serif;
-            margin: 0;
-            background-color: #F5F5F5; /* Light Gray Background */
+            background-color: #f0f2f5;
             color: #333;
-            display: flex;
-            min-height: 100vh;
-            overflow-x: hidden; /* Prevent horizontal scroll */
         }
-
-        /* Blue & White Theme */
-        :root {
-            --primary-blue: #4A90E2;
-            --accent-blue: #2196F3;
-            --light-blue: #E3F2FD;
-            --white: #FFFFFF;
-            --text-dark: #333;
-            --text-light: #666;
-            --border-light: #E0E0E0;
-            --success-green: #4CAF50;
-            --error-red: #F44336;
-            --warning-orange: #FF9800;
-        }
-
-        /* Layout */
-        .dashboard-container {
-            display: flex;
-            width: 100%;
-            min-height: 100vh;
-        }
-
         .sidebar {
+            background-color: #2c3e50; /* Dark blue-gray */
+            color: #ecf0f1;
             width: 250px;
-            background-color: var(--primary-blue);
-            color: var(--white);
-            padding: 20px 0;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-            transition: width 0.3s ease;
-            flex-shrink: 0;
+            min-height: 100vh;
+            padding: 2rem;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
         }
-
-        .sidebar.collapsed {
-            width: 60px;
-        }
-
-        .sidebar h2 {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 1.5em;
-            padding: 0 15px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .sidebar.collapsed h2 {
-            font-size: 0; /* Hide text */
-        }
-
-        .sidebar nav ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .sidebar nav ul li {
-            margin-bottom: 10px;
-        }
-
-        .sidebar nav ul li a {
+        .sidebar a {
             display: flex;
             align-items: center;
-            padding: 12px 20px;
-            color: var(--white);
-            text-decoration: none;
-            font-size: 1.1em;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
             border-radius: 8px;
-            margin: 0 10px;
-            transition: background-color 0.2s ease, transform 0.1s ease;
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
-
-        .sidebar nav ul li a:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-            transform: translateX(5px);
+        .sidebar a:hover {
+            background-color: #34495e;
+            color: #ffffff;
         }
-
-        .sidebar nav ul li a.active {
-            background-color: var(--accent-blue);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        .sidebar a.active {
+            background-color: #3498db;
+            color: #ffffff;
+            font-weight: bold;
         }
-
-        .sidebar nav ul li a i {
-            margin-right: 15px;
-            width: 20px; /* Ensure consistent icon width */
+        .sidebar a i {
+            margin-right: 10px;
+            width: 20px;
             text-align: center;
         }
-
-        .sidebar.collapsed nav ul li a i {
-            margin-right: 0;
-        }
-
-        .sidebar.collapsed nav ul li a span {
-            display: none;
-        }
-
-        .main-content {
-            flex-grow: 1;
-            padding: 20px;
-            background-color: var(--white);
-            border-radius: 10px;
-            margin: 20px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
-            display: flex;
-            flex-direction: column;
-        }
-
         .header {
+            background-color: #ffffff;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-light);
         }
-
-        .header h1 {
-            margin: 0;
-            color: var(--primary-blue);
-            font-size: 2em;
-        }
-
-        .header .user-info {
-            display: flex;
-            align-items: center;
-        }
-
-        .header .user-info span {
-            margin-right: 15px;
-            font-weight: bold;
-            color: var(--text-dark);
-        }
-
-        .header .user-info button {
-            background-color: var(--error-red);
-            color: var(--white);
-            border: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-
-        .header .user-info button:hover {
-            background-color: #D32F2F;
-        }
-
-        .section {
-            display: none;
-            flex-grow: 1;
-            padding-top: 10px;
-        }
-
-        .section.active {
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Common Elements */
         .card {
-            background-color: var(--white);
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            padding: 20px;
-            margin-bottom: 20px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
         }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-disconnected { background-color: #e74c3c; } /* Red */
+        .status-qr_received { background-color: #f39c12; } /* Orange */
+        .status-authenticated { background-color: #3498db; } /* Blue */
+        .status-ready { background-color: #2ecc71; } /* Green */
+        .status-auth_failure, .status-qr_error { background-color: #c0392b; } /* Darker Red */
+        .status-initializing { background-color: #9b59b6; } /* Purple */
 
-        .card h3 {
-            color: var(--primary-blue);
-            margin-top: 0;
-            margin-bottom: 15px;
-            border-bottom: 1px solid var(--border-light);
-            padding-bottom: 10px;
-        }
-
-        .btn {
-            background-color: var(--primary-blue);
-            color: var(--white);
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn:hover {
-            background-color: var(--accent-blue);
-            transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-            background-color: var(--border-light);
-            color: var(--text-dark);
-        }
-
-        .btn-secondary:hover {
-            background-color: #D0D0D0;
-        }
-
-        .btn-danger {
-            background-color: var(--error-red);
-        }
-
-        .btn-danger:hover {
-            background-color: #D32F2F;
-        }
-
-        .btn-success {
-            background-color: var(--success-green);
-        }
-
-        .btn-success:hover {
-            background-color: #388E3C;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: var(--text-dark);
-        }
-
-        .form-group input[type="text"],
-        .form-group input[type="number"],
-        .form-group input[type="email"],
-        .form-group input[type="password"],
-        .form-group textarea,
-        .form-group select {
-            width: calc(100% - 20px);
-            padding: 10px;
-            border: 1px solid var(--border-light);
-            border-radius: 5px;
-            font-size: 1em;
-            box-sizing: border-box; /* Include padding in width */
-        }
-        
-        .form-group select {
-            width: 100%; /* Ensure select takes full width */
-        }
-
-        .form-group input[type="checkbox"] {
-            margin-right: 10px;
-        }
-
-        .table-container {
-            overflow-x: auto; /* Enable horizontal scroll for tables on small screens */
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: var(--white);
-        }
-
-        table th, table td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-light);
-        }
-
-        table th {
-            background-color: var(--light-blue);
-            color: var(--primary-blue);
-            font-weight: bold;
-            text-transform: uppercase;
-            font-size: 0.9em;
-        }
-
-        table tbody tr:hover {
-            background-color: #F9F9F9;
-        }
-
-        table td .action-buttons button {
-            margin-right: 5px;
-            padding: 6px 10px;
-            font-size: 0.9em;
-        }
-
-        /* Specific Section Styles */
-        /* WhatsApp Bot Status */
-        .bot-status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .bot-status-card {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 20px;
-            background-color: var(--light-blue);
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-        }
-
-        .bot-status-card .status-indicator {
-            font-size: 1.2em;
-            font-weight: bold;
-            margin-top: 10px;
-            color: var(--primary-blue);
-        }
-
-        .bot-status-card .status-indicator.disconnected { color: var(--error-red); }
-        .bot-status-card .status-indicator.qr_received { color: var(--warning-orange); }
-        .bot-status-card .status-indicator.authenticated { color: var(--accent-blue); }
-        .bot-status-card .status-indicator.ready { color: var(--success-green); }
-        .bot-status-card .status-indicator.initializing { color: var(--primary-blue); }
-        .bot-status-card .status-indicator.auth_failure, .bot-status-card .status-indicator.qr_error { color: var(--error-red); }
-
-
-        #qrCodeDisplay {
-            max-width: 200px;
-            height: auto;
-            margin: 15px auto;
-            border: 5px solid var(--white);
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-
-        #whatsappLogs {
-            background-color: #f0f0f0;
-            border: 1px solid var(--border-light);
-            border-radius: 5px;
-            padding: 15px;
-            height: 250px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            white-space: pre-wrap; /* Preserve whitespace and wrap lines */
-            word-break: break-all; /* Break long words */
-            color: var(--text-dark);
-        }
-
-        /* Settings Section */
-        .delivery-rate-item {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-            align-items: flex-end;
-        }
-        .delivery-rate-item .form-group {
-            flex: 1;
-            margin-bottom: 0;
-        }
-        .delivery-rate-item .btn-danger {
-            height: 38px; /* Match input height */
-            margin-bottom: 5px;
-        }
-
-        /* 2FA Section */
-        #qrCode2FADisplay {
-            max-width: 180px;
-            height: auto;
-            margin: 15px auto;
-            border: 5px solid var(--white);
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .totp-secret-display {
-            background-color: #f0f0f0;
-            padding: 10px;
-            border-radius: 5px;
-            font-family: 'Courier New', monospace;
-            font-size: 1.1em;
-            text-align: center;
-            margin-top: 10px;
-            word-break: break-all;
+        /* Toggle Switch Styling */
+        .toggle-switch {
             position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
         }
-        .totp-secret-display .copy-btn {
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
             position: absolute;
-            right: 5px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: var(--primary-blue);
             cursor: pointer;
-            font-size: 1.2em;
-        }
-        .totp-secret-display .copy-btn:hover {
-            color: var(--accent-blue);
-        }
-
-        /* Modals */
-        .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
-            left: 0;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            box-sizing: border-box;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 34px;
         }
-
-        .modal-content {
-            background-color: var(--white);
-            margin: auto;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            width: 90%; /* Responsive width */
-            max-width: 600px; /* Max width */
-            position: relative;
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        .modal-content h3 {
-            margin-top: 0;
-            color: var(--primary-blue);
-            border-bottom: 1px solid var(--border-light);
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-
-        .modal-footer {
-            margin-top: 25px;
-            padding-top: 15px;
-            border-top: 1px solid var(--border-light);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            flex-wrap: wrap; /* Allow buttons to wrap */
-        }
-        .modal-footer .btn {
-            flex-shrink: 0; /* Prevent buttons from shrinking too much */
-        }
-
-
-        .close-button {
+        .slider:before {
             position: absolute;
-            top: 15px;
-            right: 20px;
-            color: var(--text-light);
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: color 0.2s ease;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+        input:checked + .slider:before {
+            -webkit-transform: translateX(26px);
+            -ms-transform: translateX(26px);
+            transform: translateX(26px);
+        }
+        /* Rounded sliders */
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
         }
 
-        .close-button:hover,
-        .close-button:focus {
-            color: var(--error-red);
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        /* Toast Notifications */
-        #toastContainer {
+        /* Message Box */
+        #messageBox {
             position: fixed;
             top: 20px;
             right: 20px;
-            z-index: 1001;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .toast {
-            background-color: var(--success-green);
-            color: var(--white);
-            padding: 12px 20px;
+            background-color: #4CAF50; /* Green */
+            color: white;
+            padding: 15px 20px;
             border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            opacity: 0;
-            animation: slideIn 0.3s forwards, fadeOut 0.5s 2.5s forwards;
-            min-width: 250px;
-            max-width: 350px;
-            word-wrap: break-word;
-        }
-
-        .toast.error { background-color: var(--error-red); }
-        .toast.warning { background-color: var(--warning-orange); }
-        .toast.info { background-color: var(--primary-blue); }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        @keyframes fadeOut {
-            from { opacity: 1; }
-            to { opacity: 0; }
-        }
-
-        /* Loading Spinner */
-        #loadingSpinner {
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
             display: none;
-            position: fixed;
-            z-index: 1002;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.8);
-            justify-content: center;
-            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
         }
-
-        .spinner {
-            border: 8px solid var(--border-light);
-            border-top: 8px solid var(--primary-blue);
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Order Tracking Map Modal Specific Styles */
-        #orderTrackMap {
-            height: 400px; /* Fixed height for the map */
-            width: 100%;
-            border-radius: 8px;
-            margin-top: 15px;
-            border: 1px solid var(--border-light);
-            /* Ensure responsiveness within its container */
-            max-width: 100%; 
-            box-sizing: border-box;
-        }
-        .leaflet-container { /* Apply border-radius to Leaflet map container */
-            border-radius: 8px;
-        }
-
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .dashboard-container {
-                flex-direction: column;
-            }
-
-            .sidebar {
-                width: 100%;
-                height: auto;
-                padding: 10px 0;
-                flex-direction: row;
-                justify-content: space-around;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-                position: sticky;
-                top: 0;
-                z-index: 900;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch; /* For smooth scrolling on iOS */
-            }
-
-            .sidebar h2 {
-                display: none; /* Hide title on small screens */
-            }
-
-            .sidebar nav ul {
-                display: flex;
-                flex-wrap: nowrap;
-            }
-
-            .sidebar nav ul li {
-                margin-bottom: 0;
-                flex-shrink: 0; /* Prevent items from shrinking */
-            }
-
-            .sidebar nav ul li a {
-                padding: 10px 15px;
-                margin: 0 5px;
-                font-size: 0.9em;
-                flex-direction: column;
-                gap: 5px;
-            }
-
-            .sidebar nav ul li a i {
-                margin-right: 0;
-                margin-bottom: 5px;
-            }
-
-            .sidebar.collapsed {
-                width: 100%; /* No collapse effect on mobile */
-            }
-
-            .sidebar.collapsed nav ul li a i {
-                margin-right: 0;
-            }
-
-            .sidebar.collapsed nav ul li a span {
-                display: block; /* Show text on mobile */
-            }
-
-            .main-content {
-                margin: 10px;
-                padding: 15px;
-            }
-
-            .header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-
-            .header h1 {
-                font-size: 1.5em;
-            }
-
-            .header .user-info {
-                width: 100%;
-                justify-content: space-between;
-            }
-
-            .bot-status-grid {
-                grid-template-columns: 1fr; /* Stack cards on mobile */
-            }
-
-            .modal-content {
-                width: 95%;
-                padding: 20px;
-            }
-
-            table th, table td {
-                padding: 10px;
-                font-size: 0.85em;
-            }
-
-            table td .action-buttons button {
-                padding: 5px 8px;
-                font-size: 0.8em;
-            }
-            .modal-footer {
-                flex-direction: column; /* Stack buttons vertically */
-                gap: 10px; /* Reduce gap when stacked */
-            }
-            .modal-footer .btn {
-                width: 100%; /* Full width for stacked buttons */
-                box-sizing: border-box;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .header .user-info span {
-                font-size: 0.9em;
-            }
-            .header .user-info button {
-                padding: 6px 10px;
-                font-size: 0.9em;
-            }
-            .sidebar nav ul li a {
-                padding: 8px 10px;
-                font-size: 0.8em;
-            }
+        #messageBox.error {
+            background-color: #f44336; /* Red */
         }
     </style>
 </head>
-<body>
-    <div id="loadingSpinner">
-        <div class="spinner"></div>
+<body class="flex">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h1 class="text-2xl font-bold mb-8 text-center">Admin Panel</h1>
+        <nav>
+            <a href="/dashboard" class="active">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="#" id="menuLink">
+                <i class="fas fa-utensils"></i> Menu Management
+            </a>
+            <a href="#" id="ordersLink">
+                <i class="fas fa-clipboard-list"></i> Order Management
+            </a>
+            <a href="#" id="customersLink">
+                <i class="fas fa-users"></i> Customer Management
+            </a>
+            <a href="#" id="settingsLink">
+                <i class="fas fa-cog"></i> General Settings
+            </a>
+            <a href="#" id="logoutButton" class="mt-8">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </nav>
     </div>
 
-    <div class="dashboard-container">
-        <aside class="sidebar" id="sidebar">
-            <h2>Delicious Bites</h2>
-            <nav>
-                <ul>
-                    <li><a href="#" data-section="bot-status" class="active"><i class="fas fa-robot"></i> <span>Bot Status</span></a></li>
-                    <li><a href="#" data-section="menu-management"><i class="fas fa-utensils"></i> <span>Menu Management</span></a></li>
-                    <li><a href="#" data-section="order-management"><i class="fas fa-receipt"></i> <span>Order Management</span></a></li>
-                    <li><a href="#" data-section="customer-management"><i class="fas fa-users"></i> <span>Customer Management</span></a></li>
-                    <li><a href="#" data-section="settings"><i class="fas fa-cogs"></i> <span>Settings</span></a></li>
-                    <li><a href="#" data-section="2fa-management"><i class="fas fa-shield-alt"></i> <span>2FA Management</span></a></li>
-                </ul>
-            </nav>
-        </aside>
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col">
+        <!-- Header -->
+        <header class="header">
+            <h2 class="text-2xl font-semibold text-gray-800">Dashboard Overview</h2>
+            <div class="flex items-center">
+                <span class="text-gray-600 mr-4">Welcome, Admin!</span>
+                <button id="logoutButtonHeader" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                </button>
+            </div>
+        </header>
 
-        <main class="main-content">
-            <header class="header">
-                <h1 id="currentSectionTitle">Bot Status</h1>
-                <div class="user-info">
-                    <span>Welcome, Admin!</span>
-                    <button id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
-                </div>
-            </header>
-
-            <!-- Bot Status Section -->
-            <section id="bot-status" class="section active">
-                <div class="bot-status-grid">
-                    <div class="card bot-status-card">
-                        <h3>WhatsApp Bot Status</h3>
-                        <i id="botStatusIcon" class="fas fa-circle" style="font-size: 3em; color: var(--error-red);"></i>
-                        <div id="botStatusText" class="status-indicator disconnected">Disconnected</div>
-                        <p>Last Authenticated: <span id="lastAuthenticatedAt">N/A</span></p>
-                        <button class="btn" id="forceNewSessionBtn"><i class="fas fa-sync-alt"></i> Force New Session</button>
+        <!-- Page Content -->
+        <main class="p-8 flex-1 overflow-y-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- WhatsApp Bot Status Card -->
+                <div class="card col-span-1 md:col-span-2 lg:col-span-1">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fab fa-whatsapp text-green-500 mr-2"></i>WhatsApp Bot Status</h3>
+                    <p class="text-gray-600 mb-2">Status: <span id="botStatusText" class="font-bold">Loading...</span></p>
+                    <p class="text-gray-600 mb-2">Last Authenticated: <span id="lastAuthenticatedAt" class="font-bold">N/A</span></p>
+                    <div id="qrCodeContainer" class="text-center my-4" style="display: none;">
+                        <p class="text-sm text-gray-500 mb-2">Scan this QR to connect WhatsApp:</p>
+                        <img id="qrCodeImage" src="" alt="QR Code" class="mx-auto w-48 h-48 border border-gray-300 rounded-lg p-2">
                     </div>
-                    <div class="card bot-status-card">
-                        <h3>QR Code</h3>
-                        <img id="qrCodeDisplay" src="" alt="QR Code" style="display: none;">
-                        <p id="qrCodeMessage">Scan QR code to connect WhatsApp</p>
+                    <button id="forceNewSessionBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out mt-4 w-full">
+                        <i class="fas fa-sync-alt mr-2"></i>Force New Session
+                    </button>
+                    <div class="mt-4 p-3 bg-gray-100 rounded-lg max-h-48 overflow-y-auto text-sm text-gray-700">
+                        <h4 class="font-semibold mb-2">Bot Logs:</h4>
+                        <div id="botLogs"></div>
                     </div>
                 </div>
-                <div class="card">
-                    <h3>WhatsApp Logs</h3>
-                    <pre id="whatsappLogs"></pre>
-                </div>
-            </section>
 
-            <!-- Menu Management Section -->
-            <section id="menu-management" class="section">
-                <div class="header-controls" style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
-                    <button class="btn" id="addMenuItemBtn"><i class="fas fa-plus"></i> Add New Item</button>
+                <!-- Discount Settings Card -->
+                <div class="card col-span-1 md:col-span-2 lg:col-span-1">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-tags text-purple-500 mr-2"></i>Discount Settings</h3>
+                    <div class="mb-4">
+                        <label for="minSubtotalForDiscount" class="block text-gray-700 text-sm font-bold mb-2">Minimum Subtotal for Discount (₹):</label>
+                        <input type="number" id="minSubtotalForDiscount" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0" min="0">
+                    </div>
+                    <div class="mb-4">
+                        <label for="discountPercentage" class="block text-gray-700 text-sm font-bold mb-2">Discount Percentage (0.0 - 1.0):</label>
+                        <input type="number" id="discountPercentage" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0.0" min="0" max="1" step="0.01">
+                    </div>
+                    <div class="flex items-center justify-between mb-4">
+                        <label for="isDiscountEnabled" class="block text-gray-700 text-sm font-bold">Enable Discount:</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="isDiscountEnabled">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <button id="saveDiscountSettingsBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out w-full">
+                        <i class="fas fa-save mr-2"></i>Save Discount Settings
+                    </button>
                 </div>
-                <div class="card">
-                    <h3>Menu Items</h3>
-                    <div class="table-container">
-                        <table id="menuItemsTable">
-                            <thead>
-                                <tr>
-                                    <th>Image</th>
-                                    <th>Name</th>
-                                    <th>Description</th>
-                                    <th>Price</th>
-                                    <th>Category</th>
-                                    <th>Available</th>
-                                    <th>Trending</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Menu items will be loaded here by JS -->
-                            </tbody>
-                        </table>
+
+                <!-- Placeholder Card (can be used for analytics, quick stats etc.) -->
+                <div class="card col-span-1 md:col-span-2 lg:col-span-1">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-chart-line text-blue-500 mr-2"></i>Quick Stats</h3>
+                    <p class="text-gray-600">More content coming soon!</p>
+                    <div class="mt-4 p-3 bg-gray-100 rounded-lg">
+                        <p class="text-sm text-gray-700">Total Orders: <span class="font-semibold">500+</span></p>
+                        <p class="text-sm text-gray-700">Active Customers: <span class="font-semibold">120</span></p>
+                        <p class="text-sm text-gray-700">Revenue (This Month): <span class="font-semibold">₹50,000</span></p>
                     </div>
                 </div>
-            </section>
-
-            <!-- Order Management Section -->
-            <section id="order-management" class="section">
-                <div class="card">
-                    <h3>Customer Orders</h3>
-                    <div class="table-container">
-                        <table id="ordersTable">
-                            <thead>
-                                <tr>
-                                    <th>Order ID</th>
-                                    <th>PIN</th>
-                                    <th>Customer</th>
-                                    <th>Phone</th>
-                                    <th>Items</th>
-                                    <th>Total</th>
-                                    <th>Status</th>
-                                    <th>Payment</th>
-                                    <th>Date</th>
-                                    <th>Address</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Orders will be loaded here by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Customer Management Section -->
-            <section id="customer-management" class="section">
-                <div class="card">
-                    <h3>Customer List</h3>
-                    <div class="table-container">
-                        <table id="customersTable">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Phone</th>
-                                    <th>Total Orders</th>
-                                    <th>Last Order Date</th>
-                                    <th>Last Known Location</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Customers will be loaded here by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Settings Section -->
-            <section id="settings" class="section">
-                <div class="card">
-                    <h3>Shop Settings</h3>
-                    <form id="settingsForm">
-                        <div class="form-group">
-                            <label for="shopName">Shop Name</label>
-                            <input type="text" id="shopName" name="shopName" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Shop Location (Latitude, Longitude)</label>
-                            <input type="number" id="shopLocationLatitude" name="shopLocation.latitude" step="0.000001" placeholder="Latitude" required>
-                            <input type="number" id="shopLocationLongitude" name="shopLocation.longitude" step="0.000001" placeholder="Longitude" required style="margin-top: 10px;">
-                        </div>
-
-                        <h4>Delivery Rates (KMs vs. Amount)</h4>
-                        <div id="deliveryRatesContainer">
-                            <!-- Delivery rate inputs will be added here -->
-                        </div>
-                        <button type="button" class="btn btn-secondary" id="addDeliveryRateBtn"><i class="fas fa-plus"></i> Add Delivery Rate</button>
-
-                        <h4 style="margin-top: 25px;">Discount Settings</h4>
-                        <div class="form-group">
-                            <label for="minSubtotalForDiscount">Minimum Subtotal for Discount (₹)</label>
-                            <input type="number" id="minSubtotalForDiscount" name="minSubtotalForDiscount" step="0.01" min="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="discountPercentage">Discount Percentage (e.g., 0.1 for 10%)</label>
-                            <input type="number" id="discountPercentage" name="discountPercentage" step="0.01" min="0" max="1" required>
-                        </div>
-
-                        <div class="modal-footer" style="border-top: none; padding-top: 0; margin-top: 20px;">
-                            <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save Settings</button>
-                        </div>
-                    </form>
-                </div>
-            </section>
-
-            <!-- 2FA Management Section -->
-            <section id="2fa-management" class="section">
-                <div class="card">
-                    <h3>Two-Factor Authentication (2FA)</h3>
-                    <p>Status: <strong id="2faStatusText">Checking...</strong></p>
-                    <div class="2fa-actions" style="margin-top: 20px;">
-                        <button class="btn btn-success" id="enable2FABtn" style="display: none;"><i class="fas fa-lock"></i> Enable 2FA</button>
-                        <button class="btn btn-danger" id="disable2FABtn" style="display: none;"><i class="fas fa-unlock"></i> Disable 2FA</button>
-                    </div>
-                </div>
-            </section>
+            </div>
         </main>
     </div>
 
-    <!-- Modals -->
+    <!-- Message Box -->
+    <div id="messageBox"></div>
 
-    <!-- Menu Item Modal -->
-    <div id="menuItemModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" data-modal-id="menuItemModal">&times;</span>
-            <h3 id="menuItemModalTitle">Add New Menu Item</h3>
-            <form id="menuItemForm">
-                <input type="hidden" id="menuItemId">
-                <div class="form-group">
-                    <label for="itemName">Name</label>
-                    <input type="text" id="itemName" required>
-                </div>
-                <div class="form-group">
-                    <label for="itemDescription">Description</label>
-                    <textarea id="itemDescription" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="itemPrice">Price (₹)</label>
-                    <input type="number" id="itemPrice" step="0.01" min="0" required>
-                </div>
-                <div class="form-group">
-                    <label for="itemImageUrl">Image URL (Optional)</label>
-                    <input type="text" id="itemImageUrl">
-                </div>
-                <div class="form-group">
-                    <label for="itemCategory">Category</label>
-                    <input type="text" id="itemCategory">
-                </div>
-                <div class="form-group">
-                    <input type="checkbox" id="isAvailable">
-                    <label for="isAvailable" style="display: inline;">Is Available</label>
-                </div>
-                <div class="form-group">
-                    <input type="checkbox" id="isTrending">
-                    <label for="isTrending" style="display: inline;">Is Trending</label>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-modal-id="menuItemModal">Cancel</button>
-                    <button type="submit" class="btn btn-success">Save Item</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Order Details Modal -->
-    <div id="orderDetailsModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" data-modal-id="orderDetailsModal">&times;</span>
-            <h3>Order Details</h3>
-            <div id="orderDetailsContent">
-                <!-- Details will be loaded here by JS -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-modal-id="orderDetailsModal">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Customer Latest Order Modal -->
-    <div id="customerLatestOrderModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" data-modal-id="customerLatestOrderModal">&times;</span>
-            <h3>Latest Order for <span id="customerLatestOrderName"></span></h3>
-            <div id="customerLatestOrderContent">
-                <!-- Latest order details will be loaded here by JS -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-modal-id="customerLatestOrderModal">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirmationModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" data-modal-id="confirmationModal">&times;</span>
-            <h3>Confirm Action</h3>
-            <p id="confirmationMessage"></p>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-modal-id="confirmationModal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmActionButton">Confirm</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2FA Generate Modal -->
-    <div id="2faGenerateModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" data-modal-id="2faGenerateModal">&times;</span>
-            <h3>Enable Two-Factor Authentication</h3>
-            <p>Scan this QR code with your authenticator app (e.g., Google Authenticator, Authy).</p>
-            <img id="qrCode2FADisplay" src="" alt="2FA QR Code">
-            <p>Or manually enter this secret key:</p>
-            <div class="totp-secret-display">
-                <span id="totpSecretText"></span>
-                <button class="copy-btn" onclick="copyToClipboard(document.getElementById('totpSecretText').innerText)"><i class="fas fa-copy"></i></button>
-            </div>
-            <div class="form-group" style="margin-top: 20px;">
-                <label for="totpCodeVerify">Enter 6-digit code from app to verify:</label>
-                <input type="text" id="totpCodeVerify" maxlength="6" pattern="\d{6}" placeholder="XXXXXX" required>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-modal-id="2faGenerateModal">Cancel</button>
-                <button type="button" class="btn btn-success" id="verify2FABtn">Verify & Enable</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Order Tracking Map Modal -->
-    <div id="orderTrackingModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" data-modal-id="orderTrackingModal">&times;</span>
-            <h3>Track Order: <span id="trackOrderIdDisplay"></span></h3>
-            <p>Delivery Address: <strong id="trackOrderAddressDisplay"></strong></p>
-            <div id="orderTrackMap"></div>
-            <div class="modal-footer" style="justify-content: center;">
-                <button type="button" class="btn btn-secondary" data-modal-id="orderTrackingModal">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="toastContainer"></div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
-    <!-- Leaflet JS for Order Tracking Map -->
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        const API_BASE_URL = window.location.origin; // Dynamically get base URL
-        const SOCKET_IO_URL = window.location.origin;
+        const API_BASE_URL = window.location.origin;
+        const socket = io();
 
-        // --- DOM Elements ---
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const currentSectionTitle = document.getElementById('currentSectionTitle');
-        const sidebarLinks = document.querySelectorAll('.sidebar nav ul li a');
-        const sections = document.querySelectorAll('.section');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const toastContainer = document.getElementById('toastContainer');
-
-        // Modals
-        const menuItemModal = document.getElementById('menuItemModal');
-        const menuItemForm = document.getElementById('menuItemForm');
-        const menuItemModalTitle = document.getElementById('menuItemModalTitle');
-        const menuItemId = document.getElementById('menuItemId');
-        const itemName = document.getElementById('itemName');
-        const itemDescription = document.getElementById('itemDescription');
-        const itemPrice = document.getElementById('itemPrice');
-        const itemImageUrl = document.getElementById('itemImageUrl');
-        const itemCategory = document.getElementById('itemCategory');
-        const isAvailable = document.getElementById('isAvailable');
-        const isTrending = document.getElementById('isTrending');
-
-        const orderDetailsModal = document.getElementById('orderDetailsModal');
-        const orderDetailsContent = document.getElementById('orderDetailsContent');
-
-        const customerLatestOrderModal = document.getElementById('customerLatestOrderModal');
-        const customerLatestOrderName = document.getElementById('customerLatestOrderName');
-        const customerLatestOrderContent = document.getElementById('customerLatestOrderContent');
-
-        const confirmationModal = document.getElementById('confirmationModal');
-        const confirmationMessage = document.getElementById('confirmationMessage');
-        const confirmActionButton = document.getElementById('confirmActionButton');
-
-        const twoFaGenerateModal = document.getElementById('2faGenerateModal');
-        const qrCode2FADisplay = document.getElementById('qrCode2FADisplay');
-        const totpSecretText = document.getElementById('totpSecretText');
-        const totpCodeVerify = document.getElementById('totpCodeVerify');
-
-        // WhatsApp Bot Status
-        const botStatusIcon = document.getElementById('botStatusIcon');
         const botStatusText = document.getElementById('botStatusText');
-        const lastAuthenticatedAtSpan = document.getElementById('lastAuthenticatedAt');
-        const qrCodeDisplay = document.getElementById('qrCodeDisplay');
-        const qrCodeMessage = document.getElementById('qrCodeMessage');
-        const whatsappLogs = document.getElementById('whatsappLogs');
+        const lastAuthenticatedAt = document.getElementById('lastAuthenticatedAt');
+        const qrCodeContainer = document.getElementById('qrCodeContainer');
+        const qrCodeImage = document.getElementById('qrCodeImage');
         const forceNewSessionBtn = document.getElementById('forceNewSessionBtn');
+        const botLogs = document.getElementById('botLogs');
 
-        // Menu Management
-        const addMenuItemBtn = document.getElementById('addMenuItemBtn');
-        const menuItemsTableBody = document.querySelector('#menuItemsTable tbody');
-
-        // Order Management
-        const ordersTableBody = document.querySelector('#ordersTable tbody');
-
-        // Customer Management
-        const customersTableBody = document.querySelector('#customersTable tbody');
-
-        // Settings
-        const settingsForm = document.getElementById('settingsForm');
-        const shopNameInput = document.getElementById('shopName');
-        const shopLocationLatitudeInput = document.getElementById('shopLocationLatitude');
-        const shopLocationLongitudeInput = document.getElementById('shopLocationLongitude');
-        const deliveryRatesContainer = document.getElementById('deliveryRatesContainer');
-        const addDeliveryRateBtn = document.getElementById('addDeliveryRateBtn');
         const minSubtotalForDiscountInput = document.getElementById('minSubtotalForDiscount');
         const discountPercentageInput = document.getElementById('discountPercentage');
+        const isDiscountEnabledToggle = document.getElementById('isDiscountEnabled');
+        const saveDiscountSettingsBtn = document.getElementById('saveDiscountSettingsBtn');
 
-        // 2FA Management
-        const twoFaStatusText = document.getElementById('2faStatusText');
-        const enable2FABtn = document.getElementById('enable2FABtn');
-        const disable2FABtn = document.getElementById('disable2FABtn');
-        const verify2FABtn = document.getElementById('verify2FABtn');
+        const logoutButton = document.getElementById('logoutButton');
+        const logoutButtonHeader = document.getElementById('logoutButtonHeader');
+        const messageBox = document.getElementById('messageBox');
 
-        // Order Tracking Map Modal
-        const orderTrackingModal = document.getElementById('orderTrackingModal');
-        const trackOrderIdDisplay = document.getElementById('trackOrderIdDisplay');
-        const trackOrderAddressDisplay = document.getElementById('trackOrderAddressDisplay');
-        const orderTrackMap = document.getElementById('orderTrackMap');
-        let trackMap = null;
-        let trackMapMarker = null;
-
-
-        let currentConfirmAction = null;
-        let temp2FASecret = null; // Temporarily store the generated 2FA secret
-
-        // --- Utility Functions ---
-
-        function showLoadingSpinner() {
-            loadingSpinner.style.display = 'flex';
-        }
-
-        function hideLoadingSpinner() {
-            loadingSpinner.style.display = 'none';
-        }
-
-        function showToast(message, type = 'success') {
-            const toast = document.createElement('div');
-            toast.classList.add('toast');
-            toast.classList.add(type);
-            toast.textContent = message;
-            toastContainer.appendChild(toast);
+        // --- Helper Function for displaying messages ---
+        function showMessage(message, isError = false) {
+            messageBox.textContent = message;
+            messageBox.className = ''; // Clear existing classes
+            messageBox.classList.add('fade-in');
+            if (isError) {
+                messageBox.classList.add('error');
+            } else {
+                messageBox.classList.add('success');
+            }
+            messageBox.style.display = 'block';
+            messageBox.style.opacity = '1';
 
             setTimeout(() => {
-                toast.remove();
-            }, 3000); // Toast disappears after 3 seconds
+                messageBox.style.opacity = '0';
+                setTimeout(() => {
+                    messageBox.style.display = 'none';
+                }, 300); // Wait for fade-out to complete
+            }, 3000); // Message visible for 3 seconds
         }
 
+        // --- Authentication Helper ---
         async function fetchWithAuth(url, options = {}) {
             const token = localStorage.getItem('jwtToken');
             if (!token) {
-                showToast('Session expired. Please log in again.', 'error');
+                console.error('No JWT token found. Redirecting to login.');
+                localStorage.removeItem('jwtToken'); // Ensure token is cleared
                 window.location.href = '/admin/login';
-                return null;
+                return; // Prevent further execution
             }
 
             options.headers = {
                 ...options.headers,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+                'Authorization': `Bearer ${token}`
             };
 
-            showLoadingSpinner();
-            try {
-                const response = await fetch(url, options);
-                hideLoadingSpinner();
+            const response = await fetch(url, options);
 
-                if (response.status === 401 || response.status === 403) {
-                    showToast('Session expired or unauthorized. Please log in again.', 'error');
-                    localStorage.removeItem('jwtToken');
-                    window.location.href = '/admin/login';
-                    return null;
-                }
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    showToast(errorData.message || `API Error: ${response.statusText}`, 'error');
-                    throw new Error(errorData.message || `API Error: ${response.statusText}`);
-                }
-                return response;
-            } catch (error) {
-                hideLoadingSpinner();
-                console.error('Fetch error:', error);
-                showToast(`Network or API error: ${error.message}`, 'error');
-                return null;
+            if (response.status === 401 || response.status === 403) {
+                console.error('Authentication failed or session expired. Redirecting to login.');
+                localStorage.removeItem('jwtToken');
+                window.location.href = '/admin/login';
+                return; // Prevent further execution
             }
+            return response;
         }
 
-        function openModal(modalElement) {
-            modalElement.style.display = 'flex';
-        }
-
-        function closeModal(modalElement) {
-            modalElement.style.display = 'none';
-        }
-
-        function showConfirmDialog(message, onConfirmCallback) {
-            confirmationMessage.textContent = message;
-            currentConfirmAction = onConfirmCallback;
-            openModal(confirmationModal);
-        }
-
-        // Copy to clipboard function
-        function copyToClipboard(text) {
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                showToast('Copied to clipboard!', 'success');
-            } catch (err) {
-                console.error('Failed to copy: ', err);
-                showToast('Failed to copy to clipboard.', 'error');
-            }
-            document.body.removeChild(textarea);
-        }
-
-        // --- Initial Authentication Check and Dashboard Setup ---
+        // --- Initial Authentication Check on Page Load ---
         document.addEventListener('DOMContentLoaded', async () => {
             const token = localStorage.getItem('jwtToken');
             if (!token) {
+                // If no token in localStorage, redirect to login
                 window.location.href = '/admin/login';
                 return;
             }
 
-            // Verify token by trying to fetch bot status
-            const initialCheck = await fetchWithAuth(`${API_BASE_URL}/api/admin/bot-status`);
-            if (!initialCheck) {
-                // fetchWithAuth already handles redirection if token is invalid
-                return;
-            }
-
-            // If token is valid, proceed with dashboard initialization
-            setupSocketIO();
-            renderSection('bot-status'); // Default active section
-        });
-
-        // --- Socket.IO Setup ---
-        let socket;
-        function setupSocketIO() {
-            socket = io(SOCKET_IO_URL);
-
-            socket.on('connect', () => {
-                console.log('Connected to Socket.IO');
-                showToast('Connected to real-time updates!', 'success');
-            });
-
-            socket.on('connect_error', (error) => {
-                console.error('Socket.IO connection error:', error);
-                showToast('Socket.IO connection error. Real-time updates may be affected.', 'error');
-            });
-
-            socket.on('disconnect', () => {
-                console.log('Disconnected from Socket.IO');
-                showToast('Disconnected from real-time updates. Some features may not be live.', 'warning');
-            });
-
-            socket.on('status', (status) => {
-                console.log('Bot Status:', status);
-                updateBotStatusUI(status);
-            });
-
-            socket.on('qrCode', (qrCode) => {
-                console.log('QR Code Received:', qrCode ? 'Yes' : 'No');
-                if (qrCode) {
-                    qrCodeDisplay.src = qrCode;
-                    qrCodeDisplay.style.display = 'block';
-                    qrCodeMessage.textContent = 'Scan this QR code with your WhatsApp app.';
-                } else {
-                    qrCodeDisplay.src = '';
-                    qrCodeDisplay.style.display = 'none';
-                    qrCodeMessage.textContent = 'No QR code available.';
+            // Verify token by making an authenticated API call
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/bot-status`);
+                if (!response || !response.ok) {
+                    // fetchWithAuth already handles redirect for 401/403
+                    // If it's another error, log and redirect
+                    console.error('Failed to verify token on dashboard load:', response ? response.status : 'No response');
+                    localStorage.removeItem('jwtToken');
+                    window.location.href = '/admin/login';
+                    return;
                 }
-            });
-
-            socket.on('sessionInfo', (info) => {
-                console.log('Session Info:', info);
-                if (info && info.lastAuthenticatedAt) {
-                    lastAuthenticatedAtSpan.textContent = new Date(info.lastAuthenticatedAt).toLocaleString();
-                } else {
-                    lastAuthenticatedAtSpan.textContent = 'N/A';
-                }
-            });
-
-            socket.on('whatsapp_log', (logMessage) => {
-                const logEntry = document.createElement('div');
-                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${logMessage}`;
-                whatsappLogs.appendChild(logEntry);
-                whatsappLogs.scrollTop = whatsappLogs.scrollHeight; // Auto-scroll to bottom
-            });
-
-            socket.on('new_order', (order) => {
-                showToast(`New Order Received! ID: ${order.customOrderId}`, 'info');
-                if (document.getElementById('order-management').classList.contains('active')) {
-                    loadOrders(); // Refresh orders table if active
-                }
-            });
-        }
-
-        // --- Navigation ---
-        sidebarLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const sectionName = link.dataset.section;
-                renderSection(sectionName);
-
-                // Update active class
-                sidebarLinks.forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-            });
-        });
-
-        async function renderSection(sectionName) {
-            sections.forEach(section => {
-                section.classList.remove('active');
-            });
-            document.getElementById(sectionName).classList.add('active');
-            currentSectionTitle.textContent = sectionName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
-            // Load data specific to the section when it becomes active
-            switch (sectionName) {
-                case 'bot-status':
-                    await loadBotStatus();
-                    break;
-                case 'menu-management':
-                    await loadMenuItems();
-                    break;
-                case 'order-management':
-                    await loadOrders();
-                    break;
-                case 'customer-management':
-                    await loadCustomers();
-                    break;
-                case 'settings':
-                    await loadSettings();
-                    break;
-                case '2fa-management':
-                    await load2FAStatus();
-                    break;
-            }
-        }
-
-        // --- Logout ---
-        logoutBtn.addEventListener('click', () => {
-            showConfirmDialog('Are you sure you want to log out?', () => {
+                console.log('Token validated. Dashboard loaded.');
+                // Proceed to load dashboard data
+                fetchBotStatus();
+                fetchDiscountSettings();
+            } catch (error) {
+                console.error('Error during initial token validation:', error);
                 localStorage.removeItem('jwtToken');
                 window.location.href = '/admin/login';
-            });
-        });
-
-        // --- Modals Event Listeners ---
-        document.querySelectorAll('.close-button').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const modalId = e.target.dataset.modalId;
-                closeModal(document.getElementById(modalId));
-                // Specific cleanup for map modal
-                if (modalId === 'orderTrackingModal' && trackMap) {
-                    trackMap.remove();
-                    trackMap = null;
-                    trackMapMarker = null;
-                }
-            });
-        });
-
-        document.querySelectorAll('.modal .btn-secondary[data-modal-id]').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const modalId = e.target.dataset.modalId;
-                closeModal(document.getElementById(modalId));
-                // Specific cleanup for map modal
-                if (modalId === 'orderTrackingModal' && trackMap) {
-                    trackMap.remove();
-                    trackMap = null;
-                    trackMapMarker = null;
-                }
-            });
-        });
-
-        confirmationModal.addEventListener('click', (e) => {
-            if (e.target === confirmationModal) {
-                closeModal(confirmationModal);
             }
         });
 
-        confirmActionButton.addEventListener('click', () => {
-            if (currentConfirmAction) {
-                currentConfirmAction();
-            }
-            closeModal(confirmationModal);
-            currentConfirmAction = null; // Reset
-        });
+        // --- Logout Functionality ---
+        function logout() {
+            localStorage.removeItem('jwtToken');
+            window.location.href = '/admin/login';
+        }
+        logoutButton.addEventListener('click', logout);
+        logoutButtonHeader.addEventListener('click', logout);
 
-        // Close modals if clicking outside content
-        [menuItemModal, orderDetailsModal, customerLatestOrderModal, twoFaGenerateModal, orderTrackingModal].forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    closeModal(modal);
-                    // Specific cleanup for map modal
-                    if (modal.id === 'orderTrackingModal' && trackMap) {
-                        trackMap.remove();
-                        trackMap = null;
-                        trackMapMarker = null;
-                    }
-                }
-            });
-        });
 
-        // --- Section Specific Functions ---
-
-        // WhatsApp Bot Status
-        async function loadBotStatus() {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/bot-status`);
-            if (response) {
+        // --- WhatsApp Bot Status Functions ---
+        async function fetchBotStatus() {
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/bot-status`);
                 const data = await response.json();
-                updateBotStatusUI(data.status);
-                if (data.lastAuthenticatedAt) {
-                    lastAuthenticatedAtSpan.textContent = new Date(data.lastAuthenticatedAt).toLocaleString();
+                updateBotStatusUI(data.status, data.lastAuthenticatedAt);
+                if (data.qrCodeAvailable) {
+                    // Request QR code if available (socket.io will send it)
+                    // No direct fetch here, socket.io handles it.
                 } else {
-                    lastAuthenticatedAtSpan.textContent = 'N/A';
+                    qrCodeContainer.style.display = 'none';
+                    qrCodeImage.src = '';
                 }
-                if (data.qrCodeAvailable && data.status === 'qr_received') {
-                    // Request QR code explicitly if available and status is qr_received
-                    // Backend will emit it via socket.io
-                    showToast('QR code is available. Please scan.', 'info');
-                } else {
-                    qrCodeDisplay.src = '';
-                    qrCodeDisplay.style.display = 'none';
-                    qrCodeMessage.textContent = 'No QR code available.';
-                }
+            } catch (error) {
+                console.error('Error fetching bot status:', error);
+                showMessage('Failed to fetch bot status.', true);
             }
         }
 
-        function updateBotStatusUI(status) {
+        function updateBotStatusUI(status, timestamp) {
             botStatusText.textContent = status.replace(/_/g, ' ').toUpperCase();
-            botStatusText.className = `status-indicator ${status}`; // Apply status class
-
-            // Update icon color based on status
-            switch (status) {
-                case 'disconnected':
-                case 'auth_failure':
-                case 'qr_error':
-                    botStatusIcon.style.color = 'var(--error-red)';
-                    break;
-                case 'qr_received':
-                    botStatusIcon.style.color = 'var(--warning-orange)';
-                    break;
-                case 'authenticated':
-                case 'initializing':
-                    botStatusIcon.style.color = 'var(--accent-blue)';
-                    break;
-                case 'ready':
-                    botStatusIcon.style.color = 'var(--success-green)';
-                    break;
-                default:
-                    botStatusIcon.style.color = 'var(--text-light)';
-            }
+            botStatusText.className = 'font-bold status-indicator ' + `status-${status}`;
+            lastAuthenticatedAt.textContent = timestamp ? new Date(timestamp).toLocaleString() : 'N/A';
         }
 
         forceNewSessionBtn.addEventListener('click', async () => {
-            showConfirmDialog('This will disconnect the current WhatsApp session and generate a new QR code. Are you sure?', async () => {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/load-session`, { method: 'POST' });
-                if (response) {
-                    showToast('WhatsApp session re-initialization requested. Please wait for QR code.', 'info');
-                }
-            });
-        });
-
-        // Menu Management
-        async function loadMenuItems() {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu`);
-            if (response) {
-                const items = await response.json();
-                menuItemsTableBody.innerHTML = '';
-                if (items.length === 0) {
-                    menuItemsTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">No menu items found. Add some!</td></tr>';
-                    return;
-                }
-                items.forEach(item => {
-                    const row = menuItemsTableBody.insertRow();
-                    row.innerHTML = `
-                        <td><img src="${item.imageUrl || 'https://placehold.co/50x50/E0E0E0/666666?text=No+Img'}" alt="${item.name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px;" onerror="this.onerror=null;this.src='https://placehold.co/50x50/E0E0E0/666666?text=No+Img';"></td>
-                        <td>${item.name}</td>
-                        <td>${item.description || '-'}</td>
-                        <td>₹${item.price.toFixed(2)}</td>
-                        <td>${item.category || '-'}</td>
-                        <td>${item.isAvailable ? '<i class="fas fa-check-circle" style="color: var(--success-green);"></i>' : '<i class="fas fa-times-circle" style="color: var(--error-red);"></i>'}</td>
-                        <td>${item.isTrending ? '<i class="fas fa-fire" style="color: var(--warning-orange);"></i>' : '-'}</td>
-                        <td class="action-buttons">
-                            <button class="btn btn-secondary btn-sm" onclick="editMenuItem('${item._id}')"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteMenuItem('${item._id}')"><i class="fas fa-trash-alt"></i></button>
-                        </td>
-                    `;
+            if (!confirm('Are you sure you want to force a new WhatsApp session? This will disconnect the current session and require scanning a new QR code.')) {
+                return;
+            }
+            try {
+                showMessage('Requesting new WhatsApp session...');
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/load-session`, {
+                    method: 'POST'
                 });
-            }
-        }
-
-        addMenuItemBtn.addEventListener('click', () => {
-            menuItemModalTitle.textContent = 'Add New Menu Item';
-            menuItemId.value = '';
-            menuItemForm.reset(); // Clear form
-            isAvailable.checked = true; // Default to available
-            isTrending.checked = false;
-            openModal(menuItemModal);
-        });
-
-        async function editMenuItem(id) {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu/${id}`);
-            if (response) {
-                const item = await response.json();
-                menuItemModalTitle.textContent = 'Edit Menu Item';
-                menuItemId.value = item._id;
-                itemName.value = item.name;
-                itemDescription.value = item.description || '';
-                itemPrice.value = item.price;
-                itemImageUrl.value = item.imageUrl || '';
-                itemCategory.value = item.category || '';
-                isAvailable.checked = item.isAvailable;
-                isTrending.checked = item.isTrending;
-                openModal(menuItemModal);
-            }
-        }
-
-        menuItemForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const id = menuItemId.value;
-            const method = id ? 'PUT' : 'POST';
-            const url = id ? `${API_BASE_URL}/api/admin/menu/${id}` : `${API_BASE_URL}/api/admin/menu`;
-
-            const itemData = {
-                name: itemName.value,
-                description: itemDescription.value,
-                price: parseFloat(itemPrice.value),
-                imageUrl: itemImageUrl.value,
-                category: itemCategory.value,
-                isAvailable: isAvailable.checked,
-                isTrending: isTrending.checked
-            };
-
-            const response = await fetchWithAuth(url, {
-                method: method,
-                body: JSON.stringify(itemData)
-            });
-
-            if (response) {
-                showToast(`Item ${id ? 'updated' : 'added'} successfully!`, 'success');
-                closeModal(menuItemModal);
-                loadMenuItems();
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(data.message);
+                } else {
+                    showMessage(data.message || 'Failed to force new session.', true);
+                }
+            } catch (error) {
+                console.error('Error forcing new session:', error);
+                showMessage('Error forcing new session.', true);
             }
         });
 
-        function deleteMenuItem(id) {
-            showConfirmDialog('Are you sure you want to delete this menu item?', async () => {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu/${id}`, { method: 'DELETE' });
-                if (response) {
-                    showToast('Menu item deleted successfully!', 'success');
-                    loadMenuItems();
-                }
-            });
-        }
-
-        // Order Management
-        async function loadOrders() {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders`);
-            if (response) {
-                const orders = await response.json();
-                ordersTableBody.innerHTML = '';
-                if (orders.length === 0) {
-                    ordersTableBody.innerHTML = '<tr><td colspan="11" style="text-align: center;">No orders found.</td></tr>';
-                    return;
-                }
-                orders.forEach(order => {
-                    const row = ordersTableBody.insertRow();
-                    const orderItems = order.items.map(item => `${item.name} x ${item.quantity}`).join(', ');
-                    const orderDate = new Date(order.orderDate).toLocaleString();
-                    const customerPhone = order.customerPhone;
-                    const customerLat = order.customerLocation ? order.customerLocation.latitude : null;
-                    const customerLng = order.customerLocation ? order.customerLocation.longitude : null;
-                    const customerAddress = order.customerLocation ? order.customerLocation.address : order.deliveryAddress;
-
-                    row.innerHTML = `
-                        <td>${order.customOrderId || order._id.substring(0, 6) + '...'}</td>
-                        <td>${order.pinId || 'N/A'}</td>
-                        <td>${order.customerName || 'Unknown'}</td>
-                        <td>${customerPhone}</td>
-                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${orderItems}">${orderItems}</td>
-                        <td>₹${order.totalAmount.toFixed(2)}</td>
-                        <td>
-                            <select onchange="updateOrderStatus('${order._id}', this.value)" class="form-group-select">
-                                <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>Pending</option>
-                                <option value="Confirmed" ${order.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
-                                <option value="Preparing" ${order.status === 'Preparing' ? 'selected' : ''}>Preparing</option>
-                                <option value="Out for Delivery" ${order.status === 'Out for Delivery' ? 'selected' : ''}>Out for Delivery</option>
-                                <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
-                                <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-                            </select>
-                        </td>
-                        <td>${order.paymentMethod}</td>
-                        <td>${orderDate}</td>
-                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${order.deliveryAddress}">${order.deliveryAddress || 'N/A'}</td>
-                        <td class="action-buttons">
-                            <button class="btn btn-secondary btn-sm" onclick="viewOrderDetails('${order._id}')"><i class="fas fa-eye"></i></button>
-                            <a href="tel:${customerPhone}" class="btn btn-success btn-sm"><i class="fas fa-phone"></i> Call</a>
-                            ${customerLat && customerLng ? `<button class="btn btn-info btn-sm" onclick="showOrderTrackingModal('${order.customOrderId || order._id.substring(0,6)}', '${customerAddress}', ${customerLat}, ${customerLng})"><i class="fas fa-map-marker-alt"></i> Track</button>` : ''}
-                            <button class="btn btn-danger btn-sm" onclick="deleteOrder('${order._id}')"><i class="fas fa-trash-alt"></i></button>
-                        </td>
-                    `;
-                });
+        // --- Socket.IO Listeners for Real-time Bot Status ---
+        socket.on('status', (status) => {
+            console.log('Socket.IO: Status update received:', status);
+            updateBotStatusUI(status, new Date()); // Use current time for immediate feedback
+            // If status is not qr_received, hide QR
+            if (status !== 'qr_received') {
+                qrCodeContainer.style.display = 'none';
+                qrCodeImage.src = '';
             }
-        }
+        });
 
-        async function updateOrderStatus(id, newStatus) {
-            showConfirmDialog(`Change status of order ${id.substring(0, 6)}... to "${newStatus}"?`, async () => {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders/${id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify({ status: newStatus })
-                });
-                if (response) {
-                    showToast('Order status updated successfully!', 'success');
-                    loadOrders();
-                }
-            });
-        }
-
-        async function viewOrderDetails(id) {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders/${id}`);
-            if (response) {
-                const order = await response.json();
-                let content = `
-                    <p><strong>Order ID:</strong> ${order.customOrderId || order._id}</p>
-                    <p><strong>PIN:</strong> ${order.pinId || 'N/A'}</p>
-                    <p><strong>Customer Name:</strong> ${order.customerName || 'Unknown'}</p>
-                    <p><strong>Customer Phone:</strong> ${order.customerPhone}</p>
-                    <p><strong>Status:</strong> ${order.status}</p>
-                    <p><strong>Payment Method:</strong> ${order.paymentMethod}</p>
-                    <p><strong>Order Date:</strong> ${new Date(order.orderDate).toLocaleString()}</p>
-                    <p><strong>Delivery Address:</strong> ${order.deliveryAddress || 'N/A'}</p>
-                    ${order.customerLocation && order.customerLocation.latitude && order.customerLocation.longitude ? `<p><strong>Customer Location:</strong> Lat: ${order.customerLocation.latitude}, Lng: ${order.customerLocation.longitude} (${order.customerLocation.address || 'N/A'})</p>` : ''}
-                    <h4>Items:</h4>
-                    <ul>
-                `;
-                order.items.forEach(item => {
-                    content += `<li>${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)</li>`;
-                });
-                content += `</ul>
-                    <p><strong>Subtotal:</strong> ₹${order.subtotal.toFixed(2)}</p>
-                    <p><strong>Transport Tax:</strong> ₹${order.transportTax.toFixed(2)}</p>
-                    ${order.discountAmount > 0 ? `<p><strong>Discount:</strong> -₹${order.discountAmount.toFixed(2)}</p>` : ''}
-                    <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
-                `;
-                orderDetailsContent.innerHTML = content;
-                openModal(orderDetailsModal);
-            }
-        }
-
-        function deleteOrder(id) {
-            showConfirmDialog('Are you sure you want to delete this order? This action cannot be undone.', async () => {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders/${id}`, { method: 'DELETE' });
-                if (response) {
-                    showToast('Order deleted successfully!', 'success');
-                    loadOrders();
-                }
-            });
-        }
-
-        // Order Tracking Map Function
-        function showOrderTrackingModal(orderId, address, lat, lng) {
-            trackOrderIdDisplay.textContent = orderId;
-            trackOrderAddressDisplay.textContent = address;
-            openModal(orderTrackingModal);
-
-            // Ensure map is initialized after modal is visible
-            setTimeout(() => {
-                if (trackMap) {
-                    trackMap.remove(); // Remove existing map instance if any
-                }
-                trackMap = L.map('orderTrackMap').setView([lat, lng], 16); // Set view with provided coordinates
-
-                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    attribution: false, // Hide attribution footer
-                    maxZoom: 18
-                }).addTo(trackMap);
-
-                if (trackMapMarker) {
-                    trackMap.removeLayer(trackMapMarker);
-                }
-                trackMapMarker = L.marker([lat, lng]).addTo(trackMap)
-                    .bindPopup(`<b>Order ${orderId}</b><br>${address}`).openPopup();
-
-                trackMap.invalidateSize(); // Crucial for map rendering correctly in a hidden modal
-            }, 100); // Small delay to allow modal to render
-        }
-
-
-        // Customer Management
-        async function loadCustomers() {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/customers`);
-            if (response) {
-                const customers = await response.json();
-                customersTableBody.innerHTML = '';
-                if (customers.length === 0) {
-                    customersTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No customers found.</td></tr>';
-                    return;
-                }
-                customers.forEach(customer => {
-                    const row = customersTableBody.insertRow();
-                    const lastOrderDate = customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString() : 'N/A';
-                    const lastKnownLocation = customer.lastKnownLocation && (customer.lastKnownLocation.address || (customer.lastKnownLocation.latitude && customer.lastKnownLocation.longitude)) ? `${customer.lastKnownLocation.address || `Lat: ${customer.lastKnownLocation.latitude}, Lng: ${customer.lastKnownLocation.longitude}`}` : 'N/A';
-
-                    row.innerHTML = `
-                        <td>${customer.customerName || 'Unknown'}</td>
-                        <td>${customer.customerPhone}</td>
-                        <td>${customer.totalOrders}</td>
-                        <td>${lastOrderDate}</td>
-                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${lastKnownLocation}">
-                            ${lastKnownLocation}
-                        </td>
-                        <td class="action-buttons">
-                            <button class="btn btn-secondary btn-sm" onclick="viewCustomerLatestOrder('${customer.customerPhone}', '${customer.customerName || 'Unknown'}')"><i class="fas fa-history"></i> Latest Order</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteCustomer('${customer._id}')"><i class="fas fa-trash-alt"></i></button>
-                        </td>
-                    `;
-                });
-            }
-        }
-
-        async function viewCustomerLatestOrder(phone, name) {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/customers/${phone}/latest-order`);
-            customerLatestOrderName.textContent = name; // Always set name
-            if (response) {
-                const order = await response.json();
-                let content = `
-                    <p><strong>Order ID:</strong> ${order.customOrderId || order._id}</p>
-                    <p><strong>PIN:</strong> ${order.pinId || 'N/A'}</p>
-                    <p><strong>Status:</strong> ${order.status}</p>
-                    <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
-                    <p><strong>Order Date:</strong> ${new Date(order.orderDate).toLocaleString()}</p>
-                    <h4>Items:</h4>
-                    <ul>
-                `;
-                order.items.forEach(item => {
-                    content += `<li>${item.name} x ${item.quantity}</li>`;
-                });
-                content += `</ul>`;
-                customerLatestOrderContent.innerHTML = content;
-                openModal(customerLatestOrderModal);
+        socket.on('qrCode', (qrData) => {
+            console.log('Socket.IO: QR Code received.');
+            if (qrData) {
+                qrCodeImage.src = qrData;
+                qrCodeContainer.style.display = 'block';
+                showMessage('New QR code received. Please scan with your WhatsApp app.');
             } else {
-                customerLatestOrderContent.innerHTML = '<p>No latest order found for this customer.</p>';
-                openModal(customerLatestOrderModal);
+                qrCodeContainer.style.display = 'none';
+                qrCodeImage.src = '';
             }
-        }
+        });
 
-        function deleteCustomer(id) {
-            showConfirmDialog('Are you sure you want to delete this customer record? This will not delete their orders.', async () => {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/customers/${id}`, { method: 'DELETE' });
-                if (response) {
-                    showToast('Customer deleted successfully!', 'success');
-                    loadCustomers();
-                }
-            });
-        }
+        socket.on('sessionInfo', (info) => {
+            console.log('Socket.IO: Session info received:', info);
+            lastAuthenticatedAt.textContent = info.lastAuthenticatedAt ? new Date(info.lastAuthenticatedAt).toLocaleString() : 'N/A';
+        });
 
-        // Settings
-        async function loadSettings() {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/settings`);
-            if (response) {
-                const settings = await response.json();
-                shopNameInput.value = settings.shopName || '';
-                shopLocationLatitudeInput.value = settings.shopLocation ? settings.shopLocation.latitude : '';
-                shopLocationLongitudeInput.value = settings.shopLocation ? settings.shopLocation.longitude : '';
-                minSubtotalForDiscountInput.value = settings.minSubtotalForDiscount || 0;
-                discountPercentageInput.value = settings.discountPercentage || 0;
+        socket.on('whatsapp_log', (logMessage) => {
+            const logEntry = document.createElement('p');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${logMessage}`;
+            botLogs.prepend(logEntry); // Add new logs to the top
+            if (botLogs.children.length > 50) { // Keep log history manageable
+                botLogs.removeChild(botLogs.lastChild);
+            }
+        });
 
-                deliveryRatesContainer.innerHTML = ''; // Clear existing
-                if (settings.deliveryRates && settings.deliveryRates.length > 0) {
-                    settings.deliveryRates.forEach(rate => addDeliveryRateRow(rate.kms, rate.amount));
+        // --- Discount Settings Functions ---
+        async function fetchDiscountSettings() {
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/discount-settings`);
+                const data = await response.json();
+                if (response.ok) {
+                    minSubtotalForDiscountInput.value = data.minSubtotalForDiscount || 0;
+                    discountPercentageInput.value = data.discountPercentage || 0;
+                    isDiscountEnabledToggle.checked = data.isDiscountEnabled;
                 } else {
-                    addDeliveryRateRow(); // Add an empty one if none exist
+                    showMessage(data.message || 'Failed to fetch discount settings.', true);
                 }
+            } catch (error) {
+                console.error('Error fetching discount settings:', error);
+                showMessage('Error fetching discount settings.', true);
             }
         }
 
-        function addDeliveryRateRow(kms = '', amount = '') {
-            const div = document.createElement('div');
-            div.classList.add('delivery-rate-item');
-            div.innerHTML = `
-                <div class="form-group">
-                    <label>KMs</label>
-                    <input type="number" class="delivery-kms" value="${kms}" step="0.01" min="0" required>
-                </div>
-                <div class="form-group">
-                    <label>Amount (₹)</label>
-                    <input type="number" class="delivery-amount" value="${amount}" step="0.01" min="0" required>
-                </div>
-                <button type="button" class="btn btn-danger btn-sm remove-delivery-rate-btn"><i class="fas fa-minus-circle"></i></button>
-            `;
-            deliveryRatesContainer.appendChild(div);
+        saveDiscountSettingsBtn.addEventListener('click', async () => {
+            const minSubtotal = parseFloat(minSubtotalForDiscountInput.value);
+            const discountPercent = parseFloat(discountPercentageInput.value);
+            const isEnabled = isDiscountEnabledToggle.checked;
 
-            div.querySelector('.remove-delivery-rate-btn').addEventListener('click', () => {
-                div.remove();
-            });
-        }
+            if (isNaN(minSubtotal) || minSubtotal < 0) {
+                showMessage('Minimum subtotal must be a non-negative number.', true);
+                return;
+            }
+            if (isNaN(discountPercent) || discountPercent < 0 || discountPercent > 1) {
+                showMessage('Discount percentage must be between 0 and 1.', true);
+                return;
+            }
 
-        addDeliveryRateBtn.addEventListener('click', () => addDeliveryRateRow());
+            try {
+                showMessage('Saving discount settings...');
+                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/discount-settings`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        minSubtotalForDiscount: minSubtotal,
+                        discountPercentage: discountPercent,
+                        isDiscountEnabled: isEnabled
+                    })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(data.message || 'Discount settings saved successfully!');
+                    // Re-fetch to ensure UI is in sync with saved data
+                    fetchDiscountSettings();
+                } else {
+                    showMessage(data.message || 'Failed to save discount settings.', true);
+                }
+            } catch (error) {
+                console.error('Error saving discount settings:', error);
+                showMessage('Error saving discount settings.', true);
+            }
+        });
 
-        settingsForm.addEventListener('submit', async (e) => {
+        // Placeholder for other navigation links (will be implemented later)
+        document.getElementById('menuLink').addEventListener('click', (e) => {
             e.preventDefault();
-
-            const deliveryRates = [];
-            document.querySelectorAll('.delivery-rate-item').forEach(item => {
-                const kms = parseFloat(item.querySelector('.delivery-kms').value);
-                const amount = parseFloat(item.querySelector('.delivery-amount').value);
-                if (!isNaN(kms) && !isNaN(amount)) {
-                    deliveryRates.push({ kms, amount });
-                }
-            });
-
-            const settingsData = {
-                shopName: shopNameInput.value,
-                shopLocation: {
-                    latitude: parseFloat(shopLocationLatitudeInput.value),
-                    longitude: parseFloat(shopLocationLongitudeInput.value)
-                },
-                deliveryRates: deliveryRates,
-                minSubtotalForDiscount: parseFloat(minSubtotalForDiscountInput.value),
-                discountPercentage: parseFloat(discountPercentageInput.value)
-            };
-
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/settings`, {
-                method: 'PUT',
-                body: JSON.stringify(settingsData)
-            });
-
-            if (response) {
-                showToast('Settings updated successfully!', 'success');
-                loadSettings(); // Reload to ensure consistent state
-            }
+            showMessage('Menu Management section coming soon!');
+        });
+        document.getElementById('ordersLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            showMessage('Order Management section coming soon!');
+        });
+        document.getElementById('customersLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            showMessage('Customer Management section coming soon!');
+        });
+        document.getElementById('settingsLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            showMessage('General Settings section coming soon!');
         });
 
-        // 2FA Management
-        async function load2FAStatus() {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/2fa/status`);
-            if (response) {
-                const data = await response.json();
-                if (data.twoFactorEnabled) {
-                    twoFaStatusText.textContent = 'Enabled';
-                    twoFaStatusText.style.color = 'var(--success-green)';
-                    enable2FABtn.style.display = 'none';
-                    disable2FABtn.style.display = 'inline-block';
-                } else {
-                    twoFaStatusText.textContent = 'Disabled';
-                    twoFaStatusText.style.color = 'var(--error-red)';
-                    enable2FABtn.style.display = 'inline-block';
-                    disable2FABtn.style.display = 'none';
-                }
-            }
-        }
-
-        enable2FABtn.addEventListener('click', async () => {
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/2fa/generate`, { method: 'POST' });
-            if (response) {
-                const data = await response.json();
-                qrCode2FADisplay.src = data.qrCodeUrl;
-                totpSecretText.textContent = data.secret;
-                temp2FASecret = data.secret; // Store for verification
-                totpCodeVerify.value = ''; // Clear input
-                openModal(twoFaGenerateModal);
-            }
-        });
-
-        verify2FABtn.addEventListener('click', async () => {
-            const totpCode = totpCodeVerify.value;
-            if (!totpCode || totpCode.length !== 6 || isNaN(totpCode)) {
-                showToast('Please enter a valid 6-digit code.', 'error');
-                return;
-            }
-
-            if (!temp2FASecret) {
-                showToast('2FA secret is missing. Please regenerate QR.', 'error');
-                return;
-            }
-
-            const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/2fa/verify`, {
-                method: 'POST',
-                body: JSON.stringify({ totpCode: totpCode, secret: temp2FASecret })
-            });
-
-            if (response) {
-                const data = await response.json();
-                if (data.verified) {
-                    showToast('2FA successfully enabled!', 'success');
-                    closeModal(twoFaGenerateModal);
-                    load2FAStatus(); // Refresh status
-                    temp2FASecret = null; // Clear temporary secret
-                } else {
-                    showToast(data.message || 'Invalid 2FA code. Please try again.', 'error');
-                }
-            }
-        });
-
-        disable2FABtn.addEventListener('click', () => {
-            showConfirmDialog('Are you sure you want to disable Two-Factor Authentication? This will reduce your account security.', async () => {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/2fa/disable`, { method: 'POST' });
-                if (response) {
-                    showToast('2FA disabled successfully!', 'success');
-                    load2FAStatus(); // Refresh status
-                }
-            });
-        });
     </script>
 </body>
 </html>
