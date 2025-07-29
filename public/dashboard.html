@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delicious Bites - Admin Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Leaflet CSS for Order Tracking Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
         /* General Styles */
         body {
@@ -462,7 +464,12 @@
             display: flex;
             justify-content: flex-end;
             gap: 10px;
+            flex-wrap: wrap; /* Allow buttons to wrap */
         }
+        .modal-footer .btn {
+            flex-shrink: 0; /* Prevent buttons from shrinking too much */
+        }
+
 
         .close-button {
             position: absolute;
@@ -547,6 +554,22 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Order Tracking Map Modal Specific Styles */
+        #orderTrackMap {
+            height: 400px; /* Fixed height for the map */
+            width: 100%;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid var(--border-light);
+            /* Ensure responsiveness within its container */
+            max-width: 100%; 
+            box-sizing: border-box;
+        }
+        .leaflet-container { /* Apply border-radius to Leaflet map container */
+            border-radius: 8px;
+        }
+
 
         /* Responsive Design */
         @media (max-width: 768px) {
@@ -644,6 +667,14 @@
             table td .action-buttons button {
                 padding: 5px 8px;
                 font-size: 0.8em;
+            }
+            .modal-footer {
+                flex-direction: column; /* Stack buttons vertically */
+                gap: 10px; /* Reduce gap when stacked */
+            }
+            .modal-footer .btn {
+                width: 100%; /* Full width for stacked buttons */
+                box-sizing: border-box;
             }
         }
 
@@ -956,9 +987,24 @@
         </div>
     </div>
 
+    <!-- Order Tracking Map Modal -->
+    <div id="orderTrackingModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" data-modal-id="orderTrackingModal">&times;</span>
+            <h3>Track Order: <span id="trackOrderIdDisplay"></span></h3>
+            <p>Delivery Address: <strong id="trackOrderAddressDisplay"></strong></p>
+            <div id="orderTrackMap"></div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button type="button" class="btn btn-secondary" data-modal-id="orderTrackingModal">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toastContainer"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
+    <!-- Leaflet JS for Order Tracking Map -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         const API_BASE_URL = window.location.origin; // Dynamically get base URL
         const SOCKET_IO_URL = window.location.origin;
@@ -1034,6 +1080,15 @@
         const enable2FABtn = document.getElementById('enable2FABtn');
         const disable2FABtn = document.getElementById('disable2FABtn');
         const verify2FABtn = document.getElementById('verify2FABtn');
+
+        // Order Tracking Map Modal
+        const orderTrackingModal = document.getElementById('orderTrackingModal');
+        const trackOrderIdDisplay = document.getElementById('trackOrderIdDisplay');
+        const trackOrderAddressDisplay = document.getElementById('trackOrderAddressDisplay');
+        const orderTrackMap = document.getElementById('orderTrackMap');
+        let trackMap = null;
+        let trackMapMarker = null;
+
 
         let currentConfirmAction = null;
         let temp2FASecret = null; // Temporarily store the generated 2FA secret
@@ -1268,6 +1323,12 @@
             button.addEventListener('click', (e) => {
                 const modalId = e.target.dataset.modalId;
                 closeModal(document.getElementById(modalId));
+                // Specific cleanup for map modal
+                if (modalId === 'orderTrackingModal' && trackMap) {
+                    trackMap.remove();
+                    trackMap = null;
+                    trackMapMarker = null;
+                }
             });
         });
 
@@ -1275,6 +1336,12 @@
             button.addEventListener('click', (e) => {
                 const modalId = e.target.dataset.modalId;
                 closeModal(document.getElementById(modalId));
+                // Specific cleanup for map modal
+                if (modalId === 'orderTrackingModal' && trackMap) {
+                    trackMap.remove();
+                    trackMap = null;
+                    trackMapMarker = null;
+                }
             });
         });
 
@@ -1293,10 +1360,16 @@
         });
 
         // Close modals if clicking outside content
-        [menuItemModal, orderDetailsModal, customerLatestOrderModal, twoFaGenerateModal].forEach(modal => {
+        [menuItemModal, orderDetailsModal, customerLatestOrderModal, twoFaGenerateModal, orderTrackingModal].forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     closeModal(modal);
+                    // Specific cleanup for map modal
+                    if (modal.id === 'orderTrackingModal' && trackMap) {
+                        trackMap.remove();
+                        trackMap = null;
+                        trackMapMarker = null;
+                    }
                 }
             });
         });
@@ -1468,12 +1541,16 @@
                     const row = ordersTableBody.insertRow();
                     const orderItems = order.items.map(item => `${item.name} x ${item.quantity}`).join(', ');
                     const orderDate = new Date(order.orderDate).toLocaleString();
+                    const customerPhone = order.customerPhone;
+                    const customerLat = order.customerLocation ? order.customerLocation.latitude : null;
+                    const customerLng = order.customerLocation ? order.customerLocation.longitude : null;
+                    const customerAddress = order.customerLocation ? order.customerLocation.address : order.deliveryAddress;
 
                     row.innerHTML = `
                         <td>${order.customOrderId || order._id.substring(0, 6) + '...'}</td>
                         <td>${order.pinId || 'N/A'}</td>
                         <td>${order.customerName || 'Unknown'}</td>
-                        <td>${order.customerPhone}</td>
+                        <td>${customerPhone}</td>
                         <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${orderItems}">${orderItems}</td>
                         <td>₹${order.totalAmount.toFixed(2)}</td>
                         <td>
@@ -1491,6 +1568,8 @@
                         <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${order.deliveryAddress}">${order.deliveryAddress || 'N/A'}</td>
                         <td class="action-buttons">
                             <button class="btn btn-secondary btn-sm" onclick="viewOrderDetails('${order._id}')"><i class="fas fa-eye"></i></button>
+                            <a href="tel:${customerPhone}" class="btn btn-success btn-sm"><i class="fas fa-phone"></i> Call</a>
+                            ${customerLat && customerLng ? `<button class="btn btn-info btn-sm" onclick="showOrderTrackingModal('${order.customOrderId || order._id.substring(0,6)}', '${customerAddress}', ${customerLat}, ${customerLng})"><i class="fas fa-map-marker-alt"></i> Track</button>` : ''}
                             <button class="btn btn-danger btn-sm" onclick="deleteOrder('${order._id}')"><i class="fas fa-trash-alt"></i></button>
                         </td>
                     `;
@@ -1552,6 +1631,35 @@
             });
         }
 
+        // Order Tracking Map Function
+        function showOrderTrackingModal(orderId, address, lat, lng) {
+            trackOrderIdDisplay.textContent = orderId;
+            trackOrderAddressDisplay.textContent = address;
+            openModal(orderTrackingModal);
+
+            // Ensure map is initialized after modal is visible
+            setTimeout(() => {
+                if (trackMap) {
+                    trackMap.remove(); // Remove existing map instance if any
+                }
+                trackMap = L.map('orderTrackMap').setView([lat, lng], 16); // Set view with provided coordinates
+
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: false, // Hide attribution footer
+                    maxZoom: 18
+                }).addTo(trackMap);
+
+                if (trackMapMarker) {
+                    trackMap.removeLayer(trackMapMarker);
+                }
+                trackMapMarker = L.marker([lat, lng]).addTo(trackMap)
+                    .bindPopup(`<b>Order ${orderId}</b><br>${address}`).openPopup();
+
+                trackMap.invalidateSize(); // Crucial for map rendering correctly in a hidden modal
+            }, 100); // Small delay to allow modal to render
+        }
+
+
         // Customer Management
         async function loadCustomers() {
             const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/customers`);
@@ -1572,7 +1680,7 @@
                         <td>${customer.customerPhone}</td>
                         <td>${customer.totalOrders}</td>
                         <td>${lastOrderDate}</td>
-                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${lastKnownLocation}">${lastKnownLocation}">
+                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${lastKnownLocation}">
                             ${lastKnownLocation}
                         </td>
                         <td class="action-buttons">
@@ -1770,3 +1878,4 @@
     </script>
 </body>
 </html>
+
