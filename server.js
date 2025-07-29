@@ -327,7 +327,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 io.emit('whatsapp_log', 'QR code expired. Reinitializing...');
                 qrCodeData = null;
                 io.emit('qrCode', null);
-                await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upspsert: true });
+                await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
                 io.emit('status', 'qr_error');
                 isInitializing = false; // Allow re-initialization
                 initializeWhatsappClient(true); // Force a new session
@@ -919,20 +919,20 @@ app.get('/admin/logout', (req, res) => {
 
 // Authentication Middleware for Admin APIs and Dashboard HTML
 const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    let token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
+    const isHtmlRequest = ['/dashboard'].includes(req.path);
 
-    // Determine if the request is for an HTML page that requires authentication
-    // This list should include all HTML dashboard routes
-    const htmlAuthRoutes = ['/dashboard']; 
-    const isHtmlRequest = htmlAuthRoutes.includes(req.path);
+    // If it's an HTML request and no Authorization header, check query parameter
+    if (isHtmlRequest && !token) {
+        token = req.query.token;
+    }
 
     if (token == null) {
         console.log('Unauthorized: No token provided. (Request to ' + req.path + ')');
         if (isHtmlRequest) {
-            return res.redirect('/admin/login'); // Redirect to login for HTML pages
+            return res.redirect('/admin/login');
         }
-        return res.status(401).json({ message: 'Unauthorized: No token provided.' }); // For API calls
+        return res.status(401).json({ message: 'Unauthorized: No token provided.' });
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
@@ -940,17 +940,26 @@ const authenticateToken = (req, res, next) => {
             console.error('JWT Verification Error:', err.message, '(Token received for ' + req.path + ')');
             if (err.name === 'TokenExpiredError') {
                 if (isHtmlRequest) {
-                    return res.redirect('/admin/login'); // Redirect to login if token expired for HTML pages
+                    return res.redirect('/admin/login');
                 }
                 return res.status(401).json({ message: 'Unauthorized: Session expired. Please log in again.' });
             }
             if (isHtmlRequest) {
-                return res.redirect('/admin/login'); // Redirect to login for other auth errors on HTML pages
+                return res.redirect('/admin/login');
             }
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
         }
         req.user = user;
-        next();
+
+        // If it was an HTML request and token came from query, redirect to clean URL
+        if (isHtmlRequest && req.query.token) {
+            // This redirect happens *after* successful verification,
+            // so the client will get the HTML without the token in the URL.
+            // The client-side JS in dashboard.html will then store it in localStorage.
+            const newUrl = req.path; // Remove query params
+            return res.redirect(302, newUrl); // Use 302 for temporary redirect
+        }
+        next(); // Proceed to serve content or API response
     });
 };
 
