@@ -3,1046 +3,1681 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Delicious Bites - Admin Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>Admin Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Socket.io Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.0.0/dist/socket.io.min.js"></script>
+    <!-- qrcode.js for any potential client-side QR needs, though backend sends data URL -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode.js/1.0.0/qrcode.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5;
-            color: #333;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            background-color: #f9fafb; /* Light gray background */
         }
-        .sidebar {
-            background-color: #2c3e50; /* Dark blue-gray */
-            color: #ecf0f1;
-            width: 250px;
-            min-height: 100vh;
-            padding: 2rem;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        /* Custom animation for notifications */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
-        .sidebar a {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.5rem;
-            border-radius: 8px;
-            transition: background-color 0.2s ease, color 0.2s ease;
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
         }
-        .sidebar a:hover {
-            background-color: #34495e;
-            color: #ffffff;
-        }
-        .sidebar a.active {
-            background-color: #3498db;
-            color: #ffffff;
-            font-weight: bold;
-        }
-        .sidebar a i {
-            margin-right: 10px;
-            width: 20px;
-            text-align: center;
-        }
-        .header {
-            background-color: #ffffff;
-            padding: 1.5rem 2rem;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .card {
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-        }
-        .status-disconnected { background-color: #e74c3c; } /* Red */
-        .status-qr_received { background-color: #f39c12; } /* Orange */
-        .status-authenticated { background-color: #3498db; } /* Blue */
-        .status-ready { background-color: #2ecc71; } /* Green */
-        .status-auth_failure, .status-qr_error { background-color: #c0392b; } /* Darker Red */
-        .status-initializing { background-color: #9b59b6; } /* Purple */
-
-        /* Toggle Switch Styling */
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            -webkit-transition: .4s;
-            transition: .4s;
-            border-radius: 34px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            -webkit-transition: .4s;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: #2196F3;
-        }
-        input:focus + .slider {
-            box-shadow: 0 0 1px #2196F3;
-            outline: none; /* Remove default outline */
-        }
-        input:checked + .slider:before {
-            -webkit-transform: translateX(26px);
-            -ms-transform: translateX(26px);
-            transform: translateX(26px);
-        }
-        /* Rounded sliders */
-        .slider.round {
-            border-radius: 34px;
-        }
-        .slider.round:before {
-            border-radius: 50%;
-        }
-
-        /* Message Box */
-        #messageBox {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background-color: #4CAF50; /* Green */
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
+        /* Hide sections by default, JavaScript will show them */
+        .page-section {
             display: none;
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out;
         }
-        #messageBox.error {
-            background-color: #f44336; /* Red */
-        }
-
-        /* Table Styling */
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-        }
-        .data-table th, .data-table td {
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        .data-table th {
-            background-color: #f8f8f8;
-            font-weight: 600;
-            color: #555;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-        }
-        .data-table tbody tr:hover {
-            background-color: #f5f5f5;
-        }
-        .action-btn {
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            transition: background-color 0.2s ease;
-        }
-        .action-btn.edit {
-            background-color: #3498db;
+        /* Style for active sidebar link */
+        .sidebar-link.active {
+            background-color: #4f46e5; /* Indigo-600 */
             color: white;
-        }
-        .action-btn.edit:hover {
-            background-color: #2186c8;
-        }
-        .action-btn.delete {
-            background-color: #e74c3c;
-            color: white;
-        }
-        .action-btn.delete:hover {
-            background-color: #c0392b;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
     </style>
 </head>
-<body class="flex">
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <h1 class="text-2xl font-bold mb-8 text-center">Admin Panel</h1>
-        <nav>
-            <a href="#" id="dashboardLink" class="active">
-                <i class="fas fa-tachometer-alt"></i> Dashboard
-            </a>
-            <a href="#" id="menuLink">
-                <i class="fas fa-utensils"></i> Menu Management
-            </a>
-            <a href="#" id="ordersLink">
-                <i class="fas fa-clipboard-list"></i> Order Management
-            </a>
-            <a href="#" id="customersLink">
-                <i class="fas fa-users"></i> Customer Management
-            </a>
-            <a href="#" id="generalSettingsLink">
-                <i class="fas fa-cog"></i> General Settings
-            </a>
-            <a href="#" id="logoutButton" class="mt-8">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-        </nav>
+<body class="min-h-screen flex flex-col font-inter">
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 flex items-center justify-between hidden animate-fade-in-up">
+        <span id="notification-message"></span>
+        <button id="notification-close" class="ml-4 text-white font-bold">&times;</button>
     </div>
 
-    <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col">
-        <!-- Header -->
-        <header class="header">
-            <h2 id="pageTitle" class="text-2xl font-semibold text-gray-800">Dashboard Overview</h2>
-            <div class="flex items-center">
-                <span class="text-gray-600 mr-4">Welcome, Admin!</span>
-                <button id="logoutButtonHeader" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out">
-                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
+    <!-- Login Page -->
+    <div id="login-page" class="page-section min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-3xl font-extrabold text-center text-gray-900 mb-8">Admin Login</h2>
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="login-username">Username</label>
+                    <input
+                        id="login-username"
+                        type="text"
+                        value="dashboard_admin"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
+                        placeholder="Enter your username"
+                        required
+                    />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="login-password">Password</label>
+                    <input
+                        id="login-password"
+                        type="password"
+                        value="password123"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
+                        placeholder="Enter your password"
+                        required
+                    />
+                </div>
+                <div id="totp-input-container" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="login-totp-code">2FA Code</label>
+                    <input
+                        id="login-totp-code"
+                        type="text"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
+                        placeholder="Enter 2FA code"
+                    />
+                </div>
+                <button
+                    type="submit"
+                    id="login-button"
+                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Login
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard Layout -->
+    <div id="dashboard-layout" class="page-section flex min-h-screen bg-gray-50 font-inter">
+        <!-- Mobile Sidebar Toggle -->
+        <button
+            id="sidebar-toggle"
+            class="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-md bg-indigo-600 text-white shadow-lg"
+        >
+            <!-- Hamburger Icon -->
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+        </button>
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 text-white shadow-xl transform -translate-x-full lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col">
+            <div class="p-6 text-2xl font-bold text-center border-b border-gray-700">
+                Admin Panel
+            </div>
+            <nav class="flex-grow mt-6">
+                <ul>
+                    <li><a href="#/dashboard" class="sidebar-link flex items-center px-6 py-3 text-lg font-medium rounded-r-full transition-all duration-200 ease-in-out text-gray-300 hover:bg-gray-700 hover:text-white">Dashboard</a></li>
+                    <li><a href="#/dashboard/whatsapp" class="sidebar-link flex items-center px-6 py-3 text-lg font-medium rounded-r-full transition-all duration-200 ease-in-out text-gray-300 hover:bg-gray-700 hover:text-white">WhatsApp Bot</a></li>
+                    <li><a href="#/dashboard/menu" class="sidebar-link flex items-center px-6 py-3 text-lg font-medium rounded-r-full transition-all duration-200 ease-in-out text-gray-300 hover:bg-gray-700 hover:text-white">Menu Management</a></li>
+                    <li><a href="#/dashboard/orders" class="sidebar-link flex items-center px-6 py-3 text-lg font-medium rounded-r-full transition-all duration-200 ease-in-out text-gray-300 hover:bg-gray-700 hover:text-white">Order Management</a></li>
+                    <li><a href="#/dashboard/customers" class="sidebar-link flex items-center px-6 py-3 text-lg font-medium rounded-r-full transition-all duration-200 ease-in-out text-gray-300 hover:bg-gray-700 hover:text-white">Customer Management</a></li>
+                    <li><a href="#/dashboard/settings" class="sidebar-link flex items-center px-6 py-3 text-lg font-medium rounded-r-full transition-all duration-200 ease-in-out text-gray-300 hover:bg-gray-700 hover:text-white">Settings</a></li>
+                    <li><a href="#/dashboard/2fa" class="sidebar-link flex items-center px-6 py-3 text-lg font-medium rounded-r-full transition-all duration-200 ease-in-out text-gray-300 hover:bg-gray-700 hover:text-white">2FA Settings</a></li>
+                </ul>
+            </nav>
+            <div class="p-6 border-t border-gray-700">
+                <button
+                    id="logout-button"
+                    class="w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-lg font-semibold text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out"
+                >
+                    Logout
                 </button>
             </div>
-        </header>
+        </aside>
 
-        <!-- Page Content -->
-        <main class="p-8 flex-1 overflow-y-auto">
-            <!-- Dashboard Section -->
-            <section id="dashboardSection" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- WhatsApp Bot Status Card -->
-                <div class="card col-span-1 md:col-span-2 lg:col-span-1">
-                    <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fab fa-whatsapp text-green-500 mr-2"></i>WhatsApp Bot Status</h3>
-                    <p class="text-gray-600 mb-2">Status: <span id="botStatusText" class="font-bold">Loading...</span></p>
-                    <p class="text-gray-600 mb-2">Last Authenticated: <span id="lastAuthenticatedAt" class="font-bold">N/A</span></p>
-                    <div id="qrCodeContainer" class="text-center my-4" style="display: none;">
-                        <p class="text-sm text-gray-500 mb-2">Scan this QR to connect WhatsApp:</p>
-                        <img id="qrCodeImage" src="" alt="QR Code" class="mx-auto w-48 h-48 border border-gray-300 rounded-lg p-2">
-                    </div>
-                    <button id="forceNewSessionBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out mt-4 w-full">
-                        <i class="fas fa-sync-alt mr-2"></i>Force New Session
-                    </button>
-                    <div class="mt-4 p-3 bg-gray-100 rounded-lg max-h-48 overflow-y-auto text-sm text-gray-700">
-                        <h4 class="font-semibold mb-2">Bot Logs:</h4>
-                        <div id="botLogs"></div>
-                    </div>
-                </div>
-
-                <!-- Quick Stats Card -->
-                <div class="card col-span-1 md:col-span-2 lg:col-span-1">
-                    <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-chart-line text-blue-500 mr-2"></i>Quick Stats</h3>
-                    <p class="text-gray-600">More content coming soon!</p>
-                    <div class="mt-4 p-3 bg-gray-100 rounded-lg">
-                        <p class="text-sm text-gray-700">Total Orders: <span class="font-semibold">500+</span></p>
-                        <p class="text-sm text-gray-700">Active Customers: <span class="font-semibold">120</span></p>
-                        <p class="text-sm text-gray-700">Revenue (This Month): <span class="font-semibold">₹50,000</span></p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Menu Management Section -->
-            <section id="menuManagementSection" class="hidden">
-                <h2 class="text-2xl font-semibold mb-6 text-gray-800"><i class="fas fa-utensils text-orange-500 mr-2"></i>Menu Management</h2>
-                <div class="card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-xl font-semibold text-gray-700">All Menu Items</h3>
-                        <button id="addMenuItemBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out">
-                            <i class="fas fa-plus mr-2"></i>Add New Item
-                        </button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Category</th>
-                                    <th>Price</th>
-                                    <th>Available</th>
-                                    <th>Trending</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="menuItemsTableBody">
-                                <!-- Menu items will be loaded here -->
-                                <tr><td colspan="6" class="text-center py-4 text-gray-500">Loading menu items...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Order Management Section -->
-            <section id="orderManagementSection" class="hidden">
-                <h2 class="text-2xl font-semibold mb-6 text-gray-800"><i class="fas fa-clipboard-list text-teal-500 mr-2"></i>Order Management</h2>
-                <div class="card">
-                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Recent Orders</h3>
-                    <div class="overflow-x-auto">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Order ID</th>
-                                    <th>Customer</th>
-                                    <th>Total</th>
-                                    <th>Status</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ordersTableBody">
-                                <!-- Orders will be loaded here -->
-                                <tr><td colspan="6" class="text-center py-4 text-gray-500">Loading orders...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Customer Management Section -->
-            <section id="customerManagementSection" class="hidden">
-                <h2 class="text-2xl font-semibold mb-6 text-gray-800"><i class="fas fa-users text-indigo-500 mr-2"></i>Customer Management</h2>
-                <div class="card">
-                    <h3 class="text-xl font-semibold text-gray-700 mb-4">All Customers</h3>
-                    <div class="overflow-x-auto">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Phone</th>
-                                    <th>Total Orders</th>
-                                    <th>Last Order Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="customersTableBody">
-                                <!-- Customers will be loaded here -->
-                                <tr><td colspan="5" class="text-center py-4 text-gray-500">Loading customers...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <!-- General Settings Section -->
-            <section id="generalSettingsSection" class="hidden">
-                <h2 class="text-2xl font-semibold mb-6 text-gray-800"><i class="fas fa-cog text-gray-600 mr-2"></i>General Settings</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Discount Settings Card (Moved from Dashboard Overview) -->
-                    <div class="card">
-                        <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-tags text-purple-500 mr-2"></i>Discount Settings</h3>
-                        <div class="mb-4">
-                            <label for="minSubtotalForDiscount" class="block text-gray-700 text-sm font-bold mb-2">Minimum Subtotal for Discount (₹):</label>
-                            <input type="number" id="minSubtotalForDiscount" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0" min="0">
-                        </div>
-                        <div class="mb-4">
-                            <label for="discountPercentage" class="block text-gray-700 text-sm font-bold mb-2">Discount Percentage (0.0 - 1.0):</label>
-                            <input type="number" id="discountPercentage" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0.0" min="0" max="1" step="0.01">
-                        </div>
-                        <div class="flex items-center justify-between mb-4">
-                            <label for="isDiscountEnabled" class="block text-gray-700 text-sm font-bold">Enable Discount:</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="isDiscountEnabled">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                        <button id="saveDiscountSettingsBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out w-full">
-                            <i class="fas fa-save mr-2"></i>Save Discount Settings
-                        </button>
-                    </div>
-
-                    <!-- Other General Settings Placeholder -->
-                    <div class="card">
-                        <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-store text-red-500 mr-2"></i>Shop Information</h3>
-                        <div class="mb-4">
-                            <label for="shopName" class="block text-gray-700 text-sm font-bold mb-2">Shop Name:</label>
-                            <input type="text" id="shopName" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="Delicious Bites">
-                        </div>
-                        <div class="mb-4">
-                            <label for="shopLatitude" class="block text-gray-700 text-sm font-bold mb-2">Shop Latitude:</label>
-                            <input type="number" id="shopLatitude" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0.0">
-                        </div>
-                        <div class="mb-4">
-                            <label for="shopLongitude" class="block text-gray-700 text-sm font-bold mb-2">Shop Longitude:</label>
-                            <input type="number" id="shopLongitude" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" value="0.0">
-                        </div>
-                        <button id="saveShopInfoBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out w-full">
-                            <i class="fas fa-save mr-2"></i>Save Shop Info
-                        </button>
-                    </div>
-
-                    <!-- Delivery Rates Placeholder -->
-                    <div class="card col-span-1 md:col-span-2">
-                        <h3 class="text-xl font-semibold mb-4 text-gray-700"><i class="fas fa-truck text-blue-500 mr-2"></i>Delivery Rates</h3>
-                        <div id="deliveryRatesContainer" class="mb-4">
-                            <div class="flex items-center mb-2">
-                                <input type="number" placeholder="KMs" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/2 mr-2">
-                                <input type="number" placeholder="Amount (₹)" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/2">
-                            </div>
-                            <!-- More rate inputs can be added dynamically -->
-                        </div>
-                        <button id="addDeliveryRateBtn" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out mr-2">
-                            <i class="fas fa-plus mr-2"></i>Add Rate
-                        </button>
-                        <button id="saveDeliveryRatesBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow-md transition duration-200 ease-in-out">
-                            <i class="fas fa-save mr-2"></i>Save Rates
-                        </button>
-                    </div>
-                </div>
-            </section>
+        <!-- Main Content Area -->
+        <main id="main-content" class="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+            <!-- Content will be dynamically loaded here by JavaScript -->
         </main>
     </div>
 
-    <!-- Message Box -->
-    <div id="messageBox"></div>
+    <!-- WhatsApp Bot Status Section -->
+    <template id="whatsapp-status-template">
+        <div class="p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">WhatsApp Bot Status</h2>
 
-    <script src="/socket.io/socket.io.js"></script>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg shadow-inner">
+                    <div id="whatsapp-status-badge" class="w-24 h-24 rounded-full flex items-center justify-center text-white text-xl font-semibold mb-4">
+                        Status
+                    </div>
+                    <p class="text-lg font-medium text-gray-700">Current Status: <span id="whatsapp-status-text" class="font-semibold"></span></p>
+                    <p id="last-authenticated-at" class="text-sm text-gray-500 mt-1"></p>
+                    <button
+                        id="reinitialize-session-button"
+                        class="mt-6 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Re-initialize Session
+                    </button>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg shadow-inner">
+                    <img id="qr-code-image" src="" alt="QR Code" class="w-48 h-48 object-contain rounded-lg shadow-md mb-4 hidden" />
+                    <div id="no-qr-message" class="w-48 h-48 flex items-center justify-center bg-gray-200 text-gray-500 rounded-lg shadow-md">
+                        No QR Code Available
+                    </div>
+                    <p id="qr-scan-message" class="text-gray-700 text-center font-medium hidden">Scan this QR code with your WhatsApp app.</p>
+                    <p id="qr-expiry-message" class="text-sm text-gray-500 text-center mt-1 hidden">QR will expire in 5 minutes if not scanned.</p>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <h3 class="text-2xl font-bold text-gray-800 mb-4">WhatsApp Logs</h3>
+                <div id="whatsapp-logs" class="bg-gray-800 text-green-300 p-4 rounded-lg h-64 overflow-y-auto font-mono text-sm shadow-inner">
+                    <p class="text-gray-500">No logs yet.</p>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Menu Management Section -->
+    <template id="menu-management-template">
+        <div class="p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Menu Management</h2>
+
+            <button
+                id="add-menu-item-button"
+                class="mb-6 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-200 ease-in-out"
+            >
+                Add New Item
+            </button>
+
+            <div id="menu-loading-message" class="text-center py-8 text-gray-600 hidden">Loading menu items...</div>
+
+            <div class="overflow-x-auto rounded-lg shadow-md">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trending</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="menu-items-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Menu items will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add/Edit Item Modal -->
+            <div id="menu-item-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4 hidden">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+                    <h3 id="menu-item-modal-title" class="text-2xl font-bold text-gray-800 mb-6">Add New Menu Item</h3>
+                    <form id="menu-item-form" class="space-y-4">
+                        <input type="hidden" id="menu-item-id" />
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="menu-item-name">Name</label>
+                            <input type="text" id="menu-item-name" name="name" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="menu-item-description">Description</label>
+                            <textarea id="menu-item-description" name="description" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="menu-item-price">Price</label>
+                            <input type="number" id="menu-item-price" name="price" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" step="0.01" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="menu-item-image-url">Image URL</label>
+                            <input type="text" id="menu-item-image-url" name="imageUrl" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="https://example.com/image.jpg" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="menu-item-category">Category</label>
+                            <input type="text" id="menu-item-category" name="category" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="menu-item-is-available" name="isAvailable" class="h-4 w-4 text-indigo-600 border-gray-300 rounded" />
+                                <label for="menu-item-is-available" class="ml-2 block text-sm text-gray-900">Is Available</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="menu-item-is-trending" name="isTrending" class="h-4 w-4 text-indigo-600 border-gray-300 rounded" />
+                                <label for="menu-item-is-trending" class="ml-2 block text-sm text-gray-900">Is Trending</label>
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-4 mt-6">
+                            <button type="button" id="cancel-menu-item-button" class="px-5 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition duration-150 ease-in-out">
+                                Cancel
+                            </button>
+                            <button type="submit" id="submit-menu-item-button" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out">
+                                Add Item
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Order Management Section -->
+    <template id="order-management-template">
+        <div class="p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Order Management</h2>
+
+            <div class="mb-6 flex flex-wrap items-center gap-4">
+                <label for="order-status-filter" class="text-gray-700 font-medium">Filter by Status:</label>
+                <select
+                    id="order-status-filter"
+                    class="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out"
+                >
+                    <option value="All">All</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Preparing">Preparing</option>
+                    <option value="Out for Delivery">Out for Delivery</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
+            </div>
+
+            <div id="order-loading-message" class="text-center py-8 text-gray-600 hidden">Loading orders...</div>
+
+            <div class="overflow-x-auto rounded-lg shadow-md">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="order-items-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Orders will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
+
+    <!-- Customer Management Section -->
+    <template id="customer-management-template">
+        <div class="p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Customer Management</h2>
+
+            <div id="customer-loading-message" class="text-center py-8 text-gray-600 hidden">Loading customers...</div>
+
+            <div class="overflow-x-auto rounded-lg shadow-md">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Order Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Location</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customer-items-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Customers will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
+
+    <!-- Settings Management Section -->
+    <template id="settings-management-template">
+        <div class="p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Shop Settings</h2>
+
+            <div id="settings-loading-message" class="text-center py-8 text-gray-600 hidden">Loading settings...</div>
+
+            <form id="settings-form" class="space-y-6">
+                <!-- General Settings -->
+                <div class="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">General Information</h3>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700" for="shop-name">Shop Name</label>
+                        <input type="text" id="shop-name" name="shopName" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                    </div>
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="shop-latitude">Shop Latitude</label>
+                            <input type="number" id="shop-latitude" name="shopLocation.latitude" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" step="any" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700" for="shop-longitude">Shop Longitude</label>
+                            <input type="number" id="shop-longitude" name="shopLocation.longitude" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" step="any" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delivery Rates -->
+                <div class="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Delivery Rates (per km)</h3>
+                    <div id="delivery-rates-container">
+                        <!-- Delivery rates will be dynamically added here -->
+                    </div>
+                    <button type="button" id="add-delivery-rate-button" class="mt-4 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150 ease-in-out">
+                        Add Delivery Rate
+                    </button>
+                </div>
+
+                <!-- Discount Settings -->
+                <div class="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Discount Settings</h3>
+                    <div class="flex items-center mb-4">
+                        <input
+                            type="checkbox"
+                            id="is-discount-enabled"
+                            name="isDiscountEnabled"
+                            class="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                        />
+                        <label for="is-discount-enabled" class="ml-2 block text-sm text-gray-900">Enable Discount</label>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700" for="min-subtotal-for-discount">Min Subtotal for Discount (₹)</label>
+                        <input
+                            type="number"
+                            id="min-subtotal-for-discount"
+                            name="minSubtotalForDiscount"
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            step="0.01"
+                        />
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700" for="discount-percentage">Discount Percentage (0.00 - 1.00)</label>
+                        <input
+                            type="number"
+                            id="discount-percentage"
+                            name="discountPercentage"
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            step="0.01"
+                            min="0"
+                            max="1"
+                        />
+                    </div>
+                </div>
+
+                <button type="submit" id="save-settings-button" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-200 ease-in-out">
+                    Save Settings
+                </button>
+            </form>
+        </div>
+    </template>
+
+    <!-- 2FA Management Section -->
+    <template id="2fa-management-template">
+        <div class="p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Two-Factor Authentication (2FA)</h2>
+
+            <div class="flex items-center mb-6">
+                <span id="2fa-status-badge" class="px-4 py-2 rounded-full text-lg font-semibold">
+                    Status: Disabled
+                </span>
+            </div>
+
+            <div class="space-y-4">
+                <button
+                    id="enable-2fa-button"
+                    class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Enable 2FA
+                </button>
+                <button
+                    id="disable-2fa-button"
+                    class="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed hidden"
+                >
+                    Disable 2FA
+                </button>
+            </div>
+
+            <!-- 2FA Enable Modal -->
+            <div id="2fa-enable-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4 hidden">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 text-center">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-6">Enable Two-Factor Authentication</h3>
+                    <div id="2fa-qr-container" class="mb-6 flex justify-center">
+                        <img id="2fa-qr-image" src="" alt="2FA QR Code" class="w-48 h-48 border border-gray-200 rounded-lg shadow-sm hidden" />
+                    </div>
+                    <p class="text-gray-700 mb-4">Scan this QR code with your authenticator app (e.g., Google Authenticator, Authy).</p>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="2fa-totp-code-verify">Enter 6-digit code from app</label>
+                        <input
+                            id="2fa-totp-code-verify"
+                            type="text"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out text-center text-xl tracking-widest"
+                            placeholder="******"
+                            maxlength="6"
+                            required
+                        />
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" id="cancel-2fa-button" class="px-5 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition duration-150 ease-in-out">
+                            Cancel
+                        </button>
+                        <button
+                            id="verify-2fa-button"
+                            class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Verify & Enable
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Dashboard Home Section -->
+    <template id="dashboard-home-template">
+        <div class="p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Welcome to Your Dashboard!</h2>
+            <p class="text-gray-700">Use the sidebar to navigate through different management sections.</p>
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-blue-50 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200">
+                    <h3 class="text-xl font-semibold text-blue-800 mb-2">WhatsApp Bot</h3>
+                    <p class="text-gray-600">Monitor bot status, QR code, and logs.</p>
+                    <a href="#/dashboard/whatsapp" class="mt-4 text-blue-600 hover:underline font-medium block">Go to Status &rarr;</a>
+                </div>
+                <div class="bg-green-50 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200">
+                    <h3 class="text-xl font-semibold text-green-800 mb-2">Menu Items</h3>
+                    <p class="text-gray-600">Add, edit, or remove food items.</p>
+                    <a href="#/dashboard/menu" class="mt-4 text-green-600 hover:underline font-medium block">Manage Menu &rarr;</a>
+                </div>
+                <div class="bg-purple-50 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200">
+                    <h3 class="text-xl font-semibold text-purple-800 mb-2">Customer Orders</h3>
+                    <p class="text-gray-600">View and update customer orders.</p>
+                    <a href="#/dashboard/orders" class="mt-4 text-purple-600 hover:underline font-medium block">View Orders &rarr;</a>
+                </div>
+                <div class="bg-yellow-50 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200">
+                    <h3 class="text-xl font-semibold text-yellow-800 mb-2">Customer List</h3>
+                    <p class="text-gray-600">View and manage customer details.</p>
+                    <a href="#/dashboard/customers" class="mt-4 text-yellow-600 hover:underline font-medium block">View Customers &rarr;</a>
+                </div>
+                 <div class="bg-red-50 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200">
+                    <h3 class="text-xl font-semibold text-red-800 mb-2">Shop Settings</h3>
+                    <p class="text-gray-600">Configure shop details, delivery rates, and discounts.</p>
+                    <a href="#/dashboard/settings" class="mt-4 text-red-600 hover:underline font-medium block">Manage Settings &rarr;</a>
+                </div>
+                 <div class="bg-pink-50 p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200">
+                    <h3 class="text-xl font-semibold text-pink-800 mb-2">2FA Settings</h3>
+                    <p class="text-gray-600">Enable or disable Two-Factor Authentication.</p>
+                    <a href="#/dashboard/2fa" class="mt-4 text-pink-600 hover:underline font-medium block">Manage 2FA &rarr;</a>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <script>
-        const API_BASE_URL = window.location.origin;
-        const socket = io();
+        const API_BASE_URL = 'http://localhost:3000/api/admin';
+        const LOGIN_URL = 'http://localhost:3000/admin/login';
 
-        // UI Elements
-        const pageTitle = document.getElementById('pageTitle');
-        const dashboardLink = document.getElementById('dashboardLink');
-        const menuLink = document.getElementById('menuLink');
-        const ordersLink = document.getElementById('ordersLink');
-        const customersLink = document.getElementById('customersLink');
-        const generalSettingsLink = document.getElementById('generalSettingsLink');
-        const logoutButton = document.getElementById('logoutButton');
-        const logoutButtonHeader = document.getElementById('logoutButtonHeader');
-        const messageBox = document.getElementById('messageBox');
+        // --- Global State Variables ---
+        let isAuthenticated = false;
+        let currentPath = window.location.hash.substring(1) || '/dashboard'; // Use hash for routing
+        let notificationTimeout;
+        let whatsappSocket;
+        let whatsappStatusData = {
+            status: 'disconnected',
+            qrCodeUrl: null,
+            lastAuthenticatedAt: null,
+            logs: []
+        };
+        let twoFactorTempSecret = ''; // Temporarily store 2FA secret for verification
 
-        // Sections
-        const dashboardSection = document.getElementById('dashboardSection');
-        const menuManagementSection = document.getElementById('menuManagementSection');
-        const orderManagementSection = document.getElementById('orderManagementSection');
-        const customerManagementSection = document.getElementById('customerManagementSection');
-        const generalSettingsSection = document.getElementById('generalSettingsSection');
+        // --- DOM Elements ---
+        const loginPage = document.getElementById('login-page');
+        const dashboardLayout = document.getElementById('dashboard-layout');
+        const mainContent = document.getElementById('main-content');
+        const loginForm = document.getElementById('login-form');
+        const loginUsernameInput = document.getElementById('login-username');
+        const loginPasswordInput = document.getElementById('login-password');
+        const totpInputContainer = document.getElementById('totp-input-container');
+        const loginTotpCodeInput = document.getElementById('login-totp-code');
+        const loginButton = document.getElementById('login-button');
+        const logoutButton = document.getElementById('logout-button');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebar = document.getElementById('sidebar');
+        const notificationToast = document.getElementById('notification-toast');
+        const notificationMessage = document.getElementById('notification-message');
+        const notificationCloseButton = document.getElementById('notification-close');
 
-        // Dashboard specific elements
-        const botStatusText = document.getElementById('botStatusText');
-        const lastAuthenticatedAt = document.getElementById('lastAuthenticatedAt');
-        const qrCodeContainer = document.getElementById('qrCodeContainer');
-        const qrCodeImage = document.getElementById('qrCodeImage');
-        const forceNewSessionBtn = document.getElementById('forceNewSessionBtn');
-        const botLogs = document.getElementById('botLogs');
+        // --- Utility Functions ---
 
-        // Discount Settings elements (now in General Settings section)
-        const minSubtotalForDiscountInput = document.querySelector('#generalSettingsSection #minSubtotalForDiscount');
-        const discountPercentageInput = document.querySelector('#generalSettingsSection #discountPercentage');
-        const isDiscountEnabledToggle = document.querySelector('#generalSettingsSection #isDiscountEnabled');
-        const saveDiscountSettingsBtn = document.querySelector('#generalSettingsSection #saveDiscountSettingsBtn');
-
-        // Menu Management elements
-        const menuItemsTableBody = document.getElementById('menuItemsTableBody');
-        const addMenuItemBtn = document.getElementById('addMenuItemBtn');
-
-        // Order Management elements
-        const ordersTableBody = document.getElementById('ordersTableBody');
-
-        // Customer Management elements
-        const customersTableBody = document.getElementById('customersTableBody');
-
-        // General Settings - Shop Info elements
-        const shopNameInput = document.getElementById('shopName');
-        const shopLatitudeInput = document.getElementById('shopLatitude');
-        const shopLongitudeInput = document.getElementById('shopLongitude');
-        const saveShopInfoBtn = document.getElementById('saveShopInfoBtn');
-
-        // General Settings - Delivery Rates elements
-        const deliveryRatesContainer = document.getElementById('deliveryRatesContainer');
-        const addDeliveryRateBtn = document.getElementById('addDeliveryRateBtn');
-        const saveDeliveryRatesBtn = document.getElementById('saveDeliveryRatesBtn');
-
-
-        // --- Helper Function for displaying messages ---
-        function showMessage(message, isError = false) {
-            messageBox.textContent = message;
-            messageBox.className = ''; // Clear existing classes
-            messageBox.classList.add('fade-in');
-            if (isError) {
-                messageBox.classList.add('error');
-            } else {
-                messageBox.classList.add('success');
+        /**
+         * Displays a toast notification.
+         * @param {string} message - The message to display.
+         * @param {'success'|'error'|'info'} type - The type of notification.
+         */
+        function showNotification(message, type) {
+            clearTimeout(notificationTimeout);
+            notificationMessage.textContent = message;
+            notificationToast.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 flex items-center justify-between animate-fade-in-up`;
+            if (type === 'success') {
+                notificationToast.classList.add('bg-green-500');
+            } else if (type === 'error') {
+                notificationToast.classList.add('bg-red-500');
+            } else if (type === 'info') {
+                notificationToast.classList.add('bg-blue-500');
             }
-            messageBox.style.display = 'block';
-            messageBox.style.opacity = '1';
+            notificationToast.classList.remove('hidden');
 
-            setTimeout(() => {
-                messageBox.style.opacity = '0';
-                setTimeout(() => {
-                    messageBox.style.display = 'none';
-                }, 300); // Wait for fade-out to complete
-            }, 3000); // Message visible for 3 seconds
+            notificationTimeout = setTimeout(() => {
+                notificationToast.classList.add('hidden');
+            }, 5000);
         }
 
-        // --- Authentication Helper ---
+        notificationCloseButton.addEventListener('click', () => {
+            notificationToast.classList.add('hidden');
+            clearTimeout(notificationTimeout);
+        });
+
+        /**
+         * Fetches data from the API with authentication token.
+         * Handles token expiration and redirects to login.
+         * @param {string} url - The API endpoint URL.
+         * @param {object} options - Fetch options (method, headers, body, etc.).
+         * @returns {Promise<Response>} The fetch response.
+         */
         async function fetchWithAuth(url, options = {}) {
-            const token = localStorage.getItem('jwtToken');
-            if (!token) {
-                console.error('No JWT token found. Redirecting to login.');
-                localStorage.removeItem('jwtToken'); // Ensure token is cleared
-                window.location.href = '/admin/login';
-                return; // Prevent further execution
+            const token = localStorage.getItem('adminToken');
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers,
+            };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
             }
 
-            options.headers = {
-                ...options.headers,
-                'Authorization': `Bearer ${token}`
-            };
-
-            const response = await fetch(url, options);
+            const response = await fetch(url, { ...options, headers });
 
             if (response.status === 401 || response.status === 403) {
-                console.error('Authentication failed or session expired. Redirecting to login.');
-                localStorage.removeItem('jwtToken');
-                window.location.href = '/admin/login';
-                return; // Prevent further execution
+                // If unauthorized or forbidden, clear token and redirect to login
+                localStorage.removeItem('adminToken');
+                isAuthenticated = false;
+                navigateTo('/admin/login'); // Redirect to login page
+                showNotification('Session expired or unauthorized. Please log in again.', 'error');
+                throw new Error('Authentication failed. Please log in again.');
             }
+
             return response;
         }
 
-        // --- Section Switching Logic ---
-        const sections = {
-            dashboard: dashboardSection,
-            menu: menuManagementSection,
-            orders: orderManagementSection,
-            customers: customerManagementSection,
-            generalSettings: generalSettingsSection
-        };
-
-        const navLinks = {
-            dashboard: dashboardLink,
-            menu: menuLink,
-            orders: ordersLink,
-            customers: customersLink,
-            generalSettings: generalSettingsLink
-        };
-
-        function showSection(sectionName) {
-            // Hide all sections
-            Object.values(sections).forEach(section => section.classList.add('hidden'));
-            // Deactivate all nav links
-            Object.values(navLinks).forEach(link => link.classList.remove('active'));
-
-            // Show the requested section
-            sections[sectionName].classList.remove('hidden');
-            // Activate the corresponding nav link
-            navLinks[sectionName].classList.add('active');
-
-            // Update page title
-            switch (sectionName) {
-                case 'dashboard': pageTitle.textContent = 'Dashboard Overview'; break;
-                case 'menu': pageTitle.textContent = 'Menu Management'; fetchMenuItems(); break;
-                case 'orders': pageTitle.textContent = 'Order Management'; fetchOrders(); break;
-                case 'customers': pageTitle.textContent = 'Customer Management'; fetchCustomers(); break;
-                case 'generalSettings': pageTitle.textContent = 'General Settings'; fetchDiscountSettings(); fetchGeneralSettings(); break;
-            }
-        }
-
-        // --- Event Listeners for Sidebar Navigation ---
-        dashboardLink.addEventListener('click', (e) => { e.preventDefault(); showSection('dashboard'); });
-        menuLink.addEventListener('click', (e) => { e.preventDefault(); showSection('menu'); });
-        ordersLink.addEventListener('click', (e) => { e.preventDefault(); showSection('orders'); });
-        customersLink.addEventListener('click', (e) => { e.preventDefault(); showSection('customers'); });
-        generalSettingsLink.addEventListener('click', (e) => { e.preventDefault(); showSection('generalSettings'); });
-
-
-        // --- Initial Authentication Check on Page Load ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('jwtToken');
-            if (!token) {
-                window.location.href = '/admin/login';
-                return;
-            }
-
-            // Verify token by making an authenticated API call
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/bot-status`);
-                if (!response || !response.ok) {
-                    console.error('Failed to verify token on dashboard load:', response ? response.status : 'No response');
-                    localStorage.removeItem('jwtToken');
-                    window.location.href = '/admin/login';
-                    return;
-                }
-                console.log('Token validated. Dashboard loaded.');
-                // Initial load: show dashboard section and fetch its data
-                showSection('dashboard');
-                fetchBotStatus();
-            } catch (error) {
-                console.error('Error during initial token validation:', error);
-                localStorage.removeItem('jwtToken');
-                window.location.href = '/admin/login';
-            }
-        });
-
-        // --- Logout Functionality ---
-        function logout() {
-            localStorage.removeItem('jwtToken');
-            window.location.href = '/admin/login';
-        }
-        logoutButton.addEventListener('click', logout);
-        logoutButtonHeader.addEventListener('click', logout);
-
-
-        // --- WhatsApp Bot Status Functions ---
-        async function fetchBotStatus() {
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/bot-status`);
-                const data = await response.json();
-                updateBotStatusUI(data.status, data.lastAuthenticatedAt);
-                if (data.qrCodeAvailable) {
-                    // Request QR code if available (socket.io will send it)
-                    // No direct fetch here, socket.io handles it.
-                } else {
-                    qrCodeContainer.style.display = 'none';
-                    qrCodeImage.src = '';
-                }
-            } catch (error) {
-                console.error('Error fetching bot status:', error);
-                showMessage('Failed to fetch bot status.', true);
-            }
-        }
-
-        function updateBotStatusUI(status, timestamp) {
-            botStatusText.textContent = status.replace(/_/g, ' ').toUpperCase();
-            botStatusText.className = 'font-bold status-indicator ' + `status-${status}`;
-            lastAuthenticatedAt.textContent = timestamp ? new Date(timestamp).toLocaleString() : 'N/A';
-        }
-
-        forceNewSessionBtn.addEventListener('click', async () => {
-            if (!confirm('Are you sure you want to force a new WhatsApp session? This will disconnect the current session and require scanning a new QR code.')) {
-                return;
-            }
-            try {
-                showMessage('Requesting new WhatsApp session...');
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/load-session`, {
-                    method: 'POST'
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    showMessage(data.message);
-                } else {
-                    showMessage(data.message || 'Failed to force new session.', true);
-                }
-            } catch (error) {
-                console.error('Error forcing new session:', error);
-                showMessage('Error forcing new session.', true);
-            }
-        });
-
-        // --- Socket.IO Listeners for Real-time Bot Status ---
-        socket.on('status', (status) => {
-            console.log('Socket.IO: Status update received:', status);
-            updateBotStatusUI(status, new Date()); // Use current time for immediate feedback
-            // If status is not qr_received, hide QR
-            if (status !== 'qr_received') {
-                qrCodeContainer.style.display = 'none';
-                qrCodeImage.src = '';
-            }
-        });
-
-        socket.on('qrCode', (qrData) => {
-            console.log('Socket.IO: QR Code received.');
-            if (qrData) {
-                qrCodeImage.src = qrData;
-                qrCodeContainer.style.display = 'block';
-                showMessage('New QR code received. Please scan with your WhatsApp app.');
+        /**
+         * Shows a specific section and hides others.
+         * @param {HTMLElement} sectionToShow - The DOM element to show.
+         */
+        function showSection(sectionToShow) {
+            document.querySelectorAll('.page-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            sectionToShow.style.display = 'flex'; // Use flex for login, dashboard-layout
+            if (sectionToShow.id === 'dashboard-layout') {
+                 sectionToShow.style.display = 'flex'; // Ensure dashboard layout is flex
             } else {
-                qrCodeContainer.style.display = 'none';
-                qrCodeImage.src = '';
-            }
-        });
-
-        socket.on('sessionInfo', (info) => {
-            console.log('Socket.IO: Session info received:', info);
-            lastAuthenticatedAt.textContent = info.lastAuthenticatedAt ? new Date(info.lastAuthenticatedAt).toLocaleString() : 'N/A';
-        });
-
-        socket.on('whatsapp_log', (logMessage) => {
-            const logEntry = document.createElement('p');
-            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${logMessage}`;
-            botLogs.prepend(logEntry); // Add new logs to the top
-            if (botLogs.children.length > 50) { // Keep log history manageable
-                botLogs.removeChild(botLogs.lastChild);
-            }
-        });
-
-        // --- Discount Settings Functions (now part of General Settings) ---
-        async function fetchDiscountSettings() {
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/discount-settings`);
-                const data = await response.json();
-                if (response.ok) {
-                    minSubtotalForDiscountInput.value = data.minSubtotalForDiscount || 0;
-                    discountPercentageInput.value = data.discountPercentage || 0;
-                    isDiscountEnabledToggle.checked = data.isDiscountEnabled;
-                } else {
-                    showMessage(data.message || 'Failed to fetch discount settings.', true);
-                }
-            } catch (error) {
-                console.error('Error fetching discount settings:', error);
-                showMessage('Error fetching discount settings.', true);
+                 sectionToShow.style.display = 'flex';
             }
         }
 
-        saveDiscountSettingsBtn.addEventListener('click', async () => {
-            const minSubtotal = parseFloat(minSubtotalForDiscountInput.value);
-            const discountPercent = parseFloat(discountPercentageInput.value);
-            const isEnabled = isDiscountEnabledToggle.checked;
+        /**
+         * Navigates to a new path and updates the UI.
+         * @param {string} path - The new path (e.g., '/dashboard/menu').
+         */
+        function navigateTo(path) {
+            window.location.hash = path;
+            currentPath = path;
+            renderPage();
+            updateSidebarActiveLink();
+        }
 
-            if (isNaN(minSubtotal) || minSubtotal < 0) {
-                showMessage('Minimum subtotal must be a non-negative number.', true);
+        /**
+         * Updates the active state of sidebar links.
+         */
+        function updateSidebarActiveLink() {
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                if (link.getAttribute('href') === `#${currentPath}`) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        }
+
+        /**
+         * Renders the appropriate page based on the current path.
+         */
+        async function renderPage() {
+            if (!isAuthenticated && currentPath !== '/admin/login') {
+                navigateTo('/admin/login');
                 return;
             }
-            if (isNaN(discountPercent) || discountPercent < 0 || discountPercent > 1) {
-                showMessage('Discount percentage must be between 0 and 1.', true);
+
+            if (currentPath === '/admin/login') {
+                showSection(loginPage);
                 return;
             }
+
+            showSection(dashboardLayout);
+            mainContent.innerHTML = ''; // Clear previous content
+
+            let templateId;
+            switch (currentPath) {
+                case '/dashboard':
+                    templateId = 'dashboard-home-template';
+                    break;
+                case '/dashboard/whatsapp':
+                    templateId = 'whatsapp-status-template';
+                    break;
+                case '/dashboard/menu':
+                    templateId = 'menu-management-template';
+                    break;
+                case '/dashboard/orders':
+                    templateId = 'order-management-template';
+                    break;
+                case '/dashboard/customers':
+                    templateId = 'customer-management-template';
+                    break;
+                case '/dashboard/settings':
+                    templateId = 'settings-management-template';
+                    break;
+                case '/dashboard/2fa':
+                    templateId = '2fa-management-template';
+                    break;
+                default:
+                    // Fallback for unknown dashboard paths
+                    templateId = 'dashboard-home-template';
+                    navigateTo('/dashboard'); // Redirect to dashboard home
+                    break;
+            }
+
+            const template = document.getElementById(templateId);
+            if (template) {
+                const clone = document.importNode(template.content, true);
+                mainContent.appendChild(clone);
+                // After appending, initialize specific page logic
+                switch (currentPath) {
+                    case '/dashboard/whatsapp':
+                        initWhatsAppStatusPage();
+                        break;
+                    case '/dashboard/menu':
+                        initMenuManagementPage();
+                        break;
+                    case '/dashboard/orders':
+                        initOrderManagementPage();
+                        break;
+                    case '/dashboard/customers':
+                        initCustomerManagementPage();
+                        break;
+                    case '/dashboard/settings':
+                        initSettingsManagementPage();
+                        break;
+                    case '/dashboard/2fa':
+                        init2FAManagementPage();
+                        break;
+                }
+            }
+            updateSidebarActiveLink();
+        }
+
+        // --- Authentication Logic ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            loginButton.textContent = 'Logging in...';
+            loginButton.disabled = true;
+
+            const username = loginUsernameInput.value;
+            const password = loginPasswordInput.value;
+            const totpCode = loginTotpCodeInput.value;
 
             try {
-                showMessage('Saving discount settings...');
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/discount-settings`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        minSubtotalForDiscount: minSubtotal,
-                        discountPercentage: discountPercent,
-                        isDiscountEnabled: isEnabled
-                    })
+                const response = await fetch(LOGIN_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, totpCode })
                 });
+
                 const data = await response.json();
+
                 if (response.ok) {
-                    showMessage(data.message || 'Discount settings saved successfully!');
-                    fetchDiscountSettings(); // Re-fetch to ensure UI is in sync with saved data
+                    if (data.twoFactorEnabled && !totpCode) {
+                        totpInputContainer.classList.remove('hidden');
+                        showNotification('Two-Factor Authentication required. Enter code.', 'info');
+                    } else {
+                        localStorage.setItem('adminToken', data.token);
+                        isAuthenticated = true;
+                        showNotification('Login successful!', 'success');
+                        navigateTo('/dashboard');
+                    }
                 } else {
-                    showMessage(data.message || 'Failed to save discount settings.', true);
+                    showNotification(data.message || 'Login failed.', 'error');
                 }
             } catch (error) {
-                console.error('Error saving discount settings:', error);
-                showMessage('Error saving discount settings.', true);
+                console.error('Login error:', error);
+                showNotification('Network error or server unavailable.', 'error');
+            } finally {
+                loginButton.textContent = 'Login';
+                loginButton.disabled = false;
             }
-        });
+        }
 
-        // --- Menu Management Functions ---
-        async function fetchMenuItems() {
-            menuItemsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Loading menu items...</td></tr>';
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/menu`);
-                const items = await response.json();
-                if (response.ok) {
-                    renderMenuItems(items);
-                } else {
-                    showMessage(items.message || 'Failed to fetch menu items.', true);
-                    menuItemsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading menu items.</td></tr>';
+        function handleLogout() {
+            localStorage.removeItem('adminToken');
+            isAuthenticated = false;
+            showNotification('Logged out successfully.', 'success');
+            navigateTo('/admin/login');
+        }
+
+        function checkAuthentication() {
+            const token = localStorage.getItem('adminToken');
+            if (token) {
+                // Simple check: assume token is valid for now.
+                // In a real app, you'd verify with a backend endpoint.
+                isAuthenticated = true;
+            } else {
+                isAuthenticated = false;
+            }
+        }
+
+        // --- WhatsApp Bot Status Page Logic ---
+        function initWhatsAppStatusPage() {
+            const whatsappStatusBadge = document.getElementById('whatsapp-status-badge');
+            const whatsappStatusText = document.getElementById('whatsapp-status-text');
+            const lastAuthenticatedAtElem = document.getElementById('last-authenticated-at');
+            const qrCodeImage = document.getElementById('qr-code-image');
+            const noQrMessage = document.getElementById('no-qr-message');
+            const qrScanMessage = document.getElementById('qr-scan-message');
+            const qrExpiryMessage = document.getElementById('qr-expiry-message');
+            const whatsappLogsContainer = document.getElementById('whatsapp-logs');
+            const reinitializeButton = document.getElementById('reinitialize-session-button');
+
+            function updateStatusUI() {
+                whatsappStatusText.textContent = whatsappStatusData.status.replace(/_/g, ' ');
+                whatsappStatusBadge.textContent = whatsappStatusData.status.charAt(0).toUpperCase() + whatsappStatusData.status.slice(1);
+
+                // Update badge color
+                whatsappStatusBadge.className = `w-24 h-24 rounded-full flex items-center justify-center text-white text-xl font-semibold mb-4`;
+                switch (whatsappStatusData.status) {
+                    case 'ready': whatsappStatusBadge.classList.add('bg-green-500'); break;
+                    case 'authenticated': whatsappStatusBadge.classList.add('bg-yellow-500'); break;
+                    case 'qr_received': whatsappStatusBadge.classList.add('bg-blue-500'); break;
+                    case 'initializing': whatsappStatusBadge.classList.add('bg-purple-500'); break;
+                    case 'auth_failure':
+                    case 'qr_error':
+                    case 'disconnected': whatsappStatusBadge.classList.add('bg-red-500'); break;
+                    default: whatsappStatusBadge.classList.add('bg-gray-500'); break;
                 }
-            } catch (error) {
-                console.error('Error fetching menu items:', error);
-                showMessage('Error fetching menu items.', true);
-                menuItemsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading menu items.</td></tr>';
-            }
-        }
 
-        function renderMenuItems(items) {
-            menuItemsTableBody.innerHTML = ''; // Clear existing rows
-            if (items.length === 0) {
-                menuItemsTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No menu items found.</td></tr>';
-                return;
-            }
-            items.forEach(item => {
-                const row = `
-                    <tr>
-                        <td>${item.name}</td>
-                        <td>${item.category || 'N/A'}</td>
-                        <td>₹${item.price.toFixed(2)}</td>
-                        <td>${item.isAvailable ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-times-circle text-red-500"></i>'}</td>
-                        <td>${item.isTrending ? '<i class="fas fa-fire text-orange-500"></i>' : '-'}</td>
-                        <td>
-                            <button class="action-btn edit mr-2" data-id="${item._id}"><i class="fas fa-edit"></i> Edit</button>
-                            <button class="action-btn delete" data-id="${item._id}"><i class="fas fa-trash"></i> Delete</button>
-                        </td>
-                    </tr>
-                `;
-                menuItemsTableBody.insertAdjacentHTML('beforeend', row);
-            });
-
-            // Add event listeners to action buttons (placeholders)
-            menuItemsTableBody.querySelectorAll('.action-btn.edit').forEach(button => {
-                button.addEventListener('click', () => showMessage(`Edit item with ID: ${button.dataset.id} (Functionality to be implemented)`, false));
-            });
-            menuItemsTableBody.querySelectorAll('.action-btn.delete').forEach(button => {
-                button.addEventListener('click', () => showMessage(`Delete item with ID: ${button.dataset.id} (Functionality to be implemented)`, true));
-            });
-        }
-
-        addMenuItemBtn.addEventListener('click', () => {
-            showMessage('Add New Item functionality to be implemented.');
-        });
-
-
-        // --- Order Management Functions ---
-        async function fetchOrders() {
-            ordersTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">Loading orders...</td></tr>';
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/orders`);
-                const orders = await response.json();
-                if (response.ok) {
-                    renderOrders(orders);
+                if (whatsappStatusData.lastAuthenticatedAt) {
+                    lastAuthenticatedAtElem.textContent = `Last Connected: ${whatsappStatusData.lastAuthenticatedAt}`;
+                    lastAuthenticatedAtElem.classList.remove('hidden');
                 } else {
-                    showMessage(orders.message || 'Failed to fetch orders.', true);
-                    ordersTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading orders.</td></tr>';
+                    lastAuthenticatedAtElem.classList.add('hidden');
                 }
-            } catch (error) {
-                console.error('Error fetching orders:', error);
-                showMessage('Error fetching orders.', true);
-                ordersTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error loading orders.</td></tr>';
-            }
-        }
 
-        function renderOrders(orders) {
-            ordersTableBody.innerHTML = ''; // Clear existing rows
-            if (orders.length === 0) {
-                ordersTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No orders found.</td></tr>';
-                return;
-            }
-            orders.forEach(order => {
-                const orderDate = new Date(order.orderDate).toLocaleString();
-                const displayId = order.customOrderId || order._id.substring(0, 8);
-                const row = `
-                    <tr>
-                        <td>${displayId}</td>
-                        <td>${order.customerName || 'N/A'}</td>
-                        <td>₹${order.totalAmount.toFixed(2)}</td>
-                        <td>${order.status}</td>
-                        <td>${orderDate}</td>
-                        <td>
-                            <button class="action-btn edit mr-2" data-id="${order._id}"><i class="fas fa-eye"></i> View</button>
-                            <button class="action-btn delete" data-id="${order._id}"><i class="fas fa-sync-alt"></i> Update Status</button>
-                        </td>
-                    </tr>
-                `;
-                ordersTableBody.insertAdjacentHTML('beforeend', row);
-            });
-
-            // Add event listeners to action buttons (placeholders)
-            ordersTableBody.querySelectorAll('.action-btn.edit').forEach(button => {
-                button.addEventListener('click', () => showMessage(`View details for order ID: ${button.dataset.id} (Functionality to be implemented)`, false));
-            });
-            ordersTableBody.querySelectorAll('.action-btn.delete').forEach(button => {
-                button.addEventListener('click', () => showMessage(`Update status for order ID: ${button.dataset.id} (Functionality to be implemented)`, false));
-            });
-        }
-
-
-        // --- Customer Management Functions ---
-        async function fetchCustomers() {
-            customersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Loading customers...</td></tr>';
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/customers`);
-                const customers = await response.json();
-                if (response.ok) {
-                    renderCustomers(customers);
+                if (whatsappStatusData.qrCodeUrl) {
+                    qrCodeImage.src = whatsappStatusData.qrCodeUrl;
+                    qrCodeImage.classList.remove('hidden');
+                    noQrMessage.classList.add('hidden');
+                    qrScanMessage.classList.remove('hidden');
+                    qrExpiryMessage.classList.remove('hidden');
                 } else {
-                    showMessage(customers.message || 'Failed to fetch customers.', true);
-                    customersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-red-500">Error loading customers.</td></tr>';
+                    qrCodeImage.classList.add('hidden');
+                    noQrMessage.classList.remove('hidden');
+                    qrScanMessage.classList.add('hidden');
+                    qrExpiryMessage.classList.add('hidden');
                 }
-            } catch (error) {
-                console.error('Error fetching customers:', error);
-                showMessage('Error fetching customers.', true);
-                customersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-red-500">Error loading customers.</td></tr>';
-            }
-        }
 
-        function renderCustomers(customers) {
-            customersTableBody.innerHTML = ''; // Clear existing rows
-            if (customers.length === 0) {
-                customersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No customers found.</td></tr>';
-                return;
-            }
-            customers.forEach(customer => {
-                const lastOrderDate = customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString() : 'N/A';
-                const row = `
-                    <tr>
-                        <td>${customer.customerName || 'Unknown'}</td>
-                        <td>${customer.customerPhone}</td>
-                        <td>${customer.totalOrders}</td>
-                        <td>${lastOrderDate}</td>
-                        <td>
-                            <button class="action-btn edit mr-2" data-id="${customer._id}"><i class="fas fa-eye"></i> View</button>
-                            <button class="action-btn delete" data-id="${customer._id}"><i class="fas fa-trash"></i> Delete</button>
-                        </td>
-                    </tr>
-                `;
-                customersTableBody.insertAdjacentHTML('beforeend', row);
-            });
+                whatsappLogsContainer.innerHTML = whatsappStatusData.logs.length > 0
+                    ? whatsappStatusData.logs.map(log => `<p class="mb-1">${log}</p>`).join('')
+                    : '<p class="text-gray-500">No logs yet.</p>';
 
-            // Add event listeners to action buttons (placeholders)
-            customersTableBody.querySelectorAll('.action-btn.edit').forEach(button => {
-                button.addEventListener('click', () => showMessage(`View details for customer ID: ${button.dataset.id} (Functionality to be implemented)`, false));
-            });
-            customersTableBody.querySelectorAll('.action-btn.delete').forEach(button => {
-                button.addEventListener('click', () => showMessage(`Delete customer with ID: ${button.dataset.id} (Functionality to be implemented)`, true));
-            });
-        }
-
-        // --- General Settings Functions (Shop Info & Delivery Rates) ---
-        async function fetchGeneralSettings() {
-            try {
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/settings`);
-                const data = await response.json();
-                if (response.ok) {
-                    shopNameInput.value = data.shopName || '';
-                    shopLatitudeInput.value = data.shopLocation ? data.shopLocation.latitude : '';
-                    shopLongitudeInput.value = data.shopLocation ? data.shopLocation.longitude : '';
-                    renderDeliveryRates(data.deliveryRates || []);
-                } else {
-                    showMessage(data.message || 'Failed to fetch general settings.', true);
-                }
-            } catch (error) {
-                console.error('Error fetching general settings:', error);
-                showMessage('Error fetching general settings.', true);
-            }
-        }
-
-        saveShopInfoBtn.addEventListener('click', async () => {
-            const shopName = shopNameInput.value;
-            const latitude = parseFloat(shopLatitudeInput.value);
-            const longitude = parseFloat(shopLongitudeInput.value);
-
-            if (!shopName) {
-                showMessage('Shop name cannot be empty.', true);
-                return;
-            }
-            if (isNaN(latitude) || isNaN(longitude)) {
-                showMessage('Latitude and Longitude must be valid numbers.', true);
-                return;
+                reinitializeButton.disabled = whatsappStatusData.status === 'initializing';
+                reinitializeButton.textContent = whatsappStatusData.status === 'initializing' ? 'Initializing...' : 'Re-initialize Session';
             }
 
-            try {
-                showMessage('Saving shop information...');
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/settings`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        shopName: shopName,
-                        shopLocation: { latitude, longitude }
-                    })
+            // Initialize Socket.io connection if not already connected
+            if (!whatsappSocket) {
+                whatsappSocket = io('http://localhost:3000');
+
+                whatsappSocket.on('status', (newStatus) => {
+                    whatsappStatusData.status = newStatus;
+                    updateStatusUI();
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    showMessage(data.message || 'Shop information saved successfully!');
-                    fetchGeneralSettings(); // Re-fetch to ensure UI is in sync
-                } else {
-                    showMessage(data.message || 'Failed to save shop information.', true);
+
+                whatsappSocket.on('qrCode', (qrDataUrl) => {
+                    whatsappStatusData.qrCodeUrl = qrDataUrl;
+                    updateStatusUI();
+                });
+
+                whatsappSocket.on('sessionInfo', (info) => {
+                    whatsappStatusData.lastAuthenticatedAt = info.lastAuthenticatedAt ? new Date(info.lastAuthenticatedAt).toLocaleString() : null;
+                    updateStatusUI();
+                });
+
+                whatsappSocket.on('whatsapp_log', (logMessage) => {
+                    whatsappStatusData.logs.push(`[${new Date().toLocaleTimeString()}] ${logMessage}`);
+                    whatsappStatusData.logs = whatsappStatusData.logs.slice(-50); // Keep last 50 logs
+                    updateStatusUI();
+                });
+            }
+
+            // Initial fetch of status when component mounts
+            async function fetchInitialStatus() {
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/bot-status`);
+                    const data = await response.json();
+                    whatsappStatusData.status = data.status;
+                    whatsappStatusData.lastAuthenticatedAt = data.lastAuthenticatedAt ? new Date(data.lastAuthenticatedAt).toLocaleString() : null;
+                    // QR code is usually sent via socket.io, but if it's available and socket missed it,
+                    // the backend might re-send on re-initialization.
+                    // For now, we rely on socket.io for QR.
+                    updateStatusUI();
+                } catch (error) {
+                    console.error('Error fetching initial bot status:', error);
+                    showNotification('Failed to fetch bot status.', 'error');
                 }
-            } catch (error) {
-                console.error('Error saving shop information:', error);
-                showMessage('Error saving shop information.', true);
             }
-        });
+            fetchInitialStatus();
 
-        function renderDeliveryRates(rates) {
-            deliveryRatesContainer.innerHTML = ''; // Clear existing inputs
-            if (rates.length === 0) {
-                addEmptyDeliveryRateRow(); // Add one empty row if no rates
-                return;
+            reinitializeButton.onclick = async () => {
+                showNotification('', ''); // Clear any previous notification
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/load-session`, { method: 'POST' });
+                    const data = await response.json();
+                    showNotification(data.message, 'success');
+                } catch (error) {
+                    console.error('Error loading session:', error);
+                    showNotification(error.message || 'Failed to load session.', 'error');
+                }
+            };
+        }
+
+        // --- Menu Management Page Logic ---
+        function initMenuManagementPage() {
+            const addMenuItemButton = document.getElementById('add-menu-item-button');
+            const menuLoadingMessage = document.getElementById('menu-loading-message');
+            const menuItemsTableBody = document.getElementById('menu-items-table-body');
+            const menuItemModal = document.getElementById('menu-item-modal');
+            const menuItemModalTitle = document.getElementById('menu-item-modal-title');
+            const menuItemForm = document.getElementById('menu-item-form');
+            const menuItemIdInput = document.getElementById('menu-item-id');
+            const menuItemNameInput = document.getElementById('menu-item-name');
+            const menuItemDescriptionInput = document.getElementById('menu-item-description');
+            const menuItemPriceInput = document.getElementById('menu-item-price');
+            const menuItemImageUrlInput = document.getElementById('menu-item-image-url');
+            const menuItemCategoryInput = document.getElementById('menu-item-category');
+            const menuItemIsAvailableInput = document.getElementById('menu-item-is-available');
+            const menuItemIsTrendingInput = document.getElementById('menu-item-is-trending');
+            const cancelMenuItemButton = document.getElementById('cancel-menu-item-button');
+            const submitMenuItemButton = document.getElementById('submit-menu-item-button');
+
+            let currentEditingItem = null; // Stores the item object being edited
+
+            async function fetchMenuItems() {
+                menuLoadingMessage.classList.remove('hidden');
+                menuItemsTableBody.innerHTML = ''; // Clear table
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/menu`);
+                    const items = await response.json();
+                    menuItemsTableBody.innerHTML = ''; // Clear existing rows
+                    if (items.length === 0) {
+                        menuItemsTableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No menu items found.</td></tr>';
+                    } else {
+                        items.forEach(item => {
+                            const row = document.createElement('tr');
+                            row.className = 'hover:bg-gray-50';
+                            row.innerHTML = `
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img src="${item.imageUrl || 'https://placehold.co/50x50/cccccc/ffffff?text=No+Img'}" alt="${item.name}" class="h-12 w-12 rounded-full object-cover" onerror="this.onerror=null;this.src='https://placehold.co/50x50/cccccc/ffffff?text=No+Img';" />
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.name}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.category || 'N/A'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹${item.price.toFixed(2)}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                        ${item.isAvailable ? 'Yes' : 'No'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.isTrending ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
+                                        ${item.isTrending ? 'Yes' : 'No'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button data-id="${item._id}" class="edit-item-button text-indigo-600 hover:text-indigo-900 mr-4">Edit</button>
+                                    <button data-id="${item._id}" class="delete-item-button text-red-600 hover:text-red-900">Delete</button>
+                                </td>
+                            `;
+                            menuItemsTableBody.appendChild(row);
+                        });
+                        addEventListenersToMenuButtons();
+                    }
+                } catch (error) {
+                    console.error('Error fetching menu items:', error);
+                    showNotification('Failed to fetch menu items.', 'error');
+                    menuItemsTableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-red-500">Error loading menu items.</td></tr>';
+                } finally {
+                    menuLoadingMessage.classList.add('hidden');
+                }
             }
-            rates.forEach(rate => {
-                addDeliveryRateRow(rate.kms, rate.amount);
+
+            function addEventListenersToMenuButtons() {
+                document.querySelectorAll('.edit-item-button').forEach(button => {
+                    button.onclick = () => {
+                        const itemId = button.dataset.id;
+                        const item = menuItemsTableBody.querySelector(`button[data-id="${itemId}"]`).closest('tr');
+                        currentEditingItem = {
+                            _id: itemId,
+                            name: item.children[1].textContent,
+                            description: '', // Desc not in table, will fetch or leave empty
+                            price: parseFloat(item.children[3].textContent.replace('₹', '')),
+                            imageUrl: item.children[0].querySelector('img').src,
+                            category: item.children[2].textContent,
+                            isAvailable: item.children[4].textContent.trim() === 'Yes',
+                            isTrending: item.children[5].textContent.trim() === 'Yes'
+                        };
+                        // Fetch full item details for description if needed, or leave empty for quick edit
+                        fetch(`${API_BASE_URL}/menu/${itemId}`, {
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data) {
+                                currentEditingItem.description = data.description || '';
+                            }
+                            openMenuItemModal();
+                        })
+                        .catch(err => {
+                            console.error('Error fetching full item details:', err);
+                            showNotification('Failed to load full item details.', 'error');
+                            openMenuItemModal(); // Open modal with partial data
+                        });
+                    };
+                });
+                document.querySelectorAll('.delete-item-button').forEach(button => {
+                    button.onclick = () => handleDeleteMenuItem(button.dataset.id);
+                });
+            }
+
+            function openMenuItemModal() {
+                if (currentEditingItem) {
+                    menuItemModalTitle.textContent = 'Edit Menu Item';
+                    menuItemIdInput.value = currentEditingItem._id;
+                    menuItemNameInput.value = currentEditingItem.name;
+                    menuItemDescriptionInput.value = currentEditingItem.description;
+                    menuItemPriceInput.value = currentEditingItem.price;
+                    menuItemImageUrlInput.value = currentEditingItem.imageUrl;
+                    menuItemCategoryInput.value = currentEditingItem.category;
+                    menuItemIsAvailableInput.checked = currentEditingItem.isAvailable;
+                    menuItemIsTrendingInput.checked = currentEditingItem.isTrending;
+                    submitMenuItemButton.textContent = 'Update Item';
+                } else {
+                    menuItemModalTitle.textContent = 'Add New Menu Item';
+                    menuItemForm.reset(); // Clear form for new item
+                    menuItemIdInput.value = '';
+                    menuItemIsAvailableInput.checked = true; // Default to available
+                    menuItemIsTrendingInput.checked = false; // Default to not trending
+                    submitMenuItemButton.textContent = 'Add Item';
+                }
+                menuItemModal.classList.remove('hidden');
+            }
+
+            async function handleMenuItemSubmit(e) {
+                e.preventDefault();
+                submitMenuItemButton.disabled = true;
+                submitMenuItemButton.textContent = currentEditingItem ? 'Updating...' : 'Adding...';
+
+                const formData = {
+                    name: menuItemNameInput.value,
+                    description: menuItemDescriptionInput.value,
+                    price: parseFloat(menuItemPriceInput.value),
+                    imageUrl: menuItemImageUrlInput.value,
+                    category: menuItemCategoryInput.value,
+                    isAvailable: menuItemIsAvailableInput.checked,
+                    isTrending: menuItemIsTrendingInput.checked
+                };
+
+                const method = currentEditingItem ? 'PUT' : 'POST';
+                const url = currentEditingItem ? `${API_BASE_URL}/menu/${currentEditingItem._id}` : `${API_BASE_URL}/menu`;
+
+                try {
+                    const response = await fetchWithAuth(url, {
+                        method,
+                        body: JSON.stringify(formData)
+                    });
+
+                    if (response.ok) {
+                        showNotification(`Item ${currentEditingItem ? 'updated' : 'added'} successfully!`, 'success');
+                        menuItemModal.classList.add('hidden');
+                        fetchMenuItems();
+                    } else {
+                        const errorData = await response.json();
+                        showNotification(errorData.message || `Failed to ${currentEditingItem ? 'update' : 'add'} item.`, 'error');
+                    }
+                } catch (error) {
+                    console.error(`Error ${currentEditingItem ? 'updating' : 'adding'} item:`, error);
+                    showNotification('Network error or server unavailable.', 'error');
+                } finally {
+                    submitMenuItemButton.disabled = false;
+                    submitMenuItemButton.textContent = currentEditingItem ? 'Update Item' : 'Add Item';
+                }
+            }
+
+            async function handleDeleteMenuItem(id) {
+                if (!confirm('Are you sure you want to delete this item?')) return;
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/menu/${id}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        showNotification('Item deleted successfully!', 'success');
+                        fetchMenuItems();
+                    } else {
+                        const errorData = await response.json();
+                        showNotification(errorData.message || 'Failed to delete item.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting item:', error);
+                    showNotification('Network error or server unavailable.', 'error');
+                }
+            }
+
+            // Event Listeners
+            addMenuItemButton.onclick = () => {
+                currentEditingItem = null;
+                openMenuItemModal();
+            };
+            cancelMenuItemButton.onclick = () => menuItemModal.classList.add('hidden');
+            menuItemForm.onsubmit = handleMenuItemSubmit;
+
+            fetchMenuItems(); // Initial fetch
+        }
+
+        // --- Order Management Page Logic ---
+        function initOrderManagementPage() {
+            const orderLoadingMessage = document.getElementById('order-loading-message');
+            const orderItemsTableBody = document.getElementById('order-items-table-body');
+            const orderStatusFilter = document.getElementById('order-status-filter');
+
+            let allOrders = []; // Store all fetched orders for filtering
+
+            async function fetchOrders() {
+                orderLoadingMessage.classList.remove('hidden');
+                orderItemsTableBody.innerHTML = ''; // Clear table
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/orders`);
+                    const data = await response.json();
+                    allOrders = data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate)); // Sort by date descending
+                    renderFilteredOrders();
+                } catch (error) {
+                    console.error('Error fetching orders:', error);
+                    showNotification('Failed to fetch orders.', 'error');
+                    orderItemsTableBody.innerHTML = '<tr><td colspan="9" class="px-6 py-4 text-center text-red-500">Error loading orders.</td></tr>';
+                } finally {
+                    orderLoadingMessage.classList.add('hidden');
+                }
+            }
+
+            function renderFilteredOrders() {
+                const filterStatus = orderStatusFilter.value;
+                const filteredOrders = filterStatus === 'All'
+                    ? allOrders
+                    : allOrders.filter(order => order.status === filterStatus);
+
+                orderItemsTableBody.innerHTML = ''; // Clear existing rows
+                if (filteredOrders.length === 0) {
+                    orderItemsTableBody.innerHTML = '<tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">No orders found for the selected filter.</td></tr>';
+                } else {
+                    filteredOrders.forEach(order => {
+                        const row = document.createElement('tr');
+                        row.className = 'hover:bg-gray-50';
+                        const statusBadgeClass = getStatusBadgeClass(order.status);
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${order.customOrderId || order._id.substring(0, 8)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.customerName || 'N/A'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.customerPhone || 'N/A'}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                ${order.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹${order.totalAmount.toFixed(2)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                ${new Date(order.orderDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">${order.deliveryAddress || 'N/A'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClass}">
+                                    ${order.status}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <select data-id="${order._id}" class="order-status-select block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                    <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                    <option value="Confirmed" ${order.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
+                                    <option value="Preparing" ${order.status === 'Preparing' ? 'selected' : ''}>Preparing</option>
+                                    <option value="Out for Delivery" ${order.status === 'Out for Delivery' ? 'selected' : ''}>Out for Delivery</option>
+                                    <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                                    <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                                </select>
+                                <button data-id="${order._id}" class="delete-order-button mt-2 text-red-600 hover:text-red-900 text-sm">
+                                    Delete
+                                </button>
+                            </td>
+                        `;
+                        orderItemsTableBody.appendChild(row);
+                    });
+                    addEventListenersToOrderButtons();
+                }
+            }
+
+            function addEventListenersToOrderButtons() {
+                document.querySelectorAll('.order-status-select').forEach(select => {
+                    select.onchange = (e) => handleOrderStatusChange(select.dataset.id, e.target.value);
+                });
+                document.querySelectorAll('.delete-order-button').forEach(button => {
+                    button.onclick = () => handleDeleteOrder(button.dataset.id);
+                });
+            }
+
+            function getStatusBadgeClass(status) {
+                switch (status) {
+                    case 'Pending': return 'bg-yellow-100 text-yellow-800';
+                    case 'Confirmed': return 'bg-blue-100 text-blue-800';
+                    case 'Preparing': return 'bg-purple-100 text-purple-800';
+                    case 'Out for Delivery': return 'bg-indigo-100 text-indigo-800';
+                    case 'Delivered': return 'bg-green-100 text-green-800';
+                    case 'Cancelled': return 'bg-red-100 text-red-800';
+                    default: return 'bg-gray-100 text-gray-800';
+                }
+            }
+
+            async function handleOrderStatusChange(orderId, newStatus) {
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/orders/${orderId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ status: newStatus })
+                    });
+
+                    if (response.ok) {
+                        showNotification('Order status updated successfully!', 'success');
+                        fetchOrders(); // Re-fetch to update the local data
+                    } else {
+                        const errorData = await response.json();
+                        showNotification(errorData.message || 'Failed to update order status.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error updating order status:', error);
+                    showNotification('Network error or server unavailable.', 'error');
+                }
+            }
+
+            async function handleDeleteOrder(orderId) {
+                if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) return;
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/orders/${orderId}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        showNotification('Order deleted successfully!', 'success');
+                        fetchOrders();
+                    } else {
+                        const errorData = await response.json();
+                        showNotification(errorData.message || 'Failed to delete order.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting order:', error);
+                    showNotification('Network error or server unavailable.', 'error');
+                }
+            }
+
+            // Event Listeners
+            orderStatusFilter.onchange = renderFilteredOrders;
+
+            // Listen for new orders via Socket.io
+            if (!whatsappSocket) { // Ensure socket is initialized, if not, it will be by whatsapp page
+                whatsappSocket = io('http://localhost:3000');
+            }
+            whatsappSocket.off('new_order'); // Remove previous listener to avoid duplicates
+            whatsappSocket.on('new_order', (newOrder) => {
+                showNotification(`New Order Received! ID: ${newOrder.customOrderId}`, 'success');
+                allOrders.unshift(newOrder); // Add to the beginning
+                allOrders.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate)); // Re-sort
+                renderFilteredOrders();
             });
+
+            fetchOrders(); // Initial fetch
         }
 
-        function addEmptyDeliveryRateRow() {
-            addDeliveryRateRow('', '');
+        // --- Customer Management Page Logic ---
+        function initCustomerManagementPage() {
+            const customerLoadingMessage = document.getElementById('customer-loading-message');
+            const customerItemsTableBody = document.getElementById('customer-items-table-body');
+
+            async function fetchCustomers() {
+                customerLoadingMessage.classList.remove('hidden');
+                customerItemsTableBody.innerHTML = ''; // Clear table
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/customers`);
+                    const customers = await response.json();
+                    customerItemsTableBody.innerHTML = ''; // Clear existing rows
+                    if (customers.length === 0) {
+                        customerItemsTableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No customers found.</td></tr>';
+                    } else {
+                        customers.forEach(customer => {
+                            const row = document.createElement('tr');
+                            row.className = 'hover:bg-gray-50';
+                            row.innerHTML = `
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${customer.customerName || 'N/A'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.customerPhone || 'N/A'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.totalOrders || 0}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    ${customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString() : 'N/A'}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                                    ${customer.lastKnownLocation?.address || 'N/A'}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button data-id="${customer._id}" class="delete-customer-button text-red-600 hover:text-red-900">Delete</button>
+                                </td>
+                            `;
+                            customerItemsTableBody.appendChild(row);
+                        });
+                        addEventListenersToCustomerButtons();
+                    }
+                } catch (error) {
+                    console.error('Error fetching customers:', error);
+                    showNotification('Failed to fetch customers.', 'error');
+                    customerItemsTableBody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Error loading customers.</td></tr>';
+                } finally {
+                    customerLoadingMessage.classList.add('hidden');
+                }
+            }
+
+            function addEventListenersToCustomerButtons() {
+                document.querySelectorAll('.delete-customer-button').forEach(button => {
+                    button.onclick = () => handleDeleteCustomer(button.dataset.id);
+                });
+            }
+
+            async function handleDeleteCustomer(id) {
+                if (!confirm('Are you sure you want to delete this customer and their associated data?')) return;
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/customers/${id}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        showNotification('Customer deleted successfully!', 'success');
+                        fetchCustomers();
+                    } else {
+                        const errorData = await response.json();
+                        showNotification(errorData.message || 'Failed to delete customer.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error deleting customer:', error);
+                    showNotification('Network error or server unavailable.', 'error');
+                }
+            }
+
+            fetchCustomers(); // Initial fetch
         }
 
-        function addDeliveryRateRow(kms, amount) {
-            const div = document.createElement('div');
-            div.className = 'flex items-center mb-2';
-            div.innerHTML = `
-                <input type="number" placeholder="KMs" value="${kms}" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/2 mr-2 delivery-kms">
-                <input type="number" placeholder="Amount (₹)" value="${amount}" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline w-1/2 delivery-amount">
-                <button class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg ml-2 remove-rate-btn"><i class="fas fa-trash"></i></button>
-            `;
-            deliveryRatesContainer.appendChild(div);
+        // --- Settings Management Page Logic ---
+        function initSettingsManagementPage() {
+            const settingsLoadingMessage = document.getElementById('settings-loading-message');
+            const settingsForm = document.getElementById('settings-form');
+            const shopNameInput = document.getElementById('shop-name');
+            const shopLatitudeInput = document.getElementById('shop-latitude');
+            const shopLongitudeInput = document.getElementById('shop-longitude');
+            const deliveryRatesContainer = document.getElementById('delivery-rates-container');
+            const addDeliveryRateButton = document.getElementById('add-delivery-rate-button');
+            const isDiscountEnabledCheckbox = document.getElementById('is-discount-enabled');
+            const minSubtotalForDiscountInput = document.getElementById('min-subtotal-for-discount');
+            const discountPercentageInput = document.getElementById('discount-percentage');
+            const saveSettingsButton = document.getElementById('save-settings-button');
 
-            // Add event listener for remove button
-            div.querySelector('.remove-rate-btn').addEventListener('click', () => {
-                div.remove();
-            });
+            let currentSettings = {
+                shopName: '',
+                shopLocation: { latitude: '', longitude: '' },
+                deliveryRates: [],
+                minSubtotalForDiscount: 0,
+                discountPercentage: 0,
+                isDiscountEnabled: true
+            };
+
+            async function fetchSettings() {
+                settingsLoadingMessage.classList.remove('hidden');
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/settings`);
+                    const data = await response.json();
+                    currentSettings = {
+                        shopName: data.shopName || '',
+                        shopLocation: {
+                            latitude: data.shopLocation?.latitude || '',
+                            longitude: data.shopLocation?.longitude || ''
+                        },
+                        deliveryRates: data.deliveryRates || [],
+                        minSubtotalForDiscount: data.minSubtotalForDiscount || 0,
+                        discountPercentage: data.discountPercentage || 0,
+                        isDiscountEnabled: data.isDiscountEnabled !== undefined ? data.isDiscountEnabled : true
+                    };
+                    populateSettingsForm();
+                } catch (error) {
+                    console.error('Error fetching settings:', error);
+                    showNotification('Failed to fetch settings.', 'error');
+                } finally {
+                    settingsLoadingMessage.classList.add('hidden');
+                }
+            }
+
+            function populateSettingsForm() {
+                shopNameInput.value = currentSettings.shopName;
+                shopLatitudeInput.value = currentSettings.shopLocation.latitude;
+                shopLongitudeInput.value = currentSettings.shopLocation.longitude;
+                isDiscountEnabledCheckbox.checked = currentSettings.isDiscountEnabled;
+                minSubtotalForDiscountInput.value = currentSettings.minSubtotalForDiscount;
+                discountPercentageInput.value = currentSettings.discountPercentage;
+                toggleDiscountInputs();
+                renderDeliveryRates();
+            }
+
+            function renderDeliveryRates() {
+                deliveryRatesContainer.innerHTML = '';
+                currentSettings.deliveryRates.forEach((rate, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'flex flex-wrap items-center gap-4 mb-3';
+                    div.innerHTML = `
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="block text-sm font-medium text-gray-700" for="kms-${index}">KMs</label>
+                            <input type="number" id="kms-${index}" value="${rate.kms}" data-index="${index}" data-field="kms" class="delivery-rate-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" step="0.1" />
+                        </div>
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="block text-sm font-medium text-gray-700" for="amount-${index}">Amount (₹)</label>
+                            <input type="number" id="amount-${index}" value="${rate.amount}" data-index="${index}" data-field="amount" class="delivery-rate-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" step="0.01" />
+                        </div>
+                        <button type="button" data-index="${index}" class="remove-delivery-rate-button mt-5 px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition duration-150 ease-in-out">
+                            Remove
+                        </button>
+                    `;
+                    deliveryRatesContainer.appendChild(div);
+                });
+                addEventListenersToDeliveryRateInputs();
+            }
+
+            function addEventListenersToDeliveryRateInputs() {
+                document.querySelectorAll('.delivery-rate-input').forEach(input => {
+                    input.onchange = (e) => {
+                        const index = parseInt(e.target.dataset.index);
+                        const field = e.target.dataset.field;
+                        const value = e.target.value;
+                        currentSettings.deliveryRates[index][field] = parseFloat(value);
+                    };
+                });
+                document.querySelectorAll('.remove-delivery-rate-button').forEach(button => {
+                    button.onclick = (e) => {
+                        const index = parseInt(e.target.dataset.index);
+                        currentSettings.deliveryRates.splice(index, 1);
+                        renderDeliveryRates();
+                    };
+                });
+            }
+
+            function toggleDiscountInputs() {
+                const isDisabled = !isDiscountEnabledCheckbox.checked;
+                minSubtotalForDiscountInput.disabled = isDisabled;
+                discountPercentageInput.disabled = isDisabled;
+                if (isDisabled) {
+                    minSubtotalForDiscountInput.classList.add('opacity-50', 'cursor-not-allowed');
+                    discountPercentageInput.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    minSubtotalForDiscountInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                    discountPercentageInput.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+
+            async function handleSaveSettings(e) {
+                e.preventDefault();
+                saveSettingsButton.disabled = true;
+                saveSettingsButton.textContent = 'Saving...';
+
+                const payload = {
+                    shopName: shopNameInput.value,
+                    shopLocation: {
+                        latitude: parseFloat(shopLatitudeInput.value),
+                        longitude: parseFloat(shopLongitudeInput.value)
+                    },
+                    deliveryRates: currentSettings.deliveryRates.map(rate => ({
+                        kms: parseFloat(rate.kms),
+                        amount: parseFloat(rate.amount)
+                    })),
+                    minSubtotalForDiscount: parseFloat(minSubtotalForDiscountInput.value),
+                    discountPercentage: parseFloat(discountPercentageInput.value),
+                    isDiscountEnabled: isDiscountEnabledCheckbox.checked
+                };
+
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/settings`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        showNotification('Settings updated successfully!', 'success');
+                        fetchSettings(); // Re-fetch to ensure consistency
+                    } else {
+                        const errorData = await response.json();
+                        showNotification(errorData.message || 'Failed to update settings.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error saving settings:', error);
+                    showNotification('Network error or server unavailable.', 'error');
+                } finally {
+                    saveSettingsButton.disabled = false;
+                    saveSettingsButton.textContent = 'Save Settings';
+                }
+            }
+
+            // Event Listeners
+            addDeliveryRateButton.onclick = () => {
+                currentSettings.deliveryRates.push({ kms: 0, amount: 0 });
+                renderDeliveryRates();
+            };
+            isDiscountEnabledCheckbox.onchange = toggleDiscountInputs;
+            settingsForm.onsubmit = handleSaveSettings;
+
+            fetchSettings(); // Initial fetch
         }
 
-        addDeliveryRateBtn.addEventListener('click', addEmptyDeliveryRateRow);
+        // --- 2FA Management Page Logic ---
+        function init2FAManagementPage() {
+            const twoFaStatusBadge = document.getElementById('2fa-status-badge');
+            const enable2FaButton = document.getElementById('enable-2fa-button');
+            const disable2FaButton = document.getElementById('disable-2fa-button');
+            const twoFaEnableModal = document.getElementById('2fa-enable-modal');
+            const twoFaQrImage = document.getElementById('2fa-qr-image');
+            const twoFaTotpCodeVerifyInput = document.getElementById('2fa-totp-code-verify');
+            const cancel2FaButton = document.getElementById('cancel-2fa-button');
+            const verify2FaButton = document.getElementById('verify-2fa-button');
 
-        saveDeliveryRatesBtn.addEventListener('click', async () => {
-            const rateInputs = deliveryRatesContainer.querySelectorAll('.flex.items-center.mb-2');
-            const newRates = [];
-            let isValid = true;
+            let is2FAEnabled = false;
 
-            rateInputs.forEach(row => {
-                const kmsInput = row.querySelector('.delivery-kms');
-                const amountInput = row.querySelector('.delivery-amount');
-                const kms = parseFloat(kmsInput.value);
-                const amount = parseFloat(amountInput.value);
+            async function fetch2FAStatus() {
+                enable2FaButton.disabled = true;
+                disable2FaButton.disabled = true;
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/2fa/status`);
+                    const data = await response.json();
+                    is2FAEnabled = data.twoFactorEnabled;
+                    update2FAUI();
+                } catch (error) {
+                    console.error('Error fetching 2FA status:', error);
+                    showNotification('Failed to fetch 2FA status.', 'error');
+                } finally {
+                    enable2FaButton.disabled = false;
+                    disable2FaButton.disabled = false;
+                }
+            }
 
-                if (isNaN(kms) || kms < 0 || isNaN(amount) || amount < 0) {
-                    isValid = false;
+            function update2FAUI() {
+                if (is2FAEnabled) {
+                    twoFaStatusBadge.textContent = 'Status: Enabled';
+                    twoFaStatusBadge.classList.remove('bg-red-100', 'text-red-800');
+                    twoFaStatusBadge.classList.add('bg-green-100', 'text-green-800');
+                    enable2FaButton.classList.add('hidden');
+                    disable2FaButton.classList.remove('hidden');
+                } else {
+                    twoFaStatusBadge.textContent = 'Status: Disabled';
+                    twoFaStatusBadge.classList.remove('bg-green-100', 'text-green-800');
+                    twoFaStatusBadge.classList.add('bg-red-100', 'text-red-800');
+                    enable2FaButton.classList.remove('hidden');
+                    disable2FaButton.classList.add('hidden');
+                }
+            }
+
+            async function handleGenerate2FA() {
+                enable2FaButton.disabled = true;
+                enable2FaButton.textContent = 'Generating...';
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/2fa/generate`, { method: 'POST' });
+                    const data = await response.json();
+                    twoFaQrImage.src = data.qrCodeUrl;
+                    twoFactorTempSecret = data.secret; // Store for verification
+                    twoFaQrImage.classList.remove('hidden');
+                    twoFaEnableModal.classList.remove('hidden');
+                } catch (error) {
+                    console.error('Error generating 2FA:', error);
+                    showNotification('Failed to generate 2FA QR code.', 'error');
+                } finally {
+                    enable2FaButton.disabled = false;
+                    enable2FaButton.textContent = 'Enable 2FA';
+                }
+            }
+
+            async function handleVerify2FA() {
+                verify2FaButton.disabled = true;
+                verify2FaButton.textContent = 'Verifying...';
+                const totpCode = twoFaTotpCodeVerifyInput.value;
+                if (totpCode.length !== 6) {
+                    showNotification('Please enter a 6-digit code.', 'error');
+                    verify2FaButton.disabled = false;
+                    verify2FaButton.textContent = 'Verify & Enable';
                     return;
                 }
-                newRates.push({ kms, amount });
-            });
 
-            if (!isValid) {
-                showMessage('All delivery rates must be valid non-negative numbers.', true);
-                return;
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/2fa/verify`, {
+                        method: 'POST',
+                        body: JSON.stringify({ totpCode, secret: twoFactorTempSecret })
+                    });
+                    const data = await response.json();
+                    if (response.ok && data.verified) {
+                        showNotification('2FA enabled successfully!', 'success');
+                        twoFaEnableModal.classList.add('hidden');
+                        twoFaTotpCodeVerifyInput.value = '';
+                        twoFaQrImage.src = '';
+                        twoFaQrImage.classList.add('hidden');
+                        twoFactorTempSecret = '';
+                        fetch2FAStatus();
+                    } else {
+                        showNotification(data.message || '2FA verification failed.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error verifying 2FA:', error);
+                    showNotification('Network error or server unavailable.', 'error');
+                } finally {
+                    verify2FaButton.disabled = false;
+                    verify2FaButton.textContent = 'Verify & Enable';
+                }
             }
 
-            try {
-                showMessage('Saving delivery rates...');
-                const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/settings`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        deliveryRates: newRates
-                    })
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    showMessage(data.message || 'Delivery rates saved successfully!');
-                    fetchGeneralSettings(); // Re-fetch to ensure UI is in sync
-                } else {
-                    showMessage(data.message || 'Failed to save delivery rates.', true);
+            async function handleDisable2FA() {
+                if (!confirm('Are you sure you want to disable Two-Factor Authentication?')) return;
+                disable2FaButton.disabled = true;
+                disable2FaButton.textContent = 'Disabling...';
+                try {
+                    const response = await fetchWithAuth(`${API_BASE_URL}/2fa/disable`, { method: 'POST' });
+                    if (response.ok) {
+                        showNotification('2FA disabled successfully!', 'success');
+                        fetch2FAStatus();
+                    } else {
+                        const errorData = await response.json();
+                        showNotification(errorData.message || 'Failed to disable 2FA.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error disabling 2FA:', error);
+                    showNotification('Network error or server unavailable.', 'error');
+                } finally {
+                    disable2FaButton.disabled = false;
+                    disable2FaButton.textContent = 'Disable 2FA';
                 }
-            } catch (error) {
-                console.error('Error saving delivery rates:', error);
-                showMessage('Error saving delivery rates.', true);
+            }
+
+            // Event Listeners
+            enable2FaButton.onclick = handleGenerate2FA;
+            disable2FaButton.onclick = handleDisable2FA;
+            cancel2FaButton.onclick = () => {
+                twoFaEnableModal.classList.add('hidden');
+                twoFaTotpCodeVerifyInput.value = '';
+                twoFaQrImage.src = '';
+                twoFaQrImage.classList.add('hidden');
+                twoFactorTempSecret = ''; // Clear temp secret on cancel
+            };
+            verify2FaButton.onclick = handleVerify2FA;
+
+            fetch2FAStatus(); // Initial fetch
+        }
+
+        // --- Initial Setup and Routing ---
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuthentication();
+            renderPage(); // Render initial page based on auth state and URL hash
+
+            // Event listeners for global elements
+            loginForm.addEventListener('submit', handleLogin);
+            logoutButton.addEventListener('click', handleLogout);
+
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('-translate-x-full');
+            });
+
+            // Handle sidebar link clicks for navigation
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const path = e.target.getAttribute('href').substring(1); // Remove '#'
+                    navigateTo(path);
+                    // Close sidebar on mobile after navigation
+                    if (window.innerWidth < 1024) { // Tailwind's 'lg' breakpoint
+                        sidebar.classList.add('-translate-x-full');
+                    }
+                });
+            });
+
+            // Listen for hash changes (browser back/forward)
+            window.addEventListener('hashchange', () => {
+                currentPath = window.location.hash.substring(1) || '/dashboard';
+                renderPage();
+            });
+
+            // Redirect from old paths to new hash-based paths
+            if (window.location.pathname.startsWith('/admin/login.html') || window.location.pathname.startsWith('/admin_login.html')) {
+                navigateTo('/admin/login');
+            } else if (window.location.pathname.startsWith('/dashboard.html') || window.location.pathname.startsWith('/admin_dashboard.html')) {
+                navigateTo('/dashboard');
+            } else if (window.location.pathname === '/' && !window.location.hash) {
+                // If on root and no hash, redirect to dashboard if authenticated, else login
+                if (isAuthenticated) {
+                    navigateTo('/dashboard');
+                } else {
+                    navigateTo('/admin/login');
+                }
             }
         });
 
