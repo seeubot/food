@@ -119,7 +119,8 @@ const SettingsSchema = new mongoose.Schema({
     lastAuthenticatedAt: Date,
     // New fields for discount settings
     minSubtotalForDiscount: { type: Number, default: 200 },
-    discountPercentage: { type: Number, default: 0.20 } // Stored as a decimal (0.20 for 20%)
+    discountPercentage: { type: Number, default: 0.20 }, // Stored as a decimal (0.20 for 20%)
+    isDiscountEnabled: { type: Boolean, default: true } // New field for enabling/disabling discount
 });
 
 const Item = mongoose.model('Item', ItemSchema);
@@ -500,7 +501,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                     },
                     { upsert: true, new: true }
                 );
-                await client.sendMessage(rawChatId, 'Your location has been updated. Thank you!');
+                await client.sendMessage(rawChatId, 'Location updated. Thank you!');
                 console.log(`[WhatsApp Message Handler] Sent location confirmation to ${customerPhone}`);
                 io.emit('whatsapp_log', `Sent location confirmation to ${customerPhone}`);
                 return;
@@ -511,27 +512,31 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 case 'hi':
                 case 'hello':
                 case 'namaste':
-                case 'menu':
+                case 'start': // Added start command
                     console.log(`[WhatsApp Message Handler] Sending welcome message to ${customerPhone}`);
                     await sendWelcomeMessage(rawChatId, customerName);
                     break;
                 case '1':
+                case 'menu':
                 case 'view menu':
-                    console.log(`[WhatsApp Message Handler] Sending menu to ${customerPhone}`);
+                    console.log(`[WhatsApp Message Handler] Sending menu URL to ${customerPhone}`);
                     await sendMenu(rawChatId);
                     break;
                 case '2':
+                case 'location':
                 case 'shop location':
                     console.log(`[WhatsApp Message Handler] Sending shop location to ${customerPhone}`);
                     await sendShopLocation(rawChatId);
                     break;
-                case '4':
+                case '3': // Updated numbering
+                case 'orders':
                 case 'my orders':
                     console.log(`[WhatsApp Message Handler] Sending customer orders to ${customerPhone}`);
                     await sendCustomerOrders(rawChatId, customerPhone);
                     break;
-                case '5':
+                case '4': // Updated numbering
                 case 'help':
+                case 'support':
                     console.log(`[WhatsApp Message Handler] Sending help message to ${customerPhone}`);
                     await sendHelpMessage(rawChatId);
                     break;
@@ -544,12 +549,12 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                         { new: true, sort: { orderDate: -1 } }
                     );
                     if (pendingOrderCod) {
-                        await client.sendMessage(rawChatId, 'Your order has been confirmed for Cash on Delivery. Thank you! Your order will be processed shortly. 😊');
+                        await client.sendMessage(rawChatId, 'Order confirmed for Cash on Delivery. Processing now. 😊');
                         io.emit('new_order', pendingOrderCod);
                         console.log(`[WhatsApp Message Handler] Order ${pendingOrderCod.customOrderId} confirmed for COD.`);
                         io.emit('whatsapp_log', `Order ${pendingOrderCod.customOrderId} confirmed for COD.`);
                     } else {
-                        await client.sendMessage(rawChatId, 'You have no pending orders. Please place an order first.');
+                        await client.sendMessage(rawChatId, 'No pending orders found. Please place an order first.');
                         console.log(`[WhatsApp Message Handler] No pending orders for COD for ${customerPhone}.`);
                         io.emit('whatsapp_log', `No pending orders for COD for ${customerPhone}.`);
                     }
@@ -557,7 +562,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 case 'op':
                 case 'online payment':
                     console.log(`[WhatsApp Message Handler] Online payment request from ${customerPhone}`);
-                    await client.sendMessage(rawChatId, 'Online payment will be added soon! For now, please use Cash on Delivery or place your order through our web menu: ' + process.env.WEB_MENU_URL);
+                    await client.sendMessage(rawChatId, 'Online payment unavailable. Use Cash on Delivery or order via web menu: ' + process.env.WEB_MENU_URL);
                     break;
                 default:
                     console.log(`[WhatsApp Message Handler] Checking for PIN or pending order for ${customerPhone}.`);
@@ -583,16 +588,15 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                                 { $set: { deliveryAddress: msg.body } },
                                 { new: true }
                             );
-                            await client.sendMessage(rawChatId, 'Your delivery address has been saved. Please choose your payment method: ' +
-                                                    "'Cash on Delivery' (COD) or 'Online Payment' (OP).");
+                            await client.sendMessage(rawChatId, 'Address saved. Select payment: \'Cash on Delivery\' (COD) or \'Online Payment\' (OP).');
                             console.log(`[WhatsApp Message Handler] Saved address and prompted for payment for ${customerPhone}.`);
                         } else {
                             console.log(`[WhatsApp Message Handler] Unrecognized input from ${customerPhone} (has pending order with address).`);
-                            await client.sendMessage(rawChatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
+                            await client.sendMessage(rawChatId, 'Invalid input. Use web menu: ' + process.env.WEB_MENU_URL + '. Type "Hi" for options.');
                         }
                     } else {
                         console.log(`[WhatsApp Message Handler] Unrecognized input from ${customerPhone} (no recent pending order).`);
-                        await client.sendMessage(rawChatId, 'I did not understand your request. To place an order, please visit our web menu: ' + process.env.WEB_MENU_URL + '. You can also type "Hi" to return to the main menu or ask for "Help".');
+                        await client.sendMessage(rawChatId, 'Invalid input. Use web menu: ' + process.env.WEB_MENU_URL + '. Type "Hi" for options.');
                     }
                     break;
             }
@@ -601,7 +605,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
             io.emit('whatsapp_log', `FATAL ERROR processing message from ${customerPhone} (rawChatId: ${rawChatId}): ${error.message}`);
             // Attempt to send a generic error message back to the user
             try {
-                await client.sendMessage(rawChatId, 'Oops! Something went wrong while processing your request. Please try again or type "Help" for options.');
+                await client.sendMessage(rawChatId, 'Error processing request. Try again or type "Help".');
             } catch (sendError) {
                 console.error(`[WhatsApp Message Handler] Failed to send error message to ${rawChatId}:`, sendError);
             }
@@ -661,13 +665,13 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 // --- Bot Logic Functions (kept separate for clarity, but called from message listener) ---
 const sendWelcomeMessage = async (chatId, customerName) => {
     const menuOptions = [
-        "1. 📜 *Explore Our Menu*: Discover delicious dishes!",
-        "2. 📍 *Find Our Shop*: Get directions to satisfy your cravings!",
-        "4. 📝 *Track Your Orders*: Check the status of your recent meals!",
-        "5. ❓ *Need Assistance?*: We're here to help!"
+        "1. *Menu*: Explore delicious dishes!",
+        "2. *Location*: Find our shop!",
+        "3. *Orders*: Track your recent meals!",
+        "4. *Help*: Get assistance!"
     ];
     // Redesigned welcome message
-    const welcomeText = `🌟 Hey there, ${customerName || 'foodie'}! Welcome to *Delicious Bites*! 😋\n\nReady for a treat? Order effortlessly from our web menu: ${process.env.WEB_MENU_URL}\n\nOr, simply pick an option below to get started:\n\n${menuOptions.join('\n')}\n\nJust reply with the *number* or *keyword* for your choice! We're excited to serve you! ✨`;
+    const welcomeText = `🌟 Welcome ${customerName || 'foodie'}! Ready to order? Visit our web menu: ${process.env.WEB_MENU_URL}\n\nOr, choose an option:\n\n${menuOptions.join('\n')}\n\nReply with the *number* or *keyword*.`;
     try {
         await client.sendMessage(chatId, welcomeText);
         io.emit('whatsapp_log', `Sent welcome message to ${chatId}`);
@@ -683,7 +687,7 @@ const sendShopLocation = async (chatId) => {
         const { latitude, longitude } = settings.shopLocation;
         const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
         try {
-            await client.sendMessage(chatId, `📍 Craving our food? Find us here:\n${googleMapsLink}\n\nWe're excited to welcome you!`);
+            await client.sendMessage(chatId, `📍 Find us here: ${googleMapsLink}\n\nWe're waiting!`);
             io.emit('whatsapp_log', `Sent shop location to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send shop location to ${chatId}:`, error);
@@ -691,7 +695,7 @@ const sendShopLocation = async (chatId) => {
         }
     } else {
         try {
-            await client.sendMessage(chatId, 'Oops! Our shop location is temporarily unavailable. Please contact our support team for assistance.');
+            await client.sendMessage(chatId, 'Shop location unavailable. Contact support.');
             io.emit('whatsapp_log', `Sent shop location unavailable message to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send shop location unavailable message to ${chatId}:`, error);
@@ -701,55 +705,22 @@ const sendShopLocation = async (chatId) => {
 };
 
 const sendMenu = async (chatId) => {
-    const items = await Item.find({ isAvailable: true });
-    if (items.length === 0) {
-        try {
-            await client.sendMessage(chatId, 'Our menu is currently being updated with fresh delights! Please check back a little later. 😊');
-            io.emit('whatsapp_log', `Sent no menu items message to ${chatId}`);
-        } catch (error) {
-            console.error(`[WhatsApp] Failed to send no menu items message to ${chatId}:`, error);
-            io.emit('whatsapp_log', `Failed to send no menu items message to ${chatId}: ${error.message}`);
-        }
-        return;
-    }
-
-    let menuMessage = "📜 *Our Irresistible Menu:*\n\n";
-    const categories = {};
-    items.forEach(item => {
-        const category = item.category || 'Other Delights'; // Changed default category name
-        if (!categories[category]) {
-            categories[category] = [];
-        }
-        categories[category].push(item);
-    });
-
-    for (const category in categories) {
-        menuMessage += `*${category}*\n`;
-        categories[category].forEach((item, index) => {
-            menuMessage += `${index + 1}. ${item.name} - ₹${item.price.toFixed(2)}${item.isTrending ? ' ✨ *Trending!*' : ''}\n`; // Added Trending text
-            if (item.description) {
-                menuMessage += `   _(${item.description})_\n`;
-            }
-        });
-        menuMessage += '\n';
-    }
-    menuMessage += "Ready to order? Head over to our full web menu for a seamless experience: " + process.env.WEB_MENU_URL + "\n\nOr, simply type 'Hi' to return to the main menu. Happy feasting! 🍽️";
     try {
-        await client.sendMessage(chatId, menuMessage);
-        io.emit('whatsapp_log', `Sent menu to ${chatId}`);
+        await client.sendMessage(chatId, `📜 Explore our full menu here: ${process.env.WEB_MENU_URL}\n\nHappy feasting! 🍽️`);
+        io.emit('whatsapp_log', `Sent menu URL to ${chatId}`);
     } catch (error) {
-        console.error(`[WhatsApp] Failed to send menu to ${chatId}:`, error);
-        io.emit('whatsapp_log', `Failed to send menu to ${chatId}: ${error.message}`);
+        console.error(`[WhatsApp] Failed to send menu URL to ${chatId}:`, error);
+        io.emit('whatsapp_log', `Failed to send menu URL to ${chatId}: ${error.message}`);
     }
 };
 
 const sendCustomerOrders = async (chatId, customerPhone) => {
     // Fetch orders using customOrderId or pinId if available, otherwise use _id
-    const orders = await Order.find({ customerPhone: customerPhone }).sort({ orderDate: -1 }).limit(5);
+    const orders = await Order.find({ customerPhone: customerPhone }).sort({ orderDate: -1 }).limit(3); // Show only last 3 for conciseness
 
     if (orders.length === 0) {
         try {
-            await client.sendMessage(chatId, 'It looks like you haven\'t placed any orders with us yet. Ready to start your delicious journey? Visit our web menu: ' + process.env.WEB_MENU_URL);
+            await client.sendMessage(chatId, 'No orders placed yet. Start your delicious journey at: ' + process.env.WEB_MENU_URL);
             io.emit('whatsapp_log', `Sent no orders message to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send no orders message to ${chatId}:`, error);
@@ -763,14 +734,13 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
         const displayId = order.customOrderId || order._id.substring(0, 6) + '...';
         orderListMessage += `*Order ${index + 1} (ID: ${displayId})*\n`;
         if (order.pinId) {
-            orderListMessage += `  PIN: ${order.pinId} (Use this to track!)\n`;
+            orderListMessage += `  PIN: ${order.pinId}\n`;
         }
         orderListMessage += `  Total: ₹${order.totalAmount.toFixed(2)}\n`;
         orderListMessage += `  Status: *${order.status}*\n`;
-        orderListMessage += `  Payment: ${order.paymentMethod}\n`;
         orderListMessage += `  Date: ${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n`;
     });
-    orderListMessage += "Want to track a specific order? Just send us its 10-digit PIN! 🚀\n\nType 'Hi' to return to the main menu.";
+    orderListMessage += "Track orders by PIN. Type 'Hi' for main menu.";
     try {
         await client.sendMessage(chatId, orderListMessage);
         io.emit('whatsapp_log', `Sent past orders to ${chatId}`);
@@ -781,14 +751,7 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
 };
 
 const sendHelpMessage = async (chatId) => {
-    const helpMessage = `👋 *How Can We Assist You?*\n\nI'm here to make your ordering experience delightful! Here are some quick commands:\n\n` +
-                        `*Hi* - Back to the main menu\n` +
-                        `*View Menu* - See all our tempting dishes\n` +
-                        `*My Orders* - Check your order history\n` +
-                        `*Shop Location* - Get our exact location\n` +
-                        `*Help* - Show this message again\n\n` +
-                        `For a full ordering experience, visit our web menu: ${process.env.WEB_MENU_URL}\n\n` +
-                        `Feel free to ask any other questions! We're happy to help. 😊`;
+    const helpMessage = `👋 *How Can We Assist?*\n\n*Hi* - Main menu\n*Menu* - Web menu link\n*Orders* - Your order history\n*Location* - Shop address\n*Help* - Show this message\n\nFor ordering, visit: ${process.env.WEB_MENU_URL}`;
     try {
         await client.sendMessage(chatId, helpMessage);
         io.emit('whatsapp_log', `Sent help message to ${chatId}`);
@@ -1140,7 +1103,7 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
             // Ensure customerPhone is in the correct format for whatsapp-web.js
             const customerChatId = updatedOrder.customerPhone.includes('@c.us') ? updatedOrder.customerPhone : updatedOrder.customerPhone + '@c.us';
             try {
-                await client.sendMessage(customerChatId, `Your order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) status has been updated to '${status}'.`);
+                await client.sendMessage(customerChatId, `Order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) status updated to '${status}'.`);
                 io.emit('whatsapp_log', `Sent order status update to ${customerChatId}: ${status}`);
             } catch (sendError) {
                 console.error(`[WhatsApp] Failed to send order status update to ${customerChatId}:`, sendError);
@@ -1226,11 +1189,17 @@ app.get('/api/admin/discount-settings', authenticateToken, async (req, res) => {
     try {
         const settings = await Settings.findOne({});
         if (!settings) {
-            return res.status(404).json({ message: 'Discount settings not found. Please create default settings first.' });
+            // Return defaults if settings document doesn't exist yet
+            return res.json({
+                minSubtotalForDiscount: 200,
+                discountPercentage: 0.20,
+                isDiscountEnabled: true
+            });
         }
         res.json({
             minSubtotalForDiscount: settings.minSubtotalForDiscount,
-            discountPercentage: settings.discountPercentage
+            discountPercentage: settings.discountPercentage,
+            isDiscountEnabled: settings.isDiscountEnabled // Return the new field
         });
     } catch (error) {
         console.error('Error fetching discount settings:', error);
@@ -1240,18 +1209,34 @@ app.get('/api/admin/discount-settings', authenticateToken, async (req, res) => {
 
 app.put('/api/admin/discount-settings', authenticateToken, async (req, res) => {
     try {
-        const { minSubtotalForDiscount, discountPercentage } = req.body;
+        const { minSubtotalForDiscount, discountPercentage, isDiscountEnabled } = req.body;
 
-        if (typeof minSubtotalForDiscount !== 'number' || minSubtotalForDiscount < 0) {
+        const updateFields = {};
+        if (typeof minSubtotalForDiscount === 'number' && minSubtotalForDiscount >= 0) {
+            updateFields.minSubtotalForDiscount = minSubtotalForDiscount;
+        } else if (typeof minSubtotalForDiscount !== 'undefined') {
             return res.status(400).json({ message: 'minSubtotalForDiscount must be a non-negative number.' });
         }
-        if (typeof discountPercentage !== 'number' || discountPercentage < 0 || discountPercentage > 1) {
+
+        if (typeof discountPercentage === 'number' && discountPercentage >= 0 && discountPercentage <= 1) {
+            updateFields.discountPercentage = discountPercentage;
+        } else if (typeof discountPercentage !== 'undefined') {
             return res.status(400).json({ message: 'discountPercentage must be a number between 0 and 1 (e.g., 0.1 for 10%).' });
+        }
+
+        if (typeof isDiscountEnabled === 'boolean') { // Check if it's a boolean
+            updateFields.isDiscountEnabled = isDiscountEnabled;
+        } else if (typeof isDiscountEnabled !== 'undefined') { // If provided but not boolean
+            return res.status(400).json({ message: 'isDiscountEnabled must be a boolean value.' });
+        }
+
+        if (Object.keys(updateFields).length === 0) {
+            return res.status(400).json({ message: 'No valid discount settings provided for update.' });
         }
 
         const updatedSettings = await Settings.findOneAndUpdate(
             {},
-            { $set: { minSubtotalForDiscount, discountPercentage } },
+            { $set: updateFields },
             { new: true, upsert: true, runValidators: true }
         );
         res.json({ message: 'Discount settings updated successfully', settings: updatedSettings });
@@ -1283,7 +1268,8 @@ app.get('/api/public/settings', async (req, res) => {
                 shopLocation: { latitude: 17.4399, longitude: 78.4983 },
                 deliveryRates: [],
                 minSubtotalForDiscount: 200, // Default for public
-                discountPercentage: 0.20 // Default for public
+                discountPercentage: 0.20, // Default for public
+                isDiscountEnabled: true // Default for public
             });
         }
         res.json({
@@ -1291,7 +1277,8 @@ app.get('/api/public/settings', async (req, res) => {
             shopLocation: settings.shopLocation,
             deliveryRates: settings.deliveryRates,
             minSubtotalForDiscount: settings.minSubtotalForDiscount,
-            discountPercentage: settings.discountPercentage
+            discountPercentage: settings.discountPercentage,
+            isDiscountEnabled: settings.isDiscountEnabled // Expose to public API
         });
     } catch (err) {
         console.error('Error fetching public settings:', err);
@@ -1396,22 +1383,17 @@ app.post('/api/order', async (req, res) => {
             console.log(`[WhatsApp] Attempting to send order confirmation to customerChatId: ${customerChatId}`); // Log target ID
             try {
                 // Construct the detailed order confirmation message for the customer
-                let customerConfirmationMessage = `🎉 Your order from Delicious Bites has been placed successfully!\n\n`;
+                let customerConfirmationMessage = `🎉 Order placed!\n\n`;
                 customerConfirmationMessage += `*Order ID:* ${newOrder.customOrderId}\n`;
                 customerConfirmationMessage += `*PIN:* ${newOrder.pinId}\n\n`;
-                customerConfirmationMessage += `*Your Items:*\n`;
+                customerConfirmationMessage += `*Items:*\n`;
                 newOrder.items.forEach(item => {
-                    customerConfirmationMessage += `- ${item.name} x ${item.quantity} (₹${item.price.toFixed(2)} each)\n`;
+                    customerConfirmationMessage += `- ${item.name} x ${item.quantity}\n`;
                 });
-                customerConfirmationMessage += `\n*Subtotal:* ₹${newOrder.subtotal.toFixed(2)}\n`;
-                customerConfirmationMessage += `*Transport Tax:* ₹${newOrder.transportTax.toFixed(2)}\n`;
-                if (newOrder.discountAmount > 0) {
-                    customerConfirmationMessage += `*Discount:* -₹${newOrder.discountAmount.toFixed(2)}\n`;
-                }
-                customerConfirmationMessage += `*Total Amount:* ₹${newOrder.totalAmount.toFixed(2)}\n`;
-                customerConfirmationMessage += `*Payment Method:* ${newOrder.paymentMethod}\n`;
-                customerConfirmationMessage += `*Delivery Address:* ${newOrder.deliveryAddress}\n\n`;
-                customerConfirmationMessage += `We will notify you of its status updates. You can also view your orders by typing "My Orders" or by sending your PIN: ${newOrder.pinId}. Thank you for your order! 🥳`;
+                customerConfirmationMessage += `\n*Total:* ₹${newOrder.totalAmount.toFixed(2)}\n`;
+                customerConfirmationMessage += `*Payment:* ${newOrder.paymentMethod}\n`;
+                customerConfirmationMessage += `*Delivery:* ${newOrder.deliveryAddress}\n\n`;
+                customerConfirmationMessage += `Status updates coming. Track with PIN: ${newOrder.pinId}. Thank you! 🥳`;
 
                 await client.sendMessage(customerChatId, customerConfirmationMessage);
                 console.log(`[WhatsApp] Sent detailed order confirmation to ${customerChatId}`);
