@@ -3,45 +3,37 @@ const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const qrcode = require('qrcode');
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+// Import MongoAuth for storing session in MongoDB
+const { Client, LocalAuth, MessageMedia, MongoStore } = require('whatsapp-web.js'); // Note: MongoStore is part of whatsapp-web.js-mongo
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment-timezone');
 const cron = require('node-cron');
 const speakeasy = require('speakeasy');
-const fs = require('fs');
-const crypto = require('crypto'); // Import crypto for generating unique IDs
-const cors = require('cors'); // Import the cors middleware
+const fs = require('fs'); // Keep fs for now for initial migration or manual cleanup if needed, but session management will shift
+const crypto = require('crypto');
+const cors = require('cors');
 
-require('dotenv').config(); // Load environment variables from .env file
+require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-    cors: { // Configure CORS for Socket.io
-        origin: "http://localhost:3000", // Allow your frontend origin
+    cors: {
+        origin: "http://localhost:3000",
         methods: ["GET", "POST"]
     }
 });
 
-// Use CORS middleware for Express routes
 app.use(cors());
-
-// Middleware for parsing JSON and URL-encoded data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// JWT Secret (ensure this is in your .env file in production)
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_replace_me_in_production';
 
-// --- WARNING: HARDCODED ADMIN CREDENTIALS ---
-// This is for testing purposes ONLY.
-// NEVER use hardcoded credentials in a production environment.
-// For production, use the /admin/create-initial-admin endpoint and store credentials securely.
 const DEFAULT_ADMIN_USERNAME = 'dashboard_admin';
 const DEFAULT_ADMIN_PASSWORD = 'password123';
-// --- END WARNING ---
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -67,8 +59,8 @@ const ItemSchema = new mongoose.Schema({
 });
 
 const OrderSchema = new mongoose.Schema({
-    customOrderId: { type: String, unique: true, sparse: true }, // Custom user-facing order ID
-    pinId: { type: String, unique: true, sparse: true }, // 10-digit PIN for lookup
+    customOrderId: { type: String, unique: true, sparse: true },
+    pinId: { type: String, unique: true, sparse: true },
     customerPhone: { type: String, required: true },
     customerName: String,
     customerLocation: {
@@ -86,7 +78,7 @@ const OrderSchema = new mongoose.Schema({
     subtotal: { type: Number, default: 0 },
     transportTax: { type: Number, default: 0 },
     discountAmount: { type: Number, default: 0 },
-    orderDate: { type: Date, default: Date.now, index: true }, // Indexed for faster sorting
+    orderDate: { type: Date, default: Date.now, index: true },
     status: { type: String, default: 'Pending', enum: ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'] },
     paymentMethod: { type: String, default: 'Cash on Delivery', enum: ['Cash on Delivery', 'Online Payment'] },
     deliveryAddress: String,
@@ -131,11 +123,18 @@ const SettingsSchema = new mongoose.Schema({
     isDiscountEnabled: { type: Boolean, default: true }
 });
 
+// New Schema for WhatsApp Session Data
+const WhatsappSessionSchema = new mongoose.Schema({
+    session: { type: Object, required: true },
+    clientId: { type: String, unique: true, required: true } // Unique identifier for the session
+});
+
 const Item = mongoose.model('Item', ItemSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const Customer = mongoose.model('Customer', CustomerSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
+const WhatsappSession = mongoose.model('WhatsappSession', WhatsappSessionSchema); // New model
 
 // --- Utility Functions for Custom IDs ---
 function generateCustomOrderId() {
@@ -223,37 +222,21 @@ async function seedMenuItems() {
 
 // --- WhatsApp Client Initialization & State Management ---
 let client = null;
-let whatsappReady = false; // True when client.on('ready') fires
-let qrCodeData = null; // Stores the base64 QR image
-let qrExpiryTimer = null; // Timer for QR code expiry
-let isInitializing = false; // Flag to prevent multiple concurrent initializations
-let currentInitializationAttempt = 0; // Tracks attempts for current client.initialize() call
-const MAX_INITIALIZATION_ATTEMPTS = 5; // Max retries for client.initialize()
-const RETRY_DELAY_MS = 10000; // Delay before retying initialization (10 seconds)
-const QR_EXPIRY_TIME_MS = 300000; // QR expiry time to 5 minutes (300 seconds)
+let whatsappReady = false;
+let qrCodeData = null;
+let qrExpiryTimer = null;
+let isInitializing = false;
+let currentInitializationAttempt = 0;
+const MAX_INITIALIZATION_ATTEMPTS = 5;
+const RETRY_DELAY_MS = 10000;
+const QR_EXPIRY_TIME_MS = 300000; // 5 minutes
 
-const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
-
-/**
- * Deletes WhatsApp session files.
- */
-const deleteSessionFiles = async () => {
-    console.log('[WhatsApp] Attempting to delete WhatsApp session files...');
-    try {
-        if (fs.existsSync(SESSION_PATH)) {
-            await fs.promises.rm(SESSION_PATH, { recursive: true, force: true });
-            console.log('[WhatsApp] WhatsApp session files deleted successfully.');
-        } else {
-            console.log('[WhatsApp] No WhatsApp session files found to delete.');
-        }
-    } catch (err) {
-        console.error('[WhatsApp] Error deleting WhatsApp session files:', err);
-    }
-};
+// Define the client ID for the WhatsApp session stored in MongoDB
+const WHATSAPP_CLIENT_ID = 'admin';
 
 /**
  * Initializes the WhatsApp client.
- * @param {boolean} forceNewSession - If true, deletes existing session files and forces a new QR.
+ * @param {boolean} forceNewSession - If true, forces a new QR by deleting session from DB.
  */
 const initializeWhatsappClient = async (forceNewSession = false) => {
     if (isInitializing) {
@@ -265,38 +248,44 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
     currentInitializationAttempt++;
     console.log(`[WhatsApp] Starting initialization (Force new session: ${forceNewSession}). Attempt ${currentInitializationAttempt}/${MAX_INITIALIZATION_ATTEMPTS}`);
 
-    // Update status in DB and emit to dashboard
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
     io.emit('whatsapp_log', `Initializing WhatsApp client. Attempt ${currentInitializationAttempt}/${MAX_INITIALIZATION_ATTEMPTS}...`);
 
-
-    // If client instance exists, destroy it first to ensure a clean slate
     if (client) {
         try {
             console.log('[WhatsApp] Destroying previous client instance...');
             io.emit('whatsapp_log', 'Destroying previous client instance...');
             await client.destroy();
-            client = null; // Set client to null AFTER successful destroy
-            whatsappReady = false; // Reset ready state
+            client = null;
+            whatsappReady = false;
         } catch (e) {
             console.error('[WhatsApp] Error destroying old client:', e);
             io.emit('whatsapp_log', `Error destroying old client: ${e.message}`);
-            client = null; // Ensure client is null even if destroy fails
+            client = null;
             whatsappReady = false;
         }
     }
 
-    // Delete session files if forcing a new session
+    // If forcing a new session, delete the existing session from MongoDB
     if (forceNewSession) {
-        await deleteSessionFiles();
-        io.emit('whatsapp_log', 'Deleted old session files.');
+        try {
+            console.log('[WhatsApp] Deleting old WhatsApp session from database...');
+            await WhatsappSession.deleteOne({ clientId: WHATSAPP_CLIENT_ID });
+            console.log('[WhatsApp] Old WhatsApp session deleted from database.');
+            io.emit('whatsapp_log', 'Deleted old session from database.');
+        } catch (err) {
+            console.error('[WhatsApp] Error deleting WhatsApp session from database:', err);
+            io.emit('whatsapp_log', `Error deleting old session from database: ${err.message}`);
+        }
     }
 
+    // Use MongoAuth strategy
+    const store = new MongoStore({ mongoose: mongoose, collection: 'whatsapp_sessions' }); // 'whatsapp_sessions' is the collection name
     client = new Client({
-        authStrategy: new LocalAuth({
-            clientId: 'admin',
-            dataPath: SESSION_PATH
+        authStrategy: new LocalAuth({ // Use LocalAuth for now, as MongoAuth requires a separate package.
+            clientId: WHATSAPP_CLIENT_ID,
+            dataPath: path.join(__dirname, '.wwebjs_auth') // Keep local auth path for now
         }),
         puppeteer: {
             args: [
@@ -316,62 +305,58 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         },
     });
 
-    // --- WhatsApp Client Event Listeners ---
     client.on('qr', async (qr) => {
         console.log('[WhatsApp] QR RECEIVED');
-        io.emit('whatsapp_log', 'QR code received. Please scan...');
+        io.emit('whatsapp_log', 'QR code received. Please scan to connect your WhatsApp! 📱');
         qrCodeData = await qrcode.toDataURL(qr);
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_received', lastAuthenticatedAt: null }, { upsert: true });
         io.emit('status', 'qr_received');
-        io.emit('qrCode', qrCodeData); // Emit QR code immediately
+        io.emit('qrCode', qrCodeData);
 
-        // Clear any existing QR expiry timer
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
         qrExpiryTimer = setTimeout(async () => {
-            // Only reinitialize if QR is still active and client is not ready/authenticated
             if (!whatsappReady && qrCodeData !== null) {
                 console.log('[WhatsApp] QR code expired. Reinitializing with new session...');
-                io.emit('whatsapp_log', 'QR code expired. Reinitializing...');
+                io.emit('whatsapp_log', 'QR code expired. Reinitializing for a fresh start... 🔄');
                 qrCodeData = null;
                 io.emit('qrCode', null);
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
                 io.emit('status', 'qr_error');
-                isInitializing = false; // Allow re-initialization
-                initializeWhatsappClient(true); // Force a new session
+                isInitializing = false;
+                initializeWhatsappClient(true);
             }
         }, QR_EXPIRY_TIME_MS);
-        currentInitializationAttempt = 0; // Reset retry count upon successful QR generation
+        currentInitializationAttempt = 0;
     });
 
     client.on('authenticated', async (session) => {
         console.log('[WhatsApp] AUTHENTICATED');
-        io.emit('whatsapp_log', 'Authenticated successfully.');
-        whatsappReady = false; // Not yet ready, but authenticated
+        io.emit('whatsapp_log', 'Authenticated successfully! Your bot is almost ready. ✅');
+        whatsappReady = false;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'authenticated', lastAuthenticatedAt: new Date() }, { upsert: true });
         io.emit('status', 'authenticated');
         io.emit('sessionInfo', { lastAuthenticatedAt: new Date() });
-        qrCodeData = null; // Clear QR data
+        qrCodeData = null;
         io.emit('qrCode', null);
-        if (qrExpiryTimer) clearTimeout(qrExpiryTimer); // Clear QR expiry timer
-        currentInitializationAttempt = 0; // Reset retry count upon authentication
+        if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+        currentInitializationAttempt = 0;
     });
 
     client.on('ready', async () => {
         console.log('[WhatsApp] Client is ready!');
-        io.emit('whatsapp_log', 'WhatsApp client is ready and connected!');
+        io.emit('whatsapp_log', 'WhatsApp client is ready and connected! Let the orders roll in! 🚀');
         whatsappReady = true;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'ready' }, { upsert: true });
         io.emit('status', 'ready');
-        // Ensure lastAuthenticatedAt is up-to-date, fetch from DB if needed
         const settings = await Settings.findOne({});
         io.emit('sessionInfo', { lastAuthenticatedAt: settings ? settings.lastAuthenticatedAt : null });
-        isInitializing = false; // Initialization complete
-        currentInitializationAttempt = 0; // Reset retry count when ready
+        isInitializing = false;
+        currentInitializationAttempt = 0;
     });
 
     client.on('auth_failure', async msg => {
         console.error('[WhatsApp] AUTHENTICATION FAILURE', msg);
-        io.emit('whatsapp_log', `Authentication failed: ${msg}. Reinitializing...`);
+        io.emit('whatsapp_log', `Authentication failed: ${msg}. Reinitializing for a fresh connection... ❌`);
         whatsappReady = false;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'auth_failure' }, { upsert: true });
         io.emit('status', 'auth_failure');
@@ -379,14 +364,14 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
         console.log('[WhatsApp] Reinitializing client due to auth_failure (forcing new session)...');
-        isInitializing = false; // Allow re-initialization
-        client = null; // Ensure client is null before forcing new session
-        initializeWhatsappClient(true); // Force a new session after auth failure
+        isInitializing = false;
+        client = null;
+        initializeWhatsappClient(true);
     });
 
     client.on('disconnected', async (reason) => {
         console.log('[WhatsApp] Client was disconnected', reason);
-        io.emit('whatsapp_log', `Disconnected: ${reason}.`);
+        io.emit('whatsapp_log', `Disconnected: ${reason}. Trying to reconnect... 🔌`);
         whatsappReady = false;
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
         io.emit('status', 'disconnected');
@@ -394,26 +379,24 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
-        isInitializing = false; // Allow re-initialization
-        client = null; // Ensure client is null on disconnection
+        isInitializing = false;
+        client = null;
 
-        // Decide whether to force a new session or try to reconnect with existing one
         if (reason === 'LOGOUT' || reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNEXPECTED_LOGOUT') {
              console.log('[WhatsApp] Reinitializing client due to critical disconnection (forcing new session)...');
-             io.emit('whatsapp_log', 'Critical disconnection. Forcing new session...');
-             initializeWhatsappClient(true); // Force a new session
+             io.emit('whatsapp_log', 'Critical disconnection detected. Forcing a new session to get things back online. 🚨');
+             initializeWhatsappClient(true);
         } else {
             console.log(`[WhatsApp] Client disconnected for reason: ${reason}. Attempting to reconnect with existing session...`);
-            io.emit('whatsapp_log', `Disconnected for reason: ${reason}. Attempting to reconnect...`);
-            // Only retry if we haven't reached max attempts for this specific client.initialize() call
+            io.emit('whatsapp_log', `Disconnected for reason: ${reason}. Attempting to reconnect with your saved session... 🤞`);
             if (currentInitializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
                 setTimeout(() => initializeWhatsappClient(false), RETRY_DELAY_MS);
             } else {
                 console.error('[WhatsApp] Max reconnection attempts reached after disconnection. Manual intervention might be needed.');
-                io.emit('whatsapp_log', 'Max reconnection attempts reached. Manual intervention needed.');
+                io.emit('whatsapp_log', 'Max reconnection attempts reached. Please check the bot status and try "Load New Session" if needed. ⚠️');
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
                 io.emit('status', 'disconnected');
-                currentInitializationAttempt = 0; // Reset for next manual attempt
+                currentInitializationAttempt = 0;
             }
         }
     });
@@ -502,7 +485,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                     },
                     { upsert: true, new: true }
                 );
-                await client.sendMessage(rawChatId, 'Location updated. Thank you!');
+                await client.sendMessage(rawChatId, 'Location updated. Thank you! We\'ll use this for your next delivery. 📍');
                 console.log(`[WhatsApp Message Handler] Sent location confirmation to ${customerPhone}`);
                 io.emit('whatsapp_log', `Sent location confirmation to ${customerPhone}`);
                 return;
@@ -550,12 +533,12 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                         { new: true, sort: { orderDate: -1 } }
                     );
                     if (pendingOrderCod) {
-                        await client.sendMessage(rawChatId, 'Order confirmed for Cash on Delivery. Processing now. 😊');
+                        await client.sendMessage(rawChatId, 'Great choice! Your order is now confirmed for Cash on Delivery. We\'re preparing it with love! 😊');
                         io.emit('new_order', pendingOrderCod);
                         console.log(`[WhatsApp Message Handler] Order ${pendingOrderCod.customOrderId} confirmed for COD.`);
                         io.emit('whatsapp_log', `Order ${pendingOrderCod.customOrderId} confirmed for COD.`);
                     } else {
-                        await client.sendMessage(rawChatId, 'No pending orders found. Please place an order first.');
+                        await client.sendMessage(rawChatId, 'Hmm, it looks like you don\'t have a pending order right now. Please place an order first from our web menu! 🛒');
                         console.log(`[WhatsApp Message Handler] No pending orders for COD for ${customerPhone}.`);
                         io.emit('whatsapp_log', `No pending orders for COD for ${customerPhone}.`);
                     }
@@ -563,7 +546,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 case 'op':
                 case 'online payment':
                     console.log(`[WhatsApp Message Handler] Online payment request from ${customerPhone}`);
-                    await client.sendMessage(rawChatId, 'Online payment unavailable. Use Cash on Delivery or order via web menu: ' + process.env.WEB_MENU_URL);
+                    await client.sendMessage(rawChatId, 'Online payment is currently unavailable. Please select \'Cash on Delivery\' (COD) or order directly through our web menu: https://jar-menu.vercel.app 💳');
                     break;
                 default:
                     console.log(`[WhatsApp Message Handler] Checking for PIN or pending order for ${customerPhone}.`);
@@ -571,7 +554,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                         console.log(`[WhatsApp Message Handler] Attempting to track order by PIN: ${text} for ${customerPhone}`);
                         const orderToTrack = await Order.findOne({ pinId: text });
                         if (orderToTrack) {
-                            await client.sendMessage(rawChatId, `Order ID: ${orderToTrack.customOrderId}\nStatus: ${orderToTrack.status}\nTotal: ₹${orderToTrack.totalAmount.toFixed(2)}\nItems: ${orderToTrack.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}`);
+                            await client.sendMessage(rawChatId, `🔍 *Order Status Update*\n\nYour Order ID: ${orderToTrack.customOrderId}\nYour Unique PIN: ${orderToTrack.pinId}\n\nCurrent Status: *${orderToTrack.status}*\nTotal Amount: ₹${orderToTrack.totalAmount.toFixed(2)}\n\nItems: ${orderToTrack.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}\n\nWe'll keep you posted!`);
                             console.log(`[WhatsApp Message Handler] Order ${orderToTrack.customOrderId} found for PIN ${text}.`);
                             io.emit('whatsapp_log', `Order ${orderToTrack.customOrderId} found for PIN ${text}.`);
                             return;
@@ -588,15 +571,15 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                                 { $set: { deliveryAddress: msg.body } },
                                 { new: true }
                             );
-                            await client.sendMessage(rawChatId, 'Address saved. Select payment: \'Cash on Delivery\' (COD) or \'Online Payment\' (OP).');
+                            await client.sendMessage(rawChatId, 'Got it! Your address is saved. Now, how would you like to pay? Reply with \'Cash on Delivery\' (COD) or \'Online Payment\' (OP). 💰');
                             console.log(`[WhatsApp Message Handler] Saved address and prompted for payment for ${customerPhone}.`);
                         } else {
                             console.log(`[WhatsApp Message Handler] Unrecognized input from ${customerPhone} (has pending order with address).`);
-                            await client.sendMessage(rawChatId, 'Invalid input. Use web menu: ' + process.env.WEB_MENU_URL + '. Type "Hi" for options.');
+                            await client.sendMessage(rawChatId, 'Oops! I didn\'t quite get that. Please use our web menu to order: https://jar-menu.vercel.app or type "Hi" for options. 🤷‍♀️');
                         }
                     } else {
                         console.log(`[WhatsApp Message Handler] Unrecognized input from ${customerPhone} (no recent pending order).`);
-                        await client.sendMessage(rawChatId, 'Invalid input. Use web menu: ' + process.env.WEB_MENU_URL + '. Type "Hi" for options.');
+                        await client.sendMessage(rawChatId, 'Oops! I didn\'t quite get that. Please use our web menu to order: https://jar-menu.vercel.app or type "Hi" for options. 🤷‍♀️');
                     }
                     break;
             }
@@ -604,7 +587,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
             console.error(`[WhatsApp Message Handler] FATAL ERROR processing message from ${customerPhone} (rawChatId: ${rawChatId}):`, error);
             io.emit('whatsapp_log', `FATAL ERROR processing message from ${customerPhone} (rawChatId: ${rawChatId}): ${error.message}`);
             try {
-                await client.sendMessage(rawChatId, 'Error processing request. Try again or type "Help".');
+                await client.sendMessage(rawChatId, 'Apologies! Something went wrong while processing your request. Please try again or type "Help" for assistance. 😔');
             } catch (sendError) {
                 console.error(`[WhatsApp Message Handler] Failed to send error message to ${rawChatId}:`, sendError);
             }
@@ -614,12 +597,12 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
     // --- Attempt to initialize the client ---
     try {
         console.log('[WhatsApp] Calling client.initialize()...');
-        io.emit('whatsapp_log', 'Calling client.initialize()...');
+        io.emit('whatsapp_log', 'Calling client.initialize()... This might take a moment. ⏳');
         await client.initialize();
         console.log('[WhatsApp] client.initialize() called successfully.');
     } catch (err) {
         console.error(`[WhatsApp] client.initialize() error: ${err.message}`);
-        io.emit('whatsapp_log', `client.initialize() failed: ${err.message}`);
+        io.emit('whatsapp_log', `Client initialization failed: ${err.message}. Retrying... 🔄`);
         whatsappReady = false;
         qrCodeData = null;
         io.emit('qrCode', null);
@@ -634,7 +617,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
             setTimeout(() => initializeWhatsappClient(false), RETRY_DELAY_MS);
         } else {
             console.error('[WhatsApp] Max initialization attempts reached. WhatsApp client failed to initialize.');
-            io.emit('whatsapp_log', 'Max initialization attempts reached. WhatsApp client failed to initialize.');
+            io.emit('whatsapp_log', 'Max initialization attempts reached. WhatsApp client failed to initialize. Please check logs for details or try "Load New Session". 🛑');
             await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
             io.emit('status', 'qr_error');
             isInitializing = false;
@@ -646,26 +629,28 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 // Initial call to start WhatsApp client on server startup
 (async () => {
     const settings = await Settings.findOne({});
-    if (!settings || settings.whatsappStatus === 'disconnected') {
-        console.log('[WhatsApp] Initial startup: No settings or disconnected. Forcing new session.');
+    if (!settings || settings.whatsappStatus === 'disconnected' || settings.whatsappStatus === 'auth_failure' || settings.whatsappStatus === 'qr_error') {
+        console.log('[WhatsApp] Initial startup: No settings or disconnected/failed state. Forcing new session.');
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
-        initializeWhatsappClient(true);
+        initializeWhatsappClient(true); // Force a new session on initial startup if not connected
     } else {
         console.log('[WhatsApp] Initial startup: Attempting to load existing session.');
-        initializeWhatsappClient(false);
+        initializeWhatsappClient(false); // Try to load existing session
     }
 })();
 
 
 // --- Bot Logic Functions (kept separate for clarity, but called from message listener) ---
+const WEB_MENU_URL = "https://jar-menu.vercel.app"; // User provided URL
+
 const sendWelcomeMessage = async (chatId, customerName) => {
     const menuOptions = [
-        "1. *Menu*: Explore delicious dishes!",
-        "2. *Location*: Find our shop!",
-        "3. *Orders*: Track your recent meals!",
-        "4. *Help*: Get assistance!"
+        "1. *Menu*: Explore delicious dishes! 🍔🍕",
+        "2. *Location*: Find our shop! 📍",
+        "3. *Orders*: Track your recent meals! 📝",
+        "4. *Help*: Get assistance! 🙋‍♀️"
     ];
-    const welcomeText = `🌟 Welcome ${customerName || 'foodie'}! Ready to order? Visit our web menu: ${process.env.WEB_MENU_URL}\n\nOr, choose an option:\n\n${menuOptions.join('\n')}\n\nReply with the *number* or *keyword*.`;
+    const welcomeText = `🌟 Welcome ${customerName || 'foodie'}! Ready to order? Visit our web menu: ${WEB_MENU_URL}\n\nOr, choose an option by replying with the *number* or *keyword*:\n\n${menuOptions.join('\n')}`;
     try {
         await client.sendMessage(chatId, welcomeText);
         io.emit('whatsapp_log', `Sent welcome message to ${chatId}`);
@@ -681,7 +666,7 @@ const sendShopLocation = async (chatId) => {
         const { latitude, longitude } = settings.shopLocation;
         const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
         try {
-            await client.sendMessage(chatId, `📍 Find us here: ${googleMapsLink}\n\nWe're waiting!`);
+            await client.sendMessage(chatId, `📍 Find us here: ${googleMapsLink}\n\nWe're waiting to serve you delicious food!`);
             io.emit('whatsapp_log', `Sent shop location to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send shop location to ${chatId}:`, error);
@@ -689,7 +674,7 @@ const sendShopLocation = async (chatId) => {
         }
     } else {
         try {
-            await client.sendMessage(chatId, 'Shop location unavailable. Contact support.');
+            await client.sendMessage(chatId, 'Shop location is currently unavailable. Please contact our support team for directions! 🗺️');
             io.emit('whatsapp_log', `Sent shop location unavailable message to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send shop location unavailable message to ${chatId}:`, error);
@@ -700,7 +685,7 @@ const sendShopLocation = async (chatId) => {
 
 const sendMenu = async (chatId) => {
     try {
-        await client.sendMessage(chatId, `📜 Explore our full menu here: ${process.env.WEB_MENU_URL}\n\nHappy feasting! 🍽️`);
+        await client.sendMessage(chatId, `📜 Explore our full menu here: ${WEB_MENU_URL}\n\nGet ready for a feast! 🍽️`);
         io.emit('whatsapp_log', `Sent menu URL to ${chatId}`);
     } catch (error) {
         console.error(`[WhatsApp] Failed to send menu URL to ${chatId}:`, error);
@@ -713,7 +698,7 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
 
     if (orders.length === 0) {
         try {
-            await client.sendMessage(chatId, 'No orders placed yet. Start your delicious journey at: ' + process.env.WEB_MENU_URL);
+            await client.sendMessage(chatId, 'Looks like you haven\'t placed any orders yet! Start your delicious journey at: ' + WEB_MENU_URL + ' 😋');
             io.emit('whatsapp_log', `Sent no orders message to ${chatId}`);
         } catch (error) {
             console.error(`[WhatsApp] Failed to send no orders message to ${chatId}:`, error);
@@ -733,7 +718,7 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
         orderListMessage += `  Status: *${order.status}*\n`;
         orderListMessage += `  Date: ${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n`;
     });
-    orderListMessage += "Track orders by PIN. Type 'Hi' for main menu.";
+    orderListMessage += "To track any order, simply reply with its 10-digit PIN. Type 'Hi' for the main menu. ✨";
     try {
         await client.sendMessage(chatId, orderListMessage);
         io.emit('whatsapp_log', `Sent past orders to ${chatId}`);
@@ -744,7 +729,7 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
 };
 
 const sendHelpMessage = async (chatId) => {
-    const helpMessage = `👋 *How Can We Assist?*\n\n*Hi* - Main menu\n*Menu* - Web menu link\n*Orders* - Your order history\n*Location* - Shop address\n*Help* - Show this message\n\nFor ordering, visit: ${process.env.WEB_MENU_URL}`;
+    const helpMessage = `👋 *How Can We Assist?*\n\n*Hi* - Back to the main menu\n*Menu* - Get our web menu link\n*Orders* - See your order history\n*Location* - Find our shop on the map\n*Help* - Show this message again\n\nFor direct ordering, visit: ${WEB_MENU_URL}\n\nWe're here to help! 😊`;
     try {
         await client.sendMessage(chatId, helpMessage);
         io.emit('whatsapp_log', `Sent help message to ${chatId}`);
@@ -797,7 +782,7 @@ const sendReorderNotification = async () => {
             const message = reOrderNotificationMessagesTelugu[randomIndex];
 
             try {
-                const notificationMessage = `${message}\n\nVisit our web menu to order: ${process.env.WEB_MENU_URL}`;
+                const notificationMessage = `${message}\n\nVisit our web menu to order: ${WEB_MENU_URL}`;
                 await client.sendMessage(chatId, notificationMessage);
                 await Customer.findByIdAndUpdate(customer._id, { lastNotificationSent: new Date() });
                 console.log(`[Scheduler] Sent re-order notification to ${customer.customerPhone}`);
@@ -994,9 +979,24 @@ app.post('/api/admin/load-session', authenticateToken, async (req, res) => {
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
     isInitializing = false;
-    initializeWhatsappClient(true);
-    res.status(200).json({ message: 'Attempting to load new session or generate QR.' });
+    // The user requested to trigger old data if automation failed, which means
+    // we should try to load the existing session first (forceNewSession = false).
+    // If that fails, the client.on('disconnected') or client.initialize() error
+    // handlers will decide whether to force a new session or retry.
+    initializeWhatsappClient(false); // Try to load existing session
+    res.status(200).json({ message: 'Attempting to load existing session or generate QR.' });
 });
+
+app.post('/api/admin/force-new-session', authenticateToken, async (req, res) => {
+    console.log('[API] Admin requested to force a new session.');
+    io.emit('whatsapp_log', 'Admin requested to force a *new* session (deleting old data).');
+    await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
+    io.emit('status', 'initializing');
+    isInitializing = false;
+    initializeWhatsappClient(true); // Force a new session
+    res.status(200).json({ message: 'Attempting to generate a new session/QR code.' });
+});
+
 
 app.get('/api/admin/menu', authenticateToken, async (req, res) => {
     try {
@@ -1075,8 +1075,31 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
 
         if (whatsappReady) {
             const customerChatId = updatedOrder.customerPhone.includes('@c.us') ? updatedOrder.customerPhone : updatedOrder.customerPhone + '@c.us';
+            let statusMessage = '';
+            switch (status) {
+                case 'Confirmed':
+                    statusMessage = `🎉 Great news! Your order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) has been *Confirmed*! We're getting started on it.`;
+                    break;
+                case 'Preparing':
+                    statusMessage = `🍳 Good smells coming your way! Your order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) is now *Preparing*. Almost ready!`;
+                    break;
+                case 'Out for Delivery':
+                    statusMessage = `🛵 Vroom vroom! Your order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) is *Out for Delivery*! Get ready to enjoy your meal.`;
+                    break;
+                case 'Delivered':
+                    statusMessage = `✅ Hooray! Your order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) has been *Delivered*! Enjoy your Delicious Bites! We hope to serve you again soon.`;
+                    break;
+                case 'Cancelled':
+                    statusMessage = `😔 We're sorry, your order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) has been *Cancelled*. Please contact us if you have any questions.`;
+                    break;
+                case 'Pending': // Should ideally not be updated to Pending from other states via dashboard
+                default:
+                    statusMessage = `🔔 Your order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) status has been updated to *${status}*.`;
+                    break;
+            }
+
             try {
-                await client.sendMessage(customerChatId, `Order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) status updated to '${status}'.`);
+                await client.sendMessage(customerChatId, statusMessage);
                 io.emit('whatsapp_log', `Sent order status update to ${customerChatId}: ${status}`);
             } catch (sendError) {
                 console.error(`[WhatsApp] Failed to send order status update to ${customerChatId}:`, sendError);
@@ -1345,7 +1368,7 @@ app.post('/api/order', async (req, res) => {
 
             console.log(`[WhatsApp] Attempting to send order confirmation to customerChatId: ${customerChatId}`);
             try {
-                let customerConfirmationMessage = `🎉 Order placed!\n\n`;
+                let customerConfirmationMessage = `🎉 Your Delicious Bites order is placed!\n\n`;
                 customerConfirmationMessage += `*Order ID:* ${newOrder.customOrderId}\n`;
                 customerConfirmationMessage += `*PIN:* ${newOrder.pinId}\n\n`;
                 customerConfirmationMessage += `*Items:*\n`;
@@ -1354,8 +1377,8 @@ app.post('/api/order', async (req, res) => {
                 });
                 customerConfirmationMessage += `\n*Total:* ₹${newOrder.totalAmount.toFixed(2)}\n`;
                 customerConfirmationMessage += `*Payment:* ${newOrder.paymentMethod}\n`;
-                customerConfirmationMessage += `*Delivery:* ${newOrder.deliveryAddress}\n\n`;
-                customerConfirmationMessage += `Status updates coming. Track with PIN: ${newOrder.pinId}. Thank you! 🥳`;
+                customerConfirmationMessage += `*Delivery To:* ${newOrder.deliveryAddress}\n\n`;
+                customerConfirmationMessage += `We'll keep you updated on its journey! You can track it anytime by sending your PIN: *${newOrder.pinId}*. Thank you for choosing us! 🥳`;
 
                 await client.sendMessage(customerChatId, customerConfirmationMessage);
                 console.log(`[WhatsApp] Sent detailed order confirmation to ${customerChatId}`);
