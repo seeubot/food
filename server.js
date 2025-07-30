@@ -12,16 +12,20 @@ const cron = require('node-cron');
 const speakeasy = require('speakeasy');
 const fs = require('fs');
 const crypto = require('crypto'); // Import crypto for generating unique IDs
-const cors = require('cors'); // NEW: Import the cors middleware
+const cors = require('cors'); // Import the cors middleware
 
-require('dotenv').config();
+require('dotenv').config(); // Load environment variables from .env file
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+    cors: { // Configure CORS for Socket.io
+        origin: "http://localhost:3000", // Allow your frontend origin
+        methods: ["GET", "POST"]
+    }
+});
 
-// NEW: Use CORS middleware - This allows all origins for simplicity in development.
-// For production, you should configure it to allow only your specific frontend origin(s).
+// Use CORS middleware for Express routes
 app.use(cors());
 
 // Middleware for parsing JSON and URL-encoded data
@@ -29,10 +33,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // JWT Secret (ensure this is in your .env file in production)
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey';
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_replace_me_in_production';
 
 // --- WARNING: HARDCODED ADMIN CREDENTIALS ---
-// This is for testing purposes ONLY as per user request.
+// This is for testing purposes ONLY.
 // NEVER use hardcoded credentials in a production environment.
 // For production, use the /admin/create-initial-admin endpoint and store credentials securely.
 const DEFAULT_ADMIN_USERNAME = 'dashboard_admin';
@@ -81,18 +85,18 @@ const OrderSchema = new mongoose.Schema({
     totalAmount: { type: Number, required: true },
     subtotal: { type: Number, default: 0 },
     transportTax: { type: Number, default: 0 },
-    discountAmount: { type: Number, default: 0 }, // Added discountAmount to schema
+    discountAmount: { type: Number, default: 0 },
     orderDate: { type: Date, default: Date.now, index: true }, // Indexed for faster sorting
     status: { type: String, default: 'Pending', enum: ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'] },
     paymentMethod: { type: String, default: 'Cash on Delivery', enum: ['Cash on Delivery', 'Online Payment'] },
     deliveryAddress: String,
     lastMessageTimestamp: { type: Date, default: Date.now },
-    razorpayOrderId: { type: String, unique: true, sparse: true }, // Kept sparse for historical data, not populated for new orders
-    razorpayPaymentId: { type: String, unique: true, sparse: true }, // Kept sparse for historical data, not populated for new orders
+    razorpayOrderId: { type: String, unique: true, sparse: true },
+    razorpayPaymentId: { type: String, unique: true, sparse: true },
 });
 
 const CustomerSchema = new mongoose.Schema({
-    customerPhone: { type: String, required: true, unique: true }, // Ensure this is unique
+    customerPhone: { type: String, required: true, unique: true },
     customerName: String,
     totalOrders: { type: Number, default: 0 },
     lastOrderDate: Date,
@@ -122,10 +126,9 @@ const SettingsSchema = new mongoose.Schema({
     }],
     whatsappStatus: { type: String, default: 'disconnected', enum: ['disconnected', 'qr_received', 'authenticated', 'ready', 'auth_failure', 'initializing', 'qr_error'] },
     lastAuthenticatedAt: Date,
-    // New fields for discount settings
     minSubtotalForDiscount: { type: Number, default: 200 },
-    discountPercentage: { type: Number, default: 0.20 }, // Stored as a decimal (0.20 for 20%)
-    isDiscountEnabled: { type: Boolean, default: true } // New field for enabling/disabling discount
+    discountPercentage: { type: Number, default: 0.20 },
+    isDiscountEnabled: { type: Boolean, default: true }
 });
 
 const Item = mongoose.model('Item', ItemSchema);
@@ -136,8 +139,8 @@ const Settings = mongoose.model('Settings', SettingsSchema);
 
 // --- Utility Functions for Custom IDs ---
 function generateCustomOrderId() {
-    const timestampPart = Date.now().toString().slice(-6); // Last 6 digits of timestamp
-    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 random chars
+    const timestampPart = Date.now().toString().slice(-6);
+    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
     return `JAR${timestampPart}${randomPart}`;
 }
 
@@ -145,7 +148,6 @@ async function generateUniquePinId() {
     let pin;
     let isUnique = false;
     while (!isUnique) {
-        // Generate a random 10-digit number as a string
         pin = Math.floor(1000000000 + Math.random() * 9000000000).toString();
         const existingOrder = await Order.findOne({ pinId: pin });
         if (!existingOrder) {
@@ -155,7 +157,7 @@ async function generateUniquePinId() {
     return pin;
 }
 
-// --- New: Function to seed default menu items ---
+// --- Function to seed default menu items ---
 async function seedMenuItems() {
     try {
         const itemCount = await Item.countDocuments();
@@ -226,9 +228,9 @@ let qrCodeData = null; // Stores the base64 QR image
 let qrExpiryTimer = null; // Timer for QR code expiry
 let isInitializing = false; // Flag to prevent multiple concurrent initializations
 let currentInitializationAttempt = 0; // Tracks attempts for current client.initialize() call
-const MAX_INITIALIZATION_ATTEMPTS = 5; // Increased max retries for client.initialize()
-const RETRY_DELAY_MS = 10000; // Increased delay before retying initialization (10 seconds)
-const QR_EXPIRY_TIME_MS = 300000; // Increased QR expiry time to 5 minutes (300 seconds)
+const MAX_INITIALIZATION_ATTEMPTS = 5; // Max retries for client.initialize()
+const RETRY_DELAY_MS = 10000; // Delay before retying initialization (10 seconds)
+const QR_EXPIRY_TIME_MS = 300000; // QR expiry time to 5 minutes (300 seconds)
 
 const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
 
@@ -297,15 +299,14 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
             dataPath: SESSION_PATH
         }),
         puppeteer: {
-            // Added more robust puppeteer args for better stability
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage', // Recommended for Docker/Linux environments
+                '--disable-dev-shm-usage',
                 '--disable-accelerated-2d-canvas',
                 '--no-zygote',
-                '--single-process', // Use if experiencing issues with multiple processes
-                '--disable-gpu' // Disable GPU hardware acceleration
+                '--single-process',
+                '--disable-gpu'
             ],
             headless: true,
         },
@@ -338,7 +339,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 isInitializing = false; // Allow re-initialization
                 initializeWhatsappClient(true); // Force a new session
             }
-        }, QR_EXPIRY_TIME_MS); // Use increased QR expiry time
+        }, QR_EXPIRY_TIME_MS);
         currentInitializationAttempt = 0; // Reset retry count upon successful QR generation
     });
 
@@ -422,30 +423,26 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         console.log(`[WhatsApp] Message received from ${msg.from}: ${msg.body}`);
         io.emit('whatsapp_log', `Message from ${msg.from}: ${msg.body}`);
 
-        // Define text here at the very beginning of the message handler
         const text = msg.body ? msg.body.toLowerCase().trim() : '';
 
-        // Extract and strictly validate customerPhone
         let customerPhone = '';
         const rawChatId = msg.from;
 
         if (typeof rawChatId === 'string' && rawChatId.length > 0) {
             customerPhone = rawChatId.includes('@c.us') ? rawChatId.split('@')[0] : rawChatId;
-            customerPhone = customerPhone.trim(); // Ensure no leading/trailing whitespace
+            customerPhone = customerPhone.trim();
         }
 
-        // If customerPhone is empty after processing, assign a unique placeholder
-        // and then skip processing this message to prevent invalid data in DB.
         if (customerPhone.length === 0) {
             console.error(`[WhatsApp Message Handler] Invalid or empty customerPhone derived from msg.from: '${rawChatId}'. Skipping message processing.`);
             io.emit('whatsapp_log', `Skipping message: Invalid phone number from ${rawChatId}`);
-            return; // Exit if customerPhone is invalid
+            return;
         }
 
-        const customerName = msg._data.notifyName; // This can be null/undefined
+        const customerName = msg._data.notifyName;
 
         try {
-            console.log(`[WhatsApp Message Handler] Attempting to find/create customer for phone: '${customerPhone}'`); // Added log for clarity
+            console.log(`[WhatsApp Message Handler] Attempting to find/create customer for phone: '${customerPhone}'`);
             let customer = await Customer.findOne({ customerPhone: customerPhone });
 
             if (!customer) {
@@ -490,7 +487,6 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 }
             }
 
-            // Now process the message body (text)
             if (msg.hasMedia && msg.type === 'location' && msg.location) {
                 console.log(`[WhatsApp Message Handler] Received location from ${customerPhone}. Updating customer record.`);
                 await Customer.findOneAndUpdate(
@@ -517,7 +513,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 case 'hi':
                 case 'hello':
                 case 'namaste':
-                case 'start': // Added start command
+                case 'start':
                     console.log(`[WhatsApp Message Handler] Sending welcome message to ${customerPhone}`);
                     await sendWelcomeMessage(rawChatId, customerName);
                     break;
@@ -533,13 +529,13 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                     console.log(`[WhatsApp Message Handler] Sending shop location to ${customerPhone}`);
                     await sendShopLocation(rawChatId);
                     break;
-                case '3': // Updated numbering
+                case '3':
                 case 'orders':
                 case 'my orders':
                     console.log(`[WhatsApp Message Handler] Sending customer orders to ${customerPhone}`);
                     await sendCustomerOrders(rawChatId, customerPhone);
                     break;
-                case '4': // Updated numbering
+                case '4':
                 case 'help':
                 case 'support':
                     console.log(`[WhatsApp Message Handler] Sending help message to ${customerPhone}`);
@@ -571,7 +567,6 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                     break;
                 default:
                     console.log(`[WhatsApp Message Handler] Checking for PIN or pending order for ${customerPhone}.`);
-                    // Check if the message is a PIN for order tracking
                     if (text.length === 10 && !isNaN(text) && !text.startsWith('0')) {
                         console.log(`[WhatsApp Message Handler] Attempting to track order by PIN: ${text} for ${customerPhone}`);
                         const orderToTrack = await Order.findOne({ pinId: text });
@@ -608,7 +603,6 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         } catch (error) {
             console.error(`[WhatsApp Message Handler] FATAL ERROR processing message from ${customerPhone} (rawChatId: ${rawChatId}):`, error);
             io.emit('whatsapp_log', `FATAL ERROR processing message from ${customerPhone} (rawChatId: ${rawChatId}): ${error.message}`);
-            // Attempt to send a generic error message back to the user
             try {
                 await client.sendMessage(rawChatId, 'Error processing request. Try again or type "Help".');
             } catch (sendError) {
@@ -623,7 +617,6 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('whatsapp_log', 'Calling client.initialize()...');
         await client.initialize();
         console.log('[WhatsApp] client.initialize() called successfully.');
-        // The 'ready' event will set isInitializing to false and reset currentInitializationAttempt
     } catch (err) {
         console.error(`[WhatsApp] client.initialize() error: ${err.message}`);
         io.emit('whatsapp_log', `client.initialize() failed: ${err.message}`);
@@ -632,23 +625,20 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
-        // If client.initialize() fails, ensure the 'client' instance is completely discarded
-        // so that the next attempt creates a fresh one.
-        client = null; // Set client to null immediately after a failed initialization
+        client = null;
 
-        // If initialization fails, retry if max attempts not reached
         if (currentInitializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
             console.log(`[WhatsApp] Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
             io.emit('whatsapp_log', `Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
-            isInitializing = false; // Allow retry
+            isInitializing = false;
             setTimeout(() => initializeWhatsappClient(false), RETRY_DELAY_MS);
         } else {
             console.error('[WhatsApp] Max initialization attempts reached. WhatsApp client failed to initialize.');
             io.emit('whatsapp_log', 'Max initialization attempts reached. WhatsApp client failed to initialize.');
             await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
             io.emit('status', 'qr_error');
-            isInitializing = false; // Allow future manual initialization
-            currentInitializationAttempt = 0; // Reset for next manual attempt
+            isInitializing = false;
+            currentInitializationAttempt = 0;
         }
     }
 };
@@ -659,7 +649,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
     if (!settings || settings.whatsappStatus === 'disconnected') {
         console.log('[WhatsApp] Initial startup: No settings or disconnected. Forcing new session.');
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
-        initializeWhatsappClient(true); // Force new session on initial startup if disconnected
+        initializeWhatsappClient(true);
     } else {
         console.log('[WhatsApp] Initial startup: Attempting to load existing session.');
         initializeWhatsappClient(false);
@@ -675,7 +665,6 @@ const sendWelcomeMessage = async (chatId, customerName) => {
         "3. *Orders*: Track your recent meals!",
         "4. *Help*: Get assistance!"
     ];
-    // Redesigned welcome message
     const welcomeText = `🌟 Welcome ${customerName || 'foodie'}! Ready to order? Visit our web menu: ${process.env.WEB_MENU_URL}\n\nOr, choose an option:\n\n${menuOptions.join('\n')}\n\nReply with the *number* or *keyword*.`;
     try {
         await client.sendMessage(chatId, welcomeText);
@@ -720,8 +709,7 @@ const sendMenu = async (chatId) => {
 };
 
 const sendCustomerOrders = async (chatId, customerPhone) => {
-    // Fetch orders using customOrderId or pinId if available, otherwise use _id
-    const orders = await Order.find({ customerPhone: customerPhone }).sort({ orderDate: -1 }).limit(3); // Show only last 3 for conciseness
+    const orders = await Order.find({ customerPhone: customerPhone }).sort({ orderDate: -1 }).limit(3);
 
     if (orders.length === 0) {
         try {
@@ -788,17 +776,17 @@ const sendReorderNotification = async () => {
     }
 
     console.log('[Scheduler] Running 1-day re-order notification job...');
-    const oneDayAgo = moment().subtract(1, 'day').toDate(); // Changed from 7 days
-    const twoDaysAgo = moment().subtract(2, 'days').toDate(); // Keep this to avoid spamming immediately after order
+    const oneDayAgo = moment().subtract(1, 'day').toDate();
+    const twoDaysAgo = moment().subtract(2, 'days').toDate();
 
     try {
         const customersToNotify = await Customer.find({
             totalOrders: { $gt: 0 },
             $or: [
                 { lastNotificationSent: { $exists: false } },
-                { lastNotificationSent: { $lt: oneDayAgo } } // Use oneDayAgo here
+                { lastNotificationSent: { $lt: oneDayAgo } }
             ],
-            lastOrderDate: { $lt: twoDaysAgo } // Only notify if last order was more than 2 days ago
+            lastOrderDate: { $lt: twoDaysAgo }
         });
 
         console.log(`[Scheduler] Found ${customersToNotify.length} customers to notify.`);
@@ -819,21 +807,21 @@ const sendReorderNotification = async () => {
                 io.emit('whatsapp_log', `Failed to send re-order notification to ${customer.customerPhone}: ${msgSendError.message}`);
             }
         }
-        console.log('[Scheduler] 1-day re-order notification job finished.'); // Updated log message
+        console.log('[Scheduler] 1-day re-order notification job finished.');
 
     } catch (dbError) {
-        console.error('[Scheduler] Error in 1-day re-order notification job (DB query):', dbError); // Updated log message
+        console.error('[Scheduler] Error in 1-day re-order notification job (DB query):', dbError);
         io.emit('whatsapp_log', `Error in re-order notification job (DB query): ${dbError.message}`);
     }
 };
 
-cron.schedule('0 9 * * *', () => {
+cron.schedule('0 9 * * *', () => { // Schedule to run daily at 9:00 AM IST
     sendReorderNotification();
 }, {
     scheduled: true,
     timezone: "Asia/Kolkata"
 });
-console.log('Daily re-order notification job scheduled to run daily at 9:00 AM IST.'); // Updated log message
+console.log('Daily re-order notification job scheduled to run daily at 9:00 AM IST.');
 
 
 // --- Admin API Routes ---
@@ -844,39 +832,33 @@ app.post('/admin/login', async (req, res) => {
     const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
 
     if (!admin) {
-        // This case should ideally be handled by ensureDefaultAdminExists on startup
         console.error('Admin user not found in database during login attempt.');
         return res.status(500).json({ message: 'Admin user not configured. Please contact server administrator.' });
     }
 
-    // Verify password first
     const isPasswordValid = await bcrypt.compare(password, admin.password);
     if (!isPasswordValid) {
         return res.status(401).json({ message: 'Invalid username or password.' });
     }
 
-    // If 2FA is enabled for this admin
     if (admin.totpSecret) {
-        // If no TOTP code is provided, request it
         if (!totpCode) {
-            return res.status(401).json({ message: 'Two-Factor Authentication code required.' });
+            return res.status(401).json({ message: 'Two-Factor Authentication code required.', twoFactorEnabled: true });
         }
 
-        // Verify TOTP code
         const verified = speakeasy.totp.verify({
             secret: admin.totpSecret,
             encoding: 'base32',
             token: totpCode,
-            window: 1 // Allows for 1 step (30 seconds) leeway
+            window: 1
         });
 
         if (!verified) {
-            return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.' });
+            return res.status(401).json({ message: 'Invalid Two-Factor Authentication code.', twoFactorEnabled: true });
         }
     }
 
-    // If we reach here, authentication (and 2FA if applicable) is successful
-    const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' }); // Token valid for 7 days
+    const token = jwt.sign({ username: admin.username }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, twoFactorEnabled: !!admin.totpSecret });
 });
 
@@ -886,15 +868,13 @@ app.get('/admin/logout', (req, res) => {
 });
 
 // Authentication Middleware for Admin APIs
-// This middleware will ONLY check the Authorization header for API calls.
-// HTML routes like /dashboard will NOT use this middleware for their initial load.
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
     if (token == null) {
         console.log('Unauthorized: No token provided. (API Request to ' + req.path + ')');
-        return res.status(401).json({ message: 'Unauthorized: No token provided.' }); // For API calls
+        return res.status(401).json({ message: 'Unauthorized: No token provided.' });
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
@@ -906,7 +886,7 @@ const authenticateToken = (req, res, next) => {
             return res.status(403).json({ message: 'Forbidden: Invalid token.' });
         }
         req.user = user;
-        next(); // Proceed to serve API response
+        next();
     });
 };
 
@@ -935,14 +915,7 @@ app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
             name: `DeliciousBites Admin (${admin.username})`,
             length: 20
         });
-        // Do NOT save the secret to DB here. Only save after successful verification.
-        // This prevents generating a new secret every time the modal is opened.
-        // Instead, we'll return the secret and QR, and the client will verify it.
-        // The secret will be temporarily stored on the client side or derived from the QR.
-
-        // For simplicity, we'll temporarily store it on the admin object in memory
-        // This is not ideal for multi-instance deployments, but fine for a single server.
-        admin.currentTotpSecret = secret.base32; // Temporary in-memory storage
+        admin.currentTotpSecret = secret.base32; // Temporarily store in memory for verification
 
         qrcode.toDataURL(secret.otpauth_url, (err, data_url) => {
             if (err) {
@@ -959,7 +932,7 @@ app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
-    const { totpCode, secret } = req.body; // Expect secret from frontend
+    const { totpCode, secret } = req.body;
     try {
         const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
         if (!admin) {
@@ -971,7 +944,7 @@ app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
         }
 
         const verified = speakeasy.totp.verify({
-            secret: secret, // Use the secret sent from the frontend
+            secret: secret,
             encoding: 'base32',
             token: totpCode,
             window: 1
@@ -981,7 +954,7 @@ app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
             return res.status(401).json({ verified: false, message: 'Invalid 2FA code.' });
         }
 
-        admin.totpSecret = secret; // Save the secret to DB only upon successful verification
+        admin.totpSecret = secret;
         await admin.save();
         res.json({ verified: true, message: '2FA successfully enabled.' });
     } catch (error) {
@@ -1011,20 +984,17 @@ app.get('/api/admin/bot-status', authenticateToken, async (req, res) => {
     res.json({
         status: settings ? settings.whatsappStatus : 'disconnected',
         lastAuthenticatedAt: settings ? settings.lastAuthenticatedAt : null,
-        qrCodeAvailable: qrCodeData !== null // Indicate if QR is currently available
+        qrCodeAvailable: qrCodeData !== null
     });
 });
 
 app.post('/api/admin/load-session', authenticateToken, async (req, res) => {
-    // This endpoint is primarily for admin to force a re-initialization,
-    // potentially with a new QR if the current session is problematic.
-    // It should always trigger a reset.
     console.log('[API] Admin requested to load/re-initialize session.');
     io.emit('whatsapp_log', 'Admin requested session re-initialization.');
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
-    isInitializing = false; // Allow the call to proceed
-    initializeWhatsappClient(true); // Force a new session
+    isInitializing = false;
+    initializeWhatsappClient(true);
     res.status(200).json({ message: 'Attempting to load new session or generate QR.' });
 });
 
@@ -1080,7 +1050,6 @@ app.delete('/api/admin/menu/:id', authenticateToken, async (req, res) => {
 
 app.get('/api/admin/orders', authenticateToken, async (req, res) => {
     try {
-        // Fetch orders and sort by orderDate for admin view
         const orders = await Order.find().sort({ orderDate: -1 });
         res.json(orders);
     } catch (error) {
@@ -1105,7 +1074,6 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
         if (!updatedOrder) return res.status(404).json({ message: 'Order not found' });
 
         if (whatsappReady) {
-            // Ensure customerPhone is in the correct format for whatsapp-web.js
             const customerChatId = updatedOrder.customerPhone.includes('@c.us') ? updatedOrder.customerPhone : updatedOrder.customerPhone + '@c.us';
             try {
                 await client.sendMessage(customerChatId, `Order (ID: ${updatedOrder.customOrderId || updatedOrder._id.substring(0, 6)}...) status updated to '${status}'.`);
@@ -1169,7 +1137,6 @@ app.get('/api/admin/settings', authenticateToken, async (req, res) => {
     try {
         let settings = await Settings.findOne({});
         if (!settings) {
-            // Create default settings if none exist
             settings = new Settings();
             await settings.save();
         }
@@ -1189,12 +1156,10 @@ app.put('/api/admin/settings', authenticateToken, async (req, res) => {
     }
 });
 
-// New: Admin API for Discount Settings
 app.get('/api/admin/discount-settings', authenticateToken, async (req, res) => {
     try {
         const settings = await Settings.findOne({});
         if (!settings) {
-            // Return defaults if settings document doesn't exist yet
             return res.json({
                 minSubtotalForDiscount: 200,
                 discountPercentage: 0.20,
@@ -1204,7 +1169,7 @@ app.get('/api/admin/discount-settings', authenticateToken, async (req, res) => {
         res.json({
             minSubtotalForDiscount: settings.minSubtotalForDiscount,
             discountPercentage: settings.discountPercentage,
-            isDiscountEnabled: settings.isDiscountEnabled // Return the new field
+            isDiscountEnabled: settings.isDiscountEnabled
         });
     } catch (error) {
         console.error('Error fetching discount settings:', error);
@@ -1229,9 +1194,9 @@ app.put('/api/admin/discount-settings', authenticateToken, async (req, res) => {
             return res.status(400).json({ message: 'discountPercentage must be a number between 0 and 1 (e.g., 0.1 for 10%).' });
         }
 
-        if (typeof isDiscountEnabled === 'boolean') { // Check if it's a boolean
+        if (typeof isDiscountEnabled === 'boolean') {
             updateFields.isDiscountEnabled = isDiscountEnabled;
-        } else if (typeof isDiscountEnabled !== 'undefined') { // If provided but not boolean
+        } else if (typeof isDiscountEnabled !== 'undefined') {
             return res.status(400).json({ message: 'isDiscountEnabled must be a boolean value.' });
         }
 
@@ -1267,14 +1232,13 @@ app.get('/api/public/settings', async (req, res) => {
     try {
         const settings = await Settings.findOne();
         if (!settings) {
-            // If no settings exist, return default public settings
             return res.json({
                 shopName: 'Delicious Bites',
                 shopLocation: { latitude: 17.4399, longitude: 78.4983 },
                 deliveryRates: [],
-                minSubtotalForDiscount: 200, // Default for public
-                discountPercentage: 0.20, // Default for public
-                isDiscountEnabled: true // Default for public
+                minSubtotalForDiscount: 200,
+                discountPercentage: 0.20,
+                isDiscountEnabled: true
             });
         }
         res.json({
@@ -1283,7 +1247,7 @@ app.get('/api/public/settings', async (req, res) => {
             deliveryRates: settings.deliveryRates,
             minSubtotalForDiscount: settings.minSubtotalForDiscount,
             discountPercentage: settings.discountPercentage,
-            isDiscountEnabled: settings.isDiscountEnabled // Expose to public API
+            isDiscountEnabled: settings.isDiscountEnabled
         });
     } catch (err) {
         console.error('Error fetching public settings:', err);
@@ -1295,32 +1259,28 @@ app.post('/api/order', async (req, res) => {
     try {
         const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, discountAmount, totalAmount, paymentMethod } = req.body;
 
-        console.log('[API] /api/order received request body:', JSON.stringify(req.body, null, 2)); // Log incoming request
+        console.log('[API] /api/order received request body:', JSON.stringify(req.body, null, 2));
 
         if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || !totalAmount) {
             console.error('[API] /api/order: Missing required order details.');
             return res.status(400).json({ message: 'Missing required order details.' });
         }
 
-        // --- START: Improved customerPhone formatting for WhatsApp ---
-        let cleanedCustomerPhone = customerPhone.trim().replace(/\D/g, ''); // Strip non-digits
-        // Assuming Indian numbers (10 digits), prepend '91' if not already present
+        let cleanedCustomerPhone = customerPhone.trim().replace(/\D/g, '');
         if (cleanedCustomerPhone.length === 10 && !cleanedCustomerPhone.startsWith('91')) {
             cleanedCustomerPhone = '91' + cleanedCustomerPhone;
         }
         const customerChatId = cleanedCustomerPhone + '@c.us';
-        // --- END: Improved customerPhone formatting ---
 
         if (typeof cleanedCustomerPhone !== 'string' || cleanedCustomerPhone === '') {
             console.error('Invalid customerPhone received for order:', customerPhone);
             return res.status(400).json({ message: 'Invalid phone number provided for customer.' });
         }
-        // --- Added logging for cleanedCustomerPhone before findOneAndUpdate ---
         console.log(`[API] /api/order: Attempting to find/update customer with phone: '${cleanedCustomerPhone}'`);
 
         const itemDetails = [];
         for (const item of items) {
-            const product = await Item.findById(item.productId); // Ensure productId matches _id in Item collection
+            const product = await Item.findById(item.productId);
             if (!product || !product.isAvailable) {
                 console.error(`[API] /api/order: Item ${item.name || item.productId} is not available or not found.`);
                 return res.status(400).json({ message: `Item ${item.name || item.productId} is not available.` });
@@ -1333,7 +1293,6 @@ app.post('/api/order', async (req, res) => {
             });
         }
 
-        // Generate custom order ID and PIN ID for all orders
         const customOrderId = generateCustomOrderId();
         const pinId = await generateUniquePinId();
 
@@ -1347,10 +1306,10 @@ app.post('/api/order', async (req, res) => {
             customerLocation,
             subtotal,
             transportTax,
-            discountAmount, // Save the discount amount
+            discountAmount,
             totalAmount,
-            paymentMethod: 'Cash on Delivery', // Force to Cash on Delivery as online is removed
-            status: 'Pending', // All new orders start as Pending
+            paymentMethod: 'Cash on Delivery',
+            status: 'Pending',
         });
 
         await newOrder.save();
@@ -1381,13 +1340,11 @@ app.post('/api/order', async (req, res) => {
         }
 
 
-        // --- START: Send order confirmation to customer via WhatsApp ---
-        if (whatsappReady && client) { // Ensure client is ready and initialized
-            io.emit('new_order', newOrder); // Still emit to admin dashboard
+        if (whatsappReady && client) {
+            io.emit('new_order', newOrder);
 
-            console.log(`[WhatsApp] Attempting to send order confirmation to customerChatId: ${customerChatId}`); // Log target ID
+            console.log(`[WhatsApp] Attempting to send order confirmation to customerChatId: ${customerChatId}`);
             try {
-                // Construct the detailed order confirmation message for the customer
                 let customerConfirmationMessage = `🎉 Order placed!\n\n`;
                 customerConfirmationMessage += `*Order ID:* ${newOrder.customOrderId}\n`;
                 customerConfirmationMessage += `*PIN:* ${newOrder.pinId}\n\n`;
@@ -1408,16 +1365,14 @@ app.post('/api/order', async (req, res) => {
                 io.emit('whatsapp_log', `Failed to send detailed order confirmation to ${customerChatId}: ${sendError.message}`);
             }
         } else {
-            console.warn(`[WhatsApp] WhatsApp client not ready or not initialized. Cannot send order confirmation to ${customerChatId}. whatsappReady: ${whatsappReady}, client exists: ${!!client}`); // Added warning
+            console.warn(`[WhatsApp] WhatsApp client not ready or not initialized. Cannot send order confirmation to ${customerChatId}. whatsappReady: ${whatsappReady}, client exists: ${!!client}`);
             io.emit('whatsapp_log', `WhatsApp client not ready. Order confirmation not sent to ${customerChatId}.`);
         }
-        // --- END: Send order confirmation to customer via WhatsApp ---
 
         res.status(201).json({ message: 'Order placed successfully!', orderId: newOrder.customOrderId, pinId: newOrder.pinId, order: newOrder });
 
     } catch (err) {
         console.error('Error placing order:', err);
-        // This catch block will now primarily handle errors from newOrder.save() or initial validation
         if (err.code === 11000 && err.keyPattern && err.keyPattern.customerPhone) {
             res.status(409).json({ message: 'A customer with this phone number already exists or an internal data issue occurred. Please try again with a valid phone number.' });
         } else {
@@ -1431,14 +1386,13 @@ app.get('/api/order/:id', async (req, res) => {
         const queryId = req.params.id;
         let order;
 
-        // Try to find by customOrderId, then by pinId, then by MongoDB _id
         if (queryId.startsWith('JAR')) {
             order = await Order.findOne({ customOrderId: queryId });
         }
-        if (!order && queryId.length === 10 && !isNaN(queryId)) { // Check if it looks like a PIN
+        if (!order && queryId.length === 10 && !isNaN(queryId)) {
             order = await Order.findOne({ pinId: queryId });
         }
-        if (!order && mongoose.Types.ObjectId.isValid(queryId)) { // Fallback to MongoDB _id
+        if (!order && mongoose.Types.ObjectId.isValid(queryId)) {
             order = await Order.findById(queryId);
         }
 
@@ -1453,15 +1407,13 @@ app.get('/api/order/:id', async (req, res) => {
 });
 
 app.post('/api/public/request-qr', async (req, res) => {
-    // This endpoint should always force a new QR generation if the client is not ready.
-    // If it's already ready, we should prevent requesting a new QR.
     if (whatsappReady) {
         return res.status(400).json({ message: 'WhatsApp client is already connected. No new QR needed.' });
     }
     console.log('[API] Public QR request received. Forcing new session initialization.');
     io.emit('whatsapp_log', 'Public QR request received. Forcing new session initialization.');
-    isInitializing = false; // Allow the call to proceed
-    initializeWhatsappClient(true); // Force a new session to get a new QR
+    isInitializing = false;
+    initializeWhatsappClient(true);
     res.status(200).json({ message: 'Requesting new QR code. Check status page.' });
 });
 
@@ -1479,8 +1431,6 @@ app.get('/admin/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin_login.html'));
 });
 
-// Dashboard Route - NOT protected by authenticateToken middleware yet.
-// Client-side JS in dashboard.html will handle initial token check.
 app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
@@ -1502,12 +1452,10 @@ app.get('/status', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'status.html'));
 });
 
-// Changed default route to redirect to /menu
 app.get('/', (req, res) => {
     res.redirect('/menu');
 });
 
-// Add favicon.ico handler to prevent it from hitting the catch-all
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 
@@ -1515,7 +1463,6 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Catch-all for undefined routes ---
-// Changed catch-all to redirect to /menu for better public user experience
 app.use((req, res) => {
     console.log(`Unhandled route: ${req.method} ${req.originalUrl}. Redirecting to /menu.`);
     res.redirect('/menu');
@@ -1555,7 +1502,7 @@ io.on('connection', (socket) => {
         if (settings) {
             socket.emit('status', settings.whatsappStatus);
             socket.emit('sessionInfo', { lastAuthenticatedAt: settings.lastAuthenticatedAt });
-            if (qrCodeData) { // If QR is already available, send it to newly connected client
+            if (qrCodeData) {
                 socket.emit('qrCode', qrCodeData);
             }
         }
@@ -1578,4 +1525,3 @@ server.listen(PORT, () => {
     console.log(`Default Admin Password (for initial setup): ${DEFAULT_ADMIN_PASSWORD}`);
     console.log('REMEMBER TO ENABLE 2FA FROM THE DASHBOARD AFTER FIRST LOGIN FOR SECURITY.');
 });
-
