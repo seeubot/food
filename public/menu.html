@@ -14,45 +14,95 @@
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
-            background-color: #F8F8F8; /* Very Light Gray */
-            color: #333;
+            background-color: var(--page-bg);
+            color: var(--text-color-dark);
             line-height: 1.6;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
             overflow-x: hidden; /* Prevent horizontal scroll */
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        /* Color Theme */
+        /* Color Theme - Light Mode (Default) */
         :root {
-            --primary-blue: #2196F3; /* Bright Blue */
-            --accent-red: #F44336;   /* Vibrant Red */
-            --white: #FFFFFF;
-            --text-dark: #333;
-            --text-light: #666;
+            --primary-red: #E53935; /* Vibrant Red */
+            --secondary-white: #FFFFFF;
+            --light-gray: #F8F8F8;
+            --text-color-dark: #333;
+            --text-color-light: #666;
             --border-light: #E0E0E0;
             --success-green: #4CAF50;
             --warning-orange: #FF9800;
             --shadow-light: rgba(0, 0, 0, 0.08);
             --shadow-medium: rgba(0, 0, 0, 0.15);
             --shadow-strong: rgba(0, 0, 0, 0.25);
-            --card-bg: #FFFFFF;
-            --button-dark: #333; /* For the "Pay" button in the image */
+            --card-bg: var(--secondary-white);
+            --button-dark: #333; /* For the "Pay" button */
+            --page-bg: var(--light-gray);
+            --header-bg: var(--secondary-white);
+            --modal-bg: var(--secondary-white);
+            --input-bg: var(--secondary-white);
+            --input-border: var(--border-light);
+            --category-btn-bg: var(--secondary-white);
+            --category-btn-text: var(--primary-red);
+            --category-btn-border: var(--primary-red);
+            --category-btn-active-bg: var(--primary-red);
+            --category-btn-active-text: var(--secondary-white);
+            --toast-text: var(--secondary-white);
+            --checkout-summary-bg: #FFF0F0; /* Light red for summary */
+            --discount-badge-bg: var(--primary-red);
+            --discount-badge-text: var(--secondary-white);
         }
+
+        /* Color Theme - Dark Mode */
+        body.dark-mode {
+            --primary-red: #FF5252; /* Slightly brighter red for dark mode */
+            --secondary-white: #2C2C2C; /* Darker background for "white" elements */
+            --light-gray: #1A1A1A; /* Darkest background */
+            --text-color-dark: #E0E0E0; /* Light text on dark background */
+            --text-color-light: #B0B0B0;
+            --border-light: #444;
+            --shadow-light: rgba(255, 255, 255, 0.05);
+            --shadow-medium: rgba(255, 255, 255, 0.1);
+            --shadow-strong: rgba(255, 255, 255, 0.2);
+            --card-bg: #3A3A3A;
+            --button-dark: #555;
+            --page-bg: var(--light-gray);
+            --header-bg: #222;
+            --modal-bg: #333;
+            --input-bg: #444;
+            --input-border: #555;
+            --category-btn-bg: #3A3A3A;
+            --category-btn-text: var(--primary-red);
+            --category-btn-border: var(--primary-red);
+            --category-btn-active-bg: var(--primary-red);
+            --category-btn-active-text: var(--light-gray);
+            --toast-text: var(--light-gray);
+            --checkout-summary-bg: #3A3A3A; /* Darker red for summary */
+            --discount-badge-bg: var(--primary-red);
+            --discount-badge-text: var(--light-gray);
+        }
+
 
         /* Header */
         .header {
-            background-color: var(--white); /* Changed to white for a cleaner look like the image */
-            color: var(--text-dark);
+            background-color: var(--header-bg);
+            color: var(--text-color-dark);
             padding: 20px;
             text-align: center;
-            box-shadow: 0 2px 5px var(--shadow-light); /* Lighter shadow */
+            box-shadow: 0 2px 5px var(--shadow-light);
             position: sticky;
             top: 0;
             z-index: 100;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: transform 0.3s ease-out, background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .header.header-hidden {
+            transform: translateY(-100%);
         }
 
         .header h1 {
@@ -60,25 +110,36 @@
             font-size: 2.2em;
             letter-spacing: 1px;
             flex-grow: 1;
-            color: var(--primary-blue); /* Keep shop name blue */
+            color: var(--primary-red);
         }
 
-        .header .cart-icon {
+        .header .header-buttons {
+            display: flex;
+            gap: 15px; /* Space between buttons */
+            align-items: center;
+        }
+
+        .header .header-btn {
             background: none;
             border: none;
-            color: var(--primary-blue); /* Cart icon blue */
+            color: var(--primary-red); /* Buttons red */
             font-size: 1.8em;
             cursor: pointer;
             position: relative;
             padding: 5px;
+            transition: color 0.2s ease;
+        }
+
+        .header .header-btn:hover {
+            color: #C62828; /* Darker red on hover */
         }
 
         .header .cart-count {
             position: absolute;
             top: -5px;
             right: -5px;
-            background-color: var(--accent-red);
-            color: var(--white);
+            background-color: var(--primary-red);
+            color: var(--secondary-white);
             border-radius: 50%;
             padding: 3px 8px;
             font-size: 0.7em;
@@ -88,24 +149,37 @@
             box-shadow: 0 2px 5px var(--shadow-medium);
         }
 
-        /* Location Header */
+        /* Location Header as a Card */
         .location-header {
-            background-color: var(--white);
+            background-color: var(--card-bg); /* Use card background for consistency */
             padding: 15px 20px;
-            border-bottom: 1px solid var(--border-light);
+            margin: 10px 20px; /* Add margin to separate it from edges/header */
+            border-radius: 12px; /* Rounded corners for card look */
+            box-shadow: 0 4px 10px var(--shadow-light); /* Card-like shadow */
             display: flex;
             align-items: center;
             gap: 10px;
             font-size: 1.1em;
-            color: var(--text-dark);
-            box-shadow: 0 2px 5px var(--shadow-light);
+            color: var(--text-color-dark);
             position: sticky;
             top: 80px; /* Below main header */
             z-index: 90;
+            transition: top 0.3s ease-out, background-color 0.3s ease, box-shadow 0.3s ease, margin 0.3s ease;
+            cursor: pointer; /* Indicate it's clickable */
+        }
+
+        .location-header:hover {
+            box-shadow: 0 6px 15px var(--shadow-medium); /* Stronger shadow on hover */
+            transform: translateY(-2px); /* Slight lift on hover */
+        }
+
+        .location-header.header-hidden-adjusted {
+            top: 0; /* Adjust when main header is hidden */
+            margin-top: 10px; /* Keep margin even when header is hidden */
         }
 
         .location-header i {
-            color: var(--primary-blue);
+            color: var(--primary-red);
             font-size: 1.2em;
         }
         
@@ -125,16 +199,17 @@
         .location-header button {
             background: none;
             border: none;
-            color: var(--accent-red);
+            color: var(--primary-red);
             font-size: 0.9em;
             font-weight: bold;
             cursor: pointer;
             text-decoration: underline;
             transition: color 0.2s ease;
+            padding: 0; /* Remove default button padding */
         }
 
         .location-header button:hover {
-            color: #D32F2F;
+            color: #C62828;
         }
 
 
@@ -156,7 +231,8 @@
             flex: 1; /* Takes less space */
             min-width: 280px; /* Minimum width for cart */
             position: sticky; /* Sticky cart on desktop */
-            top: 150px; /* Adjust based on header + location header height */
+            /* Adjusted top to account for new location header margin */
+            top: calc(80px + 15px + 20px + 10px); /* Header height + location header height + padding + location header margin */
             align-self: flex-start; /* Align to top */
             display: none; /* Hidden by default, shown on mobile cart toggle */
         }
@@ -175,9 +251,9 @@
         }
 
         .category-nav button {
-            background-color: var(--white);
-            color: var(--primary-blue);
-            border: 1px solid var(--primary-blue);
+            background-color: var(--category-btn-bg);
+            color: var(--category-btn-text);
+            border: 1px solid var(--category-btn-border);
             padding: 10px 20px;
             border-radius: 25px;
             cursor: pointer;
@@ -188,131 +264,154 @@
         }
 
         .category-nav button:hover {
-            background-color: var(--primary-blue);
-            color: var(--white);
+            background-color: var(--primary-red);
+            color: var(--secondary-white);
             transform: translateY(-2px);
         }
 
         .category-nav button.active {
-            background-color: var(--primary-blue);
-            color: var(--white);
+            background-color: var(--category-btn-active-bg);
+            color: var(--category-btn-active-text);
             box-shadow: 0 4px 8px var(--shadow-medium);
         }
 
-        /* Menu Item Cards (Inspired by image) */
+        /* Menu Item Cards */
         .menu-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px; /* Slightly reduced gap */
+            gap: 20px;
         }
 
         .menu-item-card {
-            background-color: var(--card-bg); /* White background */
-            border-radius: 16px; /* More rounded corners */
-            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.05); /* Softer, larger shadow */
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 8px 15px var(--shadow-light);
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            padding: 15px; /* Padding inside the card */
-            cursor: pointer; /* Make the whole card clickable */
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+            padding: 15px;
+            cursor: pointer;
+            position: relative; /* For discount badge positioning */
         }
 
         .menu-item-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.1); /* More pronounced hover shadow */
+            box-shadow: 0 12px 25px var(--shadow-medium);
         }
 
         .menu-item-card img {
-            width: 100px; /* Fixed width for image */
-            height: 100px; /* Fixed height for image */
+            width: 100px;
+            height: 100px;
             object-fit: cover;
-            border-radius: 10px; /* Rounded image corners */
+            border-radius: 10px;
             margin-bottom: 10px;
-            align-self: center; /* Center the image */
+            align-self: center;
         }
 
         .item-details {
-            padding: 0; /* No padding here, handled by card padding */
+            padding: 0;
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            text-align: center; /* Center text */
+            text-align: center;
         }
 
         .item-details h3 {
             margin-top: 0;
-            margin-bottom: 5px; /* Reduced margin */
-            color: var(--text-dark);
-            font-size: 1.3em; /* Slightly smaller heading */
-            font-weight: 600; /* Semi-bold */
+            margin-bottom: 5px;
+            color: var(--text-color-dark);
+            font-size: 1.3em;
+            font-weight: 600;
         }
-
-        /* Description is removed from card, only shown in modal */
-        /* .item-details p {
-            font-size: 0.85em;
-            color: var(--text-light);
-            margin-bottom: 10px;
-            flex-grow: 1;
-            opacity: 0.8;
-        } */
 
         .item-price-add {
             display: flex;
-            flex-direction: column; /* Stack price and button */
-            align-items: center; /* Center them */
+            flex-direction: column;
+            align-items: center;
             margin-top: 10px;
-            gap: 8px; /* Gap between price and button */
+            gap: 8px;
         }
 
         .item-price {
-            font-size: 1.4em; /* Slightly larger price */
+            font-size: 1.4em;
             font-weight: bold;
-            color: var(--primary-blue);
+            color: var(--primary-red);
         }
 
+        .original-price {
+            font-size: 0.9em;
+            color: var(--text-color-light);
+            text-decoration: line-through;
+            margin-left: 5px;
+        }
+
+        .price-group {
+            display: flex;
+            align-items: baseline; /* Align prices at their baseline */
+            justify-content: center;
+            gap: 5px; /* Space between prices */
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+        }
+
+        .discount-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: var(--discount-badge-bg);
+            color: var(--discount-badge-text);
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 0.8em;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+
         .add-to-cart-btn {
-            background-color: var(--primary-blue); /* Blue button */
-            color: var(--white);
+            background-color: var(--primary-red);
+            color: var(--secondary-white);
             border: none;
-            padding: 10px 25px; /* More padding */
-            border-radius: 30px; /* More rounded */
+            padding: 10px 25px;
+            border-radius: 30px;
             cursor: pointer;
             font-size: 1em;
             font-weight: bold;
             transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
             display: flex;
             align-items: center;
-            gap: 8px; /* Increased gap */
-            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.2); /* Blue shadow */
+            gap: 8px;
+            box-shadow: 0 4px 8px rgba(229, 57, 53, 0.2);
         }
 
         .add-to-cart-btn:hover {
-            background-color: #1976D2;
+            background-color: #C62828;
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(33, 150, 243, 0.3);
+            box-shadow: 0 6px 12px rgba(229, 57, 53, 0.3);
         }
 
         /* Cart Summary (Purchasing View) */
         .cart-summary {
             background-color: var(--card-bg);
-            border-radius: 16px; /* More rounded */
-            box-shadow: 0 8px 20px var(--shadow-light); /* Softer shadow */
-            padding: 25px; /* More padding */
+            border-radius: 16px;
+            box-shadow: 0 8px 20px var(--shadow-light);
+            padding: 25px;
             display: flex;
             flex-direction: column;
             height: fit-content;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
 
         .cart-summary h2 {
             margin-top: 0;
-            color: var(--text-dark); /* Dark text for Purchasing title */
+            color: var(--text-color-dark);
             font-size: 1.8em;
-            border-bottom: none; /* No border */
+            border-bottom: none;
             padding-bottom: 0;
-            margin-bottom: 25px; /* More margin */
+            margin-bottom: 25px;
             text-align: center;
-            font-weight: 700; /* Bold */
+            font-weight: 700;
         }
 
         #cartItemsList {
@@ -322,18 +421,19 @@
             flex-grow: 1;
             max-height: 400px;
             overflow-y: auto;
-            margin-bottom: 20px; /* Space before totals */
+            margin-bottom: 20px;
         }
 
         #cartItemsList li {
-            background-color: #F8F8F8; /* Light gray background for cart items */
+            background-color: var(--page-bg); /* Light gray background for cart items */
             border-radius: 12px;
             padding: 12px 15px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03); /* Subtle shadow */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+            transition: background-color 0.3s ease;
         }
 
         .cart-item-info {
@@ -344,29 +444,29 @@
         }
 
         .cart-item-info span {
-            font-weight: 600; /* Semi-bold */
-            color: var(--text-dark);
+            font-weight: 600;
+            color: var(--text-color-dark);
             font-size: 1.05em;
         }
 
         .cart-item-info small {
             font-size: 0.85em;
-            color: var(--text-light);
+            color: var(--text-color-light);
             margin-top: 3px;
         }
 
         .cart-item-controls {
             display: flex;
             align-items: center;
-            gap: 8px; /* Increased gap */
+            gap: 8px;
         }
 
         .quantity-btn {
-            background-color: var(--white);
-            color: var(--primary-blue);
-            border: 1px solid var(--border-light); /* Lighter border */
-            border-radius: 8px; /* Square buttons */
-            width: 32px; /* Larger buttons */
+            background-color: var(--secondary-white);
+            color: var(--primary-red);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            width: 32px;
             height: 32px;
             display: flex;
             justify-content: center;
@@ -379,26 +479,29 @@
         }
 
         .quantity-btn:hover {
-            background-color: var(--light-blue);
-            border-color: var(--primary-blue);
+            background-color: #FEE;
+            border-color: var(--primary-red);
+        }
+        body.dark-mode .quantity-btn:hover {
+            background-color: #4A4A4A;
         }
 
         .remove-item-btn {
             background: none;
             border: none;
-            color: var(--accent-red);
-            font-size: 1.4em; /* Larger icon */
+            color: var(--primary-red);
+            font-size: 1.4em;
             cursor: pointer;
             margin-left: 10px;
             transition: color 0.2s ease;
         }
 
         .remove-item-btn:hover {
-            color: #D32F2F;
+            color: #C62828;
         }
 
         .cart-totals {
-            margin-top: 0; /* No margin top */
+            margin-top: 0;
             padding-top: 15px;
             border-top: 1px solid var(--border-light);
         }
@@ -406,61 +509,61 @@
         .cart-totals div {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 10px; /* More space */
+            margin-bottom: 10px;
         }
 
         .cart-totals div span:first-child {
-            color: var(--text-light);
+            color: var(--text-color-light);
             font-size: 1em;
         }
 
         .cart-totals div span:last-child {
             font-weight: bold;
-            color: var(--text-dark);
+            color: var(--text-color-dark);
             font-size: 1.1em;
         }
 
         .cart-totals .total-amount {
-            font-size: 1.6em; /* Larger total */
+            font-size: 1.6em;
             font-weight: bold;
-            color: var(--text-dark); /* Dark total, like image */
+            color: var(--text-color-dark);
             margin-top: 15px;
             padding-top: 10px;
-            border-top: none; /* No border */
+            border-top: none;
         }
 
         .checkout-btn {
             width: 100%;
-            background-color: var(--button-dark); /* Dark button like image */
-            color: var(--white);
+            background-color: var(--button-dark);
+            color: var(--secondary-white);
             border: none;
-            padding: 18px; /* Larger padding */
-            border-radius: 30px; /* More rounded */
+            padding: 18px;
+            border-radius: 30px;
             cursor: pointer;
-            font-size: 1.3em; /* Larger font */
+            font-size: 1.3em;
             font-weight: bold;
-            margin-top: 25px; /* More space */
+            margin-top: 25px;
             transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
-            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2); /* Stronger shadow */
+            box-shadow: 0 8px 15px var(--shadow-strong);
         }
 
         .checkout-btn:hover {
             background-color: #000;
             transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 20px var(--shadow-strong);
         }
 
         /* Floating Checkout Button (Mobile Only) */
         .floating-checkout-btn {
-            display: none; /* Hidden by default */
+            display: none;
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: calc(100% - 40px); /* Full width with padding */
-            max-width: 400px; /* Max width for larger screens */
+            width: calc(100% - 40px);
+            max-width: 400px;
             background-color: var(--button-dark);
-            color: var(--white);
+            color: var(--secondary-white);
             border: none;
             padding: 18px;
             border-radius: 30px;
@@ -493,21 +596,21 @@
         /* Empty Cart Message */
         #emptyCartMessage {
             text-align: center;
-            color: var(--text-light);
+            color: var(--text-color-light);
             padding: 20px;
         }
 
         /* Modals */
         .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
+            display: none;
+            position: fixed;
+            z-index: 1000;
             left: 0;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
             justify-content: center;
             align-items: center;
             padding: 20px;
@@ -516,20 +619,21 @@
         }
 
         .modal-content {
-            background-color: var(--white);
+            background-color: var(--modal-bg);
             margin: auto;
             padding: 30px;
             border-radius: 15px;
             box-shadow: 0 8px 25px var(--shadow-medium);
-            width: 95%; /* Responsive width */
-            max-width: 600px; /* Max width */
+            width: 95%;
+            max-width: 600px;
             position: relative;
             animation: slideInTop 0.4s ease-out;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
 
         .modal-content h3 {
             margin-top: 0;
-            color: var(--primary-blue);
+            color: var(--primary-red);
             border-bottom: 1px solid var(--border-light);
             padding-bottom: 15px;
             margin-bottom: 25px;
@@ -543,14 +647,14 @@
             display: flex;
             justify-content: flex-end;
             gap: 15px;
-            flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+            flex-wrap: wrap;
         }
 
         .close-button {
             position: absolute;
             top: 15px;
             right: 20px;
-            color: var(--text-light);
+            color: var(--text-color-light);
             font-size: 32px;
             font-weight: bold;
             cursor: pointer;
@@ -559,7 +663,7 @@
 
         .close-button:hover,
         .close-button:focus {
-            color: var(--accent-red);
+            color: var(--primary-red);
             text-decoration: none;
             cursor: pointer;
         }
@@ -572,32 +676,34 @@
             display: block;
             margin-bottom: 8px;
             font-weight: bold;
-            color: var(--text-dark);
+            color: var(--text-color-dark);
             font-size: 1.1em;
         }
 
         .form-group input[type="text"],
         .form-group input[type="tel"],
         .form-group textarea {
-            width: calc(100% - 24px); /* Account for padding */
+            width: calc(100% - 24px);
             padding: 12px;
-            border: 1px solid var(--border-light);
+            border: 1px solid var(--input-border);
             border-radius: 8px;
             font-size: 1em;
             box-sizing: border-box;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+            background-color: var(--input-bg);
+            color: var(--text-color-dark);
         }
 
         .form-group input:focus,
         .form-group textarea:focus {
-            border-color: var(--primary-blue);
-            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+            border-color: var(--primary-red);
+            box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.2);
             outline: none;
         }
 
         .btn {
-            background-color: var(--primary-blue);
-            color: var(--white);
+            background-color: var(--primary-red);
+            color: var(--secondary-white);
             border: none;
             padding: 12px 25px;
             border-radius: 25px;
@@ -613,41 +719,45 @@
         }
 
         .btn:hover {
-            background-color: #1976D2;
+            background-color: #C62828;
             transform: translateY(-2px);
         }
 
         .btn-secondary {
             background-color: var(--border-light);
-            color: var(--text-dark);
+            color: var(--text-color-dark);
         }
 
         .btn-secondary:hover {
             background-color: #D0D0D0;
         }
+        body.dark-mode .btn-secondary:hover {
+            background-color: #555;
+        }
 
         .btn-red {
-            background-color: var(--accent-red);
+            background-color: var(--primary-red);
         }
 
         .btn-red:hover {
-            background-color: #D32F2F;
+            background-color: #C62828;
         }
 
         /* Order Summary in Checkout Modal */
         #checkoutOrderSummary {
-            background-color: #F0F8FF; /* Light blue background */
-            border: 1px solid var(--light-blue);
+            background-color: var(--checkout-summary-bg);
+            border: 1px solid var(--border-light);
             border-radius: 10px;
             padding: 20px;
             margin-bottom: 25px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
 
         #checkoutOrderSummary h4 {
-            color: var(--primary-blue);
+            color: var(--primary-red);
             margin-top: 0;
             margin-bottom: 15px;
-            border-bottom: 1px dashed var(--primary-blue);
+            border-bottom: 1px dashed var(--primary-red);
             padding-bottom: 10px;
         }
 
@@ -662,7 +772,7 @@
             justify-content: space-between;
             padding: 5px 0;
             font-size: 0.95em;
-            color: var(--text-dark);
+            color: var(--text-color-dark);
         }
 
         #checkoutOrderSummary .summary-line {
@@ -676,8 +786,8 @@
         #checkoutOrderSummary .summary-line.total {
             font-size: 1.3em;
             font-weight: bold;
-            color: var(--accent-red);
-            border-top: 2px solid var(--accent-red);
+            color: var(--primary-red);
+            border-top: 2px solid var(--primary-red);
             margin-top: 20px;
             padding-top: 15px;
         }
@@ -694,14 +804,15 @@
         #orderConfirmationModal .modal-content p {
             font-size: 1.1em;
             margin-bottom: 15px;
+            color: var(--text-color-dark);
         }
         #orderConfirmationModal .modal-content strong {
-            color: var(--primary-blue);
+            color: var(--primary-red);
         }
         #orderConfirmationModal .modal-content .track-link {
             display: inline-block;
             margin-top: 20px;
-            color: var(--primary-blue);
+            color: var(--primary-red);
             text-decoration: underline;
             font-weight: bold;
         }
@@ -719,7 +830,7 @@
 
         .toast {
             background-color: var(--success-green);
-            color: var(--white);
+            color: var(--toast-text);
             padding: 12px 20px;
             border-radius: 8px;
             box-shadow: 0 4px 8px var(--shadow-medium);
@@ -728,11 +839,12 @@
             min-width: 250px;
             max-width: 350px;
             word-wrap: break-word;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        .toast.error { background-color: var(--accent-red); }
+        .toast.error { background-color: var(--primary-red); }
         .toast.warning { background-color: var(--warning-orange); }
-        .toast.info { background-color: var(--primary-blue); }
+        .toast.info { background-color: var(--primary-red); }
 
 
         @keyframes slideIn {
@@ -755,45 +867,18 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
-        /* Loading Spinner (Lottie) */
-        #loadingSpinner {
-            display: none;
-            position: fixed;
-            z-index: 1002;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.8);
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        #loadingSpinner lottie-player {
-            width: 150px;
-            height: 150px;
-        }
-        #loadingSpinner p {
-            font-size: 1.2em;
-            color: var(--primary-blue);
-            font-weight: bold;
-        }
-
         /* Map Modal Styles */
         #locationMapModal .modal-content {
-            max-width: 700px; /* Wider for map */
+            max-width: 700px;
         }
         #map {
-            height: 400px; /* Fixed height for map */
+            height: 400px;
             width: 100%;
             border-radius: 8px;
             margin-top: 15px;
             border: 1px solid var(--border-light);
-            /* Added for responsiveness within its container */
             max-width: 100%; 
-            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            box-sizing: border-box;
         }
         .leaflet-container {
             border-radius: 8px;
@@ -804,6 +889,7 @@
         #mapLocationStatus {
             margin-top: 10px;
             font-weight: 500;
+            color: var(--text-color-light);
         }
 
         /* Item Details Modal */
@@ -817,30 +903,78 @@
             object-fit: cover;
             border-radius: 10px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 10px var(--shadow-light);
         }
         #itemDetailsModal .item-modal-content h3 {
             font-size: 2em;
             margin-bottom: 10px;
             border-bottom: none;
             padding-bottom: 0;
+            color: var(--text-color-dark);
         }
         #itemDetailsModal .item-modal-content p {
             font-size: 1em;
-            color: var(--text-light);
+            color: var(--text-color-light);
             margin-bottom: 20px;
             line-height: 1.5;
         }
+        #itemDetailsModal .item-modal-content .price-group {
+            margin-bottom: 25px;
+            justify-content: center;
+        }
         #itemDetailsModal .item-modal-content .item-price {
             font-size: 1.8em;
-            margin-bottom: 25px;
-            display: block; /* Ensure it takes full width */
+            display: inline; /* Changed to inline */
+        }
+        #itemDetailsModal .item-modal-content .original-price {
+            font-size: 1.2em; /* Adjusted for modal */
+            margin-left: 10px;
         }
         #itemDetailsModal .item-modal-content .add-to-cart-btn {
-            width: 80%; /* Make button wider in modal */
+            width: 80%;
             margin: 0 auto;
             padding: 15px 25px;
             font-size: 1.1em;
+        }
+        #itemDetailsModal .item-modal-content .discount-badge {
+            position: static; /* Remove absolute positioning */
+            display: inline-block;
+            margin-top: 10px;
+            margin-bottom: 15px;
+        }
+
+
+        /* Track Order Modal */
+        #trackOrderModal .modal-content {
+            text-align: center;
+        }
+        #trackOrderModal .modal-content input {
+            margin-bottom: 15px;
+        }
+        #trackOrderModal .modal-content #trackOrderStatus {
+            margin-top: 20px;
+            font-weight: bold;
+            color: var(--text-color-dark);
+        }
+
+        /* Dark Mode Toggle Button */
+        #darkModeToggle {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--text-color-dark); /* Adjust color for theme */
+            transition: color 0.2s ease;
+        }
+        #darkModeToggle:hover {
+            color: var(--primary-red);
+        }
+        /* Sun icon when in light mode, moon when in dark mode */
+        body:not(.dark-mode) #darkModeToggle .fa-moon {
+            display: none;
+        }
+        body.dark-mode #darkModeToggle .fa-sun {
+            display: none;
         }
 
 
@@ -853,35 +987,43 @@
 
             .menu-items-section,
             .cart-summary-section {
-                flex: none; /* Remove flex grow/shrink */
-                width: 100%; /* Take full width */
-                min-width: unset; /* Remove min-width constraints */
+                flex: none;
+                width: 100%;
+                min-width: unset;
             }
 
             .cart-summary-section {
-                position: static; /* Remove sticky on mobile */
+                position: static;
                 margin-top: 20px;
             }
 
-            .header .cart-icon {
-                display: block; /* Show cart icon in header */
+            .header .header-btn {
+                display: block;
             }
 
             .cart-summary {
-                display: none; /* Hidden by default, shown on mobile cart toggle */
+                display: none;
             }
 
             .cart-summary.active {
-                display: flex; /* Show when activated by icon */
+                display: flex;
             }
 
             .location-header {
                 top: 75px; /* Adjust sticky position for mobile header */
                 font-size: 1em;
+                margin: 10px 15px; /* Adjust horizontal margin */
+            }
+            .header.header-hidden + .location-header {
+                top: 0; /* Adjust when main header is hidden */
+            }
+            .cart-summary-section {
+                /* Adjusted top for mobile when header is hidden */
+                top: calc(15px + 20px + 10px); /* Location header padding + margin */
             }
 
             .floating-checkout-btn.visible {
-                display: flex; /* Show floating button on mobile */
+                display: flex;
             }
         }
 
@@ -901,7 +1043,7 @@
             }
 
             .menu-item-card img {
-                height: 120px; /* Slightly smaller image */
+                height: 120px;
                 width: 120px;
             }
 
@@ -944,12 +1086,12 @@
                 padding: 15px;
                 font-size: 1.1em;
             }
-            /* Adjust button spacing for map modal footer on small screens */
-            #locationMapModal .modal-footer {
+            /* Adjust button spacing for modal footer on small screens */
+            .modal-footer {
                 flex-direction: column; /* Stack buttons vertically */
                 gap: 10px; /* Reduce gap when stacked */
             }
-            #locationMapModal .modal-footer .btn {
+            .modal-footer .btn {
                 width: 100%; /* Full width for stacked buttons */
                 box-sizing: border-box;
             }
@@ -962,7 +1104,7 @@
             .header h1 {
                 font-size: 1.5em;
             }
-            .header .cart-icon {
+            .header .header-btn {
                 font-size: 1.5em;
             }
             .cart-count {
@@ -1001,23 +1143,25 @@
     </style>
 </head>
 <body>
-    <!-- Lottie Loading Spinner -->
-    <div id="loadingSpinner">
-        <!-- New Lottie animation for "Just a Remedy" or similar concept -->
-        <lottie-player src="https://lottie.host/87082729-28c0-4f51-a968-3e4210e1906a/h7Gq0462wX.json" background="transparent" speed="1" style="width: 150px; height: 150px;" loop autoplay></lottie-player>
-        <p>Just a Remedy: Preparing your order...</p>
-    </div>
-
-    <header class="header">
+    <header class="header" id="mainHeader">
         <h1 id="shopNameHeader">Delicious Bites</h1>
-        <button class="cart-icon" id="toggleCartBtn">
-            <i class="fas fa-shopping-cart"></i>
-            <span class="cart-count" id="cartCount">0</span>
-        </button>
+        <div class="header-buttons">
+            <button class="header-btn" id="trackOrderHeaderBtn" title="Track Your Order">
+                <i class="fas fa-truck"></i>
+            </button>
+            <button class="header-btn" id="darkModeToggle" title="Toggle Dark Mode">
+                <i class="fas fa-sun"></i>
+                <i class="fas fa-moon"></i>
+            </button>
+            <button class="header-btn" id="toggleCartBtn" title="View Cart">
+                <i class="fas fa-shopping-cart"></i>
+                <span class="cart-count" id="cartCount">0</span>
+            </button>
+        </div>
     </header>
 
     <!-- Location Header -->
-    <div class="location-header">
+    <div class="location-header" id="locationHeader">
         <i id="locationStatusIcon" class="fas fa-map-marker-alt status-icon"></i>
         <span id="displayLocation">Detecting your precise location...</span>
         <button id="changeLocationBtn">Change</button>
@@ -1031,7 +1175,7 @@
             <div class="menu-grid" id="menuGrid">
                 <!-- Menu items will be loaded here by JS -->
             </div>
-            <div id="noItemsMessage" style="text-align: center; color: var(--text-light); margin-top: 50px; display: none;">
+            <div id="noItemsMessage" style="text-align: center; color: var(--text-color-light); margin-top: 50px; display: none;">
                 <p>No menu items available at the moment. Please check back later!</p>
             </div>
         </section>
@@ -1056,7 +1200,7 @@
                     </div>
                     <div id="discountRow" style="display: none;">
                         <span>Discount:</span>
-                        <span id="discountAmount" style="color: var(--accent-red);">-₹0.00</span>
+                        <span id="discountAmount" style="color: var(--primary-red);">-₹0.00</span>
                     </div>
                     <div class="total-amount">
                         <span>Total:</span>
@@ -1094,8 +1238,8 @@
                 <div class="form-group">
                     <label for="deliveryAddress">Delivery Address:</label>
                     <textarea id="deliveryAddress" rows="3" required placeholder="Enter your full delivery address"></textarea>
-                    <small id="addressHint" style="color: var(--text-light); margin-top: 5px; display: block;">
-                        This address is automatically filled from your device's location. Please edit if incorrect.
+                    <small id="addressHint" style="color: var(--text-color-light); margin-top: 5px; display: block;">
+                        Your detected location will be used. Please refine if needed.
                     </small>
                 </div>
                 
@@ -1119,7 +1263,7 @@
                     </div>
                     <div class="summary-line" id="checkoutDiscountRow" style="display: none;">
                         <span>Discount:</span>
-                        <span id="checkoutDiscount" style="color: var(--accent-red);">-₹0.00</span>
+                        <span id="checkoutDiscount" style="color: var(--primary-red);">-₹0.00</span>
                     </div>
                     <div class="summary-line total">
                         <span>Total Payable:</span>
@@ -1144,7 +1288,7 @@
             <p>Your Order ID: <strong><span id="confirmedOrderId"></span></strong></p>
             <p>Your Tracking PIN: <strong><span id="confirmedPinId"></span></strong></p>
             <p>We've sent a confirmation to your WhatsApp number. You can use the PIN to track your order status.</p>
-            <a href="#" id="trackOrderLink" class="track-link" target="_blank">Track Your Order</a>
+            <a href="#" id="trackOrderLink" class="track-link" data-modal-id="trackOrderModal">Track Your Order</a>
             <div class="modal-footer" style="justify-content: center;">
                 <button type="button" class="btn" data-modal-id="orderConfirmationModal">Awesome!</button>
             </div>
@@ -1158,7 +1302,7 @@
             <h3>Select Delivery Location</h3>
             <p>Click on the map to set your delivery pin or search for an address.</p>
             <div id="map"></div>
-            <p id="mapLocationStatus" style="font-size: 0.9em; color: var(--text-light); margin-top: 10px;">No location pinned yet.</p>
+            <p id="mapLocationStatus" style="font-size: 0.9em; color: var(--text-color-light); margin-top: 10px;">No location pinned yet.</p>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-modal-id="locationMapModal">Cancel</button>
                 <button type="button" class="btn" id="usePresentLocationBtn"><i class="fas fa-location-arrow"></i> Use Present Location</button>
@@ -1175,10 +1319,32 @@
                 <img id="modalItemImage" src="" alt="Item Image">
                 <h3 id="modalItemName"></h3>
                 <p id="modalItemDescription"></p>
-                <span id="modalItemPrice" class="item-price"></span>
+                <span id="modalItemDiscountBadge" class="discount-badge"></span>
+                <div class="price-group">
+                    <span id="modalItemPrice" class="item-price"></span>
+                    <span id="modalOriginalPrice" class="original-price"></span>
+                </div>
                 <button class="add-to-cart-btn" id="modalAddToCartBtn">
                     <i class="fas fa-cart-plus"></i> Add to Cart
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Track Order Modal -->
+    <div id="trackOrderModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" data-modal-id="trackOrderModal">&times;</span>
+            <h3>Track Your Order</h3>
+            <p>Enter your 10-digit PIN or Order ID to check its status.</p>
+            <div class="form-group">
+                <label for="trackOrderIdInput">Order PIN / ID:</label>
+                <input type="text" id="trackOrderIdInput" placeholder="e.g., JAR123456ABC or 1234567890">
+            </div>
+            <p id="trackOrderStatus"></p>
+            <div class="modal-footer" style="justify-content: center;">
+                <button type="button" class="btn" id="submitTrackOrderBtn"><i class="fas fa-search"></i> Track Order</button>
+                <button type="button" class="btn btn-secondary" data-modal-id="trackOrderModal">Close</button>
             </div>
         </div>
     </div>
@@ -1196,10 +1362,12 @@
         const API_BASE_URL = window.location.origin;
 
         // --- DOM Elements ---
-        const loadingSpinner = document.getElementById('loadingSpinner');
+        const mainHeader = document.getElementById('mainHeader');
         const shopNameHeader = document.getElementById('shopNameHeader');
         const cartCount = document.getElementById('cartCount');
         const toggleCartBtn = document.getElementById('toggleCartBtn');
+        const trackOrderHeaderBtn = document.getElementById('trackOrderHeaderBtn');
+        const darkModeToggle = document.getElementById('darkModeToggle');
         const menuGrid = document.getElementById('menuGrid');
         const categoryNav = document.getElementById('categoryNav');
         const noItemsMessage = document.getElementById('noItemsMessage');
@@ -1227,11 +1395,11 @@
         const customerNameInput = document.getElementById('customerName');
         const customerPhoneInput = document.getElementById('customerPhone');
         const deliveryAddressInput = document.getElementById('deliveryAddress');
-        const addressHint = document.getElementById('addressHint'); // New hint element
+        const addressHint = document.getElementById('addressHint');
 
         const customerLatitudeInput = document.getElementById('customerLatitude');
         const customerLongitudeInput = document.getElementById('customerLongitude');
-        const customerAddressInput = document.getElementById('customerAddress'); // This will store the geocoded address
+        const customerAddressInput = document.getElementById('customerAddress');
 
         const checkoutSummaryItemsList = document.getElementById('checkoutSummaryItems');
         const checkoutSubtotalSpan = document.getElementById('checkoutSubtotal');
@@ -1247,6 +1415,7 @@
         const trackOrderLink = document.getElementById('trackOrderLink');
 
         // Location Header
+        const locationHeader = document.getElementById('locationHeader');
         const locationStatusIcon = document.getElementById('locationStatusIcon');
         const displayLocationSpan = document.getElementById('displayLocation');
         const changeLocationBtn = document.getElementById('changeLocationBtn');
@@ -1256,7 +1425,7 @@
         const mapDiv = document.getElementById('map');
         const mapLocationStatusP = document.getElementById('mapLocationStatus');
         const confirmLocationBtn = document.getElementById('confirmLocationBtn');
-        const usePresentLocationBtn = document.getElementById('usePresentLocationBtn'); // New button
+        const usePresentLocationBtn = document.getElementById('usePresentLocationBtn');
 
         // Item Details Modal
         const itemDetailsModal = document.getElementById('itemDetailsModal');
@@ -1264,7 +1433,15 @@
         const modalItemName = document.getElementById('modalItemName');
         const modalItemDescription = document.getElementById('modalItemDescription');
         const modalItemPrice = document.getElementById('modalItemPrice');
+        const modalOriginalPrice = document.getElementById('modalOriginalPrice'); // New element
+        const modalItemDiscountBadge = document.getElementById('modalItemDiscountBadge'); // New element
         const modalAddToCartBtn = document.getElementById('modalAddToCartBtn');
+
+        // Track Order Modal
+        const trackOrderModal = document.getElementById('trackOrderModal');
+        const trackOrderIdInput = document.getElementById('trackOrderIdInput');
+        const trackOrderStatus = document.getElementById('trackOrderStatus');
+        const submitTrackOrderBtn = document.getElementById('submitTrackOrderBtn');
 
 
         // --- Global State ---
@@ -1274,7 +1451,8 @@
             shopName: 'Delicious Bites',
             deliveryRates: [],
             minSubtotalForDiscount: 200,
-            discountPercentage: 0.20
+            discountPercentage: 0.20,
+            isDiscountEnabled: true // Ensure this is true by default for overall discount
         };
         let customerLocation = null; // { latitude, longitude, address }
         let map = null;
@@ -1282,14 +1460,6 @@
         let tempMapLocation = null; // Temporarily store location selected on map until confirmed
 
         // --- Utility Functions ---
-
-        function showLoadingSpinner() {
-            loadingSpinner.style.display = 'flex';
-        }
-
-        function hideLoadingSpinner() {
-            loadingSpinner.style.display = 'none';
-        }
 
         function showToast(message, type = 'success') {
             const toast = document.createElement('div');
@@ -1311,29 +1481,77 @@
             modalElement.style.display = 'none';
         }
 
+        // --- Dark Mode Toggle ---
+        darkModeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            // Save preference to localStorage
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+            } else {
+                localStorage.setItem('theme', 'light');
+            }
+        });
+
+        // Apply saved theme on load
+        function applySavedTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+        }
+
+        // --- Header Scroll Logic ---
+        let lastScrollTop = 0;
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+            if (scrollTop > lastScrollTop && scrollTop > mainHeader.offsetHeight) {
+                // Scrolling down and past header height
+                mainHeader.classList.add('header-hidden');
+                locationHeader.classList.add('header-hidden-adjusted');
+            } else if (scrollTop < lastScrollTop) {
+                // Scrolling up
+                mainHeader.classList.remove('header-hidden');
+                locationHeader.classList.remove('header-hidden-adjusted');
+            }
+            lastScrollTop = scrollTop;
+        });
+
+
         // --- Data Fetching ---
 
         async function fetchMenu() {
-            showLoadingSpinner();
             try {
                 const response = await fetch(`${API_BASE_URL}/api/menu`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                menuItems = await response.json();
+                const fetchedItems = await response.json();
+                
+                // Apply random discounts and calculate original price for display
+                menuItems = fetchedItems.map(item => {
+                    const discountPercentage = Math.floor(Math.random() * (50 - 10 + 1)) + 10; // Random int between 10 and 50
+                    // Assuming item.price from backend is the FINAL discounted price (y)
+                    // originalPrice (x) = discountedPrice / (1 - discountPercentage / 100)
+                    const originalPrice = item.price / (1 - discountPercentage / 100);
+                    return {
+                        ...item,
+                        originalPrice: originalPrice,
+                        discountPercentage: discountPercentage
+                    };
+                });
                 renderMenu();
             } catch (error) {
                 console.error('Error fetching menu items:', error);
                 showToast('Failed to load menu. Please try again later.', 'error');
-                menuGrid.innerHTML = '<p style="text-align: center; color: var(--accent-red);">Failed to load menu items. Please check your internet connection or try again later.</p>';
+                menuGrid.innerHTML = '<p style="text-align: center; color: var(--primary-red);">Failed to load menu items. Please check your internet connection or try again later.</p>';
                 noItemsMessage.style.display = 'block';
-            } finally {
-                hideLoadingSpinner();
             }
         }
 
         async function fetchSettings() {
-            showLoadingSpinner();
             try {
                 const response = await fetch(`${API_BASE_URL}/api/public/settings`);
                 if (!response.ok) {
@@ -1345,8 +1563,6 @@
             } catch (error) {
                 console.error('Error fetching settings:', error);
                 showToast('Failed to load shop settings.', 'error');
-            } finally {
-                hideLoadingSpinner();
             }
         }
 
@@ -1355,7 +1571,7 @@
         async function getAndDisplayLocation() {
             locationStatusIcon.className = 'fas fa-spinner fa-spin status-icon'; // Spinner
             displayLocationSpan.textContent = 'Detecting your precise location...';
-            locationStatusIcon.style.color = 'var(--primary-blue)';
+            locationStatusIcon.style.color = 'var(--primary-red)';
 
             // Check localStorage first
             const storedLat = localStorage.getItem('customerLatitude');
@@ -1383,10 +1599,6 @@
                 }, (error) => {
                     console.error('Error getting location:', error);
                     customerLocation = null; // Clear any partial location
-                    displayLocationSpan.textContent = 'Location detection failed. Click "Change" to set manually.';
-                    locationStatusIcon.className = 'fas fa-exclamation-triangle status-icon';
-                    locationStatusIcon.style.color = 'var(--warning-orange)';
-                    showToast('Failed to detect location. Please set manually.', 'warning');
                     updateLocationHeaderUI(); // Update UI to reflect failure
                 }, {
                     enableHighAccuracy: true, // Request GPS for high accuracy
@@ -1395,10 +1607,6 @@
                 });
             } else {
                 customerLocation = null;
-                displayLocationSpan.textContent = 'Geolocation not supported. Click "Change" to set manually.';
-                locationStatusIcon.className = 'fas fa-times-circle status-icon';
-                locationStatusIcon.style.color = 'var(--accent-red)';
-                showToast('Geolocation not supported by your browser.', 'error');
                 updateLocationHeaderUI(); // Update UI to reflect no support
             }
         }
@@ -1429,38 +1637,22 @@
             if (customerLocation && customerLocation.address && customerLocation.address !== 'null') {
                 displayLocationSpan.textContent = customerLocation.address;
                 locationStatusIcon.className = 'fas fa-map-marker-alt status-icon';
-                locationStatusIcon.style.color = 'var(--primary-blue)';
-                // Also update the checkout form's hidden inputs and textarea
-                customerLatitudeInput.value = customerLocation.latitude;
-                customerLongitudeInput.value = customerLocation.longitude;
-                customerAddressInput.value = customerLocation.address;
-                deliveryAddressInput.value = customerLocation.address; // Pre-fill delivery address
-                addressHint.textContent = 'This address is automatically filled from your device\'s location. Please edit if incorrect.';
-                addressHint.style.color = 'var(--text-light)';
-
+                locationStatusIcon.style.color = 'var(--primary-red)';
             } else {
-                displayLocationSpan.textContent = 'Location not set. Click "Change" to set or enter manually.';
+                // Default message when location is not detected/set
+                displayLocationSpan.textContent = 'Set your delivery location';
                 locationStatusIcon.className = 'fas fa-map-marker-alt status-icon';
-                locationStatusIcon.style.color = 'var(--text-light)';
-                // Clear any stored location in inputs
-                customerLatitudeInput.value = '';
-                customerLongitudeInput.value = '';
-                customerAddressInput.value = '';
-                deliveryAddressInput.value = ''; // Clear delivery address if no location
-                addressHint.textContent = 'Location detection failed. Please enter your full delivery address manually.';
-                addressHint.style.color = 'var(--accent-red)';
+                locationStatusIcon.style.color = 'var(--text-color-light)';
             }
         }
 
-        changeLocationBtn.addEventListener('click', () => {
-            // Open the map modal
+        locationHeader.addEventListener('click', () => { // Changed event listener to the entire card
             openModal(locationMapModal);
-            // Use a small timeout to ensure modal is visible before map renders
             setTimeout(() => {
                 if (map) {
-                    map.invalidateSize(); // Invalidate map size to fix rendering issues inside hidden modals
+                    map.invalidateSize();
                 }
-                initMap(); // Initialize or re-initialize map
+                initMap();
             }, 100);
         });
 
@@ -1468,57 +1660,50 @@
         // --- Map Initialization and Interaction (for LocationMapModal) ---
         function initMap() {
             if (map) {
-                map.remove(); // Remove existing map instance if any
+                map.remove();
             }
 
-            // Default to shop location if available, otherwise a general Indian city
             const defaultLat = settings.shopLocation ? settings.shopLocation.latitude : 17.4399; // Hyderabad
             const defaultLng = settings.shopLocation ? settings.shopLocation.longitude : 78.4983; // Hyderabad
 
-            // Use customer's current location if available, otherwise default
             let initialMapLat = customerLocation ? customerLocation.latitude : defaultLat;
             let initialMapLng = customerLocation ? customerLocation.longitude : defaultLng;
-            let initialMapZoom = customerLocation ? 16 : 13; // Zoom in more if location is known
+            let initialMapZoom = customerLocation ? 16 : 13;
 
             map = L.map('map', {
-                zoomControl: false // Hide default zoom controls
+                zoomControl: false
             }).setView([initialMapLat, initialMapLng], initialMapZoom);
 
-            // OpenStreetMap Satellite Tiles (using Esri World Imagery as a common satellite option)
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: false, // Hide attribution footer
+                attribution: false,
                 maxZoom: 18
             }).addTo(map);
 
-            // Add Geocoder for address search
             const geocoder = L.Control.Geocoder.nominatim();
             L.Control.geocoder({
                 geocoder: geocoder,
                 placeholder: 'Search for address...',
                 defaultMarkGeocodedLocation: false,
-                collapsed: false // Keep search bar open
+                collapsed: false
             }).on('markgeocode', function(e) {
                 const center = e.geocode.center;
                 setMapMarker(center.lat, center.lng, e.geocode.name);
-                map.setView(center, 16); // Zoom to result
+                map.setView(center, 16);
             }).addTo(map);
 
-            // Click event to set marker
             map.on('click', function(e) {
                 setMapMarker(e.latlng.lat, e.latlng.lng);
             });
 
-            // Attempt to get current location for map's initial center and marker
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
-                    map.setView([lat, lng], 16); // Center map to current location
+                    map.setView([lat, lng], 16);
                     setMapMarker(lat, lng, 'Your current location');
                 }, (error) => {
                     console.warn('Geolocation failed for map initial center:', error);
                     mapLocationStatusP.textContent = 'Click on the map to set your delivery pin or search for an address.';
-                    // If geolocation fails, set marker to customer's last known location or default
                     if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
                         setMapMarker(customerLocation.latitude, customerLocation.longitude, customerLocation.address);
                     } else {
@@ -1526,7 +1711,6 @@
                     }
                 });
             } else {
-                // If geolocation not supported, set marker to customer's last known location or default
                 if (customerLocation && customerLocation.latitude && customerLocation.longitude) {
                     setMapMarker(customerLocation.latitude, customerLocation.longitude, customerLocation.address);
                 } else {
@@ -1542,13 +1726,12 @@
             }
             mapMarker = L.marker([lat, lng]).addTo(map);
 
-            tempMapLocation = { latitude: lat, longitude: lng }; // Store temporarily
+            tempMapLocation = { latitude: lat, longitude: lng };
 
-            if (address && address !== 'Your current location' && address !== 'Default Location') { // Avoid setting generic strings as confirmed address
+            if (address && address !== 'Your current location' && address !== 'Default Location') {
                 tempMapLocation.address = address;
                 mapLocationStatusP.textContent = `Pinned location: ${address}`;
             } else {
-                // Reverse geocode if address is not provided (e.g., direct map click) or is a generic string
                 try {
                     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
                     if (!response.ok) {
@@ -1568,13 +1751,16 @@
                 }
                 mapLocationStatusP.textContent = `Pinned location: ${tempMapLocation.address}`;
             }
-            mapLocationStatusP.style.color = 'var(--primary-blue)';
+            mapLocationStatusP.style.color = 'var(--primary-red)';
         }
 
         confirmLocationBtn.addEventListener('click', () => {
             if (tempMapLocation && tempMapLocation.latitude && tempMapLocation.longitude && tempMapLocation.address && tempMapLocation.address !== 'Address not found' && tempMapLocation.address !== 'Your current location' && tempMapLocation.address !== 'Default Location') {
-                customerLocation = { ...tempMapLocation }; // Confirm the location
-                updateLocationHeaderUI(); // Update the main UI
+                customerLocation = { ...tempMapLocation };
+                localStorage.setItem('customerLatitude', customerLocation.latitude);
+                localStorage.setItem('customerLongitude', customerLocation.longitude);
+                localStorage.setItem('customerAddress', customerLocation.address);
+                updateLocationHeaderUI();
                 closeModal(locationMapModal);
                 showToast('Delivery location updated!', 'success');
             } else {
@@ -1588,9 +1774,8 @@
                 navigator.geolocation.getCurrentPosition(async (position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
-                    await setMapMarker(lat, lng, 'Your current location'); // Set generic text for immediate feedback
-                    map.setView([lat, lng], 16); // Zoom to detected location
-                    // Immediately reverse geocode to get a proper address for confirmation
+                    await setMapMarker(lat, lng, 'Your current location');
+                    map.setView([lat, lng], 16);
                     try {
                         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
                         if (!response.ok) throw new Error('Reverse geocoding failed');
@@ -1634,21 +1819,24 @@
             );
 
             if (filteredItems.length === 0) {
-                menuGrid.innerHTML = ''; // Clear grid
+                menuGrid.innerHTML = '';
                 noItemsMessage.style.display = 'block';
             } else {
                 noItemsMessage.style.display = 'none';
                 filteredItems.forEach(item => {
                     const card = document.createElement('div');
                     card.classList.add('menu-item-card');
-                    card.dataset.itemId = item._id; // Store item ID on the card
+                    card.dataset.itemId = item._id;
                     card.innerHTML = `
+                        ${item.discountPercentage > 0 ? `<span class="discount-badge">-${item.discountPercentage}%</span>` : ''}
                         <img src="${item.imageUrl || 'https://placehold.co/100x100/E0E0E0/666666?text=No+Image'}" alt="${item.name}" onerror="this.onerror=null;this.src='https://placehold.co/100x100/E0E0E0/666666?text=No+Image';">
                         <div class="item-details">
                             <h3>${item.name} ${item.isTrending ? '<i class="fas fa-fire" style="color: var(--warning-orange); font-size: 0.8em;"></i>' : ''}</h3>
                             <div class="item-price-add">
-                                <span class="item-price">₹${item.price.toFixed(2)}</span>
-                                <!-- Add button here, but clicking the card also opens modal -->
+                                <div class="price-group">
+                                    <span class="item-price">₹${item.price.toFixed(2)}</span>
+                                    ${item.discountPercentage > 0 ? `<span class="original-price">₹${item.originalPrice.toFixed(2)}</span>` : ''}
+                                </div>
                                 <button class="add-to-cart-btn" data-item-id="${item._id}">
                                     <i class="fas fa-cart-plus"></i> Add
                                 </button>
@@ -1658,10 +1846,9 @@
                     menuGrid.appendChild(card);
                 });
 
-                // Event listener for adding to cart directly from the card (if user prefers not to open modal)
                 document.querySelectorAll('.menu-item-card .add-to-cart-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Prevent card click event from firing
+                        e.stopPropagation();
                         const itemId = e.currentTarget.dataset.itemId;
                         const item = menuItems.find(i => i._id === itemId);
                         if (item) {
@@ -1670,7 +1857,6 @@
                     });
                 });
 
-                // Event listener for opening item details modal when card is clicked
                 document.querySelectorAll('.menu-item-card').forEach(card => {
                     card.addEventListener('click', (e) => {
                         const itemId = e.currentTarget.dataset.itemId;
@@ -1702,17 +1888,27 @@
             modalItemName.textContent = item.name;
             modalItemDescription.textContent = item.description || 'No description available for this item.';
             modalItemPrice.textContent = `₹${item.price.toFixed(2)}`;
-            modalAddToCartBtn.dataset.itemId = item._id; // Set item ID for add to cart button in modal
+            
+            if (item.discountPercentage > 0) {
+                modalOriginalPrice.textContent = `₹${item.originalPrice.toFixed(2)}`;
+                modalOriginalPrice.style.display = 'inline';
+                modalItemDiscountBadge.textContent = `-${item.discountPercentage}%`;
+                modalItemDiscountBadge.style.display = 'inline-block';
+            } else {
+                modalOriginalPrice.style.display = 'none';
+                modalItemDiscountBadge.style.display = 'none';
+            }
+
+            modalAddToCartBtn.dataset.itemId = item._id;
             openModal(itemDetailsModal);
         }
 
-        // Add to cart from item details modal
         modalAddToCartBtn.addEventListener('click', (e) => {
             const itemId = e.currentTarget.dataset.itemId;
             const item = menuItems.find(i => i._id === itemId);
             if (item) {
                 addToCart(item);
-                closeModal(itemDetailsModal); // Close modal after adding to cart
+                closeModal(itemDetailsModal);
             }
         });
 
@@ -1727,7 +1923,9 @@
                 cart.push({
                     itemId: item._id,
                     name: item.name,
-                    price: item.price,
+                    price: item.price, // Use the discounted price for cart calculation
+                    originalPrice: item.originalPrice, // Store original price for display if needed later
+                    discountPercentage: item.discountPercentage, // Store discount percentage
                     quantity: 1
                 });
             }
@@ -1740,7 +1938,7 @@
             if (itemIndex > -1) {
                 cart[itemIndex].quantity += change;
                 if (cart[itemIndex].quantity <= 0) {
-                    cart.splice(itemIndex, 1); // Remove if quantity is 0 or less
+                    cart.splice(itemIndex, 1);
                 }
             }
             updateCartUI();
@@ -1781,7 +1979,7 @@
                         </div>
                     `;
                     cartItemsList.appendChild(li);
-                    subtotal += item.price * item.quantity;
+                    subtotal += item.price * item.quantity; // Subtotal uses the already discounted price
                     totalItemsInCart += item.quantity;
                 });
 
@@ -1806,27 +2004,25 @@
 
             subtotalAmountSpan.textContent = `₹${subtotal.toFixed(2)}`;
 
-            // Calculate Transport Tax
             let transportTax = 0;
-            // Use the first delivery rate amount if available, otherwise a default flat rate
             if (settings.deliveryRates && settings.deliveryRates.length > 0 && settings.deliveryRates[0].amount !== undefined) {
                 transportTax = settings.deliveryRates[0].amount;
             } else {
-                transportTax = 20; // Default flat rate if no delivery rates are configured
+                transportTax = 20;
             }
             transportTaxAmountSpan.textContent = `₹${transportTax.toFixed(2)}`;
 
-            // Calculate Discount
-            let discountAmount = 0;
-            if (subtotal >= settings.minSubtotalForDiscount && settings.discountPercentage > 0) {
-                discountAmount = subtotal * settings.discountPercentage;
+            let overallDiscountAmount = 0;
+            // This is the *overall* discount on the cart subtotal, separate from item-level discounts
+            if (settings.isDiscountEnabled && subtotal >= settings.minSubtotalForDiscount && settings.discountPercentage > 0) {
+                overallDiscountAmount = subtotal * settings.discountPercentage;
                 discountRow.style.display = 'flex';
             } else {
                 discountRow.style.display = 'none';
             }
-            discountAmountSpan.textContent = `-₹${discountAmount.toFixed(2)}`;
+            discountAmountSpan.textContent = `-₹${overallDiscountAmount.toFixed(2)}`;
 
-            const totalAmount = subtotal - discountAmount + transportTax;
+            const totalAmount = subtotal - overallDiscountAmount + transportTax;
             totalAmountSpan.textContent = `₹${totalAmount.toFixed(2)}`;
             floatingTotalAmount.textContent = totalAmount.toFixed(2);
         }
@@ -1851,7 +2047,12 @@
             let currentSubtotal = 0;
             cart.forEach(item => {
                 const li = document.createElement('li');
-                li.textContent = `${item.name} x ${item.quantity} (₹${(item.price * item.quantity).toFixed(2)})`;
+                // Display original price and discount in checkout summary
+                let priceDisplay = `₹${item.price.toFixed(2)}`;
+                if (item.discountPercentage > 0) {
+                    priceDisplay += ` <span style="text-decoration: line-through; color: var(--text-color-light); font-size: 0.85em;">₹${item.originalPrice.toFixed(2)}</span> (-${item.discountPercentage}%)`;
+                }
+                li.innerHTML = `<span>${item.name} x ${item.quantity}</span><span>${priceDisplay}</span>`;
                 checkoutSummaryItemsList.appendChild(li);
                 currentSubtotal += item.price * item.quantity;
             });
@@ -1879,9 +2080,9 @@
                 deliveryAddressInput.value = customerLocation.address;
                 customerLatitudeInput.value = customerLocation.latitude;
                 customerLongitudeInput.value = customerLocation.longitude;
-                customerAddressInput.value = customerLocation.address; // Store the geocoded address
+                customerAddressInput.value = customerLocation.address;
                 addressHint.textContent = 'This address is automatically filled from your device\'s location. Please edit if incorrect.';
-                addressHint.style.color = 'var(--text-light)';
+                addressHint.style.color = 'var(--text-color-light)';
             } else if (localStorage.getItem('customerAddress') && localStorage.getItem('customerAddress') !== 'null') {
                 const storedLat = localStorage.getItem('customerLatitude');
                 const storedLng = localStorage.getItem('customerLongitude');
@@ -1896,14 +2097,22 @@
                 customerLongitudeInput.value = storedLng;
                 customerAddressInput.value = storedAddress;
                 addressHint.textContent = 'This address is from your previous order. Please edit if incorrect.';
-                addressHint.style.color = 'var(--text-light)';
+                addressHint.style.color = 'var(--text-color-light)';
             } else {
-                deliveryAddressInput.value = ''; // Ensure it's empty for manual entry
+                // If no location detected or stored, pre-fill with previous deliveryAddress from localStorage if available
+                const storedDeliveryAddress = localStorage.getItem('deliveryAddress');
+                if (storedDeliveryAddress && storedDeliveryAddress !== 'null') {
+                    deliveryAddressInput.value = storedDeliveryAddress;
+                    addressHint.textContent = 'This address is from your previous order. Please edit if incorrect.';
+                    addressHint.style.color = 'var(--text-color-light)';
+                } else {
+                    deliveryAddressInput.value = '';
+                    addressHint.textContent = 'Please enter your full delivery address manually or use "Change" to select on map.';
+                    addressHint.style.color = 'var(--text-color-light)';
+                }
                 customerLatitudeInput.value = '';
                 customerLongitudeInput.value = '';
                 customerAddressInput.value = '';
-                addressHint.textContent = 'Location detection failed. Please enter your full delivery address manually.';
-                addressHint.style.color = 'var(--accent-red)';
             }
         }
 
@@ -1912,58 +2121,52 @@
 
             const customerName = customerNameInput.value.trim();
             const customerPhone = customerPhoneInput.value.trim();
-            const deliveryAddress = deliveryAddressInput.value.trim(); // The address displayed in the textarea
+            const deliveryAddress = deliveryAddressInput.value.trim();
             
-            // Use the geocoded address from customerLocation if available, otherwise fall back to textarea content
             const orderLatitude = customerLocation ? customerLocation.latitude : null;
             const orderLongitude = customerLocation ? customerLocation.longitude : null;
-            const orderAddressForBackend = customerLocation ? customerLocation.address : deliveryAddress; // Backend expects the geocoded address if available
+            const orderAddressForBackend = customerLocation ? customerLocation.address : deliveryAddress;
 
             if (!customerName || !customerPhone || !deliveryAddress) {
                 showToast('Please fill in all required customer details.', 'error');
                 return;
             }
             
-            // Basic validation for location data. If GPS failed, user must manually enter.
-            if (!orderLatitude || !orderLongitude || !orderAddressForBackend || orderAddressForBackend.includes('Address not found') || orderAddressForBackend === 'Location not set. Click "Change" to set or enter manually.' || orderAddressForBackend === 'Location detection failed. Please enter address manually.') {
-                // If GPS failed, and the user hasn't typed a substantial address, prompt them
-                if (deliveryAddress.length < 10) { // Arbitrary length check for a "substantial" address
+            if (!orderLatitude || !orderLongitude || !orderAddressForBackend || orderAddressForBackend.includes('Address not found') || orderAddressForBackend === 'Set your delivery location' || orderAddressForBackend === 'Please enter your full delivery address manually or use "Change" to select on map.') {
+                if (deliveryAddress.length < 10) {
                     showToast('Please provide a detailed delivery address for accurate delivery.', 'warning');
-                    return; // Prevent submission until a better address is given
+                    return;
                 }
-                // If they typed something, proceed but log the warning
                 console.warn("Submitting order with manually entered address due to GPS failure.");
                 showToast('Location not precisely detected. Using manually entered address.', 'warning');
             }
 
-            // Save customer details to localStorage for next time
             localStorage.setItem('customerName', customerName);
             localStorage.setItem('customerPhone', customerPhone);
-            localStorage.setItem('deliveryAddress', deliveryAddress); // Save the manually entered address too
+            localStorage.setItem('deliveryAddress', deliveryAddress);
             localStorage.setItem('customerLatitude', orderLatitude);
             localStorage.setItem('customerLongitude', orderLongitude);
-            localStorage.setItem('customerAddress', orderAddressForBackend); // Save the geocoded address (or manual fallback)
+            localStorage.setItem('customerAddress', orderAddressForBackend);
 
 
             const orderPayload = {
                 items: cart.map(item => ({
-                    productId: item.itemId, // Backend expects productId
+                    productId: item.itemId,
                     name: item.name,
-                    price: item.price,
+                    price: item.price, // Send the discounted price to backend
                     quantity: item.quantity
                 })),
                 customerName: customerName,
                 customerPhone: customerPhone,
-                deliveryAddress: deliveryAddress, // Send the address from the text area
-                customerLocation: { latitude: orderLatitude, longitude: orderLongitude, address: orderAddressForBackend }, // Send the geocoded location
+                deliveryAddress: deliveryAddress,
+                customerLocation: { latitude: orderLatitude, longitude: orderLongitude, address: orderAddressForBackend },
                 subtotal: parseFloat(subtotalAmountSpan.textContent.replace('₹', '')),
                 transportTax: parseFloat(transportTaxAmountSpan.textContent.replace('₹', '')),
                 discountAmount: parseFloat(discountAmountSpan.textContent.replace('-₹', '')),
                 totalAmount: parseFloat(totalAmountSpan.textContent.replace('₹', '')),
-                paymentMethod: 'Cash on Delivery' // Hardcoded as per backend
+                paymentMethod: 'Cash on Delivery'
             };
 
-            showLoadingSpinner();
             try {
                 const response = await fetch(`${API_BASE_URL}/api/order`, {
                     method: 'POST',
@@ -1982,28 +2185,80 @@
 
                 confirmedOrderIdSpan.textContent = result.orderId;
                 confirmedPinIdSpan.textContent = result.pinId;
-                trackOrderLink.href = `/track?orderId=${result.pinId}`; // Link to track page
+                trackOrderLink.dataset.orderId = result.pinId;
+                trackOrderLink.href = '#';
 
-                // Play Lottie animation
                 orderPlacedLottie.play();
                 openModal(orderConfirmationModal);
 
-                cart = []; // Clear cart after successful order
-                updateCartUI(); // Update UI to reflect empty cart
+                cart = [];
+                updateCartUI();
             } catch (error) {
                 console.error('Error placing order:', error);
                 showToast(`Error placing order: ${error.message}`, 'error');
             } finally {
-                hideLoadingSpinner();
+                // No loading spinner to hide
             }
         });
 
+        // --- Track Order Logic ---
+        trackOrderHeaderBtn.addEventListener('click', () => {
+            trackOrderIdInput.value = '';
+            trackOrderStatus.textContent = '';
+            openModal(trackOrderModal);
+        });
+
+        trackOrderLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeModal(orderConfirmationModal);
+            const orderId = e.currentTarget.dataset.orderId;
+            trackOrderIdInput.value = orderId || '';
+            trackOrderStatus.textContent = '';
+            openModal(trackOrderModal);
+        });
+
+
+        submitTrackOrderBtn.addEventListener('click', async () => {
+            const queryId = trackOrderIdInput.value.trim();
+            if (!queryId) {
+                trackOrderStatus.textContent = 'Please enter an Order PIN or ID.';
+                trackOrderStatus.style.color = 'var(--primary-red)';
+                return;
+            }
+
+            trackOrderStatus.textContent = 'Tracking order...';
+            trackOrderStatus.style.color = 'var(--text-color-light)';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/order/${queryId}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Order not found.');
+                }
+                const order = await response.json();
+                trackOrderStatus.innerHTML = `
+                    Order ID: <strong>${order.customOrderId || order._id}</strong><br>
+                    PIN: <strong>${order.pinId}</strong><br>
+                    Status: <strong style="color: var(--primary-red);">${order.status}</strong><br>
+                    Total: ₹${order.totalAmount.toFixed(2)}<br>
+                    Date: ${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                `;
+                trackOrderStatus.style.color = 'var(--text-color-dark)';
+            } catch (error) {
+                console.error('Error tracking order:', error);
+                trackOrderStatus.textContent = `Error: ${error.message}`;
+                trackOrderStatus.style.color = 'var(--primary-red)';
+            }
+        });
+
+
         // --- Initial Load ---
         document.addEventListener('DOMContentLoaded', async () => {
+            applySavedTheme();
             await fetchSettings();
             await fetchMenu();
             await getAndDisplayLocation(); // Auto-detect location on page load
-            updateCartUI(); // Initialize cart UI
+            updateCartUI();
         });
 
         // --- Modal Close Button Handlers ---
@@ -2012,16 +2267,15 @@
                 const modalId = e.target.dataset.modalId;
                 closeModal(document.getElementById(modalId));
                 if (modalId === 'orderConfirmationModal') {
-                    orderPlacedLottie.stop(); // Stop animation when closing
+                    orderPlacedLottie.stop();
                 }
-                // If closing map modal, ensure map is properly removed to prevent issues
                 if (modalId === 'locationMapModal' && map) {
                     map.remove();
                     map = null;
                     mapMarker = null;
                     tempMapLocation = null;
                     mapLocationStatusP.textContent = 'No location pinned yet.';
-                    mapLocationStatusP.style.color = 'var(--text-light)';
+                    mapLocationStatusP.style.color = 'var(--text-color-light)';
                 }
             });
         });
@@ -2030,14 +2284,13 @@
             button.addEventListener('click', (e) => {
                 const modalId = e.target.dataset.modalId;
                 closeModal(document.getElementById(modalId));
-                // If closing map modal, ensure map is properly removed to prevent issues
                 if (modalId === 'locationMapModal' && map) {
                     map.remove();
                     map = null;
                     mapMarker = null;
                     tempMapLocation = null;
                     mapLocationStatusP.textContent = 'No location pinned yet.';
-                    mapLocationStatusP.style.color = 'var(--text-light)';
+                    mapLocationStatusP.style.color = 'var(--text-color-light)';
                 }
             });
         });
@@ -2045,17 +2298,14 @@
         // --- Responsive Cart Toggle for Mobile ---
         toggleCartBtn.addEventListener('click', () => {
             cartSummarySection.classList.toggle('active');
-            // Scroll to cart if it's opened
             if (cartSummarySection.classList.contains('active')) {
                 cartSummarySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         });
 
-        // Close cart summary if clicking outside on mobile (if it's open)
         document.addEventListener('click', (e) => {
             if (window.innerWidth <= 992 && cartSummarySection.classList.contains('active')) {
-                // Check if the click was outside the cart summary and not on the toggle button itself
-                if (!cartSummarySection.contains(e.target) && !toggleCartBtn.contains(e.target) && !floatingCheckoutBtn.contains(e.target)) {
+                if (!cartSummarySection.contains(e.target) && !toggleCartBtn.contains(e.target) && !floatingCheckoutBtn.contains(e.target) && !trackOrderHeaderBtn.contains(e.target) && !darkModeToggle.contains(e.target) && !locationHeader.contains(e.target)) {
                     cartSummarySection.classList.remove('active');
                 }
             }
