@@ -44,6 +44,21 @@
             color: white;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
+        /* Custom scrollbar for logs */
+        #whatsapp-logs::-webkit-scrollbar {
+            width: 8px;
+        }
+        #whatsapp-logs::-webkit-scrollbar-track {
+            background: #2d3748; /* Darker gray for track */
+            border-radius: 10px;
+        }
+        #whatsapp-logs::-webkit-scrollbar-thumb {
+            background: #4a5568; /* Even darker gray for thumb */
+            border-radius: 10px;
+        }
+        #whatsapp-logs::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0; /* Lighter on hover */
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col font-inter">
@@ -591,12 +606,17 @@
         /**
          * Fetches data from the API with authentication token.
          * Handles token expiration and redirects to login.
+         * Implements exponential backoff for retries.
          * @param {string} url - The API endpoint URL.
          * @param {object} options - Fetch options (method, headers, body, etc.).
+         * @param {number} retries - Current retry count (internal).
          * @returns {Promise<Response>} The fetch response.
          */
-        async function fetchWithAuth(url, options = {}) {
-            console.log(`[fetchWithAuth] Attempting to fetch: ${url}`); // Debug log
+        async function fetchWithAuth(url, options = {}, retries = 0) {
+            const MAX_RETRIES = 3;
+            const BASE_DELAY_MS = 1000; // 1 second
+
+            console.log(`[fetchWithAuth] Attempting to fetch: ${url} (Retry: ${retries})`); // Debug log
             const token = localStorage.getItem('adminToken');
             const headers = {
                 'Content-Type': 'application/json',
@@ -604,9 +624,6 @@
             };
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;
-                console.log('[fetchWithAuth] Authorization header included.'); // Debug log
-            } else {
-                console.log('[fetchWithAuth] No Authorization token found.'); // Debug log
             }
 
             try {
@@ -622,10 +639,18 @@
                     throw new Error('Authentication failed. Please log in again.');
                 }
 
-                // Check for non-OK responses (e.g., 400, 500) that are not auth-related
                 if (!response.ok) {
                     const errorBody = await response.json().catch(() => ({ message: 'Unknown error' }));
                     console.error(`[fetchWithAuth] API error for ${url}. Status: ${response.status}, Message: ${errorBody.message}`);
+
+                    // Implement exponential backoff for server errors or network issues
+                    if (retries < MAX_RETRIES && (response.status >= 500 || response.status === 0)) { // Status 0 often means network error
+                        const delay = Math.pow(2, retries) * BASE_DELAY_MS;
+                        console.log(`[fetchWithAuth] Retrying ${url} in ${delay}ms...`);
+                        await new Promise(res => setTimeout(res, delay));
+                        return fetchWithAuth(url, options, retries + 1);
+                    }
+
                     throw new Error(errorBody.message || `API request failed with status ${response.status}`);
                 }
 
@@ -878,6 +903,8 @@
                 whatsappLogsContainer.innerHTML = whatsappStatusData.logs.length > 0
                     ? whatsappStatusData.logs.map(log => `<p class="mb-1">${log}</p>`).join('')
                     : '<p class="text-gray-500">No logs yet.</p>';
+                // Scroll to bottom of logs
+                whatsappLogsContainer.scrollTop = whatsappLogsContainer.scrollHeight;
 
                 reinitializeButton.disabled = whatsappStatusData.status === 'initializing';
                 reinitializeButton.textContent = whatsappStatusData.status === 'initializing' ? 'Initializing...' : 'Re-initialize Session';
@@ -886,7 +913,7 @@
             // Initialize Socket.io connection if not already connected
             if (!whatsappSocket) {
                 console.log('[WhatsAppStatus] Connecting to Socket.io...'); // Debug log
-                whatsappSocket = io('http://localhost:3000');
+                whatsappSocket = io('http://localhost:3000'); // Ensure this matches your backend Socket.io server
 
                 whatsappSocket.on('connect', () => {
                     console.log('[WhatsAppStatus] Socket.io connected.'); // Debug log
@@ -926,6 +953,32 @@
                 });
             } else {
                 console.log('[WhatsAppStatus] Socket.io already connected.'); // Debug log
+                // If already connected, ensure we re-subscribe to events if this init function is called again
+                whatsappSocket.off('status');
+                whatsappSocket.off('qrCode');
+                whatsappSocket.off('sessionInfo');
+                whatsappSocket.off('whatsapp_log');
+
+                whatsappSocket.on('status', (newStatus) => {
+                    console.log('[WhatsAppStatus] Socket: status received', newStatus);
+                    whatsappStatusData.status = newStatus;
+                    updateStatusUI();
+                });
+                whatsappSocket.on('qrCode', (qrDataUrl) => {
+                    console.log('[WhatsAppStatus] Socket: qrCode received');
+                    whatsappStatusData.qrCodeUrl = qrDataUrl;
+                    updateStatusUI();
+                });
+                whatsappSocket.on('sessionInfo', (info) => {
+                    console.log('[WhatsAppStatus] Socket: sessionInfo received', info);
+                    whatsappStatusData.lastAuthenticatedAt = info.lastAuthenticatedAt ? new Date(info.lastAuthenticatedAt).toLocaleString() : null;
+                    updateStatusUI();
+                });
+                whatsappSocket.on('whatsapp_log', (logMessage) => {
+                    whatsappStatusData.logs.push(`[${new Date().toLocaleTimeString()}] ${logMessage}`);
+                    whatsappStatusData.logs = whatsappStatusData.logs.slice(-50);
+                    updateStatusUI();
+                });
             }
 
             // Initial fetch of status when component mounts
