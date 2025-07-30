@@ -11,13 +11,35 @@
     <!-- Socket.io Client CDN -->
     <script src="/socket.io/socket.io.js"></script>
     <style>
+        /* Custom Font - Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
         }
+        /* Responsive Sidebar */
         .sidebar {
-            width: 280px; /* Fixed width for sidebar */
+            width: 280px; /* Fixed width for larger screens */
+            transition: transform 0.3s ease-in-out;
+            transform: translateX(0); /* Default visible */
+            z-index: 40; /* Ensure sidebar is above content on smaller screens when active */
         }
+        .sidebar.hidden-mobile {
+            transform: translateX(-100%); /* Hide sidebar off-screen on mobile */
+            position: absolute; /* Position absolutely to allow content to take full width */
+            height: 100%; /* Full height for mobile sidebar */
+        }
+        /* Overlay for mobile when sidebar is open */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 30;
+        }
+
         .content-area {
             flex-grow: 1;
             overflow-y: auto; /* Allow scrolling for content */
@@ -40,12 +62,78 @@
         .modal {
             background-color: rgba(0, 0, 0, 0.5);
         }
+        /* Ensure tables are responsive */
+        .overflow-x-auto table {
+            min-width: 700px; /* Ensure table doesn't shrink too much */
+        }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 250px; /* Slightly smaller sidebar on tablets */
+            }
+            .dashboard-section {
+                padding: 1rem; /* Reduce padding on sections */
+            }
+            .grid-cols-1\/2 {
+                grid-template-columns: 1fr; /* Stack columns on small screens */
+            }
+        }
+
+        @media (max-width: 640px) { /* Mobile specific adjustments */
+            .sidebar {
+                position: fixed; /* Fixed position for mobile sidebar */
+                left: 0;
+                top: 0;
+                height: 100vh; /* Full viewport height */
+                z-index: 50; /* Ensure it's on top */
+                box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+            }
+            .sidebar:not(.active) {
+                transform: translateX(-100%); /* Hide by default */
+            }
+            .content-area {
+                padding: 1rem; /* Adjust padding */
+            }
+            .dashboard-section {
+                margin-bottom: 1rem;
+            }
+            .text-3xl {
+                font-size: 2rem; /* Smaller title */
+            }
+            .text-2xl {
+                font-size: 1.5rem; /* Smaller section titles */
+            }
+            .px-6 {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+            .py-3 {
+                padding-top: 0.5rem;
+                padding-bottom: 0.5rem;
+            }
+            .modal-content {
+                max-width: 95%; /* Make modal wider on small screens */
+            }
+            .flex-col-mobile {
+                flex-direction: column;
+            }
+            .space-x-4-mobile > *:not(:first-child) {
+                margin-left: 0 !important;
+                margin-top: 1rem;
+            }
+        }
     </style>
 </head>
 <body class="flex min-h-screen bg-gray-100">
 
+    <!-- Mobile Menu Toggle Button -->
+    <button id="menuToggleButton" class="md:hidden fixed top-4 left-4 z-50 p-3 bg-gray-800 text-white rounded-lg shadow-md">
+        <i class="fas fa-bars text-xl"></i>
+    </button>
+
     <!-- Sidebar -->
-    <aside class="sidebar bg-gray-800 text-white p-6 flex flex-col shadow-lg">
+    <aside id="sidebar" class="sidebar bg-gray-800 text-white p-6 flex flex-col shadow-lg hidden-mobile md:block">
         <h1 class="text-3xl font-bold mb-8 text-center text-indigo-400">Delicious Bites</h1>
         <nav class="flex-1">
             <ul class="space-y-3">
@@ -99,8 +187,11 @@
         </button>
     </aside>
 
+    <!-- Overlay for mobile sidebar -->
+    <div id="sidebarOverlay" class="overlay hidden md:hidden"></div>
+
     <!-- Main Content Area -->
-    <main class="content-area p-8 bg-gray-100 overflow-auto">
+    <main class="content-area p-4 md:p-8 bg-gray-100 overflow-auto w-full">
         <!-- Bot Status Section -->
         <section id="botStatus" class="dashboard-section bg-white p-6 rounded-lg shadow-md mb-8">
             <h2 class="text-2xl font-semibold text-gray-800 mb-4">WhatsApp Bot Status</h2>
@@ -121,36 +212,39 @@
                     </div>
                 </div>
             </div>
-            <div class="mt-6 text-center">
+            <div class="mt-6 flex flex-col md:flex-row justify-center space-y-4 md:space-y-0 md:space-x-4">
                 <button id="loadSessionButton" class="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out text-lg font-semibold">
-                    Load New Session / Generate QR
+                    Attempt Reconnect (Load Old Session)
+                </button>
+                <button id="forceNewSessionButton" class="px-6 py-3 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 transition duration-150 ease-in-out text-lg font-semibold">
+                    Force New Session (Delete Old)
                 </button>
             </div>
         </section>
 
         <!-- Menu Management Section -->
         <section id="menuManagement" class="dashboard-section bg-white p-6 rounded-lg shadow-md mb-8 hidden">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-4 sm:space-y-0">
                 <h2 class="text-2xl font-semibold text-gray-800">Menu Management</h2>
-                <button id="addMenuItemButton" class="px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-150 ease-in-out flex items-center space-x-2">
+                <button id="addMenuItemButton" class="px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-150 ease-in-out flex items-center space-x-2 w-full sm:w-auto justify-center">
                     <i class="fas fa-plus"></i>
                     <span>Add New Item</span>
                 </button>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white rounded-lg shadow-sm">
-                    <thead>
-                        <tr class="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                            <th class="py-3 px-6 text-left">Image</th>
-                            <th class="py-3 px-6 text-left">Name</th>
-                            <th class="py-3 px-6 text-left">Category</th>
-                            <th class="py-3 px-6 text-right">Price</th>
-                            <th class="py-3 px-6 text-center">Available</th>
-                            <th class="py-3 px-6 text-center">Trending</th>
-                            <th class="py-3 px-6 text-center">Actions</th>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
+                            <th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            <th class="py-3 px-6 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Trending</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="menuItemsTableBody" class="text-gray-600 text-sm font-light">
+                    <tbody id="menuItemsTableBody" class="bg-white divide-y divide-gray-200">
                         <!-- Menu items will be loaded here -->
                     </tbody>
                 </table>
@@ -160,20 +254,20 @@
         <!-- Order Management Section -->
         <section id="orderManagement" class="dashboard-section bg-white p-6 rounded-lg shadow-md mb-8 hidden">
             <h2 class="text-2xl font-semibold text-gray-800 mb-4">Order Management</h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white rounded-lg shadow-sm">
-                    <thead>
-                        <tr class="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                            <th class="py-3 px-6 text-left">Order ID</th>
-                            <th class="py-3 px-6 text-left">Customer</th>
-                            <th class="py-3 px-6 text-left">Phone</th>
-                            <th class="py-3 px-6 text-right">Total</th>
-                            <th class="py-3 px-6 text-center">Status</th>
-                            <th class="py-3 px-6 text-center">Date</th>
-                            <th class="py-3 px-6 text-center">Actions</th>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                            <th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                            <th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th class="py-3 px-6 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="ordersTableBody" class="text-gray-600 text-sm font-light">
+                    <tbody id="ordersTableBody" class="bg-white divide-y divide-gray-200">
                         <!-- Orders will be loaded here -->
                     </tbody>
                 </table>
@@ -183,18 +277,18 @@
         <!-- Customer Management Section -->
         <section id="customerManagement" class="dashboard-section bg-white p-6 rounded-lg shadow-md mb-8 hidden">
             <h2 class="text-2xl font-semibold text-gray-800 mb-4">Customer Management</h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white rounded-lg shadow-sm">
-                    <thead>
-                        <tr class="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                            <th class="py-3 px-6 text-left">Name</th>
-                            <th class="py-3 px-6 text-left">Phone</th>
-                            <th class="py-3 px-6 text-center">Total Orders</th>
-                            <th class="py-3 px-6 text-center">Last Order</th>
-                            <th class="py-3 px-6 text-center">Actions</th>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Last Order</th>
+                            <th class="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="customersTableBody" class="text-gray-600 text-sm font-light">
+                    <tbody id="customersTableBody" class="bg-white divide-y divide-gray-200">
                         <!-- Customers will be loaded here -->
                     </tbody>
                 </table>
@@ -211,9 +305,9 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Shop Location (Latitude, Longitude)</label>
-                    <div class="flex space-x-4 mt-1">
-                        <input type="number" id="shopLatitude" name="shopLatitude" step="any" class="block w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Latitude">
-                        <input type="number" id="shopLongitude" name="shopLongitude" step="any" class="block w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Longitude">
+                    <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mt-1">
+                        <input type="number" id="shopLatitude" name="shopLatitude" step="any" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Latitude">
+                        <input type="number" id="shopLongitude" name="shopLongitude" step="any" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Longitude">
                     </div>
                 </div>
                 <h3 class="text-xl font-semibold text-gray-800 mt-6 mb-3">Delivery Rates</h3>
@@ -225,7 +319,7 @@
                     <span>Add Delivery Rate</span>
                 </button>
                 <div class="pt-4">
-                    <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out text-lg font-semibold">
+                    <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out text-lg font-semibold w-full sm:w-auto">
                         Save Shop Settings
                     </button>
                 </div>
@@ -246,7 +340,7 @@
                     <label for="isDiscountEnabled" class="ml-2 block text-sm font-medium text-gray-700">Enable Discount</label>
                 </div>
                 <div class="pt-4">
-                    <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out text-lg font-semibold">
+                    <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out text-lg font-semibold w-full sm:w-auto">
                         Save Discount Settings
                     </button>
                 </div>
@@ -258,12 +352,12 @@
             <h2 class="text-2xl font-semibold text-gray-800 mb-4">Two-Factor Authentication (2FA)</h2>
             <div class="space-y-4">
                 <p id="2faStatus" class="text-lg font-medium text-gray-700">2FA Status: <span class="font-bold text-red-500">Disabled</span></p>
-                <div id="2faActions" class="flex space-x-4">
-                    <button id="enable2faButton" class="px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-150 ease-in-out flex items-center space-x-2">
+                <div id="2faActions" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                    <button id="enable2faButton" class="px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-150 ease-in-out flex items-center space-x-2 justify-center">
                         <i class="fas fa-check-circle"></i>
                         <span>Enable 2FA</span>
                     </button>
-                    <button id="disable2faButton" class="px-4 py-2 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 transition duration-150 ease-in-out flex items-center space-x-2 hidden">
+                    <button id="disable2faButton" class="px-4 py-2 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 transition duration-150 ease-in-out flex items-center space-x-2 justify-center hidden">
                         <i class="fas fa-times-circle"></i>
                         <span>Disable 2FA</span>
                     </button>
@@ -283,7 +377,7 @@
     <!-- Modals -->
     <!-- Generic Modal for Add/Edit Item, Order Details, 2FA setup -->
     <div id="genericModal" class="modal fixed inset-0 flex items-center justify-center z-50 hidden">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-4">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg mx-4 modal-content">
             <div class="flex justify-between items-center mb-6">
                 <h3 id="modalTitle" class="text-2xl font-semibold text-gray-800">Modal Title</h3>
                 <button id="closeModalButton" class="text-gray-500 hover:text-gray-700 text-3xl">&times;</button>
@@ -300,6 +394,7 @@
 
     <script>
         const API_BASE_URL = ''; // Relative path, assumes same origin
+        const WEB_MENU_URL = 'https://jar-menu.vercel.app'; // User provided URL
         const socket = io();
         const jwtToken = localStorage.getItem('jwtToken');
 
@@ -308,12 +403,19 @@
         const navLinks = document.querySelectorAll('nav a');
         const logoutButton = document.getElementById('logoutButton');
 
+        // Mobile Menu Toggle
+        const menuToggleButton = document.getElementById('menuToggleButton');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+
         // Bot Status Elements
         const botStatusText = document.getElementById('botStatusText');
         const lastAuthenticatedAt = document.getElementById('lastAuthenticatedAt');
         const qrCodeImage = document.getElementById('qrCodeImage');
         const qrMessage = document.getElementById('qrMessage');
         const loadSessionButton = document.getElementById('loadSessionButton');
+        const forceNewSessionButton = document.getElementById('forceNewSessionButton');
+
 
         // Menu Management Elements
         const addMenuItemButton = document.getElementById('addMenuItemButton');
@@ -393,6 +495,13 @@
                     link.classList.remove('bg-gray-700');
                 }
             });
+
+            // Hide sidebar on mobile after selection
+            if (window.innerWidth < 768) {
+                sidebar.classList.remove('active');
+                sidebar.classList.add('hidden-mobile');
+                sidebarOverlay.classList.add('hidden');
+            }
         }
 
         function openModal(title, contentHtml, actionsHtml = '') {
@@ -456,6 +565,19 @@
             window.location.href = '/admin/login';
         });
 
+        // --- Mobile Menu Toggle ---
+        menuToggleButton.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            sidebar.classList.toggle('hidden-mobile');
+            sidebarOverlay.classList.toggle('hidden');
+        });
+
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('active');
+            sidebar.classList.add('hidden-mobile');
+            sidebarOverlay.classList.add('hidden');
+        });
+
         // --- Socket.io Listeners ---
         socket.on('status', (status) => {
             botStatusText.textContent = status.replace(/_/g, ' ').toUpperCase();
@@ -512,12 +634,26 @@
         loadSessionButton.addEventListener('click', async () => {
             try {
                 await fetchData(`${API_BASE_URL}/api/admin/load-session`, { method: 'POST' });
-                appendLog('Requested new WhatsApp session initialization.');
+                appendLog('Requested to attempt reconnect with existing WhatsApp session.');
             } catch (error) {
-                console.error('Error loading session:', error);
-                appendLog(`Error loading session: ${error.message}`);
+                console.error('Error attempting reconnect:', error);
+                appendLog(`Error attempting reconnect: ${error.message}`);
             }
         });
+
+        forceNewSessionButton.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to force a NEW WhatsApp session? This will delete any existing session data and require a new QR scan.')) {
+                return;
+            }
+            try {
+                await fetchData(`${API_BASE_URL}/api/admin/force-new-session`, { method: 'POST' });
+                appendLog('Requested to force a new WhatsApp session. A new QR code should appear shortly.');
+            } catch (error) {
+                console.error('Error forcing new session:', error);
+                appendLog(`Error forcing new session: ${error.message}`);
+            }
+        });
+
 
         // --- Menu Management Functions ---
         async function fetchMenuItems() {
@@ -541,10 +677,10 @@
                             </td>
                             <td class="py-3 px-6 text-center">
                                 <div class="flex item-center justify-center space-x-2">
-                                    <button class="edit-item-btn text-blue-600 hover:text-blue-800" data-id="${item._id}">
+                                    <button class="edit-item-btn text-blue-600 hover:text-blue-800 p-1 rounded-md" data-id="${item._id}" title="Edit Item">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="delete-item-btn text-red-600 hover:text-red-800" data-id="${item._id}">
+                                    <button class="delete-item-btn text-red-600 hover:text-red-800 p-1 rounded-md" data-id="${item._id}" title="Delete Item">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
                                 </div>
@@ -655,6 +791,7 @@
                 } catch (error) {
                     console.error(`Error ${modalAction.toLowerCase()}ing menu item:`, error);
                     appendLog(`Error ${modalAction.toLowerCase()}ing menu item: ${error.message}`);
+                    alert(`Error ${modalAction.toLowerCase()}ing menu item: ${error.message}`); // Use alert for immediate feedback
                 }
             });
             document.getElementById('cancelMenuItemButton').addEventListener('click', closeModal);
@@ -669,6 +806,7 @@
             } catch (error) {
                 console.error('Error deleting menu item:', error);
                 appendLog(`Error deleting menu item: ${error.message}`);
+                alert(`Error deleting menu item: ${error.message}`);
             }
         }
 
@@ -678,6 +816,11 @@
                 const orders = await fetchData(`${API_BASE_URL}/api/admin/orders`);
                 ordersTableBody.innerHTML = '';
                 orders.forEach(order => {
+                    // Clean customer phone for call link
+                    const cleanedPhone = order.customerPhone.replace(/\D/g, '');
+                    const callLink = `tel:+${cleanedPhone}`;
+                    const trackLink = `${WEB_MENU_URL}/track?orderId=${order.pinId || order.customOrderId}`;
+
                     const row = `
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
                             <td class="py-3 px-6 text-left whitespace-nowrap">${order.customOrderId || order._id.substring(0, 8) + '...'}</td>
@@ -696,10 +839,16 @@
                             </td>
                             <td class="py-3 px-6 text-center">${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                             <td class="py-3 px-6 text-center">
-                                <div class="flex item-center justify-center space-x-2">
-                                    <button class="view-order-btn text-indigo-600 hover:text-indigo-800" data-id="${order._id}">
+                                <div class="flex flex-col sm:flex-row item-center justify-center space-y-2 sm:space-y-0 sm:space-x-2">
+                                    <button class="view-order-btn text-indigo-600 hover:text-indigo-800 p-1 rounded-md" data-id="${order._id}" title="View Details">
                                         <i class="fas fa-eye"></i>
                                     </button>
+                                    <a href="${callLink}" class="text-green-600 hover:text-green-800 p-1 rounded-md" title="Call Customer">
+                                        <i class="fas fa-phone"></i>
+                                    </a>
+                                    <a href="${trackLink}" target="_blank" class="text-blue-600 hover:text-blue-800 p-1 rounded-md" title="Track Order Publicly">
+                                        <i class="fas fa-map-marker-alt"></i>
+                                    </a>
                                     <select class="status-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1" data-id="${order._id}">
                                         <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>Pending</option>
                                         <option value="Confirmed" ${order.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
@@ -748,12 +897,13 @@
                     <p><strong>Discount:</strong> ₹${order.discountAmount.toFixed(2)}</p>
                     <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
                     <h4 class="font-semibold mt-4">Items:</h4>
-                    <ul class="list-disc list-inside">${itemsList}</ul>
+                    <ul class="list-disc list-inside ml-5">${itemsList}</ul>
                 `;
                 openModal('Order Details', content);
             } catch (error) {
                 console.error('Error viewing order details:', error);
                 appendLog(`Error viewing order details: ${error.message}`);
+                alert(`Error viewing order details: ${error.message}`);
             }
         }
 
@@ -768,6 +918,7 @@
             } catch (error) {
                 console.error('Error updating order status:', error);
                 appendLog(`Error updating order status: ${error.message}`);
+                alert(`Error updating order status: ${error.message}`);
             }
         }
 
@@ -777,6 +928,10 @@
                 const customers = await fetchData(`${API_BASE_URL}/api/admin/customers`);
                 customersTableBody.innerHTML = '';
                 customers.forEach(customer => {
+                    // Clean customer phone for call link
+                    const cleanedPhone = customer.customerPhone.replace(/\D/g, '');
+                    const callLink = `tel:+${cleanedPhone}`;
+
                     const row = `
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
                             <td class="py-3 px-6 text-left whitespace-nowrap">${customer.customerName || 'N/A'}</td>
@@ -784,12 +939,15 @@
                             <td class="py-3 px-6 text-center">${customer.totalOrders}</td>
                             <td class="py-3 px-6 text-center">${customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</td>
                             <td class="py-3 px-6 text-center">
-                                <div class="flex item-center justify-center space-x-2">
-                                    <button class="view-latest-order-btn text-blue-600 hover:text-blue-800" data-phone="${customer.customerPhone}">
+                                <div class="flex flex-col sm:flex-row item-center justify-center space-y-2 sm:space-y-0 sm:space-x-2">
+                                    <button class="view-latest-order-btn text-blue-600 hover:text-blue-800 p-1 rounded-md" data-phone="${customer.customerPhone}" title="View Latest Order">
                                         <i class="fas fa-history"></i> Latest Order
                                     </button>
-                                    <button class="delete-customer-btn text-red-600 hover:text-red-800" data-id="${customer._id}">
-                                        <i class="fas fa-trash-alt"></i>
+                                    <a href="${callLink}" class="text-green-600 hover:text-green-800 p-1 rounded-md" title="Call Customer">
+                                        <i class="fas fa-phone"></i> Call
+                                    </a>
+                                    <button class="delete-customer-btn text-red-600 hover:text-red-800 p-1 rounded-md" data-id="${customer._id}" title="Delete Customer">
+                                        <i class="fas fa-trash-alt"></i> Delete
                                     </button>
                                 </div>
                             </td>
@@ -831,13 +989,13 @@
                     <p><strong>Discount:</strong> ₹${order.discountAmount.toFixed(2)}</p>
                     <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
                     <h4 class="font-semibold mt-4">Items:</h4>
-                    <ul class="list-disc list-inside">${itemsList}</ul>
+                    <ul class="list-disc list-inside ml-5">${itemsList}</ul>
                 `;
                 openModal('Latest Order Details', content);
             } catch (error) {
                 console.error('Error viewing latest customer order:', error);
                 appendLog(`Error viewing latest customer order: ${error.message}`);
-                openModal('Error', `<p class="text-red-600">${error.message}</p>`);
+                alert(`Error viewing latest customer order: ${error.message}`);
             }
         }
 
@@ -850,6 +1008,7 @@
             } catch (error) {
                 console.error('Error deleting customer:', error);
                 appendLog(`Error deleting customer: ${error.message}`);
+                alert(`Error deleting customer: ${error.message}`);
             }
         }
 
@@ -873,11 +1032,11 @@
             deliveryRatesContainer.innerHTML = '';
             rates.forEach((rate, index) => {
                 const div = document.createElement('div');
-                div.className = 'flex space-x-2 items-center';
+                div.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center';
                 div.innerHTML = `
-                    <input type="number" class="block w-1/2 px-3 py-2 border border-gray-300 rounded-md delivery-kms" placeholder="KMs" value="${rate.kms}" step="0.1">
-                    <input type="number" class="block w-1/2 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" value="${rate.amount}" step="0.01">
-                    <button type="button" class="remove-delivery-rate text-red-600 hover:text-red-800 px-2 py-1 rounded-md">
+                    <input type="number" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md delivery-kms" placeholder="KMs" value="${rate.kms}" step="0.1">
+                    <input type="number" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" value="${rate.amount}" step="0.01">
+                    <button type="button" class="remove-delivery-rate text-red-600 hover:text-red-800 px-2 py-1 rounded-md" title="Remove Rate">
                         <i class="fas fa-minus-circle"></i>
                     </button>
                 `;
@@ -1062,6 +1221,11 @@
         document.addEventListener('DOMContentLoaded', () => {
             showSection('botStatus'); // Show bot status by default
             fetchBotStatus();
+
+            // Initial state for mobile sidebar
+            if (window.innerWidth < 768) {
+                sidebar.classList.add('hidden-mobile');
+            }
         });
     </script>
 </body>
