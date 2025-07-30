@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <!-- Socket.io Client CDN -->
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -67,6 +69,23 @@
             min-width: 700px; /* Ensure table doesn't shrink too much */
         }
 
+        /* New Order Alert Modal Specific Styling */
+        #newOrderAlertModal .modal-content {
+            border: 2px solid #4CAF50; /* Green border for new order */
+            animation: pulse-green 1.5s infinite alternate;
+            text-align: center;
+        }
+
+        #newOrderAlertModal h3 {
+            color: #4CAF50; /* Green text for new order */
+            margin-bottom: 10px;
+        }
+
+        @keyframes pulse-green {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            100% { transform: scale(1.02); box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+        }
+
         /* Responsive adjustments for smaller screens */
         @media (max-width: 768px) {
             .sidebar {
@@ -121,6 +140,10 @@
             .space-x-4-mobile > *:not(:first-child) {
                 margin-left: 0 !important;
                 margin-top: 1rem;
+            }
+            .action-buttons-group {
+                flex-direction: column; /* Stack action buttons vertically on mobile */
+                gap: 0.5rem; /* Space between stacked buttons */
             }
         }
     </style>
@@ -310,9 +333,17 @@
                         <input type="number" id="shopLongitude" name="shopLongitude" step="any" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Longitude">
                     </div>
                 </div>
-                <h3 class="text-xl font-semibold text-gray-800 mt-6 mb-3">Delivery Rates</h3>
+                <h3 class="text-xl font-semibold text-gray-800 mt-6 mb-3">Delivery Rates (by Distance)</h3>
                 <div id="deliveryRatesContainer" class="space-y-3">
                     <!-- Delivery rate inputs will be added here -->
+                    <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center">
+                        <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-start" placeholder="Start KM" step="0.1">
+                        <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-end" placeholder="End KM" step="0.1">
+                        <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" step="0.01">
+                        <button type="button" class="remove-delivery-rate text-red-600 hover:text-red-800 px-2 py-1 rounded-md" title="Remove Rate">
+                            <i class="fas fa-minus-circle"></i>
+                        </button>
+                    </div>
                 </div>
                 <button type="button" id="addDeliveryRate" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-150 ease-in-out flex items-center space-x-2">
                     <i class="fas fa-plus"></i>
@@ -391,6 +422,42 @@
         </div>
     </div>
 
+    <!-- Customer Location Map Modal -->
+    <div id="customerLocationMapModal" class="modal fixed inset-0 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl mx-4 modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-semibold text-gray-800">Customer Location</h3>
+                <button class="close-button text-gray-500 hover:text-gray-700 text-3xl" data-modal-id="customerLocationMapModal">&times;</button>
+            </div>
+            <div id="customerLocationMap" class="w-full h-96 rounded-lg border border-gray-300 mb-4"></div>
+            <p id="mapLocationDisplay" class="text-gray-700 text-center"></p>
+            <div class="mt-6 flex justify-end">
+                <button class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400" onclick="closeModalById('customerLocationMapModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Order Alert Modal -->
+    <div id="newOrderAlertModal" class="modal fixed inset-0 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm mx-4 modal-content">
+            <div class="flex justify-end">
+                <button class="close-button text-gray-500 hover:text-gray-700 text-3xl" data-modal-id="newOrderAlertModal">&times;</button>
+            </div>
+            <lottie-player src="https://lottie.host/e211e031-6e3e-436f-b27e-850d51459a03/P0w652t11n.json" background="transparent" speed="1" loop autoplay style="width: 120px; height: 120px; margin: 0 auto;"></lottie-player>
+            <h3 class="text-2xl font-bold text-center mb-2">New Order Received!</h3>
+            <p class="text-lg text-gray-700 text-center mb-6">Order ID: <strong id="newOrderAlertId"></strong></p>
+            <div class="flex justify-center space-x-4">
+                <button id="dismissNewOrderAlertBtn" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">Dismiss</button>
+                <button id="viewNewOrderBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">View Order</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Lottie Player Script -->
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 
     <script>
         const API_BASE_URL = ''; // Relative path, assumes same origin
@@ -457,6 +524,20 @@
         const modalActions = document.getElementById('modalActions');
         const closeModalButton = document.getElementById('closeModalButton');
 
+        // New Modals
+        const customerLocationMapModal = document.getElementById('customerLocationMapModal');
+        const customerLocationMapDiv = document.getElementById('customerLocationMap');
+        const mapLocationDisplay = document.getElementById('mapLocationDisplay');
+        const newOrderAlertModal = document.getElementById('newOrderAlertModal');
+        const newOrderAlertId = document.getElementById('newOrderAlertId');
+        const dismissNewOrderAlertBtn = document.getElementById('dismissNewOrderAlertBtn');
+        const viewNewOrderBtn = document.getElementById('viewNewOrderBtn');
+
+
+        // Global Map Instance
+        let currentMapInstance = null;
+        let currentMapMarker = null;
+
         // --- Authentication Check ---
         if (!jwtToken) {
             window.location.href = '/admin/login';
@@ -504,26 +585,50 @@
             }
         }
 
-        function openModal(title, contentHtml, actionsHtml = '') {
+        function openGenericModal(title, contentHtml, actionsHtml = '') {
             modalTitle.textContent = title;
             modalContent.innerHTML = contentHtml;
             modalActions.innerHTML = actionsHtml;
             genericModal.classList.remove('hidden');
         }
 
-        function closeModal() {
+        function closeModalGeneric() {
             genericModal.classList.add('hidden');
             modalTitle.textContent = '';
             modalContent.innerHTML = '';
             modalActions.innerHTML = '';
         }
 
-        closeModalButton.addEventListener('click', closeModal);
+        function openModalById(modalElementId) {
+            document.getElementById(modalElementId).classList.remove('hidden');
+            document.getElementById(modalElementId).classList.add('flex'); // Ensure flex for centering
+        }
+
+        function closeModalById(modalElementId) {
+            document.getElementById(modalElementId).classList.add('hidden');
+            document.getElementById(modalElementId).classList.remove('flex');
+            // Clean up map if it's the map modal
+            if (modalElementId === 'customerLocationMapModal' && currentMapInstance) {
+                currentMapInstance.remove();
+                currentMapInstance = null;
+                currentMapMarker = null;
+            }
+        }
+
+        closeModalButton.addEventListener('click', closeModalGeneric);
         genericModal.addEventListener('click', (e) => {
             if (e.target === genericModal) {
-                closeModal();
+                closeModalGeneric();
             }
         });
+        // Event listeners for close buttons on new modals
+        document.querySelectorAll('.close-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const modalId = e.currentTarget.dataset.modalId;
+                closeModalById(modalId);
+            });
+        });
+
 
         function formatDateTime(dateString) {
             if (!dateString) return 'N/A';
@@ -609,7 +714,20 @@
 
         socket.on('new_order', (order) => {
             appendLog(`NEW ORDER: ${order.customOrderId || order._id} from ${order.customerName} - Total: ₹${order.totalAmount.toFixed(2)}`);
+            newOrderAlertId.textContent = order.customOrderId || order._id;
+            openModalById('newOrderAlertModal');
             fetchOrders(); // Refresh orders table
+        });
+
+        dismissNewOrderAlertBtn.addEventListener('click', () => {
+            closeModalById('newOrderAlertModal');
+        });
+
+        viewNewOrderBtn.addEventListener('click', () => {
+            closeModalById('newOrderAlertModal');
+            // In a real app, you might scroll to the new order or highlight it
+            showSection('orderManagement'); // Navigate to order management
+            // The fetchOrders() in new_order listener already refreshes the table
         });
 
         socket.on('whatsapp_log', (message) => {
@@ -660,6 +778,10 @@
             try {
                 const items = await fetchData(`${API_BASE_URL}/api/admin/menu`);
                 menuItemsTableBody.innerHTML = '';
+                if (items.length === 0) {
+                    menuItemsTableBody.innerHTML = `<tr><td colspan="7" class="py-3 px-6 text-center text-gray-500">No menu items added yet.</td></tr>`;
+                    return;
+                }
                 items.forEach(item => {
                     const row = `
                         <tr class="border-b border-gray-200 hover:bg-gray-100">
@@ -762,7 +884,7 @@
                 <button id="saveMenuItemButton" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save</button>
                 <button id="cancelMenuItemButton" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">Cancel</button>
             `;
-            openModal(`${modalAction} Menu Item`, content, actions);
+            openGenericModal(`${modalAction} Menu Item`, content, actions);
 
             document.getElementById('saveMenuItemButton').addEventListener('click', async () => {
                 const form = document.getElementById('menuItemForm');
@@ -786,7 +908,7 @@
                         });
                         appendLog(`Menu item ${data.name} added.`);
                     }
-                    closeModal();
+                    closeModalGeneric();
                     fetchMenuItems();
                 } catch (error) {
                     console.error(`Error ${modalAction.toLowerCase()}ing menu item:`, error);
@@ -794,7 +916,7 @@
                     alert(`Error ${modalAction.toLowerCase()}ing menu item: ${error.message}`); // Use alert for immediate feedback
                 }
             });
-            document.getElementById('cancelMenuItemButton').addEventListener('click', closeModal);
+            document.getElementById('cancelMenuItemButton').addEventListener('click', closeModalGeneric);
         }
 
         async function deleteMenuItem(itemId) {
@@ -815,6 +937,10 @@
             try {
                 const orders = await fetchData(`${API_BASE_URL}/api/admin/orders`);
                 ordersTableBody.innerHTML = '';
+                if (orders.length === 0) {
+                    ordersTableBody.innerHTML = `<tr><td colspan="7" class="py-3 px-6 text-center text-gray-500">No orders yet.</td></tr>`;
+                    return;
+                }
                 orders.forEach(order => {
                     // Clean customer phone for call link
                     const cleanedPhone = order.customerPhone.replace(/\D/g, '');
@@ -839,16 +965,16 @@
                             </td>
                             <td class="py-3 px-6 text-center">${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                             <td class="py-3 px-6 text-center">
-                                <div class="flex flex-col sm:flex-row item-center justify-center space-y-2 sm:space-y-0 sm:space-x-2">
+                                <div class="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-2 action-buttons-group">
                                     <button class="view-order-btn text-indigo-600 hover:text-indigo-800 p-1 rounded-md" data-id="${order._id}" title="View Details">
                                         <i class="fas fa-eye"></i>
                                     </button>
                                     <a href="${callLink}" class="text-green-600 hover:text-green-800 p-1 rounded-md" title="Call Customer">
                                         <i class="fas fa-phone"></i>
                                     </a>
-                                    <a href="${trackLink}" target="_blank" class="text-blue-600 hover:text-blue-800 p-1 rounded-md" title="Track Order Publicly">
+                                    <button class="view-location-btn text-blue-600 hover:text-blue-800 p-1 rounded-md" data-lat="${order.customerLocation?.latitude}" data-lng="${order.customerLocation?.longitude}" data-address="${order.customerLocation?.address || order.deliveryAddress}" title="View Location">
                                         <i class="fas fa-map-marker-alt"></i>
-                                    </a>
+                                    </button>
                                     <select class="status-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1" data-id="${order._id}">
                                         <option value="Pending" ${order.status === 'Pending' ? 'selected' : ''}>Pending</option>
                                         <option value="Confirmed" ${order.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option>
@@ -857,6 +983,9 @@
                                         <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
                                         <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
                                     </select>
+                                    <button class="delete-order-btn text-red-600 hover:text-red-800 p-1 rounded-md" data-id="${order._id}" title="Delete Order">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -876,6 +1005,17 @@
             });
             document.querySelectorAll('.status-select').forEach(select => {
                 select.onchange = (e) => updateOrderStatus(e.currentTarget.dataset.id, e.currentTarget.value);
+            });
+            document.querySelectorAll('.view-location-btn').forEach(button => {
+                button.onclick = (e) => {
+                    const lat = parseFloat(e.currentTarget.dataset.lat);
+                    const lng = parseFloat(e.currentTarget.dataset.lng);
+                    const address = e.currentTarget.dataset.address;
+                    showCustomerLocationOnMap(lat, lng, address);
+                };
+            });
+            document.querySelectorAll('.delete-order-btn').forEach(button => {
+                button.onclick = (e) => deleteOrder(e.currentTarget.dataset.id);
             });
         }
 
@@ -899,7 +1039,7 @@
                     <h4 class="font-semibold mt-4">Items:</h4>
                     <ul class="list-disc list-inside ml-5">${itemsList}</ul>
                 `;
-                openModal('Order Details', content);
+                openGenericModal('Order Details', content);
             } catch (error) {
                 console.error('Error viewing order details:', error);
                 appendLog(`Error viewing order details: ${error.message}`);
@@ -922,11 +1062,57 @@
             }
         }
 
+        async function deleteOrder(orderId) {
+            if (!confirm('Are you sure you want to delete this order? This action is irreversible.')) return;
+            try {
+                await fetchData(`${API_BASE_URL}/api/admin/orders/${orderId}`, { method: 'DELETE' });
+                appendLog(`Order ${orderId} deleted.`);
+                fetchOrders();
+            } catch (error) {
+                console.error('Error deleting order:', error);
+                appendLog(`Error deleting order: ${error.message}`);
+                alert(`Error deleting order: ${error.message}`);
+            }
+        }
+
+        function showCustomerLocationOnMap(lat, lng, address) {
+            if (isNaN(lat) || isNaN(lng)) {
+                alert('Customer location coordinates are not available for this order.');
+                return;
+            }
+            openModalById('customerLocationMapModal');
+            mapLocationDisplay.textContent = `Location: ${address || 'Coordinates provided'}`;
+
+            setTimeout(() => {
+                if (currentMapInstance) {
+                    currentMapInstance.remove(); // Remove existing map instance
+                }
+                currentMapInstance = L.map('customerLocationMap').setView([lat, lng], 16); // Zoom level 16
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(currentMapInstance);
+
+                if (currentMapMarker) {
+                    currentMapInstance.removeLayer(currentMapMarker);
+                }
+                currentMapMarker = L.marker([lat, lng]).addTo(currentMapInstance)
+                    .bindPopup(`<b>Customer Location:</b><br>${address || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`}`)
+                    .openPopup();
+
+                currentMapInstance.invalidateSize(); // Crucial for map rendering in hidden modals
+            }, 100); // Small delay to ensure modal is visible
+        }
+
         // --- Customer Management Functions ---
         async function fetchCustomers() {
             try {
                 const customers = await fetchData(`${API_BASE_URL}/api/admin/customers`);
                 customersTableBody.innerHTML = '';
+                if (customers.length === 0) {
+                    customersTableBody.innerHTML = `<tr><td colspan="5" class="py-3 px-6 text-center text-gray-500">No customers found.</td></tr>`;
+                    return;
+                }
                 customers.forEach(customer => {
                     // Clean customer phone for call link
                     const cleanedPhone = customer.customerPhone.replace(/\D/g, '');
@@ -939,9 +1125,9 @@
                             <td class="py-3 px-6 text-center">${customer.totalOrders}</td>
                             <td class="py-3 px-6 text-center">${customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</td>
                             <td class="py-3 px-6 text-center">
-                                <div class="flex flex-col sm:flex-row item-center justify-center space-y-2 sm:space-y-0 sm:space-x-2">
-                                    <button class="view-latest-order-btn text-blue-600 hover:text-blue-800 p-1 rounded-md" data-phone="${customer.customerPhone}" title="View Latest Order">
-                                        <i class="fas fa-history"></i> Latest Order
+                                <div class="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-2 action-buttons-group">
+                                    <button class="view-customer-orders-btn text-blue-600 hover:text-blue-800 p-1 rounded-md" data-phone="${customer.customerPhone}" title="View All Orders">
+                                        <i class="fas fa-history"></i> Orders
                                     </button>
                                     <a href="${callLink}" class="text-green-600 hover:text-green-800 p-1 rounded-md" title="Call Customer">
                                         <i class="fas fa-phone"></i> Call
@@ -963,39 +1149,39 @@
         }
 
         function addCustomerEventListeners() {
-            document.querySelectorAll('.view-latest-order-btn').forEach(button => {
-                button.onclick = (e) => viewLatestCustomerOrder(e.currentTarget.dataset.phone);
+            document.querySelectorAll('.view-customer-orders-btn').forEach(button => {
+                button.onclick = (e) => viewCustomerOrders(e.currentTarget.dataset.phone);
             });
             document.querySelectorAll('.delete-customer-btn').forEach(button => {
                 button.onclick = (e) => deleteCustomer(e.currentTarget.dataset.id);
             });
         }
 
-        async function viewLatestCustomerOrder(customerPhone) {
+        async function viewCustomerOrders(customerPhone) {
             try {
-                const order = await fetchData(`${API_BASE_URL}/api/admin/customers/${customerPhone}/latest-order`);
-                const itemsList = order.items.map(item => `<li>${item.name} x ${item.quantity} (₹${item.price.toFixed(2)})</li>`).join('');
-                const content = `
-                    <p><strong>Order ID:</strong> ${order.customOrderId || order._id}</p>
-                    <p><strong>PIN:</strong> ${order.pinId}</p>
-                    <p><strong>Customer Name:</strong> ${order.customerName}</p>
-                    <p><strong>Customer Phone:</strong> ${order.customerPhone}</p>
-                    <p><strong>Delivery Address:</strong> ${order.deliveryAddress}</p>
-                    <p><strong>Order Date:</strong> ${formatDateTime(order.orderDate)}</p>
-                    <p><strong>Status:</strong> ${order.status}</p>
-                    <p><strong>Payment Method:</strong> ${order.paymentMethod}</p>
-                    <p><strong>Subtotal:</strong> ₹${order.subtotal.toFixed(2)}</p>
-                    <p><strong>Transport Tax:</strong> ₹${order.transportTax.toFixed(2)}</p>
-                    <p><strong>Discount:</strong> ₹${order.discountAmount.toFixed(2)}</p>
-                    <p><strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}</p>
-                    <h4 class="font-semibold mt-4">Items:</h4>
-                    <ul class="list-disc list-inside ml-5">${itemsList}</ul>
-                `;
-                openModal('Latest Order Details', content);
+                const orders = await fetchData(`${API_BASE_URL}/api/admin/customers/${customerPhone}/orders`);
+                let content = '';
+                if (orders.length === 0) {
+                    content = '<p>No orders found for this customer.</p>';
+                } else {
+                    content = orders.map(order => `
+                        <div class="border-b border-gray-200 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0">
+                            <p><strong>Order ID:</strong> ${order.customOrderId || order._id}</p>
+                            <p><strong>Total:</strong> ₹${order.totalAmount.toFixed(2)}</p>
+                            <p><strong>Status:</strong> ${order.status}</p>
+                            <p><strong>Date:</strong> ${formatDateTime(order.orderDate)}</p>
+                            <h5 class="font-medium mt-2">Items:</h5>
+                            <ul class="list-disc list-inside ml-5">
+                                ${order.items.map(item => `<li>${item.name} x ${item.quantity}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `).join('');
+                }
+                openGenericModal(`Orders for ${customerPhone}`, content);
             } catch (error) {
-                console.error('Error viewing latest customer order:', error);
-                appendLog(`Error viewing latest customer order: ${error.message}`);
-                alert(`Error viewing latest customer order: ${error.message}`);
+                console.error('Error viewing customer orders:', error);
+                appendLog(`Error viewing customer orders: ${error.message}`);
+                alert(`Error viewing customer orders: ${error.message}`);
             }
         }
 
@@ -1030,12 +1216,17 @@
 
         function renderDeliveryRates(rates) {
             deliveryRatesContainer.innerHTML = '';
-            rates.forEach((rate, index) => {
+            // Ensure there's at least one empty row if no rates exist
+            if (rates.length === 0) {
+                rates.push({ rangeStart: '', rangeEnd: '', amount: '' });
+            }
+            rates.forEach((rate) => {
                 const div = document.createElement('div');
                 div.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center';
                 div.innerHTML = `
-                    <input type="number" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md delivery-kms" placeholder="KMs" value="${rate.kms}" step="0.1">
-                    <input type="number" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" value="${rate.amount}" step="0.01">
+                    <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-start" placeholder="Start KM" value="${rate.rangeStart !== undefined ? rate.rangeStart : ''}" step="0.1">
+                    <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-end" placeholder="End KM" value="${rate.rangeEnd !== undefined ? rate.rangeEnd : ''}" step="0.1">
+                    <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" value="${rate.amount !== undefined ? rate.amount : ''}" step="0.01">
                     <button type="button" class="remove-delivery-rate text-red-600 hover:text-red-800 px-2 py-1 rounded-md" title="Remove Rate">
                         <i class="fas fa-minus-circle"></i>
                     </button>
@@ -1047,15 +1238,29 @@
 
         function addDeliveryRateEventListeners() {
             document.querySelectorAll('.remove-delivery-rate').forEach(button => {
-                button.onclick = (e) => e.target.closest('.flex').remove();
+                button.onclick = (e) => {
+                    if (deliveryRatesContainer.children.length > 1) { // Don't remove the last one
+                        e.target.closest('.flex').remove();
+                    } else {
+                        alert('You must have at least one delivery rate.');
+                    }
+                };
             });
         }
 
         addDeliveryRateButton.addEventListener('click', () => {
-            renderDeliveryRates([...Array.from(deliveryRatesContainer.children).map(div => ({
-                kms: parseFloat(div.querySelector('.delivery-kms').value),
-                amount: parseFloat(div.querySelector('.delivery-amount').value)
-            })).filter(r => !isNaN(r.kms) && !isNaN(r.amount)), { kms: '', amount: '' }]);
+            const newRateDiv = document.createElement('div');
+            newRateDiv.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center';
+            newRateDiv.innerHTML = `
+                <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-start" placeholder="Start KM" step="0.1">
+                <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-end" placeholder="End KM" step="0.1">
+                <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" step="0.01">
+                <button type="button" class="remove-delivery-rate text-red-600 hover:text-red-800 px-2 py-1 rounded-md" title="Remove Rate">
+                    <i class="fas fa-minus-circle"></i>
+                </button>
+            `;
+            deliveryRatesContainer.appendChild(newRateDiv);
+            addDeliveryRateEventListeners(); // Re-add listeners for new buttons
         });
 
         shopSettingsForm.addEventListener('submit', async (e) => {
@@ -1063,10 +1268,25 @@
             const shopName = shopNameInput.value;
             const latitude = parseFloat(shopLatitudeInput.value);
             const longitude = parseFloat(shopLongitudeInput.value);
-            const deliveryRates = Array.from(deliveryRatesContainer.children).map(div => ({
-                kms: parseFloat(div.querySelector('.delivery-kms').value),
-                amount: parseFloat(div.querySelector('.delivery-amount').value)
-            })).filter(r => !isNaN(r.kms) && !isNaN(r.amount));
+            
+            const deliveryRates = [];
+            let isValidRates = true;
+            Array.from(deliveryRatesContainer.children).forEach(div => {
+                const start = parseFloat(div.querySelector('.delivery-range-start').value);
+                const end = parseFloat(div.querySelector('.delivery-range-end').value);
+                const amount = parseFloat(div.querySelector('.delivery-amount').value);
+
+                if (isNaN(start) || isNaN(end) || isNaN(amount) || start < 0 || end < 0 || amount < 0 || start >= end) {
+                    isValidRates = false;
+                    return;
+                }
+                deliveryRates.push({ rangeStart: start, rangeEnd: end, amount });
+            });
+
+            if (!isValidRates) {
+                alert('Please ensure all delivery rate ranges and amounts are valid (Start KM < End KM, all values non-negative).');
+                return;
+            }
 
             try {
                 await fetchData(`${API_BASE_URL}/api/admin/settings`, {
@@ -1091,9 +1311,9 @@
             try {
                 const settings = await fetchData(`${API_BASE_URL}/api/admin/discount-settings`);
                 if (settings) {
-                    minSubtotalForDiscountInput.value = settings.minSubtotalForDiscount;
-                    discountPercentageInput.value = settings.discountPercentage;
-                    isDiscountEnabledCheckbox.checked = settings.isDiscountEnabled;
+                    minSubtotalForDiscountInput.value = settings.minSubtotalForDiscount || 0;
+                    discountPercentageInput.value = settings.discountPercentage || 0;
+                    isDiscountEnabledCheckbox.checked = settings.isDiscountEnabled || false;
                 }
             } catch (error) {
                 console.error('Error fetching discount settings:', error);
@@ -1106,6 +1326,15 @@
             const minSubtotalForDiscount = parseFloat(minSubtotalForDiscountInput.value);
             const discountPercentage = parseFloat(discountPercentageInput.value);
             const isDiscountEnabled = isDiscountEnabledCheckbox.checked;
+
+            if (isNaN(minSubtotalForDiscount) || minSubtotalForDiscount < 0) {
+                alert('Minimum Subtotal for Discount must be a non-negative number.');
+                return;
+            }
+            if (isNaN(discountPercentage) || discountPercentage < 0 || discountPercentage > 1) {
+                alert('Discount Percentage must be a number between 0 and 1.');
+                return;
+            }
 
             try {
                 await fetchData(`${API_BASE_URL}/api/admin/discount-settings`, {
@@ -1167,7 +1396,7 @@
                     <button id="verify2faButton" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Verify & Enable</button>
                     <button id="cancel2faButton" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">Cancel</button>
                 `;
-                openModal('Enable Two-Factor Authentication', content, actions);
+                openGenericModal('Enable Two-Factor Authentication', content, actions);
 
                 document.getElementById('verify2faButton').addEventListener('click', async () => {
                     const totpCode = document.getElementById('2faCodeInput').value;
@@ -1180,7 +1409,7 @@
                         });
                         if (verifyData.verified) {
                             alert('2FA enabled successfully!');
-                            closeModal();
+                            closeModalGeneric();
                             fetch2FAStatus();
                             appendLog('2FA enabled successfully.');
                         } else {
@@ -1194,7 +1423,7 @@
                         appendLog(`Error verifying 2FA: ${error.message}`);
                     }
                 });
-                document.getElementById('cancel2faButton').addEventListener('click', closeModal);
+                document.getElementById('cancel2faButton').addEventListener('click', closeModalGeneric);
 
             } catch (error) {
                 console.error('Error generating 2FA QR:', error);
