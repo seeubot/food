@@ -3,15 +3,15 @@ const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const qrcode = require('qrcode');
-// Import MongoAuth for storing session in MongoDB
-const { Client, LocalAuth, MessageMedia, MongoStore } = require('whatsapp-web.js'); // Note: MongoStore is part of whatsapp-web.js-mongo
+// Removed MongoStore import as it's from a separate package
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const moment = require('moment-timezone');
 const cron = require('node-cron');
 const speakeasy = require('speakeasy');
-const fs = require('fs'); // Keep fs for now for initial migration or manual cleanup if needed, but session management will shift
+const fs = require('fs');
 const crypto = require('crypto');
 const cors = require('cors');
 
@@ -123,18 +123,14 @@ const SettingsSchema = new mongoose.Schema({
     isDiscountEnabled: { type: Boolean, default: true }
 });
 
-// New Schema for WhatsApp Session Data
-const WhatsappSessionSchema = new mongoose.Schema({
-    session: { type: Object, required: true },
-    clientId: { type: String, unique: true, required: true } // Unique identifier for the session
-});
+// Removed WhatsappSessionSchema as it's not directly used by LocalAuth
 
 const Item = mongoose.model('Item', ItemSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const Customer = mongoose.model('Customer', CustomerSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
-const WhatsappSession = mongoose.model('WhatsappSession', WhatsappSessionSchema); // New model
+// Removed WhatsappSession model
 
 // --- Utility Functions for Custom IDs ---
 function generateCustomOrderId() {
@@ -234,9 +230,29 @@ const QR_EXPIRY_TIME_MS = 300000; // 5 minutes
 // Define the client ID for the WhatsApp session stored in MongoDB
 const WHATSAPP_CLIENT_ID = 'admin';
 
+const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
+
+/**
+ * Deletes WhatsApp session files.
+ * This is used for LocalAuth to force a new QR.
+ */
+const deleteSessionFiles = async () => {
+    console.log('[WhatsApp] Attempting to delete WhatsApp session files...');
+    try {
+        if (fs.existsSync(SESSION_PATH)) {
+            await fs.promises.rm(SESSION_PATH, { recursive: true, force: true });
+            console.log('[WhatsApp] WhatsApp session files deleted successfully.');
+        } else {
+            console.log('[WhatsApp] No WhatsApp session files found to delete.');
+        }
+    } catch (err) {
+        console.error('[WhatsApp] Error deleting WhatsApp session files:', err);
+    }
+};
+
 /**
  * Initializes the WhatsApp client.
- * @param {boolean} forceNewSession - If true, forces a new QR by deleting session from DB.
+ * @param {boolean} forceNewSession - If true, forces a new QR by deleting existing session files.
  */
 const initializeWhatsappClient = async (forceNewSession = false) => {
     if (isInitializing) {
@@ -255,37 +271,29 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
     if (client) {
         try {
             console.log('[WhatsApp] Destroying previous client instance...');
-            io.emit('whatsapp_log', 'Destroying previous client instance...');
+            io.emit('whatsapp_log', 'Destroying previous client instance... 🧹');
             await client.destroy();
             client = null;
             whatsappReady = false;
         } catch (e) {
             console.error('[WhatsApp] Error destroying old client:', e);
-            io.emit('whatsapp_log', `Error destroying old client: ${e.message}`);
+            io.emit('whatsapp_log', `Error destroying old client: ${e.message} ⚠️`);
             client = null;
             whatsappReady = false;
         }
     }
 
-    // If forcing a new session, delete the existing session from MongoDB
+    // If forcing a new session, delete the existing session files
     if (forceNewSession) {
-        try {
-            console.log('[WhatsApp] Deleting old WhatsApp session from database...');
-            await WhatsappSession.deleteOne({ clientId: WHATSAPP_CLIENT_ID });
-            console.log('[WhatsApp] Old WhatsApp session deleted from database.');
-            io.emit('whatsapp_log', 'Deleted old session from database.');
-        } catch (err) {
-            console.error('[WhatsApp] Error deleting WhatsApp session from database:', err);
-            io.emit('whatsapp_log', `Error deleting old session from database: ${err.message}`);
-        }
+        await deleteSessionFiles();
+        io.emit('whatsapp_log', 'Deleted old session files. Preparing for a fresh start! ✨');
     }
 
-    // Use MongoAuth strategy
-    const store = new MongoStore({ mongoose: mongoose, collection: 'whatsapp_sessions' }); // 'whatsapp_sessions' is the collection name
+    // Using LocalAuth strategy which stores session in local files
     client = new Client({
-        authStrategy: new LocalAuth({ // Use LocalAuth for now, as MongoAuth requires a separate package.
+        authStrategy: new LocalAuth({
             clientId: WHATSAPP_CLIENT_ID,
-            dataPath: path.join(__dirname, '.wwebjs_auth') // Keep local auth path for now
+            dataPath: SESSION_PATH
         }),
         puppeteer: {
             args: [
@@ -307,7 +315,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 
     client.on('qr', async (qr) => {
         console.log('[WhatsApp] QR RECEIVED');
-        io.emit('whatsapp_log', 'QR code received. Please scan to connect your WhatsApp! 📱');
+        io.emit('whatsapp_log', 'QR code received! Please scan this with your WhatsApp app to connect. 📱');
         qrCodeData = await qrcode.toDataURL(qr);
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_received', lastAuthenticatedAt: null }, { upsert: true });
         io.emit('status', 'qr_received');
@@ -393,7 +401,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 setTimeout(() => initializeWhatsappClient(false), RETRY_DELAY_MS);
             } else {
                 console.error('[WhatsApp] Max reconnection attempts reached after disconnection. Manual intervention might be needed.');
-                io.emit('whatsapp_log', 'Max reconnection attempts reached. Please check the bot status and try "Load New Session" if needed. ⚠️');
+                io.emit('whatsapp_log', 'Max reconnection attempts reached. Please check the bot status and try "Load New Session". ⚠️');
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
                 io.emit('status', 'disconnected');
                 currentInitializationAttempt = 0;
@@ -979,11 +987,8 @@ app.post('/api/admin/load-session', authenticateToken, async (req, res) => {
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
     isInitializing = false;
-    // The user requested to trigger old data if automation failed, which means
-    // we should try to load the existing session first (forceNewSession = false).
-    // If that fails, the client.on('disconnected') or client.initialize() error
-    // handlers will decide whether to force a new session or retry.
-    initializeWhatsappClient(false); // Try to load existing session
+    // This attempts to load the existing session from local files
+    initializeWhatsappClient(false);
     res.status(200).json({ message: 'Attempting to load existing session or generate QR.' });
 });
 
@@ -993,7 +998,8 @@ app.post('/api/admin/force-new-session', authenticateToken, async (req, res) => 
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
     isInitializing = false;
-    initializeWhatsappClient(true); // Force a new session
+    // This forces a new session by deleting local session files
+    initializeWhatsappClient(true);
     res.status(200).json({ message: 'Attempting to generate a new session/QR code.' });
 });
 
@@ -1548,3 +1554,4 @@ server.listen(PORT, () => {
     console.log(`Default Admin Password (for initial setup): ${DEFAULT_ADMIN_PASSWORD}`);
     console.log('REMEMBER TO ENABLE 2FA FROM THE DASHBOARD AFTER FIRST LOGIN FOR SECURITY.');
 });
+
