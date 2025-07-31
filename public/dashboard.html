@@ -28,6 +28,7 @@
             z-index: 40;
             background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%); /* Darker gradient */
             box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3); /* Stronger shadow */
+            overflow-y: auto; /* ADDED: Allows sidebar content to scroll */
         }
         .sidebar.hidden-mobile {
             transform: translateX(-100%); /* Hide sidebar off-screen on mobile */
@@ -335,47 +336,41 @@
             <form id="shopSettingsForm" class="space-y-6">
                 <div>
                     <label for="shopName" class="block text-sm font-medium text-gray-700">Shop Name</label>
-                    <input type="text" id="shopName" name="shopName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <input type="text" id="shopName" name="shopName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Shop Location (Latitude, Longitude)</label>
                     <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mt-1">
-                        <input type="number" id="shopLatitude" name="shopLatitude" step="any" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Latitude">
-                        <input type="number" id="shopLongitude" name="shopLongitude" step="any" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Longitude">
+                        <input type="number" id="shopLatitude" name="shopLatitude" step="any" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Latitude" required>
+                        <input type="number" id="shopLongitude" name="shopLongitude" step="any" class="block w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Longitude" required>
                     </div>
                 </div>
+
+                <!-- NEW FIELD FOR NOTIFICATION DAYS -->
+                <div>
+                    <label for="notificationDays" class="block text-sm font-medium text-gray-700">Re-order Notification Days</label>
+                    <input type="number" id="notificationDays" name="notificationDays" min="1" value="7"
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                    <p class="mt-1 text-sm text-gray-500">Number of days after which a customer who hasn't ordered will receive a re-order notification.</p>
+                </div>
+
                 <h3 class="text-xl font-semibold text-gray-800 mt-6 mb-3">Delivery Rates (by Distance)</h3>
                 <div id="deliveryRatesContainer" class="space-y-3">
-                    <!-- Delivery rate inputs will be added here -->
-                    <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center">
-                        <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-start" placeholder="Start KM" step="0.1">
-                        <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-end" placeholder="End KM" step="0.1">
-                        <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" step="0.01">
-                        <button type="button" class="remove-delivery-rate text-red-600 hover:text-red-800 px-2 py-1 rounded-md" title="Remove Rate">
-                            <i class="fas fa-minus-circle"></i>
-                        </button>
-                    </div>
+                    <!-- Delivery rate inputs will be added here by JS -->
                 </div>
                 <button type="button" id="addDeliveryRate" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-150 ease-in-out flex items-center space-x-2">
                     <i class="fas fa-plus"></i>
                     <span>Add Delivery Rate</span>
                 </button>
-                <div class="pt-4">
-                    <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out text-lg font-semibold w-full sm:w-auto">
-                        Save Shop Settings
-                    </button>
-                </div>
-            </form>
 
-            <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4">Discount Settings</h2>
-            <form id="discountSettingsForm" class="space-y-6">
+                <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4">Discount Settings</h2>
                 <div>
                     <label for="minSubtotalForDiscount" class="block text-sm font-medium text-gray-700">Minimum Subtotal for Discount (₹)</label>
-                    <input type="number" id="minSubtotalForDiscount" name="minSubtotalForDiscount" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <input type="number" id="minSubtotalForDiscount" name="minSubtotalForDiscount" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
                 </div>
                 <div>
                     <label for="discountPercentage" class="block text-sm font-medium text-gray-700">Discount Percentage (0-1, e.g., 0.1 for 10%)</label>
-                    <input type="number" id="discountPercentage" name="discountPercentage" step="0.01" min="0" max="1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <input type="number" id="discountPercentage" name="discountPercentage" step="0.01" min="0" max="1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
                 </div>
                 <div class="flex items-center">
                     <input type="checkbox" id="isDiscountEnabled" name="isDiscountEnabled" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
@@ -383,7 +378,7 @@
                 </div>
                 <div class="pt-4">
                     <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 ease-in-out text-lg font-semibold w-full sm:w-auto">
-                        Save Discount Settings
+                        Save All Settings
                     </button>
                 </div>
             </form>
@@ -505,16 +500,16 @@
         // Customer Management Elements
         const customersTableBody = document.getElementById('customersTableBody');
 
-        // Shop Settings Elements
+        // Shop Settings Elements (Consolidated)
         const shopSettingsForm = document.getElementById('shopSettingsForm');
         const shopNameInput = document.getElementById('shopName');
         const shopLatitudeInput = document.getElementById('shopLatitude');
         const shopLongitudeInput = document.getElementById('shopLongitude');
+        const notificationDaysInput = document.getElementById('notificationDays'); // NEW
         const deliveryRatesContainer = document.getElementById('deliveryRatesContainer');
         const addDeliveryRateButton = document.getElementById('addDeliveryRate');
 
-        // Discount Settings Elements
-        const discountSettingsForm = document.getElementById('discountSettingsForm');
+        // Discount Settings Elements (now part of shopSettingsForm)
         const minSubtotalForDiscountInput = document.getElementById('minSubtotalForDiscount');
         const discountPercentageInput = document.getElementById('discountPercentage');
         const isDiscountEnabledCheckbox = document.getElementById('isDiscountEnabled');
@@ -576,9 +571,31 @@
 
         // Modified showSection to scroll instead of hide/show
         function showSection(sectionId) {
+            // Hide all sections first
+            dashboardSections.forEach(section => {
+                section.style.display = 'none';
+            });
+
             const targetSection = document.getElementById(sectionId);
             if (targetSection) {
-                targetSection.scrollIntoView({ behavior: 'smooth' });
+                targetSection.style.display = 'block'; // Show the selected section
+                targetSection.scrollIntoView({ behavior: 'smooth' }); // Scroll to it
+
+                // Special handling for sections that need data loaded
+                if (sectionId === 'botStatus') {
+                    fetchBotStatus();
+                } else if (sectionId === 'menuManagement') {
+                    fetchMenuItems();
+                } else if (sectionId === 'orderManagement') {
+                    fetchOrders();
+                } else if (sectionId === 'customerManagement') {
+                    fetchCustomers();
+                } else if (sectionId === 'settings') {
+                    fetchSettings(); // Load all settings
+                } else if (sectionId === 'twoFactorAuth') {
+                    fetch2FAStatus();
+                }
+                // whatsappLogs doesn't need specific fetch, it's real-time
             }
 
             navLinks.forEach(link => {
@@ -711,7 +728,6 @@
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 showSection(link.dataset.section);
-                // Data loading is now handled on initial DOMContentLoaded for all visible sections
             });
         });
 
@@ -775,9 +791,7 @@
 
         viewNewOrderBtn.addEventListener('click', () => {
             closeModalById('newOrderAlertModal');
-            // In a real app, you might scroll to the new order or highlight it
             showSection('orderManagement'); // Navigate to order management
-            // The fetchOrders() in new_order listener already refreshes the table
         });
 
         socket.on('whatsapp_log', (message) => {
@@ -1273,7 +1287,20 @@
                     shopNameInput.value = settings.shopName || '';
                     shopLatitudeInput.value = settings.shopLocation ? settings.shopLocation.latitude : '';
                     shopLongitudeInput.value = settings.shopLocation ? settings.shopLocation.longitude : '';
-                    renderDeliveryRates(settings.deliveryRates || []);
+                    notificationDaysInput.value = settings.notificationDays || 7; // NEW: Populate notificationDays
+
+                    // Populate Delivery Rates
+                    deliveryRatesContainer.innerHTML = ''; // Clear existing rows
+                    if (settings.deliveryRates && settings.deliveryRates.length > 0) {
+                        settings.deliveryRates.forEach(rate => addDeliveryRateRow(rate.kms, rate.amount));
+                    } else {
+                        addDeliveryRateRow(); // Add an empty row if no rates exist
+                    }
+
+                    // Populate Discount Settings
+                    minSubtotalForDiscountInput.value = settings.minSubtotalForDiscount || 0;
+                    discountPercentageInput.value = settings.discountPercentage || 0;
+                    isDiscountEnabledCheckbox.checked = settings.isDiscountEnabled || false;
                 }
             } catch (error) {
                 console.error('Error fetching settings:', error);
@@ -1282,144 +1309,110 @@
             }
         }
 
-        function renderDeliveryRates(rates) {
-            deliveryRatesContainer.innerHTML = '';
-            // Ensure there's at least one empty row if no rates exist
-            if (rates.length === 0) {
-                rates.push({ rangeStart: '', rangeEnd: '', amount: '' });
-            }
-            rates.forEach((rate) => {
-                const div = document.createElement('div');
-                div.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center';
-                div.innerHTML = `
-                    <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-start" placeholder="Start KM" value="${rate.rangeStart !== undefined ? rate.rangeStart : ''}" step="0.1">
-                    <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-end" placeholder="End KM" value="${rate.rangeEnd !== undefined ? rate.rangeEnd : ''}" step="0.1">
-                    <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" value="${rate.amount !== undefined ? rate.amount : ''}" step="0.01">
-                    <button type="button" class="remove-delivery-rate text-red-600 hover:text-red-800 px-2 py-1 rounded-md" title="Remove Rate">
-                        <i class="fas fa-minus-circle"></i>
-                    </button>
-                `;
-                deliveryRatesContainer.appendChild(div);
-            });
-            addDeliveryRateEventListeners();
-        }
-
-        function addDeliveryRateEventListeners() {
-            document.querySelectorAll('.remove-delivery-rate').forEach(button => {
-                button.onclick = (e) => {
-                    if (deliveryRatesContainer.children.length > 1) { // Don't remove the last one
-                        e.target.closest('.flex').remove();
-                    } else {
-                        showCustomAlert('You must have at least one delivery rate.', 'Cannot Remove Last Rate');
-                    }
-                };
-            });
-        }
-
-        addDeliveryRateButton.addEventListener('click', () => {
-            const newRateDiv = document.createElement('div');
-            newRateDiv.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center';
-            newRateDiv.innerHTML = `
-                <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-start" placeholder="Start KM" step="0.1">
-                <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-end" placeholder="End KM" step="0.1">
-                <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" step="0.01">
+        function addDeliveryRateRow(kms = '', amount = '') {
+            const div = document.createElement('div');
+            div.className = 'flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 items-center';
+            div.innerHTML = `
+                <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-range-start" placeholder="Start KM" value="${kms}" step="0.1" required>
+                <input type="number" class="block w-full sm:w-1/3 px-3 py-2 border border-gray-300 rounded-md delivery-amount" placeholder="Amount (₹)" value="${amount}" step="0.01" required>
                 <button type="button" class="remove-delivery-rate text-red-600 hover:text-red-800 px-2 py-1 rounded-md" title="Remove Rate">
                     <i class="fas fa-minus-circle"></i>
                 </button>
             `;
-            deliveryRatesContainer.appendChild(newRateDiv);
-            addDeliveryRateEventListeners(); // Re-add listeners for new buttons
-        });
+            deliveryRatesContainer.appendChild(div);
+            // Add event listener to the newly created remove button
+            div.querySelector('.remove-delivery-rate').addEventListener('click', (e) => {
+                if (deliveryRatesContainer.children.length > 1) { // Don't remove the last one
+                    e.target.closest('.flex').remove();
+                } else {
+                    showCustomAlert('You must have at least one delivery rate.', 'Cannot Remove Last Rate');
+                }
+            });
+        }
+
+        addDeliveryRateButton.addEventListener('click', () => addDeliveryRateRow());
 
         shopSettingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const shopName = shopNameInput.value;
+
+            const shopName = shopNameInput.value.trim();
             const latitude = parseFloat(shopLatitudeInput.value);
             const longitude = parseFloat(shopLongitudeInput.value);
-            
-            const deliveryRates = [];
-            let isValidRates = true;
-            Array.from(deliveryRatesContainer.children).forEach(div => {
-                const start = parseFloat(div.querySelector('.delivery-range-start').value);
-                const end = parseFloat(div.querySelector('.delivery-range-end').value);
-                const amount = parseFloat(div.querySelector('.delivery-amount').value);
+            const notificationDays = parseInt(notificationDaysInput.value, 10); // NEW
 
-                if (isNaN(start) || isNaN(end) || isNaN(amount) || start < 0 || end < 0 || amount < 0 || start >= end) {
-                    isValidRates = false;
-                    return;
-                }
-                deliveryRates.push({ rangeStart: start, rangeEnd: end, amount });
-            });
-
-            if (!isValidRates) {
-                showCustomAlert('Please ensure all delivery rate ranges and amounts are valid (Start KM < End KM, all values non-negative).', 'Invalid Delivery Rates');
+            // Basic validation for shop settings
+            if (!shopName) {
+                showCustomAlert('Shop Name is required.', 'Validation Error');
+                return;
+            }
+            if (isNaN(latitude) || isNaN(longitude)) {
+                showCustomAlert('Shop Latitude and Longitude must be valid numbers.', 'Validation Error');
+                return;
+            }
+            if (isNaN(notificationDays) || notificationDays < 1) { // NEW
+                showCustomAlert('Re-order Notification Days must be a positive number.', 'Validation Error');
                 return;
             }
 
+
+            const deliveryRates = [];
+            let isValidRates = true;
+            Array.from(deliveryRatesContainer.children).forEach(div => {
+                const startInput = div.querySelector('.delivery-range-start'); // Note: Your HTML has .delivery-range-start/.delivery-range-end but JS only uses .delivery-range-start
+                const amountInput = div.querySelector('.delivery-amount');
+
+                // Assuming 'start' is the 'kms' value as per backend schema
+                const kms = parseFloat(startInput.value);
+                const amount = parseFloat(amountInput.value);
+
+                // Frontend validation for delivery rates
+                if (isNaN(kms) || kms < 0 || isNaN(amount) || amount < 0) {
+                    isValidRates = false;
+                    return; // Exit forEach early
+                }
+                deliveryRates.push({ kms: kms, amount: amount }); // Ensure 'kms' is the key for backend
+            });
+
+            if (!isValidRates) {
+                showCustomAlert('Please ensure all delivery rate KMs and Amounts are valid non-negative numbers.', 'Invalid Delivery Rates');
+                return;
+            }
+
+            // Discount Settings Validation
+            const minSubtotalForDiscount = parseFloat(minSubtotalForDiscountInput.value);
+            const discountPercentage = parseFloat(discountPercentageInput.value);
+            const isDiscountEnabled = isDiscountEnabledCheckbox.checked;
+
+            if (isNaN(minSubtotalForDiscount) || minSubtotalForDiscount < 0) {
+                showCustomAlert('Minimum Subtotal for Discount must be a non-negative number.', 'Validation Error');
+                return;
+            }
+            if (isNaN(discountPercentage) || discountPercentage < 0 || discountPercentage > 1) {
+                showCustomAlert('Discount Percentage must be a number between 0 and 1 (e.g., 0.1 for 10%).', 'Validation Error');
+                return;
+            }
+
+            const settingsPayload = {
+                shopName: shopName,
+                shopLocation: { latitude: latitude, longitude: longitude },
+                notificationDays: notificationDays, // NEW
+                deliveryRates: deliveryRates,
+                minSubtotalForDiscount: minSubtotalForDiscount,
+                discountPercentage: discountPercentage,
+                isDiscountEnabled: isDiscountEnabled
+            };
+
             try {
-                await fetchData(`${API_BASE_URL}/api/admin/settings`, {
+                const data = await fetchData(`${API_BASE_URL}/api/admin/settings`, {
                     method: 'PUT',
-                    body: JSON.stringify({
-                        shopName,
-                        shopLocation: { latitude, longitude },
-                        deliveryRates
-                    })
+                    body: JSON.stringify(settingsPayload)
                 });
                 appendLog('Shop settings updated successfully.');
                 showCustomAlert('Shop settings updated successfully!', 'Success');
             } catch (error) {
                 console.error('Error updating shop settings:', error);
                 appendLog(`Error updating shop settings: ${error.message}`);
-                showCustomAlert(`Error updating shop settings: ${error.message}`, 'Update Failed');
-            }
-        });
-
-        // Discount Settings
-        async function fetchDiscountSettings() {
-            try {
-                const settings = await fetchData(`${API_BASE_URL}/api/admin/discount-settings`);
-                if (settings) {
-                    minSubtotalForDiscountInput.value = settings.minSubtotalForDiscount || 0;
-                    discountPercentageInput.value = settings.discountPercentage || 0;
-                    isDiscountEnabledCheckbox.checked = settings.isDiscountEnabled || false;
-                }
-            } catch (error) {
-                console.error('Error fetching discount settings:', error);
-                appendLog(`Error fetching discount settings: ${error.message}`);
-                showCustomAlert(`Failed to fetch discount settings: ${error.message}`, 'Settings Error');
-            }
-        }
-
-        discountSettingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const minSubtotalForDiscount = parseFloat(minSubtotalForDiscountInput.value);
-            const discountPercentage = parseFloat(discountPercentageInput.value);
-            const isDiscountEnabled = isDiscountEnabledCheckbox.checked;
-
-            if (isNaN(minSubtotalForDiscount) || minSubtotalForDiscount < 0) {
-                showCustomAlert('Minimum Subtotal for Discount must be a non-negative number.', 'Invalid Input');
-                return;
-            }
-            if (isNaN(discountPercentage) || discountPercentage < 0 || discountPercentage > 1) {
-                showCustomAlert('Discount Percentage must be a number between 0 and 1.', 'Invalid Input');
-                return;
-            }
-
-            try {
-                await fetchData(`${API_BASE_URL}/api/admin/discount-settings`, {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        minSubtotalForDiscount,
-                        discountPercentage,
-                        isDiscountEnabled
-                    })
-                });
-                appendLog('Discount settings updated successfully.');
-                showCustomAlert('Discount settings updated successfully!', 'Success');
-            } catch (error) {
-                console.error('Error updating discount settings:', error);
-                appendLog(`Error updating discount settings: ${error.message}`);
-                showCustomAlert(`Error updating discount settings: ${error.message}`, 'Update Failed');
+                showCustomAlert(`Failed to update shop settings: ${error.message}`, 'Update Failed');
             }
         });
 
@@ -1519,16 +1512,16 @@
 
         // --- Initial Load ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Fetch data for all sections on initial load
-            fetchBotStatus();
-            fetchMenuItems();
-            fetchOrders();
-            fetchCustomers();
-            fetchSettings(); // This also calls fetchDiscountSettings internally
-            fetch2FAStatus();
+            // Hide all sections initially
+            dashboardSections.forEach(section => {
+                section.style.display = 'none';
+            });
 
-            // Highlight the first nav link by default
-            navLinks[0].classList.add('bg-gray-700');
+            // Determine the initial section to show (e.g., 'botStatus' or 'orderManagement')
+            const initialSectionId = 'botStatus'; // You can change this to any section ID
+
+            // Show the initial section and load its data
+            showSection(initialSectionId);
 
             // Initial state for mobile sidebar
             if (window.innerWidth < 768) {
@@ -1538,4 +1531,3 @@
     </script>
 </body>
 </html>
-
