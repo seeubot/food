@@ -3,7 +3,6 @@ const http = require('http');
 const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const qrcode = require('qrcode');
-// Removed MongoStore import as it's from a separate package
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const path = require('path');
 const bcrypt = require('bcryptjs');
@@ -21,7 +20,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: "http://localhost:3000", // Ensure this matches your frontend URL in production too
         methods: ["GET", "POST"]
     }
 });
@@ -30,10 +29,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_replace_me_in_production';
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_replace_me_in_production'; // IMPORTANT: Change this in production!
 
 const DEFAULT_ADMIN_USERNAME = 'dashboard_admin';
-const DEFAULT_ADMIN_PASSWORD = 'password123';
+const DEFAULT_ADMIN_PASSWORD = 'password123'; // IMPORTANT: Change this password after first login!
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -41,7 +40,7 @@ mongoose.connect(process.env.MONGODB_URI, {
     useUnifiedTopology: true,
 })
 .then(() => {
-    console.log('MongoDB connected');
+    console.log('MongoDB connected successfully.');
     // Seed default menu items after successful connection
     seedMenuItems();
 })
@@ -51,7 +50,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 const ItemSchema = new mongoose.Schema({
     name: { type: String, required: true },
     description: String,
-    price: { type: Number, required: true },
+    price: { type: Number, required: true, min: 0 }, // Added min: 0 for price validation
     imageUrl: String,
     category: String,
     isAvailable: { type: Boolean, default: true },
@@ -72,16 +71,16 @@ const OrderSchema = new mongoose.Schema({
         itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
         name: String,
         price: Number,
-        quantity: { type: Number, required: true }
+        quantity: { type: Number, required: true, min: 1 } // Added min: 1 for quantity validation
     }],
-    totalAmount: { type: Number, required: true },
-    subtotal: { type: Number, default: 0 },
-    transportTax: { type: Number, default: 0 },
-    discountAmount: { type: Number, default: 0 },
+    totalAmount: { type: Number, required: true, min: 0 },
+    subtotal: { type: Number, default: 0, min: 0 },
+    transportTax: { type: Number, default: 0, min: 0 },
+    discountAmount: { type: Number, default: 0, min: 0 },
     orderDate: { type: Date, default: Date.now, index: true },
     status: { type: String, default: 'Pending', enum: ['Pending', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'] },
     paymentMethod: { type: String, default: 'Cash on Delivery', enum: ['Cash on Delivery', 'Online Payment'] },
-    deliveryAddress: String,
+    deliveryAddress: { type: String, required: true }, // Made deliveryAddress required
     lastMessageTimestamp: { type: Date, default: Date.now },
     razorpayOrderId: { type: String, unique: true, sparse: true },
     razorpayPaymentId: { type: String, unique: true, sparse: true },
@@ -91,13 +90,13 @@ const CustomerSchema = new mongoose.Schema({
     customerPhone: { type: String, required: true, unique: true },
     customerName: String,
     totalOrders: { type: Number, default: 0 },
-    lastOrderDate: Date,
+    lastOrderDate: { type: Date, index: true }, // Added index for better query performance
     lastKnownLocation: {
         latitude: Number,
         longitude: Number,
         address: String
     },
-    lastNotificationSent: { type: Date }
+    lastNotificationSent: { type: Date, index: true } // Added index for better query performance
 });
 
 const AdminSchema = new mongoose.Schema({
@@ -113,24 +112,22 @@ const SettingsSchema = new mongoose.Schema({
         longitude: { type: Number, default: 78.4983 }
     },
     deliveryRates: [{
-        kms: { type: Number, required: true },
-        amount: { type: Number, required: true }
+        kms: { type: Number, required: true, min: 0 },
+        amount: { type: Number, required: true, min: 0 }
     }],
     whatsappStatus: { type: String, default: 'disconnected', enum: ['disconnected', 'qr_received', 'authenticated', 'ready', 'auth_failure', 'initializing', 'qr_error'] },
     lastAuthenticatedAt: Date,
-    minSubtotalForDiscount: { type: Number, default: 200 },
-    discountPercentage: { type: Number, default: 0.20 },
-    isDiscountEnabled: { type: Boolean, default: true }
+    minSubtotalForDiscount: { type: Number, default: 200, min: 0 },
+    discountPercentage: { type: Number, default: 0.20, min: 0, max: 1 }, // Ensure percentage is between 0 and 1
+    isDiscountEnabled: { type: Boolean, default: true },
+    notificationDays: { type: Number, default: 7, min: 1 } // New: Number of days for re-order notification inactivity
 });
-
-// Removed WhatsappSessionSchema as it's not directly used by LocalAuth
 
 const Item = mongoose.model('Item', ItemSchema);
 const Order = mongoose.model('Order', OrderSchema);
 const Customer = mongoose.model('Customer', CustomerSchema);
 const Admin = mongoose.model('Admin', AdminSchema);
 const Settings = mongoose.model('Settings', SettingsSchema);
-// Removed WhatsappSession model
 
 // --- Utility Functions for Custom IDs ---
 function generateCustomOrderId() {
@@ -143,7 +140,7 @@ async function generateUniquePinId() {
     let pin;
     let isUnique = false;
     while (!isUnique) {
-        pin = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+        pin = Math.floor(1000000000 + Math.random() * 9000000000).toString(); // 10-digit number
         const existingOrder = await Order.findOne({ pinId: pin });
         if (!existingOrder) {
             isUnique = true;
@@ -227,9 +224,8 @@ const MAX_INITIALIZATION_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 10000;
 const QR_EXPIRY_TIME_MS = 300000; // 5 minutes
 
-// Define the client ID for the WhatsApp session stored in MongoDB
+// Define the client ID for the WhatsApp session stored in local files
 const WHATSAPP_CLIENT_ID = 'admin';
-
 const SESSION_PATH = path.join(__dirname, '.wwebjs_auth');
 
 /**
@@ -309,7 +305,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         },
         webVersionCache: {
             type: 'remote',
-            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html', // Keep this updated if issues arise
         },
     });
 
@@ -331,23 +327,23 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'qr_error' }, { upsert: true });
                 io.emit('status', 'qr_error');
                 isInitializing = false;
-                initializeWhatsappClient(true);
+                initializeWhatsappClient(true); // Force new session on QR expiry
             }
         }, QR_EXPIRY_TIME_MS);
-        currentInitializationAttempt = 0;
+        currentInitializationAttempt = 0; // Reset attempts on successful QR reception
     });
 
     client.on('authenticated', async (session) => {
         console.log('[WhatsApp] AUTHENTICATED');
         io.emit('whatsapp_log', 'Authenticated successfully! Your bot is almost ready. ✅');
-        whatsappReady = false;
+        whatsappReady = false; // Not ready until 'ready' event
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'authenticated', lastAuthenticatedAt: new Date() }, { upsert: true });
         io.emit('status', 'authenticated');
         io.emit('sessionInfo', { lastAuthenticatedAt: new Date() });
-        qrCodeData = null;
+        qrCodeData = null; // Clear QR data once authenticated
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
-        currentInitializationAttempt = 0;
+        currentInitializationAttempt = 0; // Reset attempts on successful authentication
     });
 
     client.on('ready', async () => {
@@ -358,8 +354,8 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('status', 'ready');
         const settings = await Settings.findOne({});
         io.emit('sessionInfo', { lastAuthenticatedAt: settings ? settings.lastAuthenticatedAt : null });
-        isInitializing = false;
-        currentInitializationAttempt = 0;
+        isInitializing = false; // Initialization complete
+        currentInitializationAttempt = 0; // Reset attempts on ready
     });
 
     client.on('auth_failure', async msg => {
@@ -372,9 +368,9 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
         console.log('[WhatsApp] Reinitializing client due to auth_failure (forcing new session)...');
-        isInitializing = false;
-        client = null;
-        initializeWhatsappClient(true);
+        isInitializing = false; // Allow new initialization
+        client = null; // Clear client instance
+        initializeWhatsappClient(true); // Force a new session on auth failure
     });
 
     client.on('disconnected', async (reason) => {
@@ -387,8 +383,8 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
-        isInitializing = false;
-        client = null;
+        isInitializing = false; // Allow new initialization
+        client = null; // Clear client instance
 
         if (reason === 'LOGOUT' || reason === 'PRIMARY_UNAVAILABLE' || reason === 'UNEXPECTED_LOGOUT') {
              console.log('[WhatsApp] Reinitializing client due to critical disconnection (forcing new session)...');
@@ -404,7 +400,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 io.emit('whatsapp_log', 'Max reconnection attempts reached. Please check the bot status and try "Load New Session". ⚠️');
                 await Settings.findOneAndUpdate({}, { whatsappStatus: 'disconnected' }, { upsert: true });
                 io.emit('status', 'disconnected');
-                currentInitializationAttempt = 0;
+                currentInitializationAttempt = 0; // Reset attempts after reaching max
             }
         }
     });
@@ -447,10 +443,10 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                     console.log(`[WhatsApp Message Handler] Successfully created new customer: ${customerPhone}`);
                     io.emit('whatsapp_log', `Successfully created new customer: ${customerPhone}`);
                 } catch (saveError) {
-                    if (saveError.code === 11000) {
-                        console.warn(`[WhatsApp Message Handler] Duplicate key error during customer creation for ${customerPhone}. Key Pattern: ${JSON.stringify(saveError.keyPattern)}, Key Value: ${JSON.stringify(saveError.keyValue)}`);
+                    if (saveError.code === 11000) { // Duplicate key error
+                        console.warn(`[WhatsApp Message Handler] Duplicate key error during customer creation for ${customerPhone}. Retrying find.`);
                         io.emit('whatsapp_log', `Duplicate customer found for ${customerPhone}. Attempting update.`);
-                        customer = await Customer.findOne({ customerPhone: customerPhone });
+                        customer = await Customer.findOne({ customerPhone: customerPhone }); // Try finding it again
                         if (customer) {
                             if (customerName && customer.customerName !== customerName) {
                                 customer.customerName = customerName;
@@ -480,6 +476,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
 
             if (msg.hasMedia && msg.type === 'location' && msg.location) {
                 console.log(`[WhatsApp Message Handler] Received location from ${customerPhone}. Updating customer record.`);
+                // Use findOneAndUpdate with upsert:true might be redundant if customer is already found, but safer.
                 await Customer.findOneAndUpdate(
                     { customerPhone: customerPhone },
                     {
@@ -496,7 +493,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 await client.sendMessage(rawChatId, 'Location updated. Thank you! We\'ll use this for your next delivery. 📍');
                 console.log(`[WhatsApp Message Handler] Sent location confirmation to ${customerPhone}`);
                 io.emit('whatsapp_log', `Sent location confirmation to ${customerPhone}`);
-                return;
+                return; // Stop processing further if it's a location message
             }
 
             console.log(`[WhatsApp Message Handler] Processing text: '${text}' from ${customerPhone}`);
@@ -535,14 +532,15 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                 case 'cod':
                 case 'cash on delivery':
                     console.log(`[WhatsApp Message Handler] Processing COD for ${customerPhone}`);
+                    // Find the latest pending order for this customer
                     const pendingOrderCod = await Order.findOneAndUpdate(
                         { customerPhone: customerPhone, status: 'Pending' },
                         { $set: { paymentMethod: 'Cash on Delivery', status: 'Confirmed' } },
-                        { new: true, sort: { orderDate: -1 } }
+                        { new: true, sort: { orderDate: -1 } } // Sort to get the most recent pending order
                     );
                     if (pendingOrderCod) {
                         await client.sendMessage(rawChatId, 'Great choice! Your order is now confirmed for Cash on Delivery. We\'re preparing it with love! 😊');
-                        io.emit('new_order', pendingOrderCod);
+                        io.emit('new_order', pendingOrderCod); // Notify dashboard of status change
                         console.log(`[WhatsApp Message Handler] Order ${pendingOrderCod.customOrderId} confirmed for COD.`);
                         io.emit('whatsapp_log', `Order ${pendingOrderCod.customOrderId} confirmed for COD.`);
                     } else {
@@ -558,6 +556,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                     break;
                 default:
                     console.log(`[WhatsApp Message Handler] Checking for PIN or pending order for ${customerPhone}.`);
+                    // Check if it's a 10-digit number (potential PIN)
                     if (text.length === 10 && !isNaN(text) && !text.startsWith('0')) {
                         console.log(`[WhatsApp Message Handler] Attempting to track order by PIN: ${text} for ${customerPhone}`);
                         const orderToTrack = await Order.findOne({ pinId: text });
@@ -565,28 +564,25 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
                             await client.sendMessage(rawChatId, `🔍 *Order Status Update*\n\nYour Order ID: ${orderToTrack.customOrderId}\nYour Unique PIN: ${orderToTrack.pinId}\n\nCurrent Status: *${orderToTrack.status}*\nTotal Amount: ₹${orderToTrack.totalAmount.toFixed(2)}\n\nItems: ${orderToTrack.items.map(item => `${item.name} x ${item.quantity}`).join(', ')}\n\nWe'll keep you posted!`);
                             console.log(`[WhatsApp Message Handler] Order ${orderToTrack.customOrderId} found for PIN ${text}.`);
                             io.emit('whatsapp_log', `Order ${orderToTrack.customOrderId} found for PIN ${text}.`);
-                            return;
+                            return; // Stop processing after tracking order
                         }
                     }
 
+                    // Handle address capture for a very recent pending order
                     const lastOrderInteraction = await Order.findOne({ customerPhone: customerPhone }).sort({ orderDate: -1 });
 
-                    if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 5 && lastOrderInteraction.status === 'Pending') {
-                        if (!lastOrderInteraction.deliveryAddress || lastOrderInteraction.deliveryAddress === 'Address not yet provided.') {
-                            console.log(`[WhatsApp Message Handler] Capturing delivery address for pending order for ${customerPhone}.`);
-                            await Order.findOneAndUpdate(
-                                { _id: lastOrderInteraction._id },
-                                { $set: { deliveryAddress: msg.body } },
-                                { new: true }
-                            );
-                            await client.sendMessage(rawChatId, 'Got it! Your address is saved. Now, how would you like to pay? Reply with \'Cash on Delivery\' (COD) or \'Online Payment\' (OP). 💰');
-                            console.log(`[WhatsApp Message Handler] Saved address and prompted for payment for ${customerPhone}.`);
-                        } else {
-                            console.log(`[WhatsApp Message Handler] Unrecognized input from ${customerPhone} (has pending order with address).`);
-                            await client.sendMessage(rawChatId, 'Oops! I didn\'t quite get that. Please use our web menu to order: https://jar-menu.vercel.app or type "Hi" for options. 🤷‍♀️');
-                        }
+                    // Check if there's a recent pending order that needs an address
+                    if (lastOrderInteraction && moment().diff(moment(lastOrderInteraction.orderDate), 'minutes') < 15 && lastOrderInteraction.status === 'Pending' && (lastOrderInteraction.deliveryAddress === 'Address not yet provided.' || !lastOrderInteraction.deliveryAddress)) {
+                        console.log(`[WhatsApp Message Handler] Capturing delivery address for pending order for ${customerPhone}.`);
+                        await Order.findOneAndUpdate(
+                            { _id: lastOrderInteraction._id },
+                            { $set: { deliveryAddress: msg.body } },
+                            { new: true }
+                        );
+                        await client.sendMessage(rawChatId, 'Got it! Your address is saved. Now, how would you like to pay? Reply with \'Cash on Delivery\' (COD) or \'Online Payment\' (OP). 💰');
+                        console.log(`[WhatsApp Message Handler] Saved address and prompted for payment for ${customerPhone}.`);
                     } else {
-                        console.log(`[WhatsApp Message Handler] Unrecognized input from ${customerPhone} (no recent pending order).`);
+                        console.log(`[WhatsApp Message Handler] Unrecognized input from ${customerPhone}. No recent pending order or address already provided.`);
                         await client.sendMessage(rawChatId, 'Oops! I didn\'t quite get that. Please use our web menu to order: https://jar-menu.vercel.app or type "Hi" for options. 🤷‍♀️');
                     }
                     break;
@@ -616,12 +612,12 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
         io.emit('qrCode', null);
         if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
 
-        client = null;
+        client = null; // Clear client instance on initialization error
 
         if (currentInitializationAttempt < MAX_INITIALIZATION_ATTEMPTS) {
             console.log(`[WhatsApp] Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
             io.emit('whatsapp_log', `Retrying initialization in ${RETRY_DELAY_MS / 1000} seconds...`);
-            isInitializing = false;
+            isInitializing = false; // Allow next attempt
             setTimeout(() => initializeWhatsappClient(false), RETRY_DELAY_MS);
         } else {
             console.error('[WhatsApp] Max initialization attempts reached. WhatsApp client failed to initialize.');
@@ -640,7 +636,7 @@ const initializeWhatsappClient = async (forceNewSession = false) => {
     if (!settings || settings.whatsappStatus === 'disconnected' || settings.whatsappStatus === 'auth_failure' || settings.whatsappStatus === 'qr_error') {
         console.log('[WhatsApp] Initial startup: No settings or disconnected/failed state. Forcing new session.');
         await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
-        initializeWhatsappClient(true); // Force a new session on initial startup if not connected
+        initializeWhatsappClient(true); // Force a new session on initial startup if not connected or failed
     } else {
         console.log('[WhatsApp] Initial startup: Attempting to load existing session.');
         initializeWhatsappClient(false); // Try to load existing session
@@ -672,7 +668,8 @@ const sendShopLocation = async (chatId) => {
     const settings = await Settings.findOne({});
     if (settings && settings.shopLocation && settings.shopLocation.latitude && settings.shopLocation.longitude) {
         const { latitude, longitude } = settings.shopLocation;
-        const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+        // Constructing Google Maps link with the correct format
+        const googleMapsLink = `http://maps.google.com/maps?q=${latitude},${longitude}`;
         try {
             await client.sendMessage(chatId, `📍 Find us here: ${googleMapsLink}\n\nWe're waiting to serve you delicious food!`);
             io.emit('whatsapp_log', `Sent shop location to ${chatId}`);
@@ -724,7 +721,8 @@ const sendCustomerOrders = async (chatId, customerPhone) => {
         }
         orderListMessage += `  Total: ₹${order.totalAmount.toFixed(2)}\n`;
         orderListMessage += `  Status: *${order.status}*\n`;
-        orderListMessage += `  Date: ${new Date(order.orderDate).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n`;
+        // Format date to Indian timezone
+        orderListMessage += `  Date: ${moment(order.orderDate).tz('Asia/Kolkata').format('DD-MM-YYYY HH:mm')}\n\n`;
     });
     orderListMessage += "To track any order, simply reply with its 10-digit PIN. Type 'Hi' for the main menu. ✨";
     try {
@@ -768,18 +766,22 @@ const sendReorderNotification = async () => {
         return;
     }
 
-    console.log('[Scheduler] Running 1-day re-order notification job...');
-    const oneDayAgo = moment().subtract(1, 'day').toDate();
-    const twoDaysAgo = moment().subtract(2, 'days').toDate();
-
     try {
+        const settings = await Settings.findOne({});
+        const notifyDays = settings ? settings.notificationDays : 7; // Default to 7 if not set
+
+        console.log(`[Scheduler] Running re-order notification job for customers who haven't ordered in ${notifyDays} days.`);
+
+        const minLastOrderDate = moment().subtract(notifyDays, 'days').toDate();
+        const minLastNotificationSent = moment().subtract(notifyDays, 'days').toDate(); // Notify if last notification was also older than X days
+
         const customersToNotify = await Customer.find({
-            totalOrders: { $gt: 0 },
+            totalOrders: { $gt: 0 }, // Only notify customers who have ordered at least once
+            lastOrderDate: { $lt: minLastOrderDate }, // Last order was *before* X days ago
             $or: [
-                { lastNotificationSent: { $exists: false } },
-                { lastNotificationSent: { $lt: oneDayAgo } }
-            ],
-            lastOrderDate: { $lt: twoDaysAgo }
+                { lastNotificationSent: { $exists: false } }, // Never sent a notification
+                { lastNotificationSent: { $lt: minLastNotificationSent } } // Last notification was more than X days ago
+            ]
         });
 
         console.log(`[Scheduler] Found ${customersToNotify.length} customers to notify.`);
@@ -800,10 +802,10 @@ const sendReorderNotification = async () => {
                 io.emit('whatsapp_log', `Failed to send re-order notification to ${customer.customerPhone}: ${msgSendError.message}`);
             }
         }
-        console.log('[Scheduler] 1-day re-order notification job finished.');
+        console.log('[Scheduler] Re-order notification job finished.');
 
     } catch (dbError) {
-        console.error('[Scheduler] Error in 1-day re-order notification job (DB query):', dbError);
+        console.error('[Scheduler] Error in re-order notification job (DB query):', dbError);
         io.emit('whatsapp_log', `Error in re-order notification job (DB query): ${dbError.message}`);
     }
 };
@@ -825,7 +827,7 @@ app.post('/admin/login', async (req, res) => {
     const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
 
     if (!admin) {
-        console.error('Admin user not found in database during login attempt.');
+        console.error('Admin user not found in database during login attempt. Please ensure default admin is seeded.');
         return res.status(500).json({ message: 'Admin user not configured. Please contact server administrator.' });
     }
 
@@ -857,6 +859,8 @@ app.post('/admin/login', async (req, res) => {
 
 
 app.get('/admin/logout', (req, res) => {
+    // For a stateless JWT system, logout is typically handled client-side by deleting the token.
+    // This endpoint is mostly for informational purposes or to clear client-side state.
     res.send('Logged out successfully');
 });
 
@@ -908,14 +912,15 @@ app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
             name: `DeliciousBites Admin (${admin.username})`,
             length: 20
         });
-        admin.currentTotpSecret = secret.base32; // Temporarily store in memory for verification
+        // We don't save this secret to DB yet, only return it for QR generation
+        // It will be saved upon successful verification in /api/admin/2fa/verify
 
         qrcode.toDataURL(secret.otpauth_url, (err, data_url) => {
             if (err) {
-                console.error('Error generating QR code:', err);
+                console.error('Error generating QR code for 2FA:', err);
                 return res.status(500).json({ message: 'Error generating QR code.' });
             }
-            res.json({ qrCodeUrl: data_url, secret: secret.base32 });
+            res.json({ qrCodeUrl: data_url, secret: secret.base32 }); // Return base32 secret for frontend to send back for verification
         });
 
     } catch (error) {
@@ -925,7 +930,7 @@ app.post('/api/admin/2fa/generate', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
-    const { totpCode, secret } = req.body;
+    const { totpCode, secret } = req.body; // Secret received from the generate step
     try {
         const admin = await Admin.findOne({ username: DEFAULT_ADMIN_USERNAME });
         if (!admin) {
@@ -940,14 +945,14 @@ app.post('/api/admin/2fa/verify', authenticateToken, async (req, res) => {
             secret: secret,
             encoding: 'base32',
             token: totpCode,
-            window: 1
+            window: 1 // Allows for token validity +/- 1 step (30 seconds)
         });
 
         if (!verified) {
             return res.status(401).json({ verified: false, message: 'Invalid 2FA code.' });
         }
 
-        admin.totpSecret = secret;
+        admin.totpSecret = secret; // Save the secret to the database
         await admin.save();
         res.json({ verified: true, message: '2FA successfully enabled.' });
     } catch (error) {
@@ -962,7 +967,7 @@ app.post('/api/admin/2fa/disable', authenticateToken, async (req, res) => {
         if (!admin) {
             return res.status(404).json({ message: 'Admin user not found.' });
         }
-        admin.totpSecret = null;
+        admin.totpSecret = null; // Remove the secret
         await admin.save();
         res.json({ message: 'Two-Factor Authentication disabled successfully.' });
     } catch (error) {
@@ -984,9 +989,10 @@ app.get('/api/admin/bot-status', authenticateToken, async (req, res) => {
 app.post('/api/admin/load-session', authenticateToken, async (req, res) => {
     console.log('[API] Admin requested to load/re-initialize session.');
     io.emit('whatsapp_log', 'Admin requested session re-initialization.');
+    // Set initializing status before calling the function
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
-    isInitializing = false;
+    isInitializing = false; // Reset flag to allow new initialization attempt
     // This attempts to load the existing session from local files
     initializeWhatsappClient(false);
     res.status(200).json({ message: 'Attempting to load existing session or generate QR.' });
@@ -995,9 +1001,10 @@ app.post('/api/admin/load-session', authenticateToken, async (req, res) => {
 app.post('/api/admin/force-new-session', authenticateToken, async (req, res) => {
     console.log('[API] Admin requested to force a new session.');
     io.emit('whatsapp_log', 'Admin requested to force a *new* session (deleting old data).');
+    // Set initializing status before calling the function
     await Settings.findOneAndUpdate({}, { whatsappStatus: 'initializing' }, { upsert: true });
     io.emit('status', 'initializing');
-    isInitializing = false;
+    isInitializing = false; // Reset flag to allow new initialization attempt
     // This forces a new session by deleting local session files
     initializeWhatsappClient(true);
     res.status(200).json({ message: 'Attempting to generate a new session/QR code.' });
@@ -1009,6 +1016,7 @@ app.get('/api/admin/menu', authenticateToken, async (req, res) => {
         const items = await Item.find({});
         res.json(items);
     } catch (error) {
+        console.error('Error fetching menu items for admin:', error);
         res.status(500).json({ message: 'Error fetching menu items', error: error.message });
     }
 });
@@ -1019,6 +1027,7 @@ app.get('/api/admin/menu/:id', authenticateToken, async (req, res) => {
         if (!item) return res.status(404).json({ message: 'Item not found' });
         res.json(item);
     } catch (error) {
+        console.error('Error fetching single menu item for admin:', error);
         res.status(500).json({ message: 'Error fetching menu item', error: error.message });
     }
 });
@@ -1029,6 +1038,7 @@ app.post('/api/admin/menu', authenticateToken, async (req, res) => {
         await newItem.save();
         res.status(201).json({ message: 'Menu item added successfully', item: newItem });
     } catch (error) {
+        console.error('Error adding new menu item:', error);
         res.status(400).json({ message: 'Error adding menu item', error: error.message });
     }
 });
@@ -1040,6 +1050,7 @@ app.put('/api/admin/menu/:id', authenticateToken, async (req, res) => {
         res.json({ message: 'Menu item updated successfully', item: updatedItem });
     }
     catch (error) {
+        console.error('Error updating menu item:', error);
         res.status(400).json({ message: 'Error updating menu item', error: error.message });
     }
 });
@@ -1050,6 +1061,7 @@ app.delete('/api/admin/menu/:id', authenticateToken, async (req, res) => {
         if (!deletedItem) return res.status(404).json({ message: 'Item not found' });
         res.json({ message: 'Menu item deleted successfully' });
     } catch (error) {
+        console.error('Error deleting menu item:', error);
         res.status(500).json({ message: 'Error deleting menu item', error: error.message });
     }
 });
@@ -1059,6 +1071,7 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
         const orders = await Order.find().sort({ orderDate: -1 });
         res.json(orders);
     } catch (error) {
+        console.error('Error fetching orders for admin:', error);
         res.status(500).json({ message: 'Error fetching orders', error: error.message });
     }
 });
@@ -1069,6 +1082,7 @@ app.get('/api/admin/orders/:id', authenticateToken, async (req, res) => {
         if (!order) return res.status(404).json({ message: 'Order not found' });
         res.json(order);
     } catch (error) {
+        console.error('Error fetching single order for admin:', error);
         res.status(500).json({ message: 'Error fetching order', error: error.message });
     }
 });
@@ -1115,6 +1129,7 @@ app.put('/api/admin/orders/:id', authenticateToken, async (req, res) => {
 
         res.json({ message: 'Order status updated successfully', order: updatedOrder });
     } catch (error) {
+        console.error('Error updating order status:', error);
         res.status(400).json({ message: 'Error updating order status', error: error.message });
     }
 });
@@ -1125,6 +1140,7 @@ app.delete('/api/admin/orders/:id', authenticateToken, async (req, res) => {
         if (!deletedOrder) return res.status(404).json({ message: 'Item not found' });
         res.json({ message: 'Order deleted successfully' });
     } catch (error) {
+        console.error('Error deleting order:', error);
         res.status(500).json({ message: 'Error deleting order', error: error.message });
     }
 });
@@ -1135,6 +1151,7 @@ app.get('/api/admin/customers', authenticateToken, async (req, res) => {
         res.json(customers);
     }
     catch (error) {
+        console.error('Error fetching customers for admin:', error);
         res.status(500).json({ message: 'Error fetching customers', error: error.message });
     }
 });
@@ -1148,6 +1165,7 @@ app.get('/api/admin/customers/:phone/latest-order', authenticateToken, async (re
         }
         res.json(latestOrder);
     } catch (error) {
+        console.error('Error fetching latest order for customer:', error);
         res.status(500).json({ message: 'Error fetching latest order', error: error.message });
     }
 });
@@ -1158,6 +1176,7 @@ app.delete('/api/admin/customers/:id', authenticateToken, async (req, res) => {
         if (!deletedCustomer) return res.status(404).json({ message: 'Customer not found' });
         res.json({ message: 'Customer deleted successfully' });
     } catch (error) {
+        console.error('Error deleting customer:', error);
         res.status(500).json({ message: 'Error deleting customer', error: error.message });
     }
 });
@@ -1166,22 +1185,34 @@ app.get('/api/admin/settings', authenticateToken, async (req, res) => {
     try {
         let settings = await Settings.findOne({});
         if (!settings) {
+            // If no settings exist, create default ones
             settings = new Settings();
             await settings.save();
+            console.log('Default settings created as no existing settings found.');
         }
         res.json(settings);
     } catch (error) {
+        console.error('Error fetching settings for admin:', error);
         res.status(500).json({ message: 'Error fetching settings', error: error.message });
     }
 });
 
 app.put('/api/admin/settings', authenticateToken, async (req, res) => {
     try {
+        // Log the incoming request body for debugging
+        console.log('Incoming settings update request body:', req.body);
         const updatedSettings = await Settings.findOneAndUpdate({}, req.body, { new: true, upsert: true, runValidators: true });
         res.json({ message: 'Settings updated successfully', settings: updatedSettings });
     }
     catch (error) {
-        res.status(400).json({ message: 'Error updating settings', error: error.message });
+        // Crucial for debugging the settings update error
+        console.error('Detailed Error updating settings:', error);
+        // This will often contain Mongoose validation errors
+        if (error.name === 'ValidationError') {
+            const errors = Object.keys(error.errors).map(key => error.errors[key].message);
+            return res.status(400).json({ message: 'Validation Error: ' + errors.join(', '), details: errors, error: error.message });
+        }
+        res.status(400).json({ message: 'Error updating shop settings: Error updating settings', error: error.message });
     }
 });
 
@@ -1189,6 +1220,7 @@ app.get('/api/admin/discount-settings', authenticateToken, async (req, res) => {
     try {
         const settings = await Settings.findOne({});
         if (!settings) {
+            // Return default values if no settings document exists yet
             return res.json({
                 minSubtotalForDiscount: 200,
                 discountPercentage: 0.20,
@@ -1217,6 +1249,7 @@ app.put('/api/admin/discount-settings', authenticateToken, async (req, res) => {
             return res.status(400).json({ message: 'minSubtotalForDiscount must be a non-negative number.' });
         }
 
+        // Percentage should be between 0 and 1
         if (typeof discountPercentage === 'number' && discountPercentage >= 0 && discountPercentage <= 1) {
             updateFields.discountPercentage = discountPercentage;
         } else if (typeof discountPercentage !== 'undefined') {
@@ -1241,6 +1274,10 @@ app.put('/api/admin/discount-settings', authenticateToken, async (req, res) => {
         res.json({ message: 'Discount settings updated successfully', settings: updatedSettings });
     } catch (error) {
         console.error('Error updating discount settings:', error);
+        if (error.name === 'ValidationError') {
+            const errors = Object.keys(error.errors).map(key => error.errors[key].message);
+            return res.status(400).json({ message: 'Validation Error: ' + errors.join(', '), details: errors, error: error.message });
+        }
         res.status(400).json({ message: 'Error updating discount settings', error: error.message });
     }
 });
@@ -1261,6 +1298,7 @@ app.get('/api/public/settings', async (req, res) => {
     try {
         const settings = await Settings.findOne();
         if (!settings) {
+            // Return default values if no settings document exists yet
             return res.json({
                 shopName: 'Delicious Bites',
                 shopLocation: { latitude: 17.4399, longitude: 78.4983 },
@@ -1288,31 +1326,44 @@ app.post('/api/order', async (req, res) => {
     try {
         const { items, customerName, customerPhone, deliveryAddress, customerLocation, subtotal, transportTax, discountAmount, totalAmount, paymentMethod } = req.body;
 
-        console.log('[API] /api/order received request body:', JSON.stringify(req.body, null, 2));
+        console.log('[API] /api/order received request body (partial):', { customerPhone, totalAmount, itemsCount: items ? items.length : 0 });
 
         if (!items || items.length === 0 || !customerName || !customerPhone || !deliveryAddress || !totalAmount) {
-            console.error('[API] /api/order: Missing required order details.');
+            console.error('[API] /api/order: Missing required order details. Body:', req.body);
             return res.status(400).json({ message: 'Missing required order details.' });
         }
 
         let cleanedCustomerPhone = customerPhone.trim().replace(/\D/g, '');
+        // Assuming Indian numbers, ensure 91 prefix if 10 digits
         if (cleanedCustomerPhone.length === 10 && !cleanedCustomerPhone.startsWith('91')) {
             cleanedCustomerPhone = '91' + cleanedCustomerPhone;
+            console.log(`[API] /api/order: Auto-prefixed 10-digit phone to ${cleanedCustomerPhone}`);
+        }
+        if (cleanedCustomerPhone.length < 10 || cleanedCustomerPhone.length > 15 || isNaN(cleanedCustomerPhone)) {
+             console.error(`[API] /api/order: Invalid cleaned phone number format: ${cleanedCustomerPhone}`);
+             return res.status(400).json({ message: 'Invalid phone number format provided.' });
         }
         const customerChatId = cleanedCustomerPhone + '@c.us';
 
-        if (typeof cleanedCustomerPhone !== 'string' || cleanedCustomerPhone === '') {
-            console.error('Invalid customerPhone received for order:', customerPhone);
-            return res.status(400).json({ message: 'Invalid phone number provided for customer.' });
-        }
+
         console.log(`[API] /api/order: Attempting to find/update customer with phone: '${cleanedCustomerPhone}'`);
 
         const itemDetails = [];
         for (const item of items) {
+            // Validate product ID and availability
+            if (!item.productId) {
+                console.error('[API] /api/order: Item in cart missing productId.');
+                return res.status(400).json({ message: 'One or more items in your cart are missing product IDs.' });
+            }
             const product = await Item.findById(item.productId);
             if (!product || !product.isAvailable) {
                 console.error(`[API] /api/order: Item ${item.name || item.productId} is not available or not found.`);
-                return res.status(400).json({ message: `Item ${item.name || item.productId} is not available.` });
+                return res.status(400).json({ message: `Item "${item.name || item.productId}" is not available or does not exist.` });
+            }
+            // Ensure quantity is positive
+            if (item.quantity <= 0) {
+                console.error(`[API] /api/order: Item ${item.name} has invalid quantity: ${item.quantity}.`);
+                return res.status(400).json({ message: `Quantity for item "${item.name}" must be at least 1.` });
             }
             itemDetails.push({
                 itemId: product._id,
@@ -1337,12 +1388,12 @@ app.post('/api/order', async (req, res) => {
             transportTax,
             discountAmount,
             totalAmount,
-            paymentMethod: 'Cash on Delivery',
+            paymentMethod: 'Cash on Delivery', // Hardcoded as per current logic
             status: 'Pending',
         });
 
         await newOrder.save();
-        console.log('[API] /api/order: Order saved successfully.', newOrder._id);
+        console.log('[API] /api/order: Order saved successfully with ID:', newOrder._id);
 
         try {
             await Customer.findOneAndUpdate(
@@ -1355,22 +1406,24 @@ app.post('/api/order', async (req, res) => {
                     },
                     $inc: { totalOrders: 1 }
                 },
-                { upsert: true, new: true }
+                { upsert: true, new: true } // Create if not exists, return updated/new doc
             );
             console.log('[API] /api/order: Customer updated/created successfully.');
         } catch (customerUpdateError) {
-            if (customerUpdateError.code === 11000 && customerUpdateError.keyPattern && customerUpdateError.keyPattern.customerPhone && customerUpdateError.keyValue && customerUpdateError.keyValue.customerPhone === null) {
-                console.error(`[API] /api/order: Duplicate key error (customerPhone: null) during customer update/creation. This indicates a pre-existing null phone entry in DB. Please clean your 'customers' collection: ${customerUpdateError.message}`);
-                return res.status(500).json({ message: 'Failed to update customer record due to a database conflict (duplicate null phone number). Please contact support.' });
+            // Handle specific duplicate key error for customerPhone=null if it happens
+            if (customerUpdateError.code === 11000 && customerUpdateError.keyPattern && customerUpdateError.keyPattern.customerPhone) {
+                console.error(`[API] /api/order: Duplicate key error during customer update/creation for phone '${cleanedCustomerPhone}'. This means an entry with this phone already exists and the unique index prevented an upsert or there's a null key issue: ${customerUpdateError.message}`);
+                // This scenario should ideally be handled by the findOneUpdate above, but good to catch.
             } else {
-                console.error('[API] /api/order: Error updating/creating customer:', customerUpdateError);
-                return res.status(500).json({ message: 'Failed to update customer record due to a server error.' });
+                console.error('[API] /api/order: Generic error updating/creating customer:', customerUpdateError);
             }
+            // Do not block order placement for a customer update error, but log it.
+            // Consider if customer update failure should block order in a production critical system.
         }
 
 
         if (whatsappReady && client) {
-            io.emit('new_order', newOrder);
+            io.emit('new_order', newOrder); // Emit to dashboard
 
             console.log(`[WhatsApp] Attempting to send order confirmation to customerChatId: ${customerChatId}`);
             try {
@@ -1402,11 +1455,16 @@ app.post('/api/order', async (req, res) => {
 
     } catch (err) {
         console.error('Error placing order:', err);
-        if (err.code === 11000 && err.keyPattern && err.keyPattern.customerPhone) {
-            res.status(409).json({ message: 'A customer with this phone number already exists or an internal data issue occurred. Please try again with a valid phone number.' });
-        } else {
-            res.status(500).json({ message: 'Failed to place order due to a server error.' });
+        // More specific error handling for validation errors from Mongoose
+        if (err.name === 'ValidationError') {
+            const errors = Object.keys(err.errors).map(key => err.errors[key].message);
+            return res.status(400).json({ message: 'Validation Error: ' + errors.join(', '), details: errors, error: err.message });
         }
+        // Handle unique constraint errors (e.g., customOrderId, pinId) if they somehow occur on save
+        if (err.code === 11000) {
+            return res.status(409).json({ message: 'Duplicate entry detected (e.g., order ID or PIN already exists). Please try again.', error: err.message });
+        }
+        res.status(500).json({ message: 'Failed to place order due to a server error.', error: err.message });
     }
 });
 
@@ -1415,12 +1473,15 @@ app.get('/api/order/:id', async (req, res) => {
         const queryId = req.params.id;
         let order;
 
+        // Try to find by customOrderId first
         if (queryId.startsWith('JAR')) {
             order = await Order.findOne({ customOrderId: queryId });
         }
+        // If not found by customOrderId, try by pinId (10-digit number)
         if (!order && queryId.length === 10 && !isNaN(queryId)) {
             order = await Order.findOne({ pinId: queryId });
         }
+        // If still not found, try by Mongoose ObjectId (if it matches the format)
         if (!order && mongoose.Types.ObjectId.isValid(queryId)) {
             order = await Order.findById(queryId);
         }
@@ -1441,13 +1502,13 @@ app.post('/api/public/request-qr', async (req, res) => {
     }
     console.log('[API] Public QR request received. Forcing new session initialization.');
     io.emit('whatsapp_log', 'Public QR request received. Forcing new session initialization.');
-    isInitializing = false;
+    isInitializing = false; // Reset flag to allow new initialization attempt
     initializeWhatsappClient(true);
     res.status(200).json({ message: 'Requesting new QR code. Check status page.' });
 });
 
 
-// --- URL Rewriting / Redirection for .html files ---
+// --- URL Rewriting / Redirection for .html files (for backward compatibility) ---
 app.get('/admin/dashboard.html', (req, res) => res.redirect(301, '/dashboard'));
 app.get('/admin_dashboard.html', (req, res) => res.redirect(301, '/dashboard'));
 app.get('/admin/login.html', (req, res) => res.redirect(301, '/admin/login'));
@@ -1471,6 +1532,7 @@ app.get('/menu', (req, res) => {
 app.get('/track', (req, res) => {
     const orderId = req.query.orderId;
     if (orderId) {
+        // Redirect to menu page with orderId as query param for tracking
         res.redirect(`/menu?orderId=${orderId}`);
     } else {
         res.redirect('/menu');
@@ -1482,11 +1544,10 @@ app.get('/status', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    res.redirect('/menu');
+    res.redirect('/menu'); // Default route redirects to public menu
 });
 
-app.get('/favicon.ico', (req, res) => res.status(204).end());
-
+app.get('/favicon.ico', (req, res) => res.status(204).end()); // Handle favicon requests
 
 // --- Serve other static assets (CSS, JS, images) ---
 app.use(express.static(path.join(__dirname, 'public')));
@@ -1494,7 +1555,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // --- Catch-all for undefined routes ---
 app.use((req, res) => {
     console.log(`Unhandled route: ${req.method} ${req.originalUrl}. Redirecting to /menu.`);
-    res.redirect('/menu');
+    res.redirect('/menu'); // Redirect any unhandled route to the public menu
 });
 
 
@@ -1507,10 +1568,11 @@ async function ensureDefaultAdminExists() {
             admin = new Admin({
                 username: DEFAULT_ADMIN_USERNAME,
                 password: hashedPassword,
-                totpSecret: null
+                totpSecret: null // Initially no 2FA
             });
             await admin.save();
             console.log(`Default admin user '${DEFAULT_ADMIN_USERNAME}' created with 2FA disabled.`);
+            console.warn(`IMPORTANT: Default Admin Password is '${DEFAULT_ADMIN_PASSWORD}'. CHANGE THIS IMMEDIATELY AFTER FIRST LOGIN from the dashboard for security.`);
         } else {
             console.log(`Default admin user '${DEFAULT_ADMIN_USERNAME}' already exists.`);
         }
@@ -1519,14 +1581,16 @@ async function ensureDefaultAdminExists() {
     }
 }
 
+// Ensure default admin exists only after MongoDB connection is established
 mongoose.connection.on('connected', () => {
     ensureDefaultAdminExists();
 });
 
 
-// Socket.io for real-time updates
+// Socket.io for real-time updates to dashboard
 io.on('connection', (socket) => {
     console.log('Admin dashboard connected via Socket.io');
+    // Send current status and QR code data on new connection
     Settings.findOne({}).then(settings => {
         if (settings) {
             socket.emit('status', settings.whatsappStatus);
@@ -1535,7 +1599,8 @@ io.on('connection', (socket) => {
                 socket.emit('qrCode', qrCodeData);
             }
         }
-    });
+    }).catch(err => console.error('Error fetching settings for new socket connection:', err));
+
 
     socket.on('disconnect', () => {
         console.log('Admin dashboard disconnected from Socket.io');
